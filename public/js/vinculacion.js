@@ -3,7 +3,7 @@
 
 async function renderVincular() {
   detenerPolling();
-  app.innerHTML = `<div class="loading">⏳ Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/vinculacion");
     pintarVincular(data.vinculacion);

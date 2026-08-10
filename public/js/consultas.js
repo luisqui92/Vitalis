@@ -109,7 +109,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
 // Requiere que el médico ya haya vinculado su celular hoy (ver vinculacion.js).
 async function renderNuevaConsultaRemota(pacienteId, pacienteNombre) {
   detenerPolling();
-  app.innerHTML = `<div class="loading">⏳ Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/vinculacion");
     pintarControlRemoto(data.vinculacion, pacienteId, pacienteNombre);
@@ -192,7 +192,7 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
 // pantalla se refresca sola cada 8s hasta que ambas terminan.
 async function renderDetalle(id, esRefrescoAutomatico) {
   detenerPolling();
-  if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading">⏳ Cargando...</div>`;
+  if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/consultas/" + id);
     const c = data.consulta;

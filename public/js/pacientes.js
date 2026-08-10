@@ -6,7 +6,7 @@ async function renderDashboard() {
   detenerPolling();
   headerSub.textContent = "Hola, " + (MEDICO_NOMBRE || "");
   btnLogout.style.display = "inline-block";
-  app.innerHTML = `<div class="loading">⏳ Cargando tus pacientes...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando tus pacientes...</div>`;
   try {
     const [dataPacientes, dataRecordatorios] = await Promise.all([
       api("/medico/pacientes"),
@@ -92,7 +92,7 @@ function renderNuevoPaciente() {
 // para no estar yendo y viniendo cada vez que querés ver otra cosa.
 async function renderPacienteDetalle(pacienteId, tabInicial) {
   detenerPolling();
-  app.innerHTML = `<div class="loading">⏳ Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/pacientes/" + pacienteId);
     pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabInicial || "consultas");

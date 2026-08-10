@@ -98,7 +98,7 @@ function wireTabRecetas(p, recetas) {
 // ─── VER/IMPRIMIR UNA RECETA ─────────────────────────────────────────────
 async function renderReceta(id) {
   detenerPolling();
-  app.innerHTML = `<div class="loading">⏳ Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/recetas/" + id);
     const { receta, paciente, medico } = data;

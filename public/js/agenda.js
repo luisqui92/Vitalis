@@ -6,7 +6,7 @@ const DIAS_SEMANA_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 async function renderAgenda() {
   detenerPolling();
-  app.innerHTML = `<div class="loading">⏳ Cargando agenda...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando agenda...</div>`;
   try {
     const [dataCitas, dataPacientes, dataWA] = await Promise.all([
       api("/medico/citas"),
@@ -148,7 +148,7 @@ function pintarAgenda(citas, pacientes, wa) {
 
 async function renderConfigHorario() {
   detenerPolling();
-  app.innerHTML = `<div class="loading">⏳ Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/horario");
     pintarConfigHorario(data.horario);
