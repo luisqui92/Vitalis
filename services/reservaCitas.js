@@ -5,7 +5,8 @@
 const { Medico, Paciente, Cita, SesionCitaWA } = require("../db/models");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
 const { crearEvento, eliminarEvento } = require("./googleCalendar");
-const { CONFIG } = require("../config");
+const { enrutarMensaje } = require("./asistenteWhatsapp");
+const { CONFIG, log } = require("../config");
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -56,8 +57,22 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
     case "pedir_motivo":
       return pedirMotivo(medicoPhone, numero, texto, sesion.datos, medico);
     default:
-      return iniciarReserva(medicoPhone, numero);
+      return manejarMensajeLibre(medicoPhone, numero, texto, medico);
   }
+}
+
+// Sin una conversación de reserva ya en curso: primero se fija si es una
+// pregunta general (responde con la info del consultorio) o si de verdad
+// quiere agendar — recién ahí arranca el flujo de horarios numerados.
+async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
+  try {
+    const { intencion, respuesta } = await enrutarMensaje(texto, medico.infoConsultorio, medico.nombre);
+    if (intencion === "cancelar") return iniciarCancelacion(medicoPhone, numero);
+    if (intencion === "pregunta" && respuesta) return respuesta;
+  } catch (e) {
+    log.error("[RESERVA_CITAS] enrutarMensaje falló, sigo con la reserva normal:", e.message);
+  }
+  return iniciarReserva(medicoPhone, numero);
 }
 
 async function iniciarReserva(medicoPhone, numero) {

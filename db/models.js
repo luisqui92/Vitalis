@@ -40,6 +40,10 @@ const medicoSchema = new mongoose.Schema({
   },
   duracionConsultaMinutos: { type: Number, default: 30 },
   googleCalendarId: { type: String, default: "" }, // ej: el gmail del médico, compartido con la cuenta de servicio
+  // Info libre del consultorio (horarios, precios, ubicación, políticas...)
+  // que el asistente de WhatsApp usa como única fuente para responder
+  // preguntas de pacientes — nunca inventa nada que no esté acá.
+  infoConsultorio: { type: String, default: "" },
 }, { timestamps: true });
 const Medico = mongoose.model("Medico", medicoSchema);
 

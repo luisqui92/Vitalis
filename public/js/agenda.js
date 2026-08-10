@@ -183,7 +183,11 @@ function pintarConfigHorario(horario) {
 
       <label>Calendario de Google (opcional)</label>
       <input id="cfgCalendarId" type="text" placeholder="tu-email@gmail.com" value="${esc(horario.googleCalendarId || "")}">
-      <div class="hint">Compartí ese calendario con la cuenta de servicio de Vitalis ("hacer cambios en eventos") para que las citas aparezcan ahí solas. Si lo dejás vacío, las citas quedan solo dentro de Vitalis.</div>
+      <div class="hint">Compartí ese calendario con la cuenta de servicio de Vitalis ("hacer cambios en eventos"). Con esto conectado, Vitalis hace las dos cosas: refleja ahí las citas que se agendan, y antes de ofrecer un horario por WhatsApp revisa que no tengas algo ya puesto directo en tu calendario. Si lo dejás vacío, las citas quedan solo dentro de Vitalis.</div>
+
+      <label>Información del consultorio (para el asistente de WhatsApp)</label>
+      <textarea id="cfgInfoConsultorio" rows="6" placeholder="Ej: Atendemos de lunes a viernes de 8 a 17hs. Consulta general: 150 Bs. Estamos en Av. América #123, Cochabamba. Aceptamos efectivo y QR. Si no podés venir, avisá con 24hs de anticipación.">${esc(horario.infoConsultorio || "")}</textarea>
+      <div class="hint">El número de WhatsApp usa esto para responder preguntas de los pacientes (horarios, precios, ubicación, políticas...) — solo contesta con lo que escribas acá, nunca inventa.</div>
 
       <div id="cfgErr"></div>
       <button class="secondary" id="btnGuardarHorario">Guardar</button>
@@ -207,6 +211,7 @@ function pintarConfigHorario(horario) {
           horarioAtencion,
           duracionConsultaMinutos: document.getElementById("cfgDuracion").value,
           googleCalendarId: document.getElementById("cfgCalendarId").value.trim(),
+          infoConsultorio: document.getElementById("cfgInfoConsultorio").value.trim(),
         }),
       });
       renderAgenda();

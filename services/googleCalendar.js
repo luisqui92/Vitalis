@@ -110,4 +110,27 @@ async function eliminarEvento(calendarId, eventId) {
   }
 }
 
-module.exports = { crearEvento, actualizarEvento, eliminarEvento };
+// Franjas ocupadas del calendario REAL del médico en un rango (incluye
+// eventos que el médico cargó directo en Google Calendar, no solo los que
+// vinieron de Vitalis) — para no ofrecer un horario que ya está tomado ahí
+// aunque en Vitalis no haya ninguna Cita registrada todavía.
+// Devuelve [{ inicio: Date, fin: Date }, ...], o [] si no está configurado.
+async function obtenerOcupadoEnRango(calendarId, desde, hasta) {
+  if (!calendarId) return [];
+  try {
+    const token = await obtenerAccessToken();
+    if (!token) return [];
+    const res = await axios.post(
+      "https://www.googleapis.com/calendar/v3/freeBusy",
+      { timeMin: new Date(desde).toISOString(), timeMax: new Date(hasta).toISOString(), items: [{ id: calendarId }] },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const busy = res.data.calendars?.[calendarId]?.busy || [];
+    return busy.map(b => ({ inicio: new Date(b.start), fin: new Date(b.end) }));
+  } catch (e) {
+    log.error("[GOOGLE_CALENDAR] obtenerOcupadoEnRango:", e.response?.data || e.message);
+    return []; // si falla la consulta, no bloqueamos la reserva — mejor ofrecer de más que trabar todo
+  }
+}
+
+module.exports = { crearEvento, actualizarEvento, eliminarEvento, obtenerOcupadoEnRango };

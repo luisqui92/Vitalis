@@ -15,7 +15,7 @@ module.exports = function (app) {
   // ─── HORARIO DE ATENCIÓN ─────────────────────────────────────────────────
   app.get("/medico/horario", requireMedico, asyncRoute(async (req, res) => {
     const horario = await Medico.findOne({ phone: req.adminUser.usuario })
-      .select("horarioAtencion duracionConsultaMinutos googleCalendarId").lean();
+      .select("horarioAtencion duracionConsultaMinutos googleCalendarId infoConsultorio").lean();
     res.json({ horario });
   }));
 
@@ -31,6 +31,9 @@ module.exports = function (app) {
     }
     if (req.body?.googleCalendarId !== undefined) {
       medico.googleCalendarId = String(req.body.googleCalendarId).trim();
+    }
+    if (req.body?.infoConsultorio !== undefined) {
+      medico.infoConsultorio = String(req.body.infoConsultorio).trim();
     }
     await medico.save();
     res.json({ ok: true, horario: medico });
