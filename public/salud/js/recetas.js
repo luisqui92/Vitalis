@@ -108,7 +108,7 @@ async function renderReceta(id) {
       <button class="back no-imprimir" id="btnBack">← Volver</button>
       <div class="card" id="recetaHoja" style="padding:28px">
         <div style="text-align:center;margin-bottom:18px">
-          <img src="/logo.png" style="width:44px;height:44px;object-fit:contain">
+          <img src="/salud/logo.png" style="width:44px;height:44px;object-fit:contain">
           <div style="font-size:16px;font-weight:700;color:var(--primary);margin-top:4px">Vitalis</div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px">

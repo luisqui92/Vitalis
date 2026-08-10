@@ -33,8 +33,11 @@ require("./services/baileysWhatsapp").iniciarWhatsapp().catch(e => log.error("[V
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
 
 // ─── ESTÁTICOS + LA APP ───────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
-app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+// Se sirve bajo /salud a propósito: nginx en el servidor de ChatGo redirige
+// api.chatgo.ia.bo/salud (y /medico) hacia esta VM sin sacarle el prefijo,
+// así que Vitalis tiene que entender esos mismos paths de este lado.
+app.use("/salud", express.static(path.join(__dirname, "public", "salud"), { maxAge: "5m" }));
+app.get("/salud", (_req, res) => res.sendFile(path.join(__dirname, "salud.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
