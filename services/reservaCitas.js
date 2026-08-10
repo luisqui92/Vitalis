@@ -66,7 +66,7 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
 // quiere agendar — recién ahí arranca el flujo de horarios numerados.
 async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
   try {
-    const { intencion, respuesta } = await enrutarMensaje(texto, medico.infoConsultorio, medico.nombre);
+    const { intencion, respuesta } = await enrutarMensaje(texto, medico);
     if (intencion === "cancelar") return iniciarCancelacion(medicoPhone, numero);
     if (intencion === "pregunta" && respuesta) return respuesta;
   } catch (e) {
