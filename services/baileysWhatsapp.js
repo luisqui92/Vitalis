@@ -100,10 +100,18 @@ function normalizarNumero(numero) {
 
 async function enviarTexto(numero, texto) {
   if (!sock || !conectado) {
-    log.warn("[VITALIS_WHATSAPP] No conectado — no se mandó el mensaje");
+    log.warn(`[VITALIS_WHATSAPP] No conectado — no se mandó el mensaje a ${numero}`);
     return null;
   }
-  return sock.sendMessage(`${normalizarNumero(numero)}@s.whatsapp.net`, { text: texto });
+  const jid = `${normalizarNumero(numero)}@s.whatsapp.net`;
+  try {
+    const r = await sock.sendMessage(jid, { text: texto });
+    log.info(`[VITALIS_WHATSAPP] Mensaje mandado a ${jid} (id: ${r?.key?.id || "?"})`);
+    return r;
+  } catch (e) {
+    log.error(`[VITALIS_WHATSAPP] Falló el envío a ${jid}:`, e.message, e.output?.payload || "");
+    throw e;
+  }
 }
 
 async function obtenerEstado() {

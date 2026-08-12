@@ -6,7 +6,10 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { obtenerHorariosDisponibles } = require("../services/agenda");
 const { crearEvento, actualizarEvento, eliminarEvento } = require("../services/googleCalendar");
+const { enviarTexto } = require("../services/baileysWhatsapp");
+const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
 const DIAS_VALIDOS = ["confirmada", "cancelada", "completada"];
@@ -82,6 +85,15 @@ module.exports = function (app) {
       const eventId = await crearEvento(medico.googleCalendarId, cita);
       if (eventId) { cita.googleEventId = eventId; await cita.save(); }
     }
+
+    // Si se cargó un teléfono, avisamos por WhatsApp igual que cuando la
+    // cita la reserva el propio paciente — no depende de por dónde se creó.
+    if (cita.pacienteTelefono) {
+      const primerNombre = cita.pacienteNombre.split(" ")[0];
+      enviarTexto(cita.pacienteTelefono, `✅ ${primerNombre}, tu cita con ${medico?.nombre || "el consultorio"} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)
+        .catch(e => log.error(`[CITAS] no se pudo mandar la confirmación por WhatsApp a ${cita.pacienteTelefono}:`, e.message));
+    }
+
     res.status(201).json({ ok: true, cita });
   }));
 

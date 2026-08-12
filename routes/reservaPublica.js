@@ -56,8 +56,9 @@ module.exports = function (app) {
       medicoPhone, medico, pacienteTelefono: numero, pacienteNombre, fecha, motivo, origen: "whatsapp_web",
     });
 
-    enviarTexto(numero, `✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo.`)
-      .catch(e => log.error("[RESERVA_PUBLICA] no se pudo mandar la confirmación por WhatsApp:", e.message));
+    const primerNombre = pacienteNombre.split(" ")[0];
+    enviarTexto(numero, `✅ ${primerNombre}, tu cita con ${medico.nombre} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)
+      .catch(e => log.error(`[RESERVA_PUBLICA] no se pudo mandar la confirmación por WhatsApp a ${numero}:`, e.message));
 
     res.json({ ok: true, fecha: cita.fecha });
   }));
