@@ -3,61 +3,46 @@
 // tanto la grabación local (consultas.js) como el celular vinculado
 // (vinculacion.js).
 
-// Dibuja la onda de voz en vivo sobre un <canvas>, a partir de un MediaStream
-// del micrófono. Se usa tanto grabando local (compu con micrófono) como en
-// el celular vinculado como micrófono remoto.
-function crearVisualizadorOnda(waveCanvas) {
-  let audioCtx = null, analyser = null, dataArray = null, animId = null;
+// Hace "latir" el logo de Vitalis (círculo con anillos alrededor) en
+// tiempo real según el volumen que capta el micrófono — reemplaza el
+// barrido de barras genérico por algo que se sienta parte de la marca:
+// cada vez que detecta voz, el logo pulsa más fuerte y los anillos se
+// expanden, como un pulso cardíaco. Se usa tanto grabando local (compu con
+// micrófono) como en el celular vinculado como micrófono remoto.
+function crearIndicadorAudio(orbEl) {
+  let audioCtx = null, analyser = null, dataArray = null, animId = null, nivelSuavizado = 0;
 
   function dibujar() {
     animId = requestAnimationFrame(dibujar);
-    analyser.getByteFrequencyData(dataArray);
-    const ctx = waveCanvas.getContext("2d");
-    const w = waveCanvas.width, h = waveCanvas.height;
-    ctx.clearRect(0, 0, w, h);
-    const bars = 32;
-    const step = Math.floor(dataArray.length / bars);
-    const barWidth = w / bars;
-    for (let i = 0; i < bars; i++) {
-      const value = dataArray[i * step] / 255;
-      const barHeight = Math.max(4, value * h * 0.9);
-      const x = i * barWidth;
-      const y = (h - barHeight) / 2;
-      const grad = ctx.createLinearGradient(0, y, 0, y + barHeight);
-      grad.addColorStop(0, "#22d3ee");
-      grad.addColorStop(1, "#0891b2");
-      ctx.fillStyle = grad;
-      const bw = barWidth * 0.6, r = bw / 2;
-      const bx = x + barWidth * 0.2;
-      ctx.beginPath();
-      ctx.moveTo(bx + r, y);
-      ctx.arcTo(bx + bw, y, bx + bw, y + barHeight, r);
-      ctx.arcTo(bx + bw, y + barHeight, bx, y + barHeight, r);
-      ctx.arcTo(bx, y + barHeight, bx, y, r);
-      ctx.arcTo(bx, y, bx + bw, y, r);
-      ctx.closePath();
-      ctx.fill();
+    analyser.getByteTimeDomainData(dataArray);
+    let sumaCuadrados = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const v = (dataArray[i] - 128) / 128;
+      sumaCuadrados += v * v;
     }
+    const rms = Math.sqrt(sumaCuadrados / dataArray.length);
+    // El ruido de fondo también tiene algo de RMS; restamos un piso para
+    // que un ambiente en silencio no haga "latir" el logo todo el tiempo.
+    const nivelCrudo = Math.min(1, Math.max(0, (rms - 0.02) * 6));
+    nivelSuavizado += (nivelCrudo - nivelSuavizado) * 0.25;
+    orbEl.style.setProperty("--nivel", nivelSuavizado.toFixed(3));
   }
 
   return {
     iniciar(stream) {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = waveCanvas.getBoundingClientRect();
-      waveCanvas.width = rect.width * dpr;
-      waveCanvas.height = rect.height * dpr;
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
+      analyser.fftSize = 512;
       source.connect(analyser);
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      dataArray = new Uint8Array(analyser.fftSize);
       dibujar();
     },
     detener() {
       if (animId) cancelAnimationFrame(animId);
       if (audioCtx) audioCtx.close();
       audioCtx = null; analyser = null;
+      orbEl.style.setProperty("--nivel", 0);
     },
   };
 }

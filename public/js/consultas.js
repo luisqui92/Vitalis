@@ -1,7 +1,12 @@
 // Vitalis — Nueva consulta (local o control remoto) y el detalle de una
 // consulta (transcripción + nota clínica).
 
-// ─── NUEVA CONSULTA (grabar con onda de voz en vivo, o subir archivo) ──
+// Íconos del botón de grabar (SVG en vez de emoji: se ve nítido y
+// consistente en cualquier celular, y toma el color por currentColor).
+const ICONO_MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+const ICONO_STOP = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="3"/></svg>`;
+
+// ─── NUEVA CONSULTA (grabar con el logo de Vitalis latiendo, o subir archivo) ──
 function renderNuevaConsulta(pacienteId, pacienteNombre) {
   detenerPolling();
   app.innerHTML = `
@@ -10,14 +15,18 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
       <div class="hint" style="margin-bottom:14px">Paciente: <b>${esc(pacienteNombre)}</b></div>
 
       <div class="listen-panel" id="listenPanel">
-        <canvas id="waveCanvas"></canvas>
+        <div class="listen-orb" id="audioOrb">
+          <div class="listen-ring"></div>
+          <div class="listen-ring listen-ring-2"></div>
+          <img src="/logo.png" alt="" class="listen-logo">
+        </div>
         <div class="listen-time" id="recTime">00:00</div>
         <div class="listen-label">🎙️ Escuchando la consulta...</div>
         <div class="live-caption" id="liveCaption"></div>
       </div>
 
       <div class="rec-box">
-        <button class="rec-btn" id="recBtn">🎙️</button>
+        <button class="rec-btn" id="recBtn">${ICONO_MIC}</button>
         <div class="rec-status" id="recStatus">Tocá para grabar</div>
       </div>
       <label class="file-label" for="ncFile">📁 O subí un archivo de audio ya grabado</label>
@@ -38,7 +47,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   const ncErr = document.getElementById("ncErr");
   const listenPanel = document.getElementById("listenPanel");
   const liveCaption = document.getElementById("liveCaption");
-  const onda = crearVisualizadorOnda(document.getElementById("waveCanvas"));
+  const onda = crearIndicadorAudio(document.getElementById("audioOrb"));
   const transcriptorVivo = crearTranscriptorEnVivo(texto => { liveCaption.textContent = texto; });
 
   recBtn.onclick = async () => {
@@ -66,7 +75,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         transcriptorVivo.iniciar(stream);
         timerId = setInterval(() => { seconds++; recTime.textContent = fmt(seconds); }, 1000);
         recBtn.classList.add("recording");
-        recBtn.textContent = "⏹️";
+        recBtn.innerHTML = ICONO_STOP;
         recStatus.textContent = "Grabando... tocá para detener";
         ncSubir.style.display = "none";
       } catch (e) {
@@ -76,7 +85,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
       mediaRecorder.stop();
       clearInterval(timerId);
       recBtn.classList.remove("recording");
-      recBtn.textContent = "🎙️";
+      recBtn.innerHTML = ICONO_MIC;
     }
   };
 

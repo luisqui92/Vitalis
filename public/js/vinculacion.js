@@ -56,13 +56,17 @@ function pintarVincular(v) {
     pacienteActual = { pacienteId, pacienteNombre };
     document.getElementById("vCard").innerHTML = `
       <div class="listen-panel" style="display:block">
-        <canvas id="waveCanvasRemoto"></canvas>
+        <div class="listen-orb" id="audioOrbRemoto">
+          <div class="listen-ring"></div>
+          <div class="listen-ring listen-ring-2"></div>
+          <img src="/logo.png" alt="" class="listen-logo">
+        </div>
         <div class="listen-time" id="recTimeRemoto">00:00</div>
         <div class="listen-label">🎙️ Grabando: ${esc(pacienteNombre)}</div>
       </div>
       <div class="hint" style="text-align:center">Esperando que la compu diga "detener"...</div>
       <button class="secondary" id="btnDetenerLocal">⏹️ Detener acá mismo</button>`;
-    const visual = crearVisualizadorOnda(document.getElementById("waveCanvasRemoto"));
+    const visual = crearIndicadorAudio(document.getElementById("audioOrbRemoto"));
     const recTime = document.getElementById("recTimeRemoto");
 
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
