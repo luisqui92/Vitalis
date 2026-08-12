@@ -47,8 +47,35 @@ function whatsappCardHtml(wa) {
   return `<div class="card"><div class="seccion-titulo" style="margin-top:0">💬 WhatsApp de reservas</div><div class="hint">Conectando...</div></div>`;
 }
 
+let diaAgendaElegido = null; // "YYYY-MM-DD" — se mantiene al refrescar (guardar/cancelar cita)
+
+function fechaStrLocal(d) {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+}
+
 function pintarAgenda(citas, pacientes, wa) {
   const pendientes = citas.filter(c => c.estado === "confirmada");
+
+  // Los próximos 14 días (mismo rango que ya trae /medico/citas por
+  // defecto), como chips — los que tienen citas se marcan con un puntito,
+  // así se ve de un vistazo qué días están ocupados sin tener que entrar
+  // uno por uno.
+  const porDia = {};
+  pendientes.forEach(c => {
+    const f = fechaStrLocal(c.fecha);
+    (porDia[f] = porDia[f] || []).push(c);
+  });
+  const dias = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(); d.setDate(d.getDate() + i);
+    dias.push(fechaStrLocal(d));
+  }
+  if (diaAgendaElegido == null || !dias.includes(diaAgendaElegido)) {
+    diaAgendaElegido = dias.find(f => porDia[f]?.length) || dias[0];
+  }
+  const citasDelDia = (porDia[diaAgendaElegido] || []).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
   app.innerHTML = `
     <button class="back" id="btnBack">← Panel</button>
     ${whatsappCardHtml(wa)}
@@ -74,24 +101,49 @@ function pintarAgenda(citas, pacientes, wa) {
       <button class="secondary" id="btnGuardarCita">Guardar cita</button>
     </div>
 
-    ${pendientes.length === 0 ? `<div class="empty" style="margin-top:14px">No hay citas próximas.</div>` : ""}
-    ${pendientes.map(c => `
-      <div class="item" style="cursor:default;margin-top:10px">
-        <div class="top">
-          <div class="nombre">${ORIGEN_ICONO[c.origen] || ""} ${esc(c.pacienteNombre)}</div>
-          <button class="link" data-cancelar-cita="${c._id}" style="margin:0;width:auto;color:var(--danger)">Cancelar</button>
-        </div>
-        <div class="fecha">${new Date(c.fecha).toLocaleString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
-        ${c.motivo ? `<div class="paciente-info">${esc(c.motivo)}</div>` : ""}
-      </div>`).join("")}
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">Calendario</div>
+      <div class="reserva-dias">
+        ${dias.map(f => {
+          const fd = new Date(f + "T00:00:00");
+          const activo = f === diaAgendaElegido;
+          const cant = porDia[f]?.length || 0;
+          return `
+            <button class="reserva-dia-chip ${activo ? "activo" : ""}" data-dia="${f}">
+              <span class="reserva-dia-semana">${DIAS_SEMANA_CORTO[fd.getDay()]}</span>
+              <span class="reserva-dia-numero">${fd.getDate()}</span>
+              ${cant ? `<span class="reserva-dia-badge">${cant}</span>` : `<span class="reserva-dia-mes">&nbsp;</span>`}
+            </button>`;
+        }).join("")}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${new Date(diaAgendaElegido + "T00:00:00").toLocaleDateString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit" })}</div>
+      ${citasDelDia.length === 0 ? `<div class="empty">No hay citas este día.</div>` : citasDelDia.map(c => `
+        <div class="item" style="cursor:default">
+          <div class="top">
+            <div class="nombre">${ORIGEN_ICONO[c.origen] || ""} ${esc(c.pacienteNombre)}</div>
+            <button class="link" data-cancelar-cita="${c._id}" style="margin:0;width:auto;color:var(--danger)">Cancelar</button>
+          </div>
+          <div class="fecha">${new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })}</div>
+          ${c.motivo ? `<div class="paciente-info">${esc(c.motivo)}</div>` : ""}
+        </div>`).join("")}
+    </div>
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
   document.getElementById("btnConfigHorario").onclick = renderConfigHorario;
   document.getElementById("btnNuevaCita").onclick = () => {
     const box = document.getElementById("citaFormBox");
-    box.style.display = box.style.display === "none" ? "block" : "none";
+    const abrir = box.style.display === "none";
+    box.style.display = abrir ? "block" : "none";
+    const campoFecha = document.getElementById("citaFecha");
+    if (abrir && !campoFecha.value && diaAgendaElegido) campoFecha.value = `${diaAgendaElegido}T09:00`;
   };
+  document.querySelectorAll(".reserva-dia-chip").forEach(btn => {
+    btn.onclick = () => { diaAgendaElegido = btn.dataset.dia; pintarAgenda(citas, pacientes, wa); };
+  });
 
   document.getElementById("btnGuardarCita").onclick = async () => {
     const errBox = document.getElementById("citaErr");
