@@ -52,8 +52,19 @@ async function iniciarWhatsapp() {
         conectado = false;
         iniciando = false;
         const debeReconectar = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-        log.warn(`[VITALIS_WHATSAPP] Conexión cerrada${debeReconectar ? " — reconectando..." : " — sesión cerrada, hay que escanear el QR de nuevo"}`);
-        if (debeReconectar) setTimeout(iniciarWhatsapp, 3000);
+        if (debeReconectar) {
+          log.warn("[VITALIS_WHATSAPP] Conexión cerrada — reconectando...");
+          setTimeout(iniciarWhatsapp, 3000);
+        } else {
+          // El médico (u otra persona) desvinculó el dispositivo desde el
+          // celular: la sesión guardada ya no sirve para nada, así que
+          // reconectar con esas mismas credenciales solo iba a volver a
+          // fallar en loop. Hay que tirarlas y arrancar de cero para que
+          // salga un QR nuevo para escanear — antes esto se quedaba
+          // "Conectando..." para siempre sin que nadie pudiera arreglarlo.
+          log.warn("[VITALIS_WHATSAPP] Sesión cerrada desde el celular — generando un QR nuevo");
+          limpiarSesionYReiniciar();
+        }
       }
     });
 
@@ -99,16 +110,20 @@ async function obtenerEstado() {
   return { configurado, conectado: false, qr: await QRCode.toDataURL(ultimoQR) };
 }
 
-// Para vincular un número distinto: cierra la sesión actual y pide un QR nuevo.
-async function reiniciarSesion() {
-  if (sock) { try { await sock.logout(); } catch (e) { /* seguimos igual */ } }
+function limpiarSesionYReiniciar() {
   fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   fs.mkdirSync(AUTH_DIR, { recursive: true });
   conectado = false;
   ultimoQR = null;
   sock = null;
   iniciando = false;
-  await iniciarWhatsapp();
+  iniciarWhatsapp();
+}
+
+// Para vincular un número distinto: cierra la sesión actual y pide un QR nuevo.
+async function reiniciarSesion() {
+  if (sock) { try { await sock.logout(); } catch (e) { /* seguimos igual */ } }
+  limpiarSesionYReiniciar();
 }
 
 module.exports = { iniciarWhatsapp, enviarTexto, obtenerEstado, reiniciarSesion };
