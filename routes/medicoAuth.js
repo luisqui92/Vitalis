@@ -16,6 +16,7 @@ module.exports = function (app) {
     const phone = String(req.body?.phone || "").trim();
     const nombre = String(req.body?.nombre || "").trim();
     const especialidad = String(req.body?.especialidad || "").trim();
+    const tipoEspecialidad = req.body?.tipoEspecialidad === "odontologia" ? "odontologia" : "medicina_general";
     const password = String(req.body?.password || "");
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
@@ -23,7 +24,7 @@ module.exports = function (app) {
     const yaExiste = await Medico.findOne({ phone });
     if (yaExiste) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
 
-    const medico = await Medico.create({ phone, nombre, especialidad, passwordHash: await hashPassword(password), activo: true });
+    const medico = await Medico.create({ phone, nombre, especialidad, tipoEspecialidad, passwordHash: await hashPassword(password), activo: true });
     registrar({ req, medicoPhone: phone, accion: "registro" });
     res.json({ ok: true, phone: medico.phone, nombre: medico.nombre });
   }));
@@ -61,7 +62,7 @@ module.exports = function (app) {
 
     registrar({ req, medicoPhone: phone, accion: "login" });
     const token = generarToken(medico.phone, "medico");
-    res.json({ token, phone: medico.phone, nombre: medico.nombre });
+    res.json({ token, phone: medico.phone, nombre: medico.nombre, tipoEspecialidad: medico.tipoEspecialidad });
   }));
 
   // ─── LOGIN (paso 2: código de 2FA) ───────────────────────────────────────
@@ -79,7 +80,7 @@ module.exports = function (app) {
     }
     registrar({ req, medicoPhone: medico.phone, accion: "login" });
     const token = generarToken(medico.phone, "medico");
-    res.json({ token, phone: medico.phone, nombre: medico.nombre });
+    res.json({ token, phone: medico.phone, nombre: medico.nombre, tipoEspecialidad: medico.tipoEspecialidad });
   }));
 
   // ─── 2FA: estado, activar, confirmar, desactivar ────────────────────────

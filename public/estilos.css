@@ -181,3 +181,10 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
   .wrap{padding:0;max-width:100%;}
   #recetaHoja{box-shadow:none;border:none;padding:0 !important;}
 }
+
+/* ─── Odontograma ─────────────────────────────────────────────────────── */
+.odonto-fila{display:flex;justify-content:center;gap:3px;flex-wrap:wrap;}
+.pieza-dental{width:30px;height:30px;flex:0 0 auto;border-radius:6px;border:1px solid;font-size:10.5px;font-weight:700;padding:0;}
+.odonto-leyenda{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 14px;margin-top:16px;}
+.odonto-leyenda-item{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);}
+.odonto-leyenda-item i{display:inline-block;width:10px;height:10px;border-radius:3px;}

@@ -122,7 +122,8 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
   app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/pacientes/" + pacienteId);
-    pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabInicial || "consultas");
+    const tabPorDefecto = MEDICO_TIPO_ESPECIALIDAD === "odontologia" ? "odontograma" : "consultas";
+    pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabInicial || tabPorDefecto);
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando el paciente")}</div>`;
@@ -280,13 +281,14 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         <div class="fecha">${new Date(v.fecha).toLocaleDateString("es-BO")}</div>
       </div>`).join("")}`;
 
-  const tabs = { paciente: tabPaciente, consultas: tabConsultas, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
+  const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
+  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
     <button class="back" id="btnBack">← Pacientes</button>
     <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
     <div class="tabs">
-      ${Object.entries(TABS_KARDEX).map(([key, t]) => `
+      ${Object.entries(tabsKardex).map(([key, t]) => `
         <button class="tab ${tabActiva === key ? "activo" : ""}" data-tab="${key}">
           <span class="tab-icono">${t.icono}</span>${t.label}
         </button>`).join("")}
@@ -298,6 +300,10 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   document.querySelectorAll(".tab").forEach(btn => {
     btn.onclick = () => pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios, recetas, btn.dataset.tab);
   });
+
+  if (tabActiva === "odontograma") {
+    renderTabOdontograma(p._id);
+  }
 
   if (tabActiva === "consultas") {
     document.getElementById("btnNuevaConsulta").onclick = () => renderNuevaConsulta(p._id, p.nombre);

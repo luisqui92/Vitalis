@@ -31,8 +31,10 @@ function renderLogin() {
 
 function completarLogin(data) {
   TOKEN = data.token; MEDICO_NOMBRE = data.nombre;
+  MEDICO_TIPO_ESPECIALIDAD = data.tipoEspecialidad || "medicina_general";
   localStorage.setItem("salud_token", TOKEN);
   localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
+  localStorage.setItem("salud_tipo_especialidad", MEDICO_TIPO_ESPECIALIDAD);
   renderDashboard();
 }
 
@@ -68,6 +70,11 @@ function renderRegistro() {
       <input id="rPhone" type="tel" placeholder="591XXXXXXXX">
       <label>Nombre completo</label>
       <input id="rNombre" type="text" placeholder="Dra. Fulana Pérez">
+      <label>Área</label>
+      <select id="rTipoEsp">
+        <option value="medicina_general">🩺 Medicina general</option>
+        <option value="odontologia">🦷 Odontología</option>
+      </select>
       <label>Especialidad (opcional)</label>
       <input id="rEsp" type="text" placeholder="Medicina general">
       <label>Contraseña (mínimo 8 caracteres)</label>
@@ -81,12 +88,13 @@ function renderRegistro() {
     const phone = document.getElementById("rPhone").value.trim();
     const nombre = document.getElementById("rNombre").value.trim();
     const especialidad = document.getElementById("rEsp").value.trim();
+    const tipoEspecialidad = document.getElementById("rTipoEsp").value;
     const password = document.getElementById("rPass").value;
     const errBox = document.getElementById("rErr");
     errBox.innerHTML = "";
     if (!phone || !nombre || !password) { errBox.innerHTML = `<div class="error">Completá teléfono, nombre y contraseña</div>`; return; }
     try {
-      await api("/medico/registro", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ phone, nombre, especialidad, password }) });
+      await api("/medico/registro", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ phone, nombre, especialidad, tipoEspecialidad, password }) });
       errBox.innerHTML = `<div class="hint">✅ Cuenta creada. Ahora ingresá con tu teléfono y contraseña.</div>`;
       setTimeout(renderLogin, 1200);
     } catch (e) {

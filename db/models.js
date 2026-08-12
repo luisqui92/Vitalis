@@ -23,6 +23,11 @@ const medicoSchema = new mongoose.Schema({
   phone: { type: String, unique: true, index: true, required: true },
   nombre: { type: String, required: true },
   especialidad: { type: String, default: "" },
+  // Determina qué pestañas ve el médico en el Kardex de cada paciente
+  // (medicina general vs. odontología, que necesitan fichas muy distintas).
+  // "especialidad" de arriba queda como texto libre descriptivo (ej.
+  // "Cardiología"), esto es lo que realmente rama la interfaz.
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -162,6 +167,43 @@ const vacunaSchema = new mongoose.Schema({
 vacunaSchema.index({ pacienteId: 1, fecha: -1 });
 const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 
+// ─── ODONTOGRAMA (Vitalis Odonto) ────────────────────────────────────────
+// Numeración FDI/ISO-3950 (dos dígitos por cuadrante), la que se usa en
+// Bolivia y el resto de Latinoamérica — no la "Universal" de EE.UU.
+// Dentición permanente: 11-18, 21-28, 31-38, 41-48 (32 piezas). La
+// dentición temporal (dientes de leche, 51-55/61-65/71-75/81-85) queda
+// para una siguiente vuelta — mezclar ambas con el recambio dental real
+// es justo la parte más delicada, no vale la pena apurarla.
+const ESTADOS_PIEZA_DENTAL = [
+  "sano", "caries", "obturado", "corona", "endodoncia",
+  "extraccion_indicada", "ausente", "fractura", "implante", "sellante",
+];
+const PIEZAS_FDI_PERMANENTE = [
+  11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28,
+  31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48,
+];
+
+const piezaDentalSchema = new mongoose.Schema({
+  numero: { type: Number, required: true }, // FDI
+  estado: { type: String, enum: ESTADOS_PIEZA_DENTAL, default: "sano" },
+  notas: { type: String, default: "" },
+  historial: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      estado: { type: String, enum: ESTADOS_PIEZA_DENTAL },
+      notas: { type: String, default: "" },
+    }],
+    default: [],
+  },
+}, { _id: false });
+
+const odontogramaSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, unique: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  piezas: { type: [piezaDentalSchema], default: [] },
+}, { timestamps: true });
+const Odontograma = mongoose.model("Odontograma", odontogramaSchema);
+
 // Evolución clínica: signos vitales/indicadores sueltos en el tiempo (presión,
 // glucosa, peso, etc.) para graficar tendencias. Carga manual del médico.
 // "tipo" es una clave fija (ver TIPOS_MEDICION en el frontend); valorSecundario
@@ -295,4 +337,4 @@ const auditLogSchema = new mongoose.Schema({
 auditLogSchema.index({ medicoPhone: 1, createdAt: -1 });
 const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog };
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE };
