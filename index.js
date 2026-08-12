@@ -22,12 +22,19 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      // El hash es del <script type="importmap"> de index.html (necesario
+      // para que los addons de Three.js resuelvan `import ... from "three"`)
+      // — 'wasm-unsafe-eval' es para poder instanciar el decoder Draco
+      // (WebAssembly) que descomprime el modelo 3D del odontograma.
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='"],
       styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
+      // El decoder Draco (vista 3D del odontograma) corre en un Web Worker
+      // que Three.js crea a partir de un blob: en vez de un archivo propio.
+      workerSrc: ["'self'", "blob:"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"], // nadie puede embeber Vitalis en un iframe (clickjacking)
     },

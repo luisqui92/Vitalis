@@ -32,7 +32,15 @@ function posicionesArco(n, cx, cy, rx, ry, invertido) {
   return pos;
 }
 
+let vista3DActual = null; // { destruir, actualizarPiezas } — instancia WebGL viva, si hay una
+let vistaOdontograma = "2d";
+
+function destruirVista3DSiExiste() {
+  if (vista3DActual) { vista3DActual.destruir(); vista3DActual = null; }
+}
+
 async function renderTabOdontograma(pacienteId) {
+  destruirVista3DSiExiste();
   const box = document.getElementById("odontogramaBox");
   if (!box) return;
   box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando odontograma...</div>`;
@@ -73,7 +81,14 @@ function pintarOdontograma(pacienteId, odontograma) {
   box.innerHTML = `
     <div class="card" style="text-align:center">
       <div class="seccion-titulo" style="margin-top:0;text-align:left">🦷 Odontograma</div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:420px;height:auto">${svgPiezas}</svg>
+      <div class="tabs" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px">
+        <button class="tab ${vistaOdontograma === "2d" ? "activo" : ""}" id="btnVista2D">Vista 2D</button>
+        <button class="tab ${vistaOdontograma === "3d" ? "activo" : ""}" id="btnVista3D">Vista 3D</button>
+      </div>
+      <div id="odontograma2dBox" style="display:${vistaOdontograma === "2d" ? "block" : "none"}">
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:420px;height:auto">${svgPiezas}</svg>
+      </div>
+      <div id="odontograma3dBox" style="display:${vistaOdontograma === "3d" ? "block" : "none"};min-height:220px"></div>
       <div class="odonto-leyenda">
         ${Object.entries(ESTADOS_PIEZA_INFO).map(([k, v]) => `
           <span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.borde || v.color}"></i>${v.label}</span>`).join("")}
@@ -84,6 +99,35 @@ function pintarOdontograma(pacienteId, odontograma) {
   document.querySelectorAll(".pieza-dental").forEach(g => {
     g.onclick = () => pintarDetallePieza(pacienteId, porNumero[Number(g.dataset.numero)]);
   });
+
+  document.getElementById("btnVista2D").onclick = () => {
+    vistaOdontograma = "2d";
+    destruirVista3DSiExiste();
+    pintarOdontograma(pacienteId, odontograma);
+  };
+  document.getElementById("btnVista3D").onclick = () => {
+    vistaOdontograma = "3d";
+    pintarOdontograma(pacienteId, odontograma);
+    montarVista3D(pacienteId, porNumero);
+  };
+
+  if (vistaOdontograma === "3d") montarVista3D(pacienteId, porNumero);
+}
+
+async function montarVista3D(pacienteId, porNumero) {
+  const contenedor = document.getElementById("odontograma3dBox");
+  if (!contenedor) return;
+  contenedor.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando modelo 3D...</div>`;
+  try {
+    const { montarOdontograma3D } = await import("/js/odontograma3d.js");
+    contenedor.innerHTML = "";
+    const coloresPorEstado = Object.fromEntries(Object.entries(ESTADOS_PIEZA_INFO).map(([k, v]) => [k, v.color]));
+    vista3DActual = montarOdontograma3D(contenedor, porNumero, coloresPorEstado, (numero) => {
+      pintarDetallePieza(pacienteId, porNumero[numero]);
+    });
+  } catch (e) {
+    contenedor.innerHTML = `<div class="error">No se pudo cargar la vista 3D.</div>`;
+  }
 }
 
 function pintarDetallePieza(pacienteId, pieza) {
