@@ -47,11 +47,11 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
 
   switch (sesion.paso) {
     case "confirmar_cancelacion":
-      return confirmarCancelacion(medicoPhone, numero, t, sesion.datos);
+      return confirmarCancelacion(medicoPhone, numero, t, texto, sesion.datos, medico);
     case "elegir_dia":
-      return elegirDia(numero, t, sesion.datos);
+      return elegirDia(medicoPhone, numero, t, texto, sesion.datos, medico);
     case "elegir_hora":
-      return elegirHora(medicoPhone, numero, t, sesion.datos, medico.duracionConsultaMinutos);
+      return elegirHora(medicoPhone, numero, t, texto, sesion.datos, medico);
     case "pedir_nombre":
       return pedirNombre(numero, texto, sesion.datos);
     case "pedir_motivo":
@@ -59,6 +59,26 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
     default:
       return manejarMensajeLibre(medicoPhone, numero, texto, medico);
   }
+}
+
+// Cuando el paciente está en medio de elegir día/hora o confirmar una
+// cancelación y escribe algo que NO es la opción esperada, puede ser que
+// simplemente esté preguntando algo ("¿qué días atienden?") en vez de estar
+// perdido — antes eso siempre caía en un seco "no entendí". Antes de darnos
+// por vencidos, probamos con la misma IA que ya usa el mensaje inicial:
+// si reconoce una pregunta respondible con la info del consultorio, la
+// responde ahí mismo (sin sacar al paciente del paso en el que estaba); si
+// reconoce que quiere cancelar, lo manda a ese flujo. Si no es ninguna de
+// las dos, seguimos con el "no entendí" de siempre.
+async function intentarDesvioLibre(texto, medico) {
+  try {
+    const { intencion, respuesta } = await enrutarMensaje(texto, medico);
+    if (intencion === "pregunta" && respuesta) return { tipo: "respuesta", texto: respuesta };
+    if (intencion === "cancelar") return { tipo: "cancelar" };
+  } catch (e) {
+    log.error("[RESERVA_CITAS] enrutarMensaje (desvío) falló:", e.message);
+  }
+  return null;
 }
 
 // Sin una conversación de reserva ya en curso: primero se fija si es una
@@ -85,20 +105,30 @@ async function iniciarReserva(medicoPhone, numero) {
   return `¡Hola! 👋 Elegí un día para tu cita respondiendo con el número:\n\n${lineas.join("\n")}\n\nEscribí "cancelar" en cualquier momento si querés cancelar una cita ya agendada.`;
 }
 
-async function elegirDia(numero, t, datos) {
+async function elegirDia(medicoPhone, numero, t, texto, datos, medico) {
   const idx = parseInt(t, 10) - 1;
   const dia = datos.dias?.[idx];
-  if (!dia) return `No entendí. Respondé con el número del día (1 a ${datos.dias?.length || 0}).`;
+  if (!dia) {
+    const desvio = await intentarDesvioLibre(texto, medico);
+    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita: respondé con el número del día (1 a ${datos.dias?.length || 0}).`;
+    if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
+    return `No entendí. Respondé con el número del día (1 a ${datos.dias?.length || 0}).`;
+  }
   const lineas = dia.slots.map((s, i) => `${i + 1}) ${formatearHora(s)}`);
   await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: dia });
   return `Horarios para el ${formatearDia(dia.fecha)}:\n\n${lineas.join("\n")}\n\nRespondé con el número del horario que te sirva.`;
 }
 
-async function elegirHora(medicoPhone, numero, t, datos, duracionConsultaMinutos) {
+async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
   const idx = parseInt(t, 10) - 1;
   const slot = datos.diaElegido?.slots?.[idx];
-  if (!slot) return `No entendí. Respondé con el número del horario (1 a ${datos.diaElegido?.slots?.length || 0}).`;
-  const libre = await horarioSigueLibre(medicoPhone, slot, duracionConsultaMinutos || 30);
+  if (!slot) {
+    const desvio = await intentarDesvioLibre(texto, medico);
+    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita: respondé con el número del horario (1 a ${datos.diaElegido?.slots?.length || 0}).`;
+    if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
+    return `No entendí. Respondé con el número del horario (1 a ${datos.diaElegido?.slots?.length || 0}).`;
+  }
+  const libre = await horarioSigueLibre(medicoPhone, slot, medico.duracionConsultaMinutos || 30);
   if (!libre) return 'Ups, ese horario se acaba de ocupar. Escribí cualquier cosa para ver los horarios disponibles de nuevo.';
   await guardarSesion(numero, "pedir_nombre", { ...datos, horaElegida: slot });
   return "¿A nombre de quién es la cita? Escribí el nombre completo.";
@@ -146,7 +176,11 @@ async function iniciarCancelacion(medicoPhone, numero) {
   return `Tenés una cita para el ${formatearFechaCompleta(cita.fecha)}. ¿Confirmás que querés cancelarla? Respondé "sí" o "no".`;
 }
 
-async function confirmarCancelacion(medicoPhone, numero, t, datos) {
+async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico) {
+  if (t !== "si" && t !== "sí" && t !== "no") {
+    const desvio = await intentarDesvioLibre(texto, medico);
+    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\n¿Confirmás que querés cancelar tu cita? Respondé "sí" o "no".`;
+  }
   if (t !== "si" && t !== "sí") {
     await limpiarSesion(numero);
     return "Ok, no cancelé nada.";
@@ -155,7 +189,6 @@ async function confirmarCancelacion(medicoPhone, numero, t, datos) {
   if (cita) {
     cita.estado = "cancelada";
     await cita.save();
-    const medico = await Medico.findOne({ phone: medicoPhone }).lean();
     if (medico?.googleCalendarId && cita.googleEventId) {
       await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
     }
