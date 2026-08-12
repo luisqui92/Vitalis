@@ -66,6 +66,7 @@ export function montarOdontograma3D(contenedor, piezasPorNumero, coloresPorEstad
   const meshesPorFdi = {};
   let vivo = true;
   let raf = null;
+  let meshSeleccionado = null;
 
   function pintarColores() {
     for (const [fdi, mesh] of Object.entries(meshesPorFdi)) {
@@ -73,6 +74,23 @@ export function montarOdontograma3D(contenedor, piezasPorNumero, coloresPorEstad
       const color = coloresPorEstado[pieza?.estado] || coloresPorEstado.sano;
       mesh.material.color.set(color);
     }
+  }
+
+  // La pieza tocada "sobresale" (se agranda un poco) y brilla, para que se
+  // note cuál es sin tener que buscarla por color en medio de las demás.
+  function seleccionarPieza(fdi) {
+    if (meshSeleccionado) {
+      meshSeleccionado.scale.set(1, 1, 1);
+      meshSeleccionado.material.emissive.set(0x000000);
+    }
+    const mesh = meshesPorFdi[fdi];
+    if (mesh) {
+      mesh.scale.set(1.18, 1.18, 1.18);
+      mesh.material.emissive.set(0x3b82f6);
+      mesh.material.emissiveIntensity = 0.5;
+      meshSeleccionado = mesh;
+    }
+    if (onClickPieza) onClickPieza(fdi);
   }
 
   loader.load("/models/dentadura.glb", (gltf) => {
@@ -114,7 +132,7 @@ export function montarOdontograma3D(contenedor, piezasPorNumero, coloresPorEstad
     );
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects(Object.values(meshesPorFdi), false);
-    if (hits.length && onClickPieza) onClickPieza(hits[0].object.userData.fdi);
+    if (hits.length) seleccionarPieza(hits[0].object.userData.fdi);
   });
 
   function animar() {
