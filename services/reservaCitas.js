@@ -100,9 +100,15 @@ async function iniciarReserva(medicoPhone, numero) {
   if (dias.length === 0) {
     return "Por ahora no tengo horarios disponibles cargados. Comunicate directo con la clínica para coordinar tu cita.";
   }
-  const lineas = dias.map((d, i) => `${i + 1}) ${formatearDia(d.fecha)} — ${d.slots.length} horario${d.slots.length === 1 ? "" : "s"} libre${d.slots.length === 1 ? "" : "s"}`);
   await guardarSesion(numero, "elegir_dia", { dias: dias.map(d => ({ fecha: d.fecha, slots: d.slots.map(s => s.toISOString()) })) });
-  return `¡Hola! 👋 Elegí un día para tu cita respondiendo con el número:\n\n${lineas.join("\n")}\n\nEscribí "cancelar" en cualquier momento si querés cancelar una cita ya agendada.`;
+  return `¡Hola! 👋 Elegí un día para tu cita respondiendo con el número:\n\n${listaDias(dias)}\n\nEscribí "cancelar" en cualquier momento si querés cancelar una cita ya agendada.`;
+}
+
+function listaDias(dias) {
+  return dias.map((d, i) => `${i + 1}) ${formatearDia(d.fecha)} — ${d.slots.length} horario${d.slots.length === 1 ? "" : "s"} libre${d.slots.length === 1 ? "" : "s"}`).join("\n");
+}
+function listaHoras(slots) {
+  return slots.map((s, i) => `${i + 1}) ${formatearHora(s)}`).join("\n");
 }
 
 async function elegirDia(medicoPhone, numero, t, texto, datos, medico) {
@@ -110,9 +116,12 @@ async function elegirDia(medicoPhone, numero, t, texto, datos, medico) {
   const dia = datos.dias?.[idx];
   if (!dia) {
     const desvio = await intentarDesvioLibre(texto, medico);
-    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita: respondé con el número del día (1 a ${datos.dias?.length || 0}).`;
+    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita, elegí un día:\n\n${listaDias(datos.dias || [])}`;
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
-    return `No entendí. Respondé con el número del día (1 a ${datos.dias?.length || 0}).`;
+    // No es ni un número válido ni algo que la IA haya reconocido (puede
+    // ser solo un saludo, "hola") — se re-muestra la lista con un tono
+    // amable en vez de un seco "no entendí", que suena a error.
+    return `¡Hola! 👋 Para tu cita, elegí un día respondiendo con el número:\n\n${listaDias(datos.dias || [])}`;
   }
   const lineas = dia.slots.map((s, i) => `${i + 1}) ${formatearHora(s)}`);
   await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: dia });
@@ -124,9 +133,9 @@ async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
   const slot = datos.diaElegido?.slots?.[idx];
   if (!slot) {
     const desvio = await intentarDesvioLibre(texto, medico);
-    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita: respondé con el número del horario (1 a ${datos.diaElegido?.slots?.length || 0}).`;
+    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita, elegí un horario para el ${formatearDia(datos.diaElegido?.fecha)}:\n\n${listaHoras(datos.diaElegido?.slots || [])}`;
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
-    return `No entendí. Respondé con el número del horario (1 a ${datos.diaElegido?.slots?.length || 0}).`;
+    return `Para el ${formatearDia(datos.diaElegido?.fecha)}, elegí un horario respondiendo con el número:\n\n${listaHoras(datos.diaElegido?.slots || [])}`;
   }
   const libre = await horarioSigueLibre(medicoPhone, slot, medico.duracionConsultaMinutos || 30);
   if (!libre) return 'Ups, ese horario se acaba de ocupar. Escribí cualquier cosa para ver los horarios disponibles de nuevo.';
