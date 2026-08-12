@@ -37,7 +37,10 @@ async function iniciarWhatsapp() {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
-    sock = makeWASocket({ version, auth: state, logger: pino({ level: "silent" }) });
+    // Por defecto Baileys hace vivir cada QR solo 20s (60s el primero) antes
+    // de reemplazarlo por uno nuevo — insuficiente para abrir WhatsApp,
+    // entrar a Dispositivos vinculados y escanear a tiempo. 45s da margen real.
+    sock = makeWASocket({ version, auth: state, logger: pino({ level: "silent" }), qrTimeout: 45000 });
     sock.ev.on("creds.update", saveCreds);
 
     sock.ev.on("connection.update", (update) => {
