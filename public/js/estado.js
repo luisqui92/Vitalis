@@ -8,6 +8,15 @@ const app = document.getElementById("app");
 const headerSub = document.getElementById("headerSub");
 const btnLogout = document.getElementById("btnLogout");
 
+// Odontología tiene su propia identidad visual ("Vitalis Dental", tema
+// oscuro) — medicina general sigue con el look claro de siempre.
+function aplicarTemaSegunEspecialidad() {
+  const esDental = MEDICO_TIPO_ESPECIALIDAD === "odontologia";
+  document.body.classList.toggle("tema-dental", esDental);
+  const marcaH1 = document.querySelector(".brand h1");
+  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : "Vitalis";
+}
+
 // La transcripción y la nota clínica de consultas largas corren en segundo
 // plano en el servidor; mientras no terminan, la pantalla se refresca sola.
 let pollTimeout = null;
@@ -75,6 +84,7 @@ function logout() {
   localStorage.removeItem("salud_token");
   localStorage.removeItem("salud_nombre");
   localStorage.removeItem("salud_tipo_especialidad");
+  aplicarTemaSegunEspecialidad();
   btnLogout.style.display = "none";
   headerSub.textContent = "Kardex inteligente";
   renderLogin();

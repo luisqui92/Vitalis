@@ -35,6 +35,7 @@ function completarLogin(data) {
   localStorage.setItem("salud_token", TOKEN);
   localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
   localStorage.setItem("salud_tipo_especialidad", MEDICO_TIPO_ESPECIALIDAD);
+  aplicarTemaSegunEspecialidad();
   renderDashboard();
 }
 

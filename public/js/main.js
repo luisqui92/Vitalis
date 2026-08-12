@@ -2,4 +2,5 @@
 // definieron sus funciones.
 btnLogout.onclick = logout;
 
+aplicarTemaSegunEspecialidad();
 if (TOKEN) renderDashboard(); else renderLogin();
