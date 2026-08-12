@@ -1,7 +1,7 @@
 // Vitalis — Rate Limiting en memoria (sin dependencias externas)
 const { log } = require("../config");
 
-const stores = { medico: new Map(), auth: new Map() };
+const stores = { medico: new Map(), auth: new Map(), reservaPublica: new Map() };
 
 // Limpieza periódica para no acumular IPs
 setInterval(() => {
@@ -55,4 +55,8 @@ const limitMedico = rateLimit("medico", 30, 60 * 1000, "Demasiadas peticiones. E
 // bruta. Acá: 8 intentos cada 10 minutos por IP.
 const limitAuth = rateLimit("auth", 8, 10 * 60 * 1000, "Demasiados intentos. Esperá unos minutos antes de volver a intentar.");
 
-module.exports = { rateLimit, limitMedico, limitAuth, getIP };
+// Página pública de reserva (sin login) — la usa cualquiera que abra el
+// link, así que necesita su propio límite en vez de compartir el de medico.
+const limitReservaPublica = rateLimit("reservaPublica", 20, 60 * 1000, "Demasiados intentos. Esperá un momento.");
+
+module.exports = { rateLimit, limitMedico, limitAuth, limitReservaPublica, getIP };

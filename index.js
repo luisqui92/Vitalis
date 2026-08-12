@@ -58,6 +58,7 @@ require("./routes/recordatorios")(app);
 require("./routes/citas")(app);
 require("./routes/whatsappSalud")(app);
 require("./routes/vinculacion")(app);
+require("./routes/reservaPublica")(app);
 
 // WhatsApp de reservas (Baileys) — corre en este mismo proceso. No hace
 // nada si no está configurado SALUD_WHATSAPP_MEDICO_PHONE.

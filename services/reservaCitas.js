@@ -2,10 +2,12 @@
 // opciones numeradas (no IA libre) — para algo tan estructurado como elegir
 // un turno, una máquina de estados es más confiable que dejar que el
 // paciente escriba libre y una IA interprete la fecha/hora.
-const { Medico, Paciente, Cita, SesionCitaWA } = require("../db/models");
+const { Medico, Cita, SesionCitaWA } = require("../db/models");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
-const { crearEvento, eliminarEvento } = require("./googleCalendar");
+const { eliminarEvento } = require("./googleCalendar");
 const { enrutarMensaje } = require("./asistenteWhatsapp");
+const { crearCitaConfirmada } = require("./crearCita");
+const { generarToken } = require("./auth");
 const { CONFIG, log } = require("../config");
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -95,13 +97,19 @@ async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
   return iniciarReserva(medicoPhone, numero);
 }
 
+// El paciente ve la disponibilidad real en un calendario propio (más claro
+// que contar días en una lista de texto) — el link tiene el número de
+// WhatsApp del paciente firmado adentro (mismo mecanismo que ya usa el
+// login de médicos), vence solo, y no hace falta guardar sesión acá: toda
+// la elección de día/hora/nombre pasa en esa página, en un solo POST final.
 async function iniciarReserva(medicoPhone, numero) {
-  const dias = await obtenerHorariosDisponibles(medicoPhone, 10);
+  const dias = await obtenerHorariosDisponibles(medicoPhone, 21);
   if (dias.length === 0) {
     return "Por ahora no tengo horarios disponibles cargados. Comunicate directo con la clínica para coordinar tu cita.";
   }
-  await guardarSesion(numero, "elegir_dia", { dias: dias.map(d => ({ fecha: d.fecha, slots: d.slots.map(s => s.toISOString()) })) });
-  return `¡Hola! 👋 Elegí un día para tu cita respondiendo con el número:\n\n${listaDias(dias)}\n\nEscribí "cancelar" en cualquier momento si querés cancelar una cita ya agendada.`;
+  const token = generarToken(numero, "reserva_publica", 45 * 60 * 1000);
+  const url = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
+  return `¡Hola! 👋 Elegí tu horario acá, vas a ver el calendario completo:\n\n${url}\n\n(el link es válido por 45 minutos)\n\nSi querés cancelar una cita ya agendada, escribí "cancelar" en cualquier momento.`;
 }
 
 function listaDias(dias) {
@@ -153,23 +161,10 @@ async function pedirNombre(numero, textoOriginal, datos) {
 async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
   const motivo = textoOriginal.trim().toLowerCase() === "ninguno" ? "" : textoOriginal.trim();
 
-  const paciente = await Paciente.findOne({ medicoPhone, telefono: numero }).lean();
-  const cita = await Cita.create({
-    medicoPhone,
-    pacienteId: paciente?._id || null,
-    pacienteNombre: datos.pacienteNombre,
-    pacienteTelefono: numero,
-    fecha: new Date(datos.horaElegida),
-    duracionMinutos: medico.duracionConsultaMinutos || 30,
-    motivo,
-    estado: "confirmada",
-    origen: "whatsapp",
+  const cita = await crearCitaConfirmada({
+    medicoPhone, medico, pacienteTelefono: numero, pacienteNombre: datos.pacienteNombre,
+    fecha: new Date(datos.horaElegida), motivo, origen: "whatsapp",
   });
-
-  if (medico.googleCalendarId) {
-    const eventId = await crearEvento(medico.googleCalendarId, cita);
-    if (eventId) await Cita.updateOne({ _id: cita._id }, { googleEventId: eventId });
-  }
 
   await limpiarSesion(numero);
   return `✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" en cualquier momento.`;
@@ -206,4 +201,4 @@ async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico
   return "Listo, cancelé tu cita. Si querés agendar otra, escribí cualquier cosa.";
 }
 
-module.exports = { procesarMensajeEntrante };
+module.exports = { procesarMensajeEntrante, formatearFechaCompleta };

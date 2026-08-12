@@ -35,11 +35,14 @@ if (!process.env.JWT_SECRET) {
 if (!process.env.ASSEMBLYAI_API_KEY) {
   log.warn("⚠️  ASSEMBLYAI_API_KEY no configurado — la transcripción de consultas fallará hasta que lo configures.");
 }
+if (process.env.SALUD_WHATSAPP_MEDICO_PHONE && !process.env.APP_URL) {
+  log.error("❌ APP_URL no está definido — el link de reserva que manda el WhatsApp va a salir roto (sin dominio). Definilo como, por ejemplo: APP_URL=https://salud.chatgo.ia.bo");
+}
 
 // ─── VALIDACIÓN DE VARIABLES DE ENTORNO ─────────────────────────────────────
 function validateConfig() {
   const required = ["MONGODB_URI", "OPENAI_KEY"];
-  const warned = ["JWT_SECRET", "ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON"];
+  const warned = ["JWT_SECRET", "ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 

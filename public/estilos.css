@@ -203,6 +203,18 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 .rec-row{border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px;}
 .rec-row .quitar-fila{background:none;border:none;color:var(--danger);font-size:12px;font-weight:600;margin-top:8px;}
 
+/* ─── Reserva pública (público, sin login) ─────────────────────────────── */
+.reserva-dias{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-top:10px;}
+.reserva-dia-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;width:58px;padding:10px 4px;background:var(--bg);border:1px solid var(--border);border-radius:12px;}
+.reserva-dia-chip.activo{background:var(--gradient-vitalis);border-color:transparent;}
+.reserva-dia-chip.activo *{color:#fff;}
+.reserva-dia-semana{font-size:10px;text-transform:uppercase;color:var(--text-muted);font-weight:600;}
+.reserva-dia-numero{font-size:20px;font-weight:700;}
+.reserva-dia-mes{font-size:10px;color:var(--text-muted);text-transform:uppercase;}
+.reserva-horas{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.reserva-hora-chip{flex:0 0 auto;padding:9px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;}
+.reserva-hora-chip.activo{background:var(--gradient-vitalis);border-color:transparent;color:#fff;}
+
 @media print{
   .no-imprimir{display:none !important;}
   body{background:#fff;}
