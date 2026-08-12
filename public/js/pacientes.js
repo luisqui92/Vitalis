@@ -13,6 +13,17 @@ function pacienteItemHtml(p) {
     </div>`;
 }
 
+function accionItemHtml(id, icono, titulo, subtitulo) {
+  return `
+    <div class="item item-paciente" id="${id}">
+      <div class="avatar avatar-xs">${icono}</div>
+      <div>
+        <div class="nombre">${titulo}</div>
+        <div class="paciente-info">${subtitulo}</div>
+      </div>
+    </div>`;
+}
+
 // ─── DASHBOARD = LISTA DE PACIENTES ─────────────────────────────────────
 async function renderDashboard() {
   detenerPolling();
@@ -27,10 +38,12 @@ async function renderDashboard() {
     const items = dataPacientes.pacientes || [];
     app.innerHTML = `
       ${tabRecordatoriosHtml(dataRecordatorios.recordatorios || [], items)}
-      <button class="secondary" id="btnNuevoPaciente">➕ Nuevo paciente</button>
-      <button class="secondary" id="btnAgenda" style="background:var(--card);color:var(--primary)">📅 Agenda de citas</button>
-      <button class="link" id="btnVincular" style="margin-top:6px">🔗 Vincular este celular como micrófono</button>
-      <button class="link" id="btnSeguridad">🛡️ Seguridad y actividad de la cuenta</button>
+      <div style="margin-bottom:16px">
+        ${accionItemHtml("btnNuevoPaciente", "➕", "Nuevo paciente", "Agregar una ficha nueva")}
+        ${accionItemHtml("btnAgenda", "📅", "Agenda de citas", "Ver y gestionar tus citas")}
+        ${accionItemHtml("btnVincular", "🎙️", "Vincular este celular", "Usarlo como micrófono remoto")}
+        ${accionItemHtml("btnSeguridad", "🛡️", "Seguridad y actividad", "2FA y registro de accesos")}
+      </div>
       ${items.length === 0 ? `<div class="empty">Todavía no registraste ningún paciente.</div>` : `
         <input id="buscarPaciente" type="text" placeholder="🔍 Buscar paciente..." style="margin:16px 0 12px">
         <div id="listaPacientes">
