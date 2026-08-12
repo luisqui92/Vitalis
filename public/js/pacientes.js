@@ -30,6 +30,7 @@ async function renderDashboard() {
       <button class="secondary" id="btnNuevoPaciente">➕ Nuevo paciente</button>
       <button class="secondary" id="btnAgenda" style="background:var(--card);color:var(--primary)">📅 Agenda de citas</button>
       <button class="link" id="btnVincular" style="margin-top:6px">🔗 Vincular este celular como micrófono</button>
+      <button class="link" id="btnSeguridad">🛡️ Seguridad y actividad de la cuenta</button>
       ${items.length === 0 ? `<div class="empty">Todavía no registraste ningún paciente.</div>` : `
         <input id="buscarPaciente" type="text" placeholder="🔍 Buscar paciente..." style="margin:16px 0 12px">
         <div id="listaPacientes">
@@ -41,6 +42,7 @@ async function renderDashboard() {
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
     document.getElementById("btnAgenda").onclick = renderAgenda;
     document.getElementById("btnVincular").onclick = renderVincular;
+    document.getElementById("btnSeguridad").onclick = renderSeguridad;
     document.querySelectorAll(".item[data-id]").forEach(el => {
       el.onclick = () => renderPacienteDetalle(el.dataset.id);
     });

@@ -4,6 +4,7 @@
 const { Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
+const { registrar } = require("../services/auditoria");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -37,6 +38,7 @@ module.exports = function (app) {
   app.get("/medico/pacientes/:id", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.id, medicoPhone }, "Paciente no encontrado");
+    registrar({ req, medicoPhone, accion: "ver_paciente", recurso: `Paciente:${paciente._id}` });
 
     const [consultas, medicamentos, vacunas, mediciones, estudios, recetas] = await Promise.all([
       ConsultaMedica.find({ pacienteId: paciente._id, medicoPhone })

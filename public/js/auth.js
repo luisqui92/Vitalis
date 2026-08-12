@@ -21,12 +21,41 @@ function renderLogin() {
     if (!phone || !password) { errBox.innerHTML = `<div class="error">Completá teléfono y contraseña</div>`; return; }
     try {
       const data = await api("/medico/login", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ phone, password }) });
-      TOKEN = data.token; MEDICO_NOMBRE = data.nombre;
-      localStorage.setItem("salud_token", TOKEN);
-      localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
-      renderDashboard();
+      if (data.requiere2fa) return renderLogin2FA(data.tempToken);
+      completarLogin(data);
     } catch (e) {
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo iniciar sesión")}</div>`;
+    }
+  };
+}
+
+function completarLogin(data) {
+  TOKEN = data.token; MEDICO_NOMBRE = data.nombre;
+  localStorage.setItem("salud_token", TOKEN);
+  localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
+  renderDashboard();
+}
+
+// ─── LOGIN, paso 2: código de la app autenticadora (si el médico tiene 2FA) ──
+function renderLogin2FA(tempToken) {
+  app.innerHTML = `
+    <div class="card">
+      <div class="hint" style="margin-bottom:14px">🔐 Ingresá el código de 6 dígitos de tu app autenticadora (Google Authenticator, Authy...).</div>
+      <input id="lCodigo" type="tel" inputmode="numeric" maxlength="6" placeholder="000000" style="text-align:center;font-size:24px;letter-spacing:6px">
+      <div id="l2Err"></div>
+      <button class="primary" id="l2Btn">Confirmar</button>
+      <button class="link" id="l2Volver">← Volver</button>
+    </div>`;
+  document.getElementById("l2Volver").onclick = renderLogin;
+  document.getElementById("l2Btn").onclick = async () => {
+    const codigo = document.getElementById("lCodigo").value.trim();
+    const errBox = document.getElementById("l2Err");
+    errBox.innerHTML = "";
+    try {
+      const data = await api("/medico/login/2fa", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ tempToken, codigo }) });
+      completarLogin(data);
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || "Código incorrecto")}</div>`;
     }
   };
 }

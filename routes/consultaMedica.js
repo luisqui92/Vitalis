@@ -10,6 +10,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming } = require("../services/assemblyai");
 const { generarNotaClinica } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
+const { registrar } = require("../services/auditoria");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -105,6 +106,7 @@ module.exports = function (app) {
   app.get("/medico/consultas/:id", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    registrar({ req, medicoPhone, accion: "ver_consulta", recurso: `ConsultaMedica:${consulta._id}` });
     res.json({ consulta });
   }));
 };

@@ -44,6 +44,15 @@ const medicoSchema = new mongoose.Schema({
   // que el asistente de WhatsApp usa como única fuente para responder
   // preguntas de pacientes — nunca inventa nada que no esté acá.
   infoConsultorio: { type: String, default: "" },
+  // 2FA (TOTP, compatible Google Authenticator/Authy). "secretoPendiente" es
+  // el secreto generado mientras el médico todavía no escaneó y confirmó el
+  // QR — recién pasa a "secreto" (y activo=true) después de esa confirmación,
+  // así un QR nunca escaneado no deja la cuenta en un estado a medias.
+  dosFA: {
+    activo: { type: Boolean, default: false },
+    secreto: { type: String, default: "" },
+    secretoPendiente: { type: String, default: "" },
+  },
 }, { timestamps: true });
 const Medico = mongoose.model("Medico", medicoSchema);
 
@@ -272,4 +281,18 @@ const vinculacionSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Vinculacion = mongoose.model("Vinculacion", vinculacionSchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion };
+// Registro de auditoría: quién accedió/hizo qué y cuándo — clave para el
+// secreto médico (poder responder "quién vio la historia de este paciente")
+// y para detectar accesos anómalos. Se escribe siempre, nunca se edita.
+const auditLogSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  accion: { type: String, required: true }, // ej: "login", "login_fallido", "ver_paciente", "ver_consulta"
+  recurso: { type: String, default: "" }, // ej: "Paciente:<id>"
+  detalle: { type: String, default: "" },
+  ip: { type: String, default: "" },
+  exito: { type: Boolean, default: true },
+}, { timestamps: true });
+auditLogSchema.index({ medicoPhone: 1, createdAt: -1 });
+const AuditLog = mongoose.model("AuditLog", auditLogSchema);
+
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog };

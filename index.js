@@ -3,10 +3,36 @@
 // ═══════════════════════════════════════════════════════════════════════════
 const path = require("path");
 const express = require("express");
+const helmet = require("helmet");
 const app = express();
 
 const { CONFIG, log, validateConfig } = require("./config");
 validateConfig();
+
+// Detrás de nginx (reverse proxy) — sin esto, Express ve todo como si
+// viniera de 127.0.0.1 y cosas como el rate limiting por IP real (X-Forwarded-For) no funcionan.
+app.set("trust proxy", 1);
+
+// ─── HEADERS DE SEGURIDAD ────────────────────────────────────────────────
+// Todo el front es propio (sin CDN ni scripts de terceros), así que la CSP
+// puede ser estricta: nada de scripts/estilos/imágenes de otro origen salvo
+// lo que Vitalis realmente usa (el WebSocket de AssemblyAI para la
+// transcripción en vivo, y las imágenes data: de los códigos QR).
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"], // nadie puede embeber Vitalis en un iframe (clickjacking)
+    },
+  },
+}));
 
 app.use(express.json({ limit: "10mb" }));
 

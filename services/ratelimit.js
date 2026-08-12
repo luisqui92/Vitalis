@@ -1,7 +1,7 @@
 // Vitalis — Rate Limiting en memoria (sin dependencias externas)
 const { log } = require("../config");
 
-const stores = { medico: new Map() };
+const stores = { medico: new Map(), auth: new Map() };
 
 // Limpieza periódica para no acumular IPs
 setInterval(() => {
@@ -49,4 +49,10 @@ function rateLimit(storeName, max, windowMs, message) {
 
 const limitMedico = rateLimit("medico", 30, 60 * 1000, "Demasiadas peticiones. Esperá un momento.");
 
-module.exports = { rateLimit, limitMedico, getIP };
+// Login/registro/2FA necesitan un límite mucho más estricto que el resto de
+// la API: 30/min (limitMedico) es razonable para uso normal, pero deja
+// margen de sobra para adivinar contraseñas o códigos de 2FA por fuerza
+// bruta. Acá: 8 intentos cada 10 minutos por IP.
+const limitAuth = rateLimit("auth", 8, 10 * 60 * 1000, "Demasiados intentos. Esperá unos minutos antes de volver a intentar.");
+
+module.exports = { rateLimit, limitMedico, limitAuth, getIP };
