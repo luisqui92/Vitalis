@@ -34,7 +34,7 @@ async function limpiarSesion(numero) {
   await SesionCitaWA.deleteOne({ numero });
 }
 
-async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
+async function procesarMensajeEntrante(numero, texto, nombrePerfil, jid) {
   const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
   if (!medicoPhone) return "Este número todavía no está configurado. Avisale a la clínica.";
   const medico = await Medico.findOne({ phone: medicoPhone }).lean();
@@ -59,7 +59,7 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
     case "pedir_motivo":
       return pedirMotivo(medicoPhone, numero, texto, sesion.datos, medico);
     default:
-      return manejarMensajeLibre(medicoPhone, numero, texto, medico);
+      return manejarMensajeLibre(medicoPhone, numero, texto, medico, jid);
   }
 }
 
@@ -86,7 +86,7 @@ async function intentarDesvioLibre(texto, medico) {
 // Sin una conversación de reserva ya en curso: primero se fija si es una
 // pregunta general (responde con la info del consultorio) o si de verdad
 // quiere agendar — recién ahí arranca el flujo de horarios numerados.
-async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
+async function manejarMensajeLibre(medicoPhone, numero, texto, medico, jid) {
   try {
     const { intencion, respuesta } = await enrutarMensaje(texto, medico);
     if (intencion === "cancelar") return iniciarCancelacion(medicoPhone, numero);
@@ -94,20 +94,23 @@ async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
   } catch (e) {
     log.error("[RESERVA_CITAS] enrutarMensaje falló, sigo con la reserva normal:", e.message);
   }
-  return iniciarReserva(medicoPhone, numero);
+  return iniciarReserva(medicoPhone, numero, jid);
 }
 
 // El paciente ve la disponibilidad real en un calendario propio (más claro
-// que contar días en una lista de texto) — el link tiene el número de
+// que contar días en una lista de texto) — el link tiene el JID de
 // WhatsApp del paciente firmado adentro (mismo mecanismo que ya usa el
 // login de médicos), vence solo, y no hace falta guardar sesión acá: toda
 // la elección de día/hora/nombre pasa en esa página, en un solo POST final.
-async function iniciarReserva(medicoPhone, numero) {
+// Se firma el JID completo (no solo el número): a veces WhatsApp identifica
+// al paciente con un LID en vez del número real, y solo el JID original
+// sirve para poder escribirle de vuelta la confirmación más tarde.
+async function iniciarReserva(medicoPhone, numero, jid) {
   const dias = await obtenerHorariosDisponibles(medicoPhone, 21);
   if (dias.length === 0) {
     return "Por ahora no tengo horarios disponibles cargados. Comunicate directo con la clínica para coordinar tu cita.";
   }
-  const token = generarToken(numero, "reserva_publica", 45 * 60 * 1000);
+  const token = generarToken(jid || numero, "reserva_publica", 45 * 60 * 1000);
   const url = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
   return `¡Hola! 👋 Elegí tu horario acá, vas a ver el calendario completo:\n\n${url}\n\n(el link es válido por 45 minutos)\n\nSi querés cancelar una cita ya agendada, escribí "cancelar" en cualquier momento.`;
 }

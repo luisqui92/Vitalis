@@ -79,7 +79,15 @@ async function iniciarWhatsapp() {
           const numero = String(m.key.remoteJid || "").split("@")[0];
           const texto = m.message.conversation || m.message.extendedTextMessage?.text;
           if (!numero || !texto) continue;
-          const respuesta = await procesarMensajeEntrante(numero, texto.trim(), m.pushName || "");
+          // Ojo: m.key.remoteJid no siempre es "<numero>@s.whatsapp.net" — a
+          // veces WhatsApp manda un LID (identificador interno, no el
+          // número real) tipo "235621973024965@lid". Reconstruir el JID a
+          // mano desde "numero" asumiendo siempre @s.whatsapp.net manda el
+          // mensaje a una dirección que no existe y se pierde en silencio
+          // (WhatsApp ni siquiera lo rechaza). Por eso el JID original se
+          // pasa entero para poder responder más tarde (ej: la confirmación
+          // de una reserva hecha por el link), no solo el número.
+          const respuesta = await procesarMensajeEntrante(numero, texto.trim(), m.pushName || "", m.key.remoteJid);
           if (respuesta) await sock.sendMessage(m.key.remoteJid, { text: respuesta });
         } catch (e) {
           log.error("[VITALIS_WHATSAPP] procesando mensaje:", e.message);
@@ -98,12 +106,18 @@ function normalizarNumero(numero) {
   return n;
 }
 
-async function enviarTexto(numero, texto) {
+// "destino" puede ser un número suelto (ej: desde el panel del médico, un
+// teléfono que él mismo escribió — ahí sí es un número real) o un JID ya
+// completo (ej: "235621973024965@lid" o "59176543210@s.whatsapp.net",
+// guardado tal cual llegó de WhatsApp) — si ya trae "@", se usa directo en
+// vez de reconstruirlo, porque reconstruir un LID como si fuera un número
+// arma una dirección que no existe.
+async function enviarTexto(destino, texto) {
   if (!sock || !conectado) {
-    log.warn(`[VITALIS_WHATSAPP] No conectado — no se mandó el mensaje a ${numero}`);
+    log.warn(`[VITALIS_WHATSAPP] No conectado — no se mandó el mensaje a ${destino}`);
     return null;
   }
-  const jid = `${normalizarNumero(numero)}@s.whatsapp.net`;
+  const jid = String(destino).includes("@") ? destino : `${normalizarNumero(destino)}@s.whatsapp.net`;
   try {
     const r = await sock.sendMessage(jid, { text: texto });
     log.info(`[VITALIS_WHATSAPP] Mensaje mandado a ${jid} (id: ${r?.key?.id || "?"})`);
