@@ -21,7 +21,7 @@ function tabRecordatoriosHtml(recordatorios, pacientes) {
           </div>
           <div class="paciente-info">${esc(r.pacienteNombre)}</div>
           <div class="fecha">${new Date(r.fecha).toLocaleDateString("es-BO")}</div>
-          <button class="link" data-completar-recordatorio="${r._id}" style="margin:8px 0 0">✅ Marcar hecho</button>
+          <button class="item-action" data-completar-recordatorio="${r._id}">✅ Marcar hecho</button>
         </div>`).join("")}
       <button type="button" class="link" id="btnNuevoRecordatorio" style="margin-top:${recordatorios.length ? "10px" : "0"}">➕ Nuevo recordatorio</button>
       <div id="recordFormBox" style="display:none;margin-top:12px">

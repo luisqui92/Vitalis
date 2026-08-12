@@ -31,6 +31,20 @@ function iniciales(nombre) {
 
 function fmt(s){ const m=String(Math.floor(s/60)).padStart(2,"0"); const r=String(s%60).padStart(2,"0"); return m+":"+r; }
 
+// Ícono + etiqueta corta de cada pestaña del Kardex (ver pintarKardex en
+// pacientes.js) — en un grid fijo de 4 columnas, así que el texto tiene que
+// entrar corto sin cortarse.
+const TABS_KARDEX = {
+  paciente: { icono: "👤", label: "Paciente" },
+  consultas: { icono: "🎙️", label: "Consultas" },
+  medicamentos: { icono: "💊", label: "Medicación" },
+  antecedentes: { icono: "📋", label: "Antecedentes" },
+  vacunas: { icono: "💉", label: "Vacunas" },
+  evolucion: { icono: "📈", label: "Evolución" },
+  estudios: { icono: "🧪", label: "Estudios" },
+  recetas: { icono: "📄", label: "Recetas" },
+};
+
 async function api(path, opts = {}) {
   const headers = opts.headers || {};
   if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;

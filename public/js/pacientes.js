@@ -1,6 +1,18 @@
 // Vitalis — Dashboard (lista de pacientes) y el Kardex de cada paciente
 // (pestañas: Paciente, Consultas, Medicación, Antecedentes, Vacunas).
 
+function pacienteItemHtml(p) {
+  const edad = edadDesde(p.fechaNacimiento);
+  return `
+    <div class="item item-paciente" data-id="${p._id}" data-nombre="${esc(p.nombre.toLowerCase())}">
+      <div class="avatar avatar-xs">${esc(iniciales(p.nombre))}</div>
+      <div>
+        <div class="nombre">${esc(p.nombre)}</div>
+        <div class="paciente-info">${edad != null ? edad + " años" : ""}${edad != null && p.sexo ? " · " : ""}${esc(p.sexo || "")}</div>
+      </div>
+    </div>`;
+}
+
 // ─── DASHBOARD = LISTA DE PACIENTES ─────────────────────────────────────
 async function renderDashboard() {
   detenerPolling();
@@ -18,15 +30,13 @@ async function renderDashboard() {
       <button class="secondary" id="btnNuevoPaciente">➕ Nuevo paciente</button>
       <button class="secondary" id="btnAgenda" style="background:var(--card);color:var(--primary)">📅 Agenda de citas</button>
       <button class="link" id="btnVincular" style="margin-top:6px">🔗 Vincular este celular como micrófono</button>
-      ${items.length === 0 ? `<div class="empty">Todavía no registraste ningún paciente.</div>` : ""}
-      ${items.map(p => {
-        const edad = edadDesde(p.fechaNacimiento);
-        return `
-        <div class="item" data-id="${p._id}">
-          <div class="nombre">${esc(p.nombre)}</div>
-          <div class="paciente-info">${edad != null ? edad + " años" : ""}${edad != null && p.sexo ? " · " : ""}${esc(p.sexo || "")}</div>
-        </div>`;
-      }).join("")}
+      ${items.length === 0 ? `<div class="empty">Todavía no registraste ningún paciente.</div>` : `
+        <input id="buscarPaciente" type="text" placeholder="🔍 Buscar paciente..." style="margin:16px 0 12px">
+        <div id="listaPacientes">
+          ${items.map(p => pacienteItemHtml(p)).join("")}
+        </div>
+        <div class="empty" id="buscarVacio" style="display:none">Ningún paciente coincide con la búsqueda.</div>
+      `}
     `;
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
     document.getElementById("btnAgenda").onclick = renderAgenda;
@@ -34,6 +44,19 @@ async function renderDashboard() {
     document.querySelectorAll(".item[data-id]").forEach(el => {
       el.onclick = () => renderPacienteDetalle(el.dataset.id);
     });
+    const buscarInput = document.getElementById("buscarPaciente");
+    if (buscarInput) {
+      buscarInput.oninput = () => {
+        const q = buscarInput.value.trim().toLowerCase();
+        let visibles = 0;
+        document.querySelectorAll("#listaPacientes .item").forEach(el => {
+          const coincide = el.dataset.nombre.includes(q);
+          el.style.display = coincide ? "" : "none";
+          if (coincide) visibles++;
+        });
+        document.getElementById("buscarVacio").style.display = visibles === 0 ? "block" : "none";
+      };
+    }
     wireRecordatorios(items);
   } catch (e) {
     if (e.status === 401) return logout();
@@ -136,34 +159,32 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   }
 
   const tabPaciente = `
-    <div class="card avatar-card">
-      <div class="avatar">${esc(iniciales(p.nombre))}</div>
-      <div class="nombre" style="font-size:16px;font-weight:700">${esc(p.nombre)}</div>
-      <div class="paciente-info">${edad != null ? edad + " años" : "Edad no registrada"}${p.sexo ? " · " + esc(p.sexo) : ""}</div>
+    <div class="card ficha-card">
+      <div class="ficha-header">
+        <div class="avatar avatar-sm">${esc(iniciales(p.nombre))}</div>
+        <div>
+          <div class="nombre" style="font-size:16px;font-weight:700">${esc(p.nombre)}</div>
+          <div class="paciente-info">${edad != null ? edad + " años" : "Edad no registrada"}${p.sexo ? " · " + esc(p.sexo) : ""}</div>
+        </div>
+      </div>
+      <div class="ficha-datos">
+        <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : "No registrado"}</div>
+        <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString("es-BO") : "No registrada"}</div>
+        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : "Sin notas registradas"}</div>
+      </div>
     </div>
-
-    ${briefHtml}
-    ${tabMemoriaHtml(p._id)}
 
     <div class="stats-row">
       <div class="stat"><div class="stat-num">${consultas.length}</div><div class="stat-lbl">Consultas</div></div>
       <div class="stat"><div class="stat-num">${ultima ? new Date(ultima.createdAt).toLocaleDateString("es-BO", {day:"2-digit", month:"short"}) : "—"}</div><div class="stat-lbl">Última visita</div></div>
     </div>
 
-    <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Contacto</div>
-      <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : "No registrado"}</div>
-      <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString("es-BO") : "No registrada"}</div>
-    </div>
-
-    <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Notas</div>
-      <div class="paciente-info">${p.notas ? esc(p.notas) : "Sin notas registradas todavía."}</div>
-    </div>
+    ${briefHtml}
+    ${tabMemoriaHtml(p._id)}
 
     ${ultimaConDx ? `
-    <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Último diagnóstico</div>
+    <div class="card card-secundaria">
+      <div class="seccion-titulo" style="margin-top:0">Último diagnóstico registrado</div>
       <div class="fecha" style="margin-bottom:6px">${new Date(ultimaConDx.createdAt).toLocaleDateString("es-BO")}</div>
       ${ultimaConDx.notaClinica.motivoConsulta ? `<div class="nota-campo"><b>Motivo:</b> ${esc(ultimaConDx.notaClinica.motivoConsulta)}</div>` : ""}
       ${ultimaConDx.notaClinica.diagnostico ? `<div class="nota-campo"><b>Diagnóstico:</b> ${esc(ultimaConDx.notaClinica.diagnostico)}</div>` : ""}
@@ -261,14 +282,10 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     <button class="back" id="btnBack">← Pacientes</button>
     <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
     <div class="tabs">
-      <button class="tab ${tabActiva === "paciente" ? "activo" : ""}" data-tab="paciente">Paciente</button>
-      <button class="tab ${tabActiva === "consultas" ? "activo" : ""}" data-tab="consultas">Consultas</button>
-      <button class="tab ${tabActiva === "medicamentos" ? "activo" : ""}" data-tab="medicamentos">Medicación</button>
-      <button class="tab ${tabActiva === "antecedentes" ? "activo" : ""}" data-tab="antecedentes">Antecedentes</button>
-      <button class="tab ${tabActiva === "vacunas" ? "activo" : ""}" data-tab="vacunas">Vacunas</button>
-      <button class="tab ${tabActiva === "evolucion" ? "activo" : ""}" data-tab="evolucion">Evolución</button>
-      <button class="tab ${tabActiva === "estudios" ? "activo" : ""}" data-tab="estudios">Estudios</button>
-      <button class="tab ${tabActiva === "recetas" ? "activo" : ""}" data-tab="recetas">Recetas</button>
+      ${Object.entries(TABS_KARDEX).map(([key, t]) => `
+        <button class="tab ${tabActiva === key ? "activo" : ""}" data-tab="${key}">
+          <span class="tab-icono">${t.icono}</span>${t.label}
+        </button>`).join("")}
     </div>
     <div id="tabContent">${tabs[tabActiva] || tabConsultas}</div>
   `;

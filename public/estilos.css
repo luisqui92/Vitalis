@@ -45,6 +45,11 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 .item .nombre{font-size:15px;font-weight:600;}
 .item .fecha{font-size:11px;color:var(--text-muted);margin-top:4px;}
 .item .preview{font-size:12px;color:var(--text-muted);margin-top:6px;}
+.item-paciente{display:flex;align-items:center;gap:12px;}
+/* Acción compacta dentro de un .item (ej: "Marcar hecho") — antes se usaba
+   .link con estilos inline sueltos (a veces full-width y centrado, a veces
+   no), lo que se veía inconsistente entre tarjetas. */
+.item-action{display:inline-block;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--primary);}
 .badge{font-size:11px;padding:3px 9px;border-radius:12px;white-space:nowrap;font-weight:600;}
 .badge-procesando{background:var(--warning-bg);color:var(--warning);}
 .badge-completado{background:var(--success-bg);color:var(--success);}
@@ -60,8 +65,12 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 .segmento .quien{font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:600;}
 .segmento .texto{font-size:14px;line-height:1.4;}
 .back{background:none;border:none;color:var(--primary);font-size:13px;margin-bottom:14px;font-weight:600;}
-.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:16px;overflow-x:auto;}
-.tab{flex:0 0 auto;background:none;border:none;padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-muted);border-radius:7px;white-space:nowrap;transition:background .15s ease;}
+/* Grid fijo de 4 columnas: con 8 pestañas eso da exactamente 2 filas
+   completas, siempre — a diferencia de una tira que scrollea, acá nunca
+   queda una pestaña escondida fuera de la pantalla sin que se note. */
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:5px;margin-bottom:16px;}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:9px 2px;font-size:10.5px;font-weight:600;color:var(--text-muted);border-radius:8px;line-height:1.15;transition:background .15s ease,color .15s ease;}
+.tab .tab-icono{font-size:16px;}
 .tab.activo{background:var(--gradient-vitalis);color:#fff;}
 .seccion-titulo{font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;margin:20px 0 8px;}
 .nota-titulo{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px;}
@@ -69,15 +78,30 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 .nota-campo b{color:var(--text);}
 .paciente-info{font-size:13px;color:var(--text-muted);margin-top:4px;line-height:1.5;}
 .avatar-card{text-align:center;}
-.avatar{width:60px;height:60px;border-radius:50%;background:var(--gradient-vitalis);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 3px 10px rgba(14,116,144,.25);}
+.avatar{width:60px;height:60px;border-radius:50%;background:var(--gradient-vitalis);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 3px 10px rgba(14,116,144,.25);flex:0 0 auto;}
+.avatar-sm{width:48px;height:48px;font-size:16px;margin:0;}
+.avatar-xs{width:38px;height:38px;font-size:13px;margin:0;box-shadow:none;}
 .stats-row{display:flex;gap:10px;margin-bottom:14px;}
 .stat{flex:1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 8px;text-align:center;box-shadow:0 1px 3px rgba(15,39,51,.05);}
 .stat-num{font-size:18px;font-weight:700;color:var(--primary);}
 .stat-lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
 .dato-row{font-size:14px;padding:9px 0;border-bottom:1px solid var(--border);}
 .dato-row:last-child{border-bottom:none;}
-.brief-card{background:linear-gradient(135deg,#e6f7fa,#f0f9fa);border:1px solid var(--accent-2);}
+
+/* Ficha del paciente: identidad + contacto + notas en un solo bloque
+   compacto (antes eran 3 tarjetas blancas idénticas seguidas). */
+.ficha-header{display:flex;align-items:center;gap:14px;}
+.ficha-datos{margin-top:14px;padding-top:2px;border-top:1px solid var(--border);}
+
+/* El Brief Clínico es lo primero que un médico quiere ver de un vistazo:
+   más peso visual que el resto (franja de color + título más grande). */
+.brief-card{background:linear-gradient(135deg,#e6f7fa,#f0f9fa);border:1px solid var(--accent-2);border-left:4px solid var(--primary);}
+.brief-card .nota-titulo{font-size:15px;}
 .brief-alerta{color:var(--danger);}
+
+/* Tarjetas de apoyo/secundarias: mismo contenido que antes pero con menos
+   peso visual, para que no compitan con el Brief Clínico por la atención. */
+.card-secundaria{background:transparent;border:1px dashed var(--border);box-shadow:none;}
 
 /* ─── Panel "escuchando": el logo de Vitalis late con el volumen real del
    micrófono (más fuerte cuando detecta voz, casi quieto en silencio) ──── */
@@ -121,8 +145,14 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
    (app.innerHTML = ...), estos son los bloques que se crean de cero, así
    que la animación se dispara sola en cada cambio de pantalla — sin tocar
    el JS de cada vista. ───────────────────────────────────────────────── */
-@keyframes entrar{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-.card,.item,.loading,.stat,.avatar-card,.empty,.error{animation:entrar .35s ease both;}
+/* Algunas pantallas se repintan solas cada pocos segundos (agenda
+   esperando el QR de WhatsApp, kardex mientras se genera el brief
+   clínico...) y eso vuelve a disparar esta animación en todas las
+   tarjetas — por eso queda sutil (opacidad, sin desplazamiento): se nota
+   como "entrada" la primera vez, y como un parpadeo casi invisible en los
+   refrescos automáticos, en vez de un fundido brusco cada vez. */
+@keyframes entrar{from{opacity:.5;}to{opacity:1;}}
+.card,.item,.loading,.stat,.avatar-card,.empty,.error{animation:entrar .25s ease both;}
 
 /* ─── Evolución clínica: chips de tipo + gráfico de tendencia ──────────── */
 .chip-row{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
