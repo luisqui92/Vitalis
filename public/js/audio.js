@@ -131,6 +131,14 @@ function crearTranscriptorEnVivo(onTexto) {
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);
+          // Antes de cerrar el socket, AssemblyAI manda el motivo real en un
+          // mensaje aparte (type:"Error") — se ignoraba porque no tiene
+          // "transcript", y por eso el cierre (código 3007 y similares)
+          // quedaba sin explicación visible.
+          if (msg.error || msg.type === "Error") {
+            onTexto("⚠️ Vista previa en vivo: " + (msg.error || msg.message || JSON.stringify(msg)));
+            return;
+          }
           if (!msg.transcript) return;
           if (msg.end_of_turn) {
             textoAcumulado += msg.transcript + " ";
