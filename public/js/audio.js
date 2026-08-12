@@ -79,7 +79,7 @@ async function subirConsulta(pacienteId, blob, mimeType) {
 // solo decorativo, la transcripción de verdad sigue viniendo del archivo
 // subido al terminar.
 function crearTranscriptorEnVivo(onTexto) {
-  let ws = null, audioCtx = null, workletNode = null, source = null;
+  let ws = null, audioCtx = null, workletNode = null, source = null, detenidoManualmente = false;
 
   const CODIGO_WORKLET = `
     class PCMWorklet extends AudioWorkletProcessor {
@@ -110,6 +110,7 @@ function crearTranscriptorEnVivo(onTexto) {
   `;
 
   async function iniciar(stream) {
+    detenidoManualmente = false;
     try {
       const { token } = await api("/medico/transcripcion-token");
       const url = "wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&encoding=pcm_s16le"
@@ -139,13 +140,26 @@ function crearTranscriptorEnVivo(onTexto) {
           }
         } catch {}
       };
-      ws.onerror = () => {}; // decorativo — si falla, seguimos grabando igual
+      // No afecta la grabación real, pero antes fallaba en silencio total —
+      // ahora se avisa en el propio texto en vivo para poder diagnosticar
+      // sin herramientas de desarrollador (el médico graba desde el celular).
+      ws.onerror = () => {
+        onTexto("⚠️ Vista previa en vivo no disponible (error de conexión). La grabación real no se ve afectada.");
+      };
+      ws.onclose = (ev) => {
+        if (detenidoManualmente) return;
+        if (ev.code !== 1000) {
+          onTexto(`⚠️ Vista previa en vivo se cortó (código ${ev.code}${ev.reason ? ": " + ev.reason : ""}). La grabación real no se ve afectada.`);
+        }
+      };
     } catch (e) {
+      onTexto("⚠️ Vista previa en vivo no disponible: " + e.message);
       console.warn("Transcripción en vivo no disponible:", e.message);
     }
   }
 
   function detener() {
+    detenidoManualmente = true;
     if (workletNode) { try { workletNode.disconnect(); } catch {} }
     if (source) { try { source.disconnect(); } catch {} }
     if (audioCtx) { try { audioCtx.close(); } catch {} }
