@@ -31,6 +31,13 @@ async function pedirTranscripcion(audioUrl) {
       audio_url: audioUrl,
       language_code: "es",
       speaker_labels: true,
+      // Sin esto, el modelo tiene que adivinar cuántas voces distintas hay
+      // y en grabaciones donde una voz domina (médico más cerca del micrófono
+      // que el paciente) suele terminar atribuyendo todo a un solo hablante.
+      // Una consulta es médico + paciente casi siempre — si en algún caso
+      // hay una tercera persona (acompañante), el modelo igual puede
+      // detectarla, este número es solo una ayuda, no un límite estricto.
+      speakers_expected: 2,
       domain: "medical-v1",
       keyterms_prompt: KEYTERMS_MEDICOS_ES,
     },
