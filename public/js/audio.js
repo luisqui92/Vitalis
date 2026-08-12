@@ -86,12 +86,18 @@ function crearTranscriptorEnVivo(onTexto) {
       constructor() {
         super();
         this.ratio = sampleRate / 16000;
+        // process() se llama cada ~128 muestras (unos 2-3ms) — mandar un
+        // mensaje por cada llamada da chunks de milisegundos, y AssemblyAI
+        // rechaza (cierra con código 3007) cualquier chunk de menos de
+        // 50ms. Por eso se acumula hasta juntar ~100ms (1600 muestras a
+        // 16kHz) antes de mandar cada mensaje.
+        this.pendientes = [];
+        this.tamanoChunk = 1600;
       }
       process(inputs) {
         const input = inputs[0][0];
         if (input && input.length) {
           const outLen = Math.max(1, Math.floor(input.length / this.ratio));
-          const buf = new Int16Array(outLen);
           for (let i = 0; i < outLen; i++) {
             const srcIdx = i * this.ratio;
             const i0 = Math.floor(srcIdx);
@@ -99,9 +105,13 @@ function crearTranscriptorEnVivo(onTexto) {
             const frac = srcIdx - i0;
             const sample = input[i0] * (1 - frac) + input[i1] * frac;
             const s = Math.max(-1, Math.min(1, sample));
-            buf[i] = s < 0 ? s * 32768 : s * 32767;
+            this.pendientes.push(s < 0 ? s * 32768 : s * 32767);
           }
-          this.port.postMessage(buf.buffer, [buf.buffer]);
+          while (this.pendientes.length >= this.tamanoChunk) {
+            const listo = this.pendientes.splice(0, this.tamanoChunk);
+            const buf = new Int16Array(listo);
+            this.port.postMessage(buf.buffer, [buf.buffer]);
+          }
         }
         return true;
       }
