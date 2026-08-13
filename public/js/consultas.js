@@ -286,6 +286,43 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       }
     }
 
+    let tratamientosHtml = "";
+    const tratSugeridos = c.notaClinica?.tratamientosSugeridos;
+    if (tratSugeridos && tratSugeridos.length) {
+      const pendientes = tratSugeridos.filter(t => t.estado === "pendiente");
+      const resueltos = tratSugeridos.filter(t => t.estado !== "pendiente");
+      if (pendientes.length || resueltos.length) {
+        tratamientosHtml = `
+          <div class="card">
+            <div class="nota-titulo">🦷 Tratamientos mencionados</div>
+            <div class="hint" style="margin-bottom:10px">Detecté esto en la consulta. Revisá el nombre, la pieza y el precio antes de agregarlo al presupuesto — no se carga nada solo.</div>
+            ${pendientes.map(t => `
+              <div class="dato-row" data-tratsug="${t._id}" style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
+                <div class="hint" style="margin-bottom:8px">Detecté esto en la consulta: "${esc(t.itemMencionado)}"</div>
+                <label>Tratamiento</label>
+                <input class="ts-nombre" type="text" value="${esc(t.catalogoNombreSugerido || t.itemMencionado || "")}">
+                <div style="display:flex;gap:10px">
+                  <div style="flex:1">
+                    <label>Pieza (FDI, opcional)</label>
+                    <input class="ts-pieza" type="number" min="11" max="48" value="${t.piezaFdi ?? ""}">
+                  </div>
+                  <div style="flex:1">
+                    <label>Precio (Bs.)</label>
+                    <input class="ts-precio" type="number" min="0" step="0.01" value="${t.precioCatalogo ?? ""}">
+                  </div>
+                </div>
+                <div class="ts-err"></div>
+                <button class="primary ts-btn-agregar" style="margin-top:8px">Agregar al presupuesto</button>
+                <button class="link ts-btn-descartar">Descartar</button>
+              </div>`).join("")}
+            ${resueltos.map(t => `
+              <div class="hint" style="margin-top:8px;color:${t.estado === "agregado" ? "var(--success)" : "inherit"}">
+                ${t.estado === "agregado" ? "✅ Agregado al presupuesto" : "— Descartado"}: "${esc(t.itemMencionado)}"
+              </div>`).join("")}
+          </div>`;
+      }
+    }
+
     let body = "";
     if (c.estado === "procesando") {
       body = `<div class="hint">⏳ Transcribiendo tu consulta... para audios largos puede tardar varios minutos. Esta pantalla se actualiza sola, no hace falta que hagas nada.</div>`;
@@ -309,6 +346,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       </div>
       ${notaHtml}
       ${reconsultaHtml}
+      ${tratamientosHtml}
       ${sugerenciasHtml}
       <div style="margin-top:14px">${body}</div>
     `;
@@ -341,6 +379,37 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         renderDetalle(id);
       };
     }
+
+    document.querySelectorAll("[data-tratsug]").forEach(row => {
+      const itemId = row.dataset.tratsug;
+      const errBox = row.querySelector(".ts-err");
+      const btnAgregar = row.querySelector(".ts-btn-agregar");
+      const btnDescartar = row.querySelector(".ts-btn-descartar");
+
+      btnAgregar.onclick = async () => {
+        errBox.innerHTML = "";
+        const nombre = row.querySelector(".ts-nombre").value.trim();
+        const piezaFdi = row.querySelector(".ts-pieza").value;
+        const precio = row.querySelector(".ts-precio").value;
+        btnAgregar.disabled = true;
+        btnAgregar.textContent = "Agregando...";
+        try {
+          await api(`/medico/consultas/${c._id}/tratamientos-sugeridos/${itemId}/agregar`, {
+            method: "POST", headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ nombre, precio, piezaFdi }),
+          });
+          renderDetalle(id);
+        } catch (e) {
+          errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo agregar")}</div>`;
+          btnAgregar.disabled = false;
+          btnAgregar.textContent = "Agregar al presupuesto";
+        }
+      };
+      btnDescartar.onclick = async () => {
+        await api(`/medico/consultas/${c._id}/tratamientos-sugeridos/${itemId}/descartar`, { method: "POST" });
+        renderDetalle(id);
+      };
+    });
 
     const btnGenerarReceta = document.getElementById("btnGenerarReceta");
     if (btnGenerarReceta) {

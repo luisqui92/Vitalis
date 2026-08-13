@@ -4,7 +4,7 @@
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
 const { CONFIG, log } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming } = require("../services/assemblyai");
@@ -68,10 +68,22 @@ module.exports = function (app) {
         try {
           const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
             .select("nombre").lean();
+
+          // Solo para odontología: le pasamos el catálogo de precios del
+          // consultorio para que la IA pueda emparejar tratamientos
+          // mencionados ("hay que sellar esto") con el ítem correcto.
+          const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+          let catalogoTratamientos = [];
+          if (medico?.tipoEspecialidad === "odontologia") {
+            const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
+            catalogoTratamientos = catalogo.map(c => c.nombre);
+          }
+
           consulta.notaClinica = await generarNotaClinica(transcripcionCompleta, {
             antecedentesPersonales: paciente.antecedentesPersonales || [],
             antecedentesFamiliares: paciente.antecedentesFamiliares || [],
             medicamentosActivos: medicamentosActivos.map(m => m.nombre),
+            catalogoTratamientos,
           });
           consulta.notaClinicaEstado = "completado";
         } catch (e) {
@@ -109,7 +121,24 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
     registrar({ req, medicoPhone, accion: "ver_consulta", recurso: `ConsultaMedica:${consulta._id}` });
-    res.json({ consulta });
+
+    // Le sumamos el precio del catálogo a cada tratamiento sugerido que la
+    // IA logró emparejar, para no obligar al médico a ir a buscarlo.
+    const consultaObj = consulta.toObject();
+    const sugeridos = consultaObj.notaClinica?.tratamientosSugeridos;
+    if (sugeridos?.length) {
+      const nombres = [...new Set(sugeridos.filter(t => t.catalogoNombreSugerido).map(t => t.catalogoNombreSugerido))];
+      if (nombres.length) {
+        const catalogo = await CatalogoTratamiento.find({ medicoPhone, nombre: { $in: nombres } }).select("nombre precio").lean();
+        const precioPorNombre = Object.fromEntries(catalogo.map(c => [c.nombre, c.precio]));
+        consultaObj.notaClinica.tratamientosSugeridos = sugeridos.map(t => ({
+          ...t,
+          precioCatalogo: t.catalogoNombreSugerido ? (precioPorNombre[t.catalogoNombreSugerido] ?? null) : null,
+        }));
+      }
+    }
+
+    res.json({ consulta: consultaObj });
   }));
 
   // ─── RECONSULTA POR VOZ: confirmar o descartar lo que detectó la IA ─────
@@ -155,6 +184,46 @@ module.exports = function (app) {
     const sugerida = consulta.notaClinica?.reconsultaSugerida;
     if (!sugerida?.fechaHora) throw new ErrorHttp(400, "Esta consulta no tiene una reconsulta sugerida");
     sugerida.estado = "descartada";
+    await consulta.save();
+    res.json({ ok: true });
+  }));
+
+  // ─── TRATAMIENTOS SUGERIDOS (Vitalis Odonto): agregar al presupuesto o
+  // descartar. Igual que la reconsulta, el odontólogo siempre revisa y
+  // puede corregir nombre/precio/pieza antes de que se cree el ítem real —
+  // la IA solo emparejó con el catálogo, nunca facturó sola. ─────────────
+  app.post("/medico/consultas/:id/tratamientos-sugeridos/:itemId/agregar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    const item = consulta.notaClinica?.tratamientosSugeridos?.id(req.params.itemId);
+    if (!item) throw new ErrorHttp(404, "Ese tratamiento sugerido no existe");
+    if (item.estado !== "pendiente") throw new ErrorHttp(409, "Este tratamiento ya fue agregado o descartado");
+
+    const nombre = String(req.body?.nombre || item.catalogoNombreSugerido || item.itemMencionado || "").trim();
+    if (!nombre) throw new ErrorHttp(400, "Falta el nombre del tratamiento");
+    const precio = Number(req.body?.precio);
+    if (!Number.isFinite(precio) || precio < 0) throw new ErrorHttp(400, "Precio inválido");
+    let piezaFdi = req.body?.piezaFdi !== undefined && req.body?.piezaFdi !== "" ? Number(req.body.piezaFdi) : item.piezaFdi;
+    if (piezaFdi !== null && piezaFdi !== undefined && !Number.isFinite(piezaFdi)) throw new ErrorHttp(400, "Pieza inválida");
+
+    const tratamiento = await TratamientoPlan.create({
+      pacienteId: consulta.pacienteId, medicoPhone, nombre, precio,
+      piezaFdi: piezaFdi ?? null, estado: "pendiente",
+    });
+
+    item.estado = "agregado";
+    await consulta.save();
+    registrar({ req, medicoPhone, accion: "tratamiento_agregado_por_voz", recurso: `ConsultaMedica:${consulta._id}` });
+    res.json({ ok: true, tratamiento });
+  }));
+
+  app.post("/medico/consultas/:id/tratamientos-sugeridos/:itemId/descartar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    const item = consulta.notaClinica?.tratamientosSugeridos?.id(req.params.itemId);
+    if (!item) throw new ErrorHttp(404, "Ese tratamiento sugerido no existe");
+    if (item.estado !== "pendiente") throw new ErrorHttp(409, "Este tratamiento ya fue agregado o descartado");
+    item.estado = "descartado";
     await consulta.save();
     res.json({ ok: true });
   }));

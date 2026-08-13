@@ -139,6 +139,17 @@ const consultaMedicaSchema = new mongoose.Schema({
     antecedentesPersonalesNuevos: [String],
     antecedentesFamiliaresNuevos: [{ parentesco: String, condicion: String }],
     vacunasMencionadas: [{ nombre: String, dosis: String, fecha: String }],
+    // Vitalis Odonto: tratamientos que el odontólogo dice que hay que hacer
+    // ("hay que poner un implante acá"), emparejados (si se puede) contra su
+    // propio catálogo de precios. Cada uno se confirma o descarta por
+    // separado — al confirmar recién se crea el ítem real en el presupuesto
+    // del paciente (ver /medico/consultas/:id/tratamientos-sugeridos/*).
+    tratamientosSugeridos: [{
+      itemMencionado: { type: String, default: "" },
+      piezaFdi: { type: Number, default: null },
+      catalogoNombreSugerido: { type: String, default: null },
+      estado: { type: String, enum: ["pendiente", "agregado", "descartado"], default: "pendiente" },
+    }],
   },
   notaClinicaError: String,
 }, { timestamps: true });

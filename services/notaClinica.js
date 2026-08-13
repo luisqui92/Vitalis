@@ -26,6 +26,7 @@ RESPONDE SOLO JSON con esta estructura exacta:
   "examenesSolicitados": ["string", ...],
   "proximoControl": "string o null",
   "reconsultaSugerida": {"fechaHora":"YYYY-MM-DDTHH:mm o null","textoOriginal":"string o null"},
+  "tratamientosSugeridos": [{"itemMencionado":"string","piezaFdi":"number o null","catalogoNombreSugerido":"string o null"}],
   "antecedentesPersonalesNuevos": ["string", ...],
   "antecedentesFamiliaresNuevos": [{"parentesco":"string","condicion":"string"}],
   "vacunasMencionadas": [{"nombre":"string","dosis":"string o null","fecha":"YYYY-MM-DD o null"}]
@@ -63,7 +64,23 @@ Reglas:
   a mano a que le llegue un mensaje equivocado al paciente. Si el médico
   solo dice algo vago sin fecha concreta ("en un mes", "cuando tenga los
   resultados", "más adelante"), también dejalo en null — eso ya lo cubre
-  "proximoControl".`;
+  "proximoControl".
+- "tratamientosSugeridos": SOLO si más abajo te doy un catálogo de
+  tratamientos de este consultorio (si no te lo doy, dejá esta lista
+  vacía — es una función solo para odontología). Reportá cada tratamiento
+  que el profesional dice que HAY QUE HACER de acá en adelante (no algo
+  que ya se hizo, no un antecedente) — ej: "hay que poner un implante
+  acá", "esto hay que sellarlo", "necesita una corona en esa pieza". Para
+  cada uno:
+  · "itemMencionado": la frase tal cual la dijo, para que la revise después.
+  · "piezaFdi": el número de pieza (11-48) si lo mencionó junto, si no null.
+  · "catalogoNombreSugerido": el profesional NO va a decir el nombre exacto
+    del catálogo, así que buscá en la lista que te paso el ítem que MEJOR
+    corresponda por significado (ej: "sellar" → el ítem de sellantes;
+    "implante" → el ítem de implante unitario). Copiá el nombre EXACTO tal
+    como aparece en la lista dada. Si ningún ítem del catálogo corresponde
+    con confianza, dejalo en null — mejor no sugerir nada que sugerir el
+    ítem equivocado (el profesional lo puede elegir a mano después).`;
 
 function construirContexto(contexto) {
   const partes = [];
@@ -78,6 +95,9 @@ function construirContexto(contexto) {
   if (contexto?.medicamentosActivos?.length) {
     partes.push(`Medicamentos ya activos: ${contexto.medicamentosActivos.join(", ")}`);
   }
+  if (contexto?.catalogoTratamientos?.length) {
+    partes.push(`Catálogo de tratamientos de este consultorio (para "tratamientosSugeridos"): ${contexto.catalogoTratamientos.join("; ")}`);
+  }
   return `\n\n(${partes.join(" ")})`;
 }
 
@@ -90,7 +110,7 @@ async function generarNotaClinica(transcripcion, contexto) {
         { role: "system", content: PROMPT_SISTEMA },
         { role: "user", content: transcripcion + construirContexto(contexto) },
       ],
-      max_tokens: 1000,
+      max_tokens: 1300,
       temperature: 0.1,
     },
     {
