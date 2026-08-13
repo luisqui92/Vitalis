@@ -283,6 +283,10 @@ const estudioSchema = new mongoose.Schema({
   archivoTamano: { type: Number, required: true },
   fecha: { type: Date, required: true },
   notas: { type: String, default: "" },
+  // Solo cuando tipo==="foto": qué ángulo es (frontal/perfil/tres_cuartos),
+  // para poder agrupar y comparar antes/después del mismo ángulo entre
+  // fechas distintas (ver /medico/pacientes/:id en la pestaña Estudios).
+  anguloFoto: { type: String, default: "" },
 }, { timestamps: true });
 estudioSchema.index({ pacienteId: 1, fecha: -1 });
 const Estudio = mongoose.model("Estudio", estudioSchema);

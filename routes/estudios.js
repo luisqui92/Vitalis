@@ -52,6 +52,7 @@ module.exports = function (app) {
       pacienteId: paciente._id, medicoPhone, tipo, nombre,
       archivoNombre, archivoMime: mime, archivoTamano: archivo.length,
       fecha, notas: String(req.query.notas || "").trim(),
+      anguloFoto: tipo === "foto" ? String(req.query.anguloFoto || "").trim() : "",
     });
     res.status(201).json({ ok: true, estudio });
   }));
