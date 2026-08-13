@@ -3,13 +3,15 @@
 // o PC) y reciben la transcripción separada por hablante + nota clínica.
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
-const { log } = require("../config");
-const { Paciente, ConsultaMedica, Medicamento } = require("../db/models");
-const { requireAuth } = require("../services/auth");
+const { CONFIG, log } = require("../config");
+const { Medico, Paciente, ConsultaMedica, Medicamento } = require("../db/models");
+const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming } = require("../services/assemblyai");
 const { generarNotaClinica } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
+const { enviarTexto } = require("../services/baileysWhatsapp");
+const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { registrar } = require("../services/auditoria");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 
@@ -108,5 +110,52 @@ module.exports = function (app) {
     const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
     registrar({ req, medicoPhone, accion: "ver_consulta", recurso: `ConsultaMedica:${consulta._id}` });
     res.json({ consulta });
+  }));
+
+  // ─── RECONSULTA POR VOZ: confirmar o descartar lo que detectó la IA ─────
+  // El médico siempre revisa antes de que le llegue algo al paciente — acá
+  // solo se llega después de que él tocó "Confirmar" en la nota clínica.
+  app.post("/medico/consultas/:id/reconsulta/confirmar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    const sugerida = consulta.notaClinica?.reconsultaSugerida;
+    if (!sugerida?.fechaHora) throw new ErrorHttp(400, "Esta consulta no tiene una reconsulta sugerida");
+    if (sugerida.estado !== "pendiente") throw new ErrorHttp(409, "Esta sugerencia ya fue confirmada o descartada");
+
+    // El médico pudo haber ajustado la fecha/hora antes de confirmar.
+    if (req.body?.fechaHora) {
+      const f = new Date(req.body.fechaHora);
+      if (isNaN(f.getTime())) throw new ErrorHttp(400, "Fecha inválida");
+      sugerida.fechaHora = f;
+    }
+
+    const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
+    if (!paciente.telefono) throw new ErrorHttp(400, "Este paciente no tiene teléfono cargado — no se le puede escribir por WhatsApp.");
+
+    const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+    const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
+    const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
+    const primerNombre = String(paciente.nombre || "").split(" ")[0];
+
+    const texto = `Hola ${primerNombre} 👋 ${medico?.nombre || "Tu médico"} te sugiere tu próxima consulta para el ${formatearFechaCompleta(sugerida.fechaHora)}.\n\nElegí el horario que te quede mejor acá (vas a ver la disponibilidad real):\n${link}\n\n(el link es válido por 45 minutos)`;
+    await enviarTexto(paciente.telefono, texto).catch(e => {
+      log.error(`[RECONSULTA] no se pudo mandar el WhatsApp a ${paciente.telefono}:`, e.message);
+      throw new ErrorHttp(502, "No se pudo mandar el WhatsApp — revisá que esté conectado en Agenda.");
+    });
+
+    sugerida.estado = "confirmada";
+    await consulta.save();
+    registrar({ req, medicoPhone, accion: "reconsulta_confirmada", recurso: `ConsultaMedica:${consulta._id}` });
+    res.json({ ok: true });
+  }));
+
+  app.post("/medico/consultas/:id/reconsulta/descartar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    const sugerida = consulta.notaClinica?.reconsultaSugerida;
+    if (!sugerida?.fechaHora) throw new ErrorHttp(400, "Esta consulta no tiene una reconsulta sugerida");
+    sugerida.estado = "descartada";
+    await consulta.save();
+    res.json({ ok: true });
   }));
 };

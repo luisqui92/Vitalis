@@ -264,6 +264,28 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       }
     }
 
+    let reconsultaHtml = "";
+    const reconsulta = c.notaClinica?.reconsultaSugerida;
+    if (reconsulta?.fechaHora) {
+      if (reconsulta.estado === "pendiente") {
+        // datetime-local necesita "YYYY-MM-DDTHH:mm" en hora local, no UTC.
+        const f = new Date(reconsulta.fechaHora);
+        const valorInput = new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        reconsultaHtml = `
+          <div class="card">
+            <div class="nota-titulo">🗓️ Reconsulta sugerida</div>
+            ${reconsulta.textoOriginal ? `<div class="hint" style="margin-bottom:10px">Detecté esto en la consulta: "${esc(reconsulta.textoOriginal)}"</div>` : ""}
+            <label>Fecha y hora (revisá antes de avisarle al paciente)</label>
+            <input id="reconsultaFecha" type="datetime-local" value="${valorInput}">
+            <div id="reconsultaErr"></div>
+            <button class="primary" id="btnConfirmarReconsulta">Confirmar y avisar por WhatsApp</button>
+            <button class="link" id="btnDescartarReconsulta">Descartar</button>
+          </div>`;
+      } else if (reconsulta.estado === "confirmada") {
+        reconsultaHtml = `<div class="card"><div class="hint" style="color:var(--success)">✅ Reconsulta confirmada — se le avisó al paciente por WhatsApp.</div></div>`;
+      }
+    }
+
     let body = "";
     if (c.estado === "procesando") {
       body = `<div class="hint">⏳ Transcribiendo tu consulta... para audios largos puede tardar varios minutos. Esta pantalla se actualiza sola, no hace falta que hagas nada.</div>`;
@@ -286,10 +308,39 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         <div class="fecha">${new Date(c.createdAt).toLocaleString("es-BO")}${c.duracionSegundos ? " · " + Math.round(c.duracionSegundos/60) + " min" : ""}</div>
       </div>
       ${notaHtml}
+      ${reconsultaHtml}
       ${sugerenciasHtml}
       <div style="margin-top:14px">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
+
+    const btnConfirmarReconsulta = document.getElementById("btnConfirmarReconsulta");
+    if (btnConfirmarReconsulta) {
+      btnConfirmarReconsulta.onclick = async () => {
+        const errBox = document.getElementById("reconsultaErr");
+        errBox.innerHTML = "";
+        btnConfirmarReconsulta.disabled = true;
+        btnConfirmarReconsulta.textContent = "Enviando...";
+        try {
+          const fechaHora = document.getElementById("reconsultaFecha").value;
+          await api(`/medico/consultas/${c._id}/reconsulta/confirmar`, {
+            method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ fechaHora }),
+          });
+          renderDetalle(id);
+        } catch (e) {
+          errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo confirmar")}</div>`;
+          btnConfirmarReconsulta.disabled = false;
+          btnConfirmarReconsulta.textContent = "Confirmar y avisar por WhatsApp";
+        }
+      };
+    }
+    const btnDescartarReconsulta = document.getElementById("btnDescartarReconsulta");
+    if (btnDescartarReconsulta) {
+      btnDescartarReconsulta.onclick = async () => {
+        await api(`/medico/consultas/${c._id}/reconsulta/descartar`, { method: "POST" });
+        renderDetalle(id);
+      };
+    }
 
     const btnGenerarReceta = document.getElementById("btnGenerarReceta");
     if (btnGenerarReceta) {

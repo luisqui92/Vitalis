@@ -5,6 +5,9 @@
 // de la transcripción en sí.
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
+const { fechaStrBolivia } = require("./utils");
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 const PROMPT_SISTEMA = `Eres un asistente clínico. A partir de la transcripción de una consulta
 médica en español (puede tener errores de transcripción, y a veces no queda
@@ -22,6 +25,7 @@ RESPONDE SOLO JSON con esta estructura exacta:
   "medicamentosRecetados": [{"nombre":"string","dosis":"string o null","frecuencia":"string o null"}],
   "examenesSolicitados": ["string", ...],
   "proximoControl": "string o null",
+  "reconsultaSugerida": {"fechaHora":"YYYY-MM-DDTHH:mm o null","textoOriginal":"string o null"},
   "antecedentesPersonalesNuevos": ["string", ...],
   "antecedentesFamiliaresNuevos": [{"parentesco":"string","condicion":"string"}],
   "vacunasMencionadas": [{"nombre":"string","dosis":"string o null","fecha":"YYYY-MM-DD o null"}]
@@ -34,22 +38,32 @@ Reglas:
 - "antecedentesPersonalesNuevos"/"antecedentesFamiliaresNuevos"/"vacunasMencionadas":
   te paso lo que el paciente YA tiene registrado (más abajo, si hay). Reportá
   SOLO lo que se menciona en esta transcripción y que NO esté ya en esa lista
-  — no repitas algo que el paciente ya tenía anotado.`;
+  — no repitas algo que el paciente ya tenía anotado.
+- "reconsultaSugerida": SOLO cuando el médico menciona una fecha u hora
+  concreta para la próxima consulta (ej: "te veo el sábado a las siete",
+  "la próxima semana el martes", "en 15 días", "el 20 a las 10"). Te doy la
+  fecha de HOY abajo — resolvé la fecha/hora real a partir de eso (si dice
+  "el sábado" y hoy es miércoles, es el sábado que viene, no uno pasado).
+  Si no se especifica si es de mañana o de tarde, elegí el horario más
+  razonable para un consultorio (el médico lo revisa después, no hace
+  falta que sea perfecto). Si el médico solo dice algo vago sin fecha
+  concreta ("en un mes", "cuando tenga los resultados", "más adelante"),
+  dejá reconsultaSugerida en null — eso ya lo cubre "proximoControl".`;
 
 function construirContexto(contexto) {
-  if (!contexto) return "";
   const partes = [];
-  if (contexto.antecedentesPersonales?.length) {
+  const hoy = new Date();
+  partes.push(`Hoy es ${DIAS_SEMANA[hoy.getDay()]} ${fechaStrBolivia(hoy)}.`);
+  if (contexto?.antecedentesPersonales?.length) {
     partes.push(`Antecedentes personales ya registrados: ${contexto.antecedentesPersonales.join("; ")}`);
   }
-  if (contexto.antecedentesFamiliares?.length) {
+  if (contexto?.antecedentesFamiliares?.length) {
     partes.push(`Antecedentes familiares ya registrados: ${contexto.antecedentesFamiliares.map(a => `${a.parentesco}: ${a.condicion}`).join("; ")}`);
   }
-  if (contexto.medicamentosActivos?.length) {
+  if (contexto?.medicamentosActivos?.length) {
     partes.push(`Medicamentos ya activos: ${contexto.medicamentosActivos.join(", ")}`);
   }
-  if (partes.length === 0) return "";
-  return `\n\n(Lo que el paciente ya tiene registrado, para no repetirlo como "nuevo":\n${partes.join("\n")})`;
+  return `\n\n(${partes.join(" ")})`;
 }
 
 async function generarNotaClinica(transcripcion, contexto) {

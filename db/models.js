@@ -123,6 +123,15 @@ const consultaMedicaSchema = new mongoose.Schema({
     medicamentosRecetados: [{ nombre: String, dosis: String, frecuencia: String }],
     examenesSolicitados: [String],
     proximoControl: String,
+    // Cuando el médico menciona una fecha/hora concreta para la reconsulta
+    // ("te veo el sábado a las siete") — no algo vago tipo "en un mes", eso
+    // ya lo cubre proximoControl de arriba. El médico confirma antes de que
+    // se le mande nada al paciente (ver /medico/consultas/:id/reconsulta/*).
+    reconsultaSugerida: {
+      fechaHora: { type: Date, default: null },
+      textoOriginal: { type: String, default: "" },
+      estado: { type: String, enum: ["pendiente", "confirmada", "descartada"], default: "pendiente" },
+    },
     // Sugerencias para el Kardex: cosas mencionadas en ESTA consulta que
     // todavía no estaban registradas (el médico las aprueba una por una,
     // no se cargan solas). medicamentosRecetados ya sirve de sugerencia
