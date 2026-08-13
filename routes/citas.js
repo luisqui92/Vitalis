@@ -9,6 +9,7 @@ const { crearEvento, actualizarEvento, eliminarEvento } = require("../services/g
 const { enviarTexto } = require("../services/baileysWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -95,6 +96,34 @@ module.exports = function (app) {
     }
 
     res.status(201).json({ ok: true, cita });
+  }));
+
+  // ─── CREAR FICHA DE PACIENTE A PARTIR DE UNA CITA (ej: reservó por
+  // WhatsApp y todavía no tiene Kardex) ────────────────────────────────────
+  // El médico revisa/corrige nombre y teléfono antes de confirmar — nunca
+  // se crea nada sin que él lo vea primero. Si ya existe un paciente con
+  // ese mismo teléfono, se vincula la cita a esa ficha en vez de duplicarla.
+  app.post("/medico/citas/:id/crear-paciente", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const cita = await obtenerOFallar(Cita, { _id: req.params.id, medicoPhone }, "Cita no encontrada");
+    if (cita.pacienteId) throw new ErrorHttp(409, "Esta cita ya tiene una ficha de paciente vinculada");
+
+    const nombre = String(req.body?.nombre || cita.pacienteNombre || "").trim();
+    if (!nombre) throw new ErrorHttp(400, "Falta el nombre del paciente");
+    const telefono = String(req.body?.telefono || cita.pacienteTelefono || "").trim();
+
+    let paciente = telefono ? await Paciente.findOne({ medicoPhone, telefono }) : null;
+    let yaExistia = !!paciente;
+    if (!paciente) {
+      paciente = await Paciente.create({ medicoPhone, nombre, telefono });
+    }
+
+    cita.pacienteId = paciente._id;
+    if (!cita.pacienteTelefono && telefono) cita.pacienteTelefono = telefono;
+    await cita.save();
+
+    registrar({ req, medicoPhone, accion: yaExistia ? "cita_vinculada_a_paciente_existente" : "paciente_creado_desde_cita", recurso: `Paciente:${paciente._id}` });
+    res.status(201).json({ ok: true, paciente, yaExistia });
   }));
 
   // ─── EDITAR / CANCELAR CITA ──────────────────────────────────────────────

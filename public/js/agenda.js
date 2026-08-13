@@ -128,6 +128,17 @@ function pintarAgenda(citas, pacientes, wa) {
           </div>
           <div class="fecha">${new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })}</div>
           ${c.motivo ? `<div class="paciente-info">${esc(c.motivo)}</div>` : ""}
+          ${!c.pacienteId ? `
+            <button class="link" data-abrir-crear-paciente="${c._id}" style="margin:6px 0 0">➕ Crear ficha de paciente</button>
+            <div id="crearPacienteBox-${c._id}" style="display:none;margin-top:8px">
+              <div class="hint" style="margin-bottom:6px">Reservó por WhatsApp y todavía no tiene ficha en el Kardex. Revisá los datos antes de crearla:</div>
+              <label>Nombre</label>
+              <input class="cp-nombre" data-cp="${c._id}" type="text" value="${esc(c.pacienteNombre || "")}">
+              <label>Teléfono</label>
+              <input class="cp-telefono" data-cp="${c._id}" type="tel" value="${esc(c.pacienteTelefono || "")}">
+              <div class="cp-err" data-cp-err="${c._id}"></div>
+              <button class="secondary" data-confirmar-crear-paciente="${c._id}">Crear ficha</button>
+            </div>` : ""}
         </div>`).join("")}
     </div>
   `;
@@ -179,6 +190,35 @@ function pintarAgenda(citas, pacientes, wa) {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ estado: "cancelada" }),
       });
       renderAgenda();
+    };
+  });
+
+  document.querySelectorAll("[data-abrir-crear-paciente]").forEach(btn => {
+    btn.onclick = () => {
+      const box = document.getElementById("crearPacienteBox-" + btn.dataset.abrirCrearPaciente);
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    };
+  });
+  document.querySelectorAll("[data-confirmar-crear-paciente]").forEach(btn => {
+    btn.onclick = async () => {
+      const citaId = btn.dataset.confirmarCrearPaciente;
+      const errBox = document.querySelector(`[data-cp-err="${citaId}"]`);
+      errBox.innerHTML = "";
+      const nombre = document.querySelector(`.cp-nombre[data-cp="${citaId}"]`).value.trim();
+      const telefono = document.querySelector(`.cp-telefono[data-cp="${citaId}"]`).value.trim();
+      if (!nombre) { errBox.innerHTML = `<div class="error">Falta el nombre</div>`; return; }
+      btn.disabled = true;
+      btn.textContent = "Creando...";
+      try {
+        const data = await api(`/medico/citas/${citaId}/crear-paciente`, {
+          method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ nombre, telefono }),
+        });
+        renderPacienteDetalle(data.paciente._id, "consultas");
+      } catch (e) {
+        errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo crear la ficha")}</div>`;
+        btn.disabled = false;
+        btn.textContent = "Crear ficha";
+      }
     };
   });
 
