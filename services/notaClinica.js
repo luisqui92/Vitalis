@@ -40,15 +40,30 @@ Reglas:
   SOLO lo que se menciona en esta transcripción y que NO esté ya en esa lista
   — no repitas algo que el paciente ya tenía anotado.
 - "reconsultaSugerida": SOLO cuando el médico menciona una fecha u hora
-  concreta para la próxima consulta (ej: "te veo el sábado a las siete",
-  "la próxima semana el martes", "en 15 días", "el 20 a las 10"). Te doy la
-  fecha de HOY abajo — resolvé la fecha/hora real a partir de eso (si dice
-  "el sábado" y hoy es miércoles, es el sábado que viene, no uno pasado).
-  Si no se especifica si es de mañana o de tarde, elegí el horario más
-  razonable para un consultorio (el médico lo revisa después, no hace
-  falta que sea perfecto). Si el médico solo dice algo vago sin fecha
-  concreta ("en un mes", "cuando tenga los resultados", "más adelante"),
-  dejá reconsultaSugerida en null — eso ya lo cubre "proximoControl".`;
+  concreta para volver a VER AL PACIENTE en una nueva consulta (ej: "te veo
+  el sábado a las siete", "la próxima semana el martes", "en 15 días", "el
+  20 a las 10", "nos vemos el viernes", "vení para control el lunes"). Te
+  doy la fecha de HOY abajo — resolvé la fecha/hora real a partir de eso
+  (si dice "el sábado" y hoy es miércoles, es el sábado que viene, no uno
+  pasado). Si no se especifica si es de mañana o de tarde, elegí el
+  horario más razonable para un consultorio (el médico lo revisa después,
+  no hace falta que sea perfecto).
+  OJO — hay fechas que se mencionan en la consulta y NO son una reconsulta,
+  aunque suenen parecido. En esos casos dejá reconsultaSugerida en null:
+    · Duración de un medicamento: "tomalo hasta el viernes", "por 5 días",
+      "hasta que se termine el frasco" → es dosis/frecuencia, va en
+      "medicamentosRecetados", no acá.
+    · Inicio de los síntomas: "estoy así desde hace tres días", "me
+      empezó el lunes" → es parte de la historia de la enfermedad actual,
+      no una cita futura.
+    · Fecha de un examen o resultado: "el jueves te llega el resultado
+      del laboratorio" → no es una consulta con el médico.
+  Ante la duda de si una fecha es realmente para volver a verse (y no otra
+  cosa), dejá reconsultaSugerida en null — mejor que el médico lo agregue
+  a mano a que le llegue un mensaje equivocado al paciente. Si el médico
+  solo dice algo vago sin fecha concreta ("en un mes", "cuando tenga los
+  resultados", "más adelante"), también dejalo en null — eso ya lo cubre
+  "proximoControl".`;
 
 function construirContexto(contexto) {
   const partes = [];
