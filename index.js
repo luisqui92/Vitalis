@@ -50,6 +50,7 @@ require("./routes/pacientes")(app);
 require("./routes/medicamentos")(app);
 require("./routes/vacunas")(app);
 require("./routes/odontograma")(app);
+require("./routes/tratamientos")(app);
 require("./routes/mediciones")(app);
 require("./routes/estudios")(app);
 require("./routes/memoriaClinica")(app);

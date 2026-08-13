@@ -60,6 +60,7 @@ const TABS_KARDEX_ODONTOLOGIA = {
   paciente: { icono: "👤", label: "Paciente" },
   consultas: { icono: "🎙️", label: "Consultas" },
   odontograma: { icono: "🦷", label: "Odontograma" },
+  plan: { icono: "💰", label: "Presupuesto" },
   medicamentos: { icono: "💊", label: "Medicación" },
   antecedentes: { icono: "📋", label: "Antecedentes" },
   estudios: { icono: "🧪", label: "Estudios" },

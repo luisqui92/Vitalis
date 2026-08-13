@@ -204,6 +204,36 @@ const odontogramaSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Odontograma = mongoose.model("Odontograma", odontogramaSchema);
 
+// Catálogo de tratamientos del odontólogo: se carga una vez (nombre +
+// precio) y se reutiliza al armar el plan de cada paciente, en vez de
+// escribir el precio a mano cada vez.
+const catalogoTratamientoSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  nombre: { type: String, required: true },
+  precio: { type: Number, required: true, default: 0 },
+}, { timestamps: true });
+const CatalogoTratamiento = mongoose.model("CatalogoTratamiento", catalogoTratamientoSchema);
+
+// Plan de tratamiento: un documento por ítem (ej: "Corona en pieza 36"),
+// opcionalmente ligado a una pieza del odontograma. Los pagos quedan como
+// lista propia adentro — precio menos la suma de pagos = saldo, calculado
+// al vuelo, nunca guardado (para no desincronizarse).
+const tratamientoPlanSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  nombre: { type: String, required: true },
+  piezaFdi: { type: Number, default: null }, // opcional: número FDI de la pieza (ver Odontograma)
+  precio: { type: Number, required: true, default: 0 },
+  estado: { type: String, enum: ["pendiente", "en_proceso", "realizado"], default: "pendiente" },
+  notas: { type: String, default: "" },
+  pagos: {
+    type: [{ monto: Number, fecha: { type: Date, default: Date.now }, notas: { type: String, default: "" } }],
+    default: [],
+  },
+}, { timestamps: true });
+tratamientoPlanSchema.index({ pacienteId: 1, createdAt: 1 });
+const TratamientoPlan = mongoose.model("TratamientoPlan", tratamientoPlanSchema);
+
 // Evolución clínica: signos vitales/indicadores sueltos en el tiempo (presión,
 // glucosa, peso, etc.) para graficar tendencias. Carga manual del médico.
 // "tipo" es una clave fija (ver TIPOS_MEDICION en el frontend); valorSecundario
@@ -337,4 +367,4 @@ const auditLogSchema = new mongoose.Schema({
 auditLogSchema.index({ medicoPhone: 1, createdAt: -1 });
 const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE };
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan };
