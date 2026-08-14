@@ -69,12 +69,13 @@ module.exports = function (app) {
           const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
             .select("nombre").lean();
 
-          // Solo para odontología: le pasamos el catálogo de precios del
-          // consultorio para que la IA pueda emparejar tratamientos
-          // mencionados ("hay que sellar esto") con el ítem correcto.
+          // Solo para odontología y estética (Vitalis Face): le pasamos el
+          // catálogo de precios del consultorio para que la IA pueda
+          // emparejar tratamientos mencionados ("hay que sellar esto",
+          // "hay que hacer un relleno acá") con el ítem correcto.
           const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
           let catalogoTratamientos = [];
-          if (medico?.tipoEspecialidad === "odontologia") {
+          if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
             const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
             catalogoTratamientos = catalogo.map(c => c.nombre);
           }

@@ -44,6 +44,30 @@ body.tema-dental button.secondary{background:#1c3a52;}
 body.tema-dental .segmento.h0{background:#1c3a52;}
 body.tema-dental .segmento.h1{background:#1c3320;}
 body.tema-dental .brief-card{background:linear-gradient(135deg,#132a33,#0f2530);}
+
+/* ─── Tema "Vitalis Face" (oscuro, rosa/dorado) ────────────────────────
+   Para cuentas de estética/plástica/dermatología. Mismo mecanismo que
+   tema-dental: solo variables, porque todo ya usa var(--x). */
+body.tema-estetica{
+  --primary:#c2477a;
+  --primary-dark:#9c3563;
+  --accent:#d4af7a;
+  --accent-2:#e6c99a;
+  --bg:#170f14;
+  --card:#241620;
+  --border:#3a2430;
+  --text:#f3e8ee;
+  --text-muted:#b599a8;
+  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
+  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
+  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
+  --gradient-vitalis: linear-gradient(135deg, #7c2d55 0%, var(--primary) 50%, var(--accent) 100%);
+}
+body.tema-estetica input, body.tema-estetica select, body.tema-estetica textarea{background:#2a1a24;}
+body.tema-estetica button.secondary{background:#3a2230;}
+body.tema-estetica .segmento.h0{background:#3a2230;}
+body.tema-estetica .segmento.h1{background:#2a2318;}
+body.tema-estetica .brief-card{background:linear-gradient(135deg,#33132a,#2a1020);}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 .header{background:var(--card);padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}

@@ -27,7 +27,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -243,6 +243,7 @@ const tratamientoPlanSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
   nombre: { type: String, required: true },
   piezaFdi: { type: Number, default: null }, // opcional: número FDI de la pieza (ver Odontograma)
+  regionFacial: { type: String, default: "" }, // opcional: para Vitalis Face (ej: "Nariz", "Mentón")
   precio: { type: Number, required: true, default: 0 },
   estado: { type: String, enum: ["pendiente", "en_proceso", "realizado"], default: "pendiente" },
   notas: { type: String, default: "" },

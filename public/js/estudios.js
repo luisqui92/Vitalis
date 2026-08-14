@@ -17,11 +17,23 @@ const TIPOS_ESTUDIO = {
   otro: "📄 Otro",
 };
 
-const ANGULOS_FOTO = {
+// Odontología/medicina general: 3 ángulos alcanza. Vitalis Face (estética/
+// plástica/dermatología) usa 5, para un seguimiento más fino de un
+// procedimiento (nariz, mentón, etc.) — ver angulosFotoActivos().
+const ANGULOS_FOTO_3 = {
   frontal: "Frontal",
   perfil: "Perfil",
   tres_cuartos: "3/4",
 };
+const ANGULOS_FOTO_5 = {
+  frontal: "Frontal",
+  angulo45_derecha: "45° derecha",
+  perfil_derecho: "Perfil derecho",
+  angulo45_izquierda: "45° izquierda",
+  perfil_izquierdo: "Perfil izquierdo",
+};
+const ANGULOS_FOTO_TODOS = { ...ANGULOS_FOTO_3, ...ANGULOS_FOTO_5 };
+function angulosFotoActivos() { return MEDICO_TIPO_ESPECIALIDAD === "estetica" ? ANGULOS_FOTO_5 : ANGULOS_FOTO_3; }
 
 function tabEstudiosHtml(estudios) {
   const hayFotos = estudios.some(e => e.tipo === "foto" && e.anguloFoto);
@@ -38,7 +50,7 @@ function tabEstudiosHtml(estudios) {
       <div id="estAnguloBox" style="display:none;margin-top:8px">
         <label>Ángulo de la foto</label>
         <div class="chip-row" id="estAnguloChips">
-          ${Object.entries(ANGULOS_FOTO).map(([k, l]) => `<button type="button" class="chip" data-angulo="${k}">${l}</button>`).join("")}
+          ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<button type="button" class="chip" data-angulo="${k}">${l}</button>`).join("")}
         </div>
         <button type="button" class="secondary" id="btnFotoGuiada" style="margin-top:6px">📸 Tomar foto guiada</button>
       </div>
@@ -54,7 +66,7 @@ function tabEstudiosHtml(estudios) {
     ${estudios.map(e => `
       <div class="item" data-ver-estudio="${e._id}">
         <div class="top">
-          <div class="nombre">${esc(TIPOS_ESTUDIO[e.tipo] || e.tipo)}${e.anguloFoto ? " · " + esc(ANGULOS_FOTO[e.anguloFoto] || e.anguloFoto) : ""} — ${esc(e.nombre)}</div>
+          <div class="nombre">${esc(TIPOS_ESTUDIO[e.tipo] || e.tipo)}${e.anguloFoto ? " · " + esc(ANGULOS_FOTO_TODOS[e.anguloFoto] || e.anguloFoto) : ""} — ${esc(e.nombre)}</div>
           <button class="link" data-borrar-estudio="${e._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
         <div class="fecha">${new Date(e.fecha).toLocaleDateString("es-BO")}</div>
@@ -97,7 +109,7 @@ function wireTabEstudios(p, estudios) {
       abrirCamaraGuiada(anguloElegido, (blob, angulo) => {
         setArchivoSeleccionado(new File([blob], "foto-" + angulo + ".jpg", { type: "image/jpeg" }), "foto tomada ahora");
         if (!document.getElementById("estNombre").value.trim()) {
-          document.getElementById("estNombre").value = "Foto clínica — " + (ANGULOS_FOTO[angulo] || angulo);
+          document.getElementById("estNombre").value = "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo);
         }
       });
     };
@@ -175,29 +187,29 @@ async function traerBlobEstudio(id) {
 // de abajo) con un dibujo guía según el ángulo elegido, para que la foto de
 // hoy quede alineada igual que la de la próxima visita.
 function guiaSvgPara(angulo) {
-  if (angulo === "perfil") {
-    return `
-      <svg viewBox="0 0 300 400" width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none">
-        <path d="M 190 90 Q 230 100 232 150 Q 234 180 250 195 Q 235 205 232 215 Q 236 235 220 245 Q 224 260 205 268 L 195 300 Q 190 330 180 350 L 130 350 L 130 90 Z"
-              fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
-        <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
-      </svg>`;
-  }
-  if (angulo === "tres_cuartos") {
-    return `
-      <svg viewBox="0 0 300 400" width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none">
-        <ellipse cx="160" cy="190" rx="95" ry="130" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
-        <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
-        <line x1="185" y1="70" x2="185" y2="310" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>
-      </svg>`;
-  }
-  // frontal (default)
-  return `
-    <svg viewBox="0 0 300 400" width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none">
+  // "perfil_izquierdo" / "angulo45_izquierda" reusan el mismo dibujo que su
+  // versión derecha, solo espejado — así no hay que dibujar cada guía dos veces.
+  const espejado = angulo.includes("izquierd");
+  let interior;
+  if (angulo.startsWith("perfil")) {
+    interior = `
+      <path d="M 190 90 Q 230 100 232 150 Q 234 180 250 195 Q 235 205 232 215 Q 236 235 220 245 Q 224 260 205 268 L 195 300 Q 190 330 180 350 L 130 350 L 130 90 Z"
+            fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
+      <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>`;
+  } else if (angulo.startsWith("angulo45") || angulo === "tres_cuartos") {
+    interior = `
+      <ellipse cx="160" cy="190" rx="95" ry="130" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
+      <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
+      <line x1="185" y1="70" x2="185" y2="310" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>`;
+  } else {
+    // frontal (default)
+    interior = `
       <ellipse cx="150" cy="190" rx="90" ry="130" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
-      <line x1="150" y1="60" x2="150" y2="320" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>
-    </svg>`;
+      <line x1="150" y1="60" x2="150" y2="320" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>`;
+  }
+  const grupo = espejado ? `<g transform="scale(-1,1) translate(-300,0)">${interior}</g>` : interior;
+  return `<svg viewBox="0 0 300 400" width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none">${grupo}</svg>`;
 }
 
 async function abrirCamaraGuiada(anguloInicial, onCapturada) {
@@ -212,7 +224,7 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
     </div>
     <div style="padding:14px;background:#111">
       <div class="chip-row" id="camAnguloChips" style="justify-content:center;margin-bottom:10px">
-        ${Object.entries(ANGULOS_FOTO).map(([k, l]) => `<button type="button" class="chip ${k === angulo ? "activo" : ""}" data-cam-angulo="${k}">${l}</button>`).join("")}
+        ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<button type="button" class="chip ${k === angulo ? "activo" : ""}" data-cam-angulo="${k}">${l}</button>`).join("")}
       </div>
       <div style="display:flex;gap:10px">
         <button class="secondary" id="btnCamCancelar" style="flex:1">Cancelar</button>
@@ -281,7 +293,7 @@ async function abrirComparadorFotos(fotos) {
       <div class="card">
         <div class="seccion-titulo" style="margin-top:0">🔀 Comparar antes / después</div>
         <div class="chip-row">
-          ${angulosDisponibles.map(a => `<button type="button" class="chip ${a === anguloElegido ? "activo" : ""}" data-cmp-angulo="${a}">${ANGULOS_FOTO[a] || a}</button>`).join("")}
+          ${angulosDisponibles.map(a => `<button type="button" class="chip ${a === anguloElegido ? "activo" : ""}" data-cmp-angulo="${a}">${ANGULOS_FOTO_TODOS[a] || a}</button>`).join("")}
         </div>
         <div style="display:flex;gap:10px;margin-top:10px">
           <div style="flex:1"><label>Antes</label><select id="cmpAntes">${opcionesFecha(lista)}</select></div>

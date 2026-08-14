@@ -8,6 +8,15 @@ const ESTADO_TRATAMIENTO_INFO = {
   realizado: { label: "Realizado", clase: "badge-completado" },
 };
 
+// Vitalis Face: en vez de pieza FDI (odontología), un tratamiento se
+// ubica en una región del rostro — mismas etiquetas que el mapa anatómico
+// de la referencia de diseño.
+const REGIONES_FACIALES = [
+  "Frente", "Ceja derecha", "Ceja izquierda", "Ojo derecho", "Ojo izquierdo",
+  "Mejilla derecha", "Mejilla izquierda", "Nariz", "Labio superior", "Labio inferior",
+  "Oreja derecha", "Oreja izquierda", "Mandíbula", "Mentón", "Cuello", "Otra",
+];
+
 function money(n) { return "Bs " + Number(n || 0).toFixed(2).replace(/\.00$/, ""); }
 function totalPagado(item) { return (item.pagos || []).reduce((s, p) => s + p.monto, 0); }
 
@@ -75,7 +84,7 @@ function itemPlanHtml(item) {
   return `
     <div class="item" data-toggle-item="${item._id}" style="cursor:pointer">
       <div class="top">
-        <div class="nombre">${esc(item.nombre)}${item.piezaFdi ? ` — pieza ${item.piezaFdi}` : ""}</div>
+        <div class="nombre">${esc(item.nombre)}${item.piezaFdi ? ` — pieza ${item.piezaFdi}` : item.regionFacial ? ` — ${esc(item.regionFacial)}` : ""}</div>
         <span class="badge ${info.clase}">${info.label}</span>
       </div>
       <div class="paciente-info">${money(item.precio)}${pagado > 0 ? ` · pagado ${money(pagado)} · saldo ${money(saldo)}` : ""}</div>
@@ -168,8 +177,16 @@ function pintarFormNuevoTratamiento(pacienteId) {
       <input id="ntNombre" type="text" placeholder="Ej: Corona, Resina, Implante...">
       <label>Precio (Bs)</label>
       <input id="ntPrecio" type="number" min="0" step="0.01" placeholder="0">
-      <label>Pieza (FDI, opcional)</label>
-      <input id="ntPieza" type="number" min="11" max="48" placeholder="Ej: 36">
+      ${MEDICO_TIPO_ESPECIALIDAD === "estetica" ? `
+        <label>Región del rostro (opcional)</label>
+        <select id="ntRegion">
+          <option value="">— Sin región —</option>
+          ${REGIONES_FACIALES.map(r => `<option value="${r}">${r}</option>`).join("")}
+        </select>
+      ` : `
+        <label>Pieza (FDI, opcional)</label>
+        <input id="ntPieza" type="number" min="11" max="48" placeholder="Ej: 36">
+      `}
       <label>Notas (opcional)</label>
       <input id="ntNotas" type="text" placeholder="Detalle">
       <div id="ntErr"></div>
@@ -187,13 +204,14 @@ function pintarFormNuevoTratamiento(pacienteId) {
     errBox.innerHTML = "";
     const nombre = document.getElementById("ntNombre").value.trim();
     const precio = document.getElementById("ntPrecio").value;
-    const piezaFdi = document.getElementById("ntPieza").value;
+    const piezaFdi = document.getElementById("ntPieza")?.value;
+    const regionFacial = document.getElementById("ntRegion")?.value;
     const notas = document.getElementById("ntNotas").value.trim();
     if (!nombre || precio === "") { errBox.innerHTML = `<div class="error">Completá nombre y precio</div>`; return; }
     try {
       await api(`/medico/pacientes/${pacienteId}/tratamientos`, {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ nombre, precio, piezaFdi: piezaFdi || undefined, notas }),
+        body: JSON.stringify({ nombre, precio, piezaFdi: piezaFdi || undefined, regionFacial: regionFacial || undefined, notas }),
       });
       renderTabPlanTratamiento(pacienteId);
     } catch (e) {

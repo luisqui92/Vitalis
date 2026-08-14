@@ -75,6 +75,7 @@ function renderRegistro() {
       <select id="rTipoEsp">
         <option value="medicina_general">🩺 Medicina general</option>
         <option value="odontologia">🦷 Odontología</option>
+        <option value="estetica">💉 Estética / Plástica / Dermatología</option>
       </select>
       <label>Especialidad (opcional)</label>
       <input id="rEsp" type="text" placeholder="Medicina general">

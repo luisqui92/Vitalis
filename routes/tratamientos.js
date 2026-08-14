@@ -64,9 +64,10 @@ module.exports = function (app) {
     if (!nombre) throw new ErrorHttp(400, "nombre es requerido");
     if (!Number.isFinite(precio) || precio < 0) throw new ErrorHttp(400, "precio inválido");
     const piezaFdi = req.body?.piezaFdi ? Number(req.body.piezaFdi) : null;
+    const regionFacial = String(req.body?.regionFacial || "").trim();
 
     const item = await TratamientoPlan.create({
-      pacienteId: paciente._id, medicoPhone, nombre, precio, piezaFdi,
+      pacienteId: paciente._id, medicoPhone, nombre, precio, piezaFdi, regionFacial,
       notas: String(req.body?.notas || "").trim(),
     });
     res.status(201).json({ ok: true, item });
@@ -78,6 +79,7 @@ module.exports = function (app) {
     if (req.body?.nombre !== undefined) item.nombre = String(req.body.nombre).trim();
     if (req.body?.notas !== undefined) item.notas = String(req.body.notas).trim();
     if (req.body?.piezaFdi !== undefined) item.piezaFdi = req.body.piezaFdi ? Number(req.body.piezaFdi) : null;
+    if (req.body?.regionFacial !== undefined) item.regionFacial = String(req.body.regionFacial).trim();
     if (req.body?.precio !== undefined) {
       const precio = Number(req.body.precio);
       if (!Number.isFinite(precio) || precio < 0) throw new ErrorHttp(400, "precio inválido");

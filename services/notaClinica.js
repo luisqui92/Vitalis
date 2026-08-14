@@ -67,7 +67,7 @@ Reglas:
   "proximoControl".
 - "tratamientosSugeridos": SOLO si más abajo te doy un catálogo de
   tratamientos de este consultorio (si no te lo doy, dejá esta lista
-  vacía — es una función solo para odontología). Reportá cada tratamiento
+  vacía — es una función solo para odontología y estética). Reportá cada tratamiento
   que el profesional dice que HAY QUE HACER de acá en adelante (no algo
   que ya se hizo, no un antecedente) — ej: "hay que poner un implante
   acá", "esto hay que sellarlo", "necesita una corona en esa pieza". Para

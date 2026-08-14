@@ -16,7 +16,7 @@ module.exports = function (app) {
     const phone = String(req.body?.phone || "").trim();
     const nombre = String(req.body?.nombre || "").trim();
     const especialidad = String(req.body?.especialidad || "").trim();
-    const tipoEspecialidad = req.body?.tipoEspecialidad === "odontologia" ? "odontologia" : "medicina_general";
+    const tipoEspecialidad = ["odontologia", "estetica"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
     const password = String(req.body?.password || "");
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");

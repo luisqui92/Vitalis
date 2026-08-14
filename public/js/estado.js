@@ -8,13 +8,16 @@ const app = document.getElementById("app");
 const headerSub = document.getElementById("headerSub");
 const btnLogout = document.getElementById("btnLogout");
 
-// Odontología tiene su propia identidad visual ("Vitalis Dental", tema
-// oscuro) — medicina general sigue con el look claro de siempre.
+// Odontología y estética tienen su propia identidad visual (temas oscuros
+// "Vitalis Dental" / "Vitalis Face") — medicina general sigue con el look
+// claro de siempre.
 function aplicarTemaSegunEspecialidad() {
   const esDental = MEDICO_TIPO_ESPECIALIDAD === "odontologia";
+  const esEstetica = MEDICO_TIPO_ESPECIALIDAD === "estetica";
   document.body.classList.toggle("tema-dental", esDental);
+  document.body.classList.toggle("tema-estetica", esEstetica);
   const marcaH1 = document.querySelector(".brand h1");
-  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : "Vitalis";
+  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : "Vitalis";
 }
 
 // La transcripción y la nota clínica de consultas largas corren en segundo
@@ -66,8 +69,23 @@ const TABS_KARDEX_ODONTOLOGIA = {
   estudios: { icono: "🧪", label: "Estudios" },
   recetas: { icono: "📄", label: "Recetas" },
 };
+// Vitalis Face (estética/plástica/dermatología): sin odontograma ni
+// vacunas/evolución — en cambio, Estudios se usa para las fotos clínicas
+// con ángulo guiado, y "plan" (mismo backend que el presupuesto dental)
+// pasa a llamarse Procedimientos.
+const TABS_KARDEX_ESTETICA = {
+  paciente: { icono: "👤", label: "Paciente" },
+  consultas: { icono: "🎙️", label: "Consultas" },
+  plan: { icono: "💉", label: "Procedimientos" },
+  estudios: { icono: "📷", label: "Fotos" },
+  medicamentos: { icono: "💊", label: "Medicación" },
+  antecedentes: { icono: "📋", label: "Antecedentes" },
+  recetas: { icono: "📄", label: "Recetas" },
+};
 function tabsKardexPara(tipoEspecialidad) {
-  return tipoEspecialidad === "odontologia" ? TABS_KARDEX_ODONTOLOGIA : TABS_KARDEX_MEDICINA_GENERAL;
+  if (tipoEspecialidad === "odontologia") return TABS_KARDEX_ODONTOLOGIA;
+  if (tipoEspecialidad === "estetica") return TABS_KARDEX_ESTETICA;
+  return TABS_KARDEX_MEDICINA_GENERAL;
 }
 
 async function api(path, opts = {}) {
