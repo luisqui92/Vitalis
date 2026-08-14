@@ -6,6 +6,7 @@ const { Paciente, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_O
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { registrar } = require("../services/auditoria");
+const { registrarCorreccion } = require("../services/correccionesIA");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -50,6 +51,16 @@ module.exports = function (app) {
 
     const item = examen.estructuras.find(e => e.ojo === ojo && e.estructura === estructura);
     if (!item) throw new ErrorHttp(404, "Estructura no encontrada");
+
+    // Si lo último que se guardó vino de la voz y el médico ahora lo
+    // cambia a mano, es justo el caso que queremos poder revisar después.
+    const ultimoFueVoz = item.historial[item.historial.length - 1]?.fuente === "voz";
+    if (ultimoFueVoz) {
+      registrarCorreccion({
+        medicoPhone, tipo: "examen_ocular", consultaId: item.historial[item.historial.length - 1]?.consultaId,
+        campo: `${ojo}:${estructura}`, valorSugerido: item.estado, valorFinal: estado,
+      });
+    }
 
     item.estado = estado;
     item.notas = notas;

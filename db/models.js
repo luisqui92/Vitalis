@@ -466,4 +466,22 @@ const auditLogSchema = new mongoose.Schema({
 auditLogSchema.index({ medicoPhone: 1, createdAt: -1 });
 const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR };
+// Registro de correcciones a sugerencias de la IA: cada vez que un médico
+// cambia lo que la IA propuso (fecha de reconsulta, nombre/pieza de un
+// tratamiento, estado de una estructura ocular) antes de que quede
+// guardado. No es para mostrarle nada al médico — es la materia prima
+// para ver en qué se equivoca más la IA y afinar los prompts (y, con
+// suficiente volumen algún día, para un eventual fine-tuning). Nunca
+// bloquea ni retrasa el flujo real si falla al guardar.
+const correccionIASchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular"], required: true },
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  campo: { type: String, default: "" }, // ej: "fechaHora", "nombre", "OD:cristalino"
+  valorSugerido: { type: String, default: "" }, // lo que propuso la IA
+  valorFinal: { type: String, default: "" }, // lo que el médico dejó guardado
+}, { timestamps: true });
+correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
+const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
+
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, CorreccionIA };

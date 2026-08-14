@@ -13,6 +13,7 @@ const { regenerarBriefClinico } = require("../services/briefClinico");
 const { enviarTexto } = require("../services/baileysWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { registrar } = require("../services/auditoria");
+const { registrarCorreccion } = require("../services/correccionesIA");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -185,12 +186,18 @@ module.exports = function (app) {
     if (!sugerida?.fechaHora) throw new ErrorHttp(400, "Esta consulta no tiene una reconsulta sugerida");
     if (sugerida.estado !== "pendiente") throw new ErrorHttp(409, "Esta sugerencia ya fue confirmada o descartada");
 
-    // El médico pudo haber ajustado la fecha/hora antes de confirmar.
+    // El médico pudo haber ajustado la fecha/hora antes de confirmar —
+    // guardamos la que propuso la IA para poder comparar después.
+    const fechaOriginal = sugerida.fechaHora;
     if (req.body?.fechaHora) {
       const f = new Date(req.body.fechaHora);
       if (isNaN(f.getTime())) throw new ErrorHttp(400, "Fecha inválida");
       sugerida.fechaHora = f;
     }
+    registrarCorreccion({
+      medicoPhone, tipo: "reconsulta", consultaId: consulta._id, campo: "fechaHora",
+      valorSugerido: fechaOriginal?.toISOString(), valorFinal: sugerida.fechaHora?.toISOString(),
+    });
 
     const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
     if (!paciente.telefono) throw new ErrorHttp(400, "Este paciente no tiene teléfono cargado — no se le puede escribir por WhatsApp.");
@@ -239,6 +246,9 @@ module.exports = function (app) {
     if (!Number.isFinite(precio) || precio < 0) throw new ErrorHttp(400, "Precio inválido");
     let piezaFdi = req.body?.piezaFdi !== undefined && req.body?.piezaFdi !== "" ? Number(req.body.piezaFdi) : item.piezaFdi;
     if (piezaFdi !== null && piezaFdi !== undefined && !Number.isFinite(piezaFdi)) throw new ErrorHttp(400, "Pieza inválida");
+
+    registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "nombre", valorSugerido: item.catalogoNombreSugerido, valorFinal: nombre });
+    registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "piezaFdi", valorSugerido: item.piezaFdi, valorFinal: piezaFdi });
 
     const tratamiento = await TratamientoPlan.create({
       pacienteId: consulta.pacienteId, medicoPhone, nombre, precio,
