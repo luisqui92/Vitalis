@@ -27,7 +27,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -150,6 +150,18 @@ const consultaMedicaSchema = new mongoose.Schema({
       catalogoNombreSugerido: { type: String, default: null },
       estado: { type: String, enum: ["pendiente", "agregado", "descartado"], default: "pendiente" },
     }],
+    // Vitalis Visión: hallazgos por ojo/estructura detectados en la
+    // consulta ("ojo derecho, cristalino con opacidad cortical leve").
+    // A diferencia de las sugerencias de arriba, estos se aplican solos al
+    // mapa ocular apenas termina de generarse la nota (el médico corrige
+    // después si hace falta) — se guarda una copia acá para que quede
+    // visible en la nota qué fue lo que se aplicó y por qué.
+    examenOcularSugerido: [{
+      ojo: { type: String, default: "" },
+      estructura: { type: String, default: "" },
+      hallazgo: { type: String, default: "" },
+      estado: { type: String, default: "" },
+    }],
   },
   notaClinicaError: String,
 }, { timestamps: true });
@@ -224,6 +236,65 @@ const odontogramaSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Odontograma = mongoose.model("Odontograma", odontogramaSchema);
 
+// ─── Vitalis Visión (oftalmología) ──────────────────────────────────────
+// Mapa ocular: un documento por paciente con las 12 estructuras × 2 ojos
+// (igual patrón que el odontograma — se crea solo, todo en "normal", la
+// primera vez que se abre). El estado de cada estructura puede venir de la
+// voz durante una consulta (fuente:"voz", se aplica automático al terminar
+// la nota clínica — el médico lo revisa y corrige después si hace falta,
+// nunca queda oculto: el historial guarda cada cambio con su origen) o
+// cargado a mano por el médico (fuente:"manual").
+const OJOS = ["OD", "OI"];
+const ESTRUCTURAS_OCULARES = [
+  "cornea", "iris", "pupila", "cristalino", "esclerotica", "conjuntiva",
+  "camara_anterior", "retina", "macula", "nervio_optico", "vasos_sanguineos", "vitreo",
+];
+const ESTADOS_ESTRUCTURA_OCULAR = ["normal", "leve", "moderado", "importante"];
+
+const estructuraOcularSchema = new mongoose.Schema({
+  ojo: { type: String, enum: OJOS, required: true },
+  estructura: { type: String, enum: ESTRUCTURAS_OCULARES, required: true },
+  estado: { type: String, enum: ESTADOS_ESTRUCTURA_OCULAR, default: "normal" },
+  notas: { type: String, default: "" },
+  historial: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      estado: { type: String, enum: ESTADOS_ESTRUCTURA_OCULAR },
+      notas: { type: String, default: "" },
+      fuente: { type: String, enum: ["voz", "manual"], default: "manual" },
+      consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+    }],
+    default: [],
+  },
+}, { _id: false });
+
+const examenOcularSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, unique: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  estructuras: { type: [estructuraOcularSchema], default: [] },
+}, { timestamps: true });
+const ExamenOcular = mongoose.model("ExamenOcular", examenOcularSchema);
+
+// Receta óptica: esfera/cilindro/eje/adición por ojo — completamente
+// distinta a una receta de medicamentos, por eso es un modelo aparte.
+const recetaOpticaSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  od: {
+    esfera: { type: Number, default: null }, cilindro: { type: Number, default: null },
+    eje: { type: Number, default: null }, adicion: { type: Number, default: null },
+  },
+  oi: {
+    esfera: { type: Number, default: null }, cilindro: { type: Number, default: null },
+    eje: { type: Number, default: null }, adicion: { type: Number, default: null },
+  },
+  distanciaPupilar: { type: Number, default: null },
+  notas: { type: String, default: "" },
+  fecha: { type: Date, required: true },
+}, { timestamps: true });
+const RecetaOptica = mongoose.model("RecetaOptica", recetaOpticaSchema);
+
 // Catálogo de tratamientos del odontólogo: se carga una vez (nombre +
 // precio) y se reutiliza al armar el plan de cada paciente, en vez de
 // escribir el precio a mano cada vez.
@@ -288,6 +359,9 @@ const estudioSchema = new mongoose.Schema({
   // para poder agrupar y comparar antes/después del mismo ángulo entre
   // fechas distintas (ver /medico/pacientes/:id en la pestaña Estudios).
   anguloFoto: { type: String, default: "" },
+  // Vitalis Visión: a qué ojo corresponde un estudio (OCT, fondo de ojo,
+  // campimetría...) — "OD", "OI" o "ambos". Vacío si no aplica.
+  ladoOjo: { type: String, default: "" },
 }, { timestamps: true });
 estudioSchema.index({ pacienteId: 1, fecha: -1 });
 const Estudio = mongoose.model("Estudio", estudioSchema);
@@ -392,4 +466,4 @@ const auditLogSchema = new mongoose.Schema({
 auditLogSchema.index({ medicoPhone: 1, createdAt: -1 });
 const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan };
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR };

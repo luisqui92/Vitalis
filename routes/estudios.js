@@ -53,6 +53,7 @@ module.exports = function (app) {
       archivoNombre, archivoMime: mime, archivoTamano: archivo.length,
       fecha, notas: String(req.query.notas || "").trim(),
       anguloFoto: tipo === "foto" ? String(req.query.anguloFoto || "").trim() : "",
+      ladoOjo: String(req.query.ladoOjo || "").trim(),
     });
     res.status(201).json({ ok: true, estudio });
   }));

@@ -11,6 +11,11 @@ const TIPOS_MEDICION = {
   colesterol:          { label: "Colesterol",        unidad: "mg/dL" },
   temperatura:         { label: "Temperatura",       unidad: "°C" },
   frecuenciaCardiaca:  { label: "Frec. cardíaca",    unidad: "lpm" },
+  // Vitalis Visión (oftalmología): presión intraocular por ojo — el
+  // umbral de alerta (>21 mmHg, o tendencia en alza) es el estándar
+  // clínico para sospecha de glaucoma.
+  presionIntraocularOD: { label: "Presión intraocular OD", unidad: "mmHg", alertaUmbral: 21 },
+  presionIntraocularOI: { label: "Presión intraocular OI", unidad: "mmHg", alertaUmbral: 21 },
 };
 
 let evolucionTipoActivo = null;
@@ -72,11 +77,30 @@ function dibujarGraficoEvolucion(canvas, puntos, doble) {
   if (doble) linea("#b45309", p => p.valorSecundario);
 }
 
+// Alerta simple de tendencia — no reemplaza el criterio del especialista,
+// solo lo señala para que lo revise. Dos casos: el último valor ya pasó el
+// umbral, o viene subiendo en las últimas 3 mediciones.
+function calcularAlertaMedicion(puntos, tipo) {
+  if (!tipo.alertaUmbral || puntos.length === 0) return null;
+  const ultimo = puntos[puntos.length - 1];
+  if (ultimo.valor > tipo.alertaUmbral) {
+    return `Último valor (${ultimo.valor} ${tipo.unidad}) por encima de lo esperado (${tipo.alertaUmbral} ${tipo.unidad}).`;
+  }
+  if (puntos.length >= 3) {
+    const ultimos3 = puntos.slice(-3);
+    if (ultimos3[0].valor < ultimos3[1].valor && ultimos3[1].valor < ultimos3[2].valor) {
+      return `Tendencia en alza en las últimas 3 mediciones: ${ultimos3.map(p => p.valor).join(" → ")} ${tipo.unidad}.`;
+    }
+  }
+  return null;
+}
+
 // ─── HTML DE LA PESTAÑA ─────────────────────────────────────────────────
 function tabEvolucionHtml(mediciones) {
   if (!evolucionTipoActivo || !TIPOS_MEDICION[evolucionTipoActivo]) evolucionTipoActivo = primerTipoConDatos(mediciones);
   const tipo = TIPOS_MEDICION[evolucionTipoActivo];
   const puntos = puntosDe(mediciones, evolucionTipoActivo);
+  const alerta = calcularAlertaMedicion(puntos, tipo);
 
   const chips = Object.entries(TIPOS_MEDICION).map(([key, t]) => `
     <button class="chip ${key === evolucionTipoActivo ? "activo" : ""}" data-tipo-chip="${key}">${esc(t.label)}</button>
@@ -96,6 +120,12 @@ function tabEvolucionHtml(mediciones) {
     </div>
 
     <div class="chip-row">${chips}</div>
+
+    ${alerta ? `
+      <div class="card" style="border-left:3px solid var(--warning)">
+        <div style="font-weight:700;color:var(--warning)">⚠️ Evolución detectada</div>
+        <div class="hint" style="margin-top:4px">${esc(alerta)} Revisar según criterio del especialista.</div>
+      </div>` : ""}
 
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${esc(tipo.label)}</div>

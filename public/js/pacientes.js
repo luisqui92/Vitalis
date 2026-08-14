@@ -122,7 +122,7 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
   app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/pacientes/" + pacienteId);
-    const tabPorDefecto = MEDICO_TIPO_ESPECIALIDAD === "odontologia" ? "odontograma" : "consultas";
+    const tabPorDefecto = MEDICO_TIPO_ESPECIALIDAD === "odontologia" ? "odontograma" : MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? "ojos" : "consultas";
     pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabInicial || tabPorDefecto);
   } catch (e) {
     if (e.status === 401) return logout();
@@ -282,7 +282,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
-  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, plan: `<div id="planBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
+  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, plan: `<div id="planBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
     <button class="back" id="btnBack">← Pacientes</button>
@@ -303,6 +303,10 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   if (tabActiva === "odontograma") {
     renderTabOdontograma(p._id);
+  }
+
+  if (tabActiva === "ojos") {
+    renderTabExamenOcular(p._id);
   }
 
   if (tabActiva === "plan") {

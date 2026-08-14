@@ -68,6 +68,29 @@ body.tema-estetica button.secondary{background:#3a2230;}
 body.tema-estetica .segmento.h0{background:#3a2230;}
 body.tema-estetica .segmento.h1{background:#2a2318;}
 body.tema-estetica .brief-card{background:linear-gradient(135deg,#33132a,#2a1020);}
+
+/* ─── Tema "Vitalis Visión" (oscuro, índigo/cian) ──────────────────────
+   Para cuentas de oftalmología. Mismo mecanismo que los otros temas. */
+body.tema-oftalmologia{
+  --primary:#6366f1;
+  --primary-dark:#4338ca;
+  --accent:#22d3ee;
+  --accent-2:#67e8f9;
+  --bg:#0e0e1b;
+  --card:#181830;
+  --border:#2c2c4a;
+  --text:#e9e9f7;
+  --text-muted:#9797b8;
+  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
+  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
+  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
+  --gradient-vitalis: linear-gradient(135deg, #4338ca 0%, var(--primary) 50%, var(--accent) 100%);
+}
+body.tema-oftalmologia input, body.tema-oftalmologia select, body.tema-oftalmologia textarea{background:#1e1e38;}
+body.tema-oftalmologia button.secondary{background:#232349;}
+body.tema-oftalmologia .segmento.h0{background:#232349;}
+body.tema-oftalmologia .segmento.h1{background:#1c2a38;}
+body.tema-oftalmologia .brief-card{background:linear-gradient(135deg,#1c1c3a,#131328);}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 .header{background:var(--card);padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}

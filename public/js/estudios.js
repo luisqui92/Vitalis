@@ -16,6 +16,18 @@ const TIPOS_ESTUDIO = {
   foto: "📷 Foto clínica",
   otro: "📄 Otro",
 };
+// Vitalis Visión: tipos de estudio propios de oftalmología, se suman a la
+// lista general solo para esa especialidad.
+const TIPOS_ESTUDIO_OFTALMOLOGIA = {
+  oct: "🩻 OCT",
+  fondo_ojo: "👁️ Fondo de ojo",
+  campimetria: "🗺️ Campimetría",
+  biometria: "📏 Biometría",
+};
+function tiposEstudioActivos() {
+  return MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? { ...TIPOS_ESTUDIO, ...TIPOS_ESTUDIO_OFTALMOLOGIA } : TIPOS_ESTUDIO;
+}
+const LADOS_OJO = { OD: "Ojo derecho (OD)", OI: "Ojo izquierdo (OI)", ambos: "Ambos ojos" };
 
 // Odontología/medicina general: 3 ángulos alcanza. Vitalis Face (estética/
 // plástica/dermatología) usa 5, para un seguimiento más fino de un
@@ -41,11 +53,18 @@ function tabEstudiosHtml(estudios) {
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">Subir estudio</div>
       <select id="estTipo">
-        ${Object.entries(TIPOS_ESTUDIO).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}
+        ${Object.entries(tiposEstudioActivos()).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}
       </select>
       <input id="estNombre" type="text" placeholder="Título (ej: Hemograma completo)" style="margin-top:8px">
       <label>Fecha</label>
       <input id="estFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
+
+      ${MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? `
+        <label>Ojo</label>
+        <div class="chip-row" id="estLadoOjoChips">
+          ${Object.entries(LADOS_OJO).map(([k, l]) => `<button type="button" class="chip" data-lado-ojo="${k}">${l}</button>`).join("")}
+        </div>
+      ` : ""}
 
       <div id="estAnguloBox" style="display:none;margin-top:8px">
         <label>Ángulo de la foto</label>
@@ -66,7 +85,7 @@ function tabEstudiosHtml(estudios) {
     ${estudios.map(e => `
       <div class="item" data-ver-estudio="${e._id}">
         <div class="top">
-          <div class="nombre">${esc(TIPOS_ESTUDIO[e.tipo] || e.tipo)}${e.anguloFoto ? " · " + esc(ANGULOS_FOTO_TODOS[e.anguloFoto] || e.anguloFoto) : ""} — ${esc(e.nombre)}</div>
+          <div class="nombre">${esc(tiposEstudioActivos()[e.tipo] || TIPOS_ESTUDIO_OFTALMOLOGIA[e.tipo] || e.tipo)}${e.anguloFoto ? " · " + esc(ANGULOS_FOTO_TODOS[e.anguloFoto] || e.anguloFoto) : ""}${e.ladoOjo ? " · " + esc(LADOS_OJO[e.ladoOjo] || e.ladoOjo) : ""} — ${esc(e.nombre)}</div>
           <button class="link" data-borrar-estudio="${e._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
         <div class="fecha">${new Date(e.fecha).toLocaleDateString("es-BO")}</div>
@@ -78,6 +97,7 @@ function tabEstudiosHtml(estudios) {
 function wireTabEstudios(p, estudios) {
   let archivoSeleccionado = null;
   let anguloElegido = null;
+  let ladoOjoElegido = null;
   const inputArchivo = document.getElementById("estArchivo");
   const nombreArchivoEl = document.getElementById("estArchivoNombre");
   const tipoSelect = document.getElementById("estTipo");
@@ -93,6 +113,13 @@ function wireTabEstudios(p, estudios) {
     btn.onclick = () => {
       anguloElegido = btn.dataset.angulo;
       document.querySelectorAll("#estAnguloChips [data-angulo]").forEach(b => b.classList.toggle("activo", b === btn));
+    };
+  });
+
+  document.querySelectorAll("#estLadoOjoChips [data-lado-ojo]").forEach(btn => {
+    btn.onclick = () => {
+      ladoOjoElegido = btn.dataset.ladoOjo;
+      document.querySelectorAll("#estLadoOjoChips [data-lado-ojo]").forEach(b => b.classList.toggle("activo", b === btn));
     };
   });
 
@@ -131,6 +158,7 @@ function wireTabEstudios(p, estudios) {
     try {
       let qs = "?tipo=" + encodeURIComponent(tipo) + "&nombre=" + encodeURIComponent(nombre) + "&fecha=" + encodeURIComponent(fecha);
       if (tipo === "foto" && anguloElegido) qs += "&anguloFoto=" + encodeURIComponent(anguloElegido);
+      if (ladoOjoElegido) qs += "&ladoOjo=" + encodeURIComponent(ladoOjoElegido);
       await api("/medico/pacientes/" + p._id + "/estudios" + qs, {
         method: "POST",
         headers: { "Content-Type": archivoSeleccionado.type || "application/octet-stream" },

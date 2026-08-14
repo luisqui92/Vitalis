@@ -8,16 +8,18 @@ const app = document.getElementById("app");
 const headerSub = document.getElementById("headerSub");
 const btnLogout = document.getElementById("btnLogout");
 
-// Odontología y estética tienen su propia identidad visual (temas oscuros
-// "Vitalis Dental" / "Vitalis Face") — medicina general sigue con el look
-// claro de siempre.
+// Odontología, estética y oftalmología tienen su propia identidad visual
+// (temas oscuros "Vitalis Dental" / "Vitalis Face" / "Vitalis Visión") —
+// medicina general sigue con el look claro de siempre.
 function aplicarTemaSegunEspecialidad() {
   const esDental = MEDICO_TIPO_ESPECIALIDAD === "odontologia";
   const esEstetica = MEDICO_TIPO_ESPECIALIDAD === "estetica";
+  const esOftalmologia = MEDICO_TIPO_ESPECIALIDAD === "oftalmologia";
   document.body.classList.toggle("tema-dental", esDental);
   document.body.classList.toggle("tema-estetica", esEstetica);
+  document.body.classList.toggle("tema-oftalmologia", esOftalmologia);
   const marcaH1 = document.querySelector(".brand h1");
-  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : "Vitalis";
+  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : esOftalmologia ? "Vitalis Visión" : "Vitalis";
 }
 
 // La transcripción y la nota clínica de consultas largas corren en segundo
@@ -82,9 +84,25 @@ const TABS_KARDEX_ESTETICA = {
   antecedentes: { icono: "📋", label: "Antecedentes" },
   recetas: { icono: "📄", label: "Recetas" },
 };
+// Vitalis Visión (oftalmología): "ojos" es el mapa ocular por estructura,
+// "evolucion" acá se usa para presión intraocular/agudeza visual (con
+// alerta si la tendencia sube), y "plan" (mismo backend de Odonto/Face)
+// pasa a llamarse Procedimientos (cirugía de catarata, láser, etc.).
+const TABS_KARDEX_OFTALMOLOGIA = {
+  paciente: { icono: "👤", label: "Paciente" },
+  consultas: { icono: "🎙️", label: "Consultas" },
+  ojos: { icono: "👁️", label: "Ojos" },
+  plan: { icono: "🏥", label: "Procedimientos" },
+  evolucion: { icono: "📈", label: "Evolución" },
+  estudios: { icono: "🧪", label: "Estudios" },
+  medicamentos: { icono: "💊", label: "Medicación" },
+  antecedentes: { icono: "📋", label: "Antecedentes" },
+  recetas: { icono: "📄", label: "Recetas" },
+};
 function tabsKardexPara(tipoEspecialidad) {
   if (tipoEspecialidad === "odontologia") return TABS_KARDEX_ODONTOLOGIA;
   if (tipoEspecialidad === "estetica") return TABS_KARDEX_ESTETICA;
+  if (tipoEspecialidad === "oftalmologia") return TABS_KARDEX_OFTALMOLOGIA;
   return TABS_KARDEX_MEDICINA_GENERAL;
 }
 

@@ -4,7 +4,7 @@
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
 const { CONFIG, log } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming } = require("../services/assemblyai");
@@ -79,14 +79,47 @@ module.exports = function (app) {
             const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
             catalogoTratamientos = catalogo.map(c => c.nombre);
           }
+          // Solo para oftalmología (Vitalis Visión): la lista de estructuras
+          // oculares válidas, para que la IA narre el examen por ojo.
+          const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
 
           consulta.notaClinica = await generarNotaClinica(transcripcionCompleta, {
             antecedentesPersonales: paciente.antecedentesPersonales || [],
             antecedentesFamiliares: paciente.antecedentesFamiliares || [],
             medicamentosActivos: medicamentosActivos.map(m => m.nombre),
             catalogoTratamientos,
+            estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
           });
           consulta.notaClinicaEstado = "completado";
+
+          // El mapa ocular se actualiza solo apenas termina la nota (el
+          // médico lo revisa/corrige después desde la pestaña Ojos) — cada
+          // cambio queda en el historial con fuente:"voz" y el id de esta
+          // consulta, nunca se pierde el origen del dato.
+          const hallazgos = consulta.notaClinica?.examenOcularSugerido;
+          if (esOftalmologia && hallazgos?.length) {
+            try {
+              let examen = await ExamenOcular.findOne({ pacienteId: paciente._id, medicoPhone });
+              if (!examen) {
+                const estructuras = [];
+                for (const ojo of OJOS) for (const estructura of ESTRUCTURAS_OCULARES) {
+                  estructuras.push({ ojo, estructura, estado: "normal", notas: "", historial: [] });
+                }
+                examen = await ExamenOcular.create({ pacienteId: paciente._id, medicoPhone, estructuras });
+              }
+              for (const h of hallazgos) {
+                if (!OJOS.includes(h.ojo) || !ESTRUCTURAS_OCULARES.includes(h.estructura) || !ESTADOS_ESTRUCTURA_OCULAR.includes(h.estado)) continue;
+                const item = examen.estructuras.find(e => e.ojo === h.ojo && e.estructura === h.estructura);
+                if (!item) continue;
+                item.estado = h.estado;
+                item.notas = h.hallazgo;
+                item.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
+              }
+              await examen.save();
+            } catch (e) {
+              log.error("[EXAMEN_OCULAR]", e.message);
+            }
+          }
         } catch (e) {
           log.error("[NOTA_CLINICA]", e.response?.data || e.message);
           consulta.notaClinicaEstado = "error";

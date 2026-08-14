@@ -27,6 +27,7 @@ RESPONDE SOLO JSON con esta estructura exacta:
   "proximoControl": "string o null",
   "reconsultaSugerida": {"fechaHora":"YYYY-MM-DDTHH:mm o null","textoOriginal":"string o null"},
   "tratamientosSugeridos": [{"itemMencionado":"string","piezaFdi":"number o null","catalogoNombreSugerido":"string o null"}],
+  "examenOcularSugerido": [{"ojo":"OD u OI","estructura":"string exacto de la lista dada","hallazgo":"string","estado":"normal|leve|moderado|importante"}],
   "antecedentesPersonalesNuevos": ["string", ...],
   "antecedentesFamiliaresNuevos": [{"parentesco":"string","condicion":"string"}],
   "vacunasMencionadas": [{"nombre":"string","dosis":"string o null","fecha":"YYYY-MM-DD o null"}]
@@ -80,7 +81,41 @@ Reglas:
     "implante" → el ítem de implante unitario). Copiá el nombre EXACTO tal
     como aparece en la lista dada. Si ningún ítem del catálogo corresponde
     con confianza, dejalo en null — mejor no sugerir nada que sugerir el
-    ítem equivocado (el profesional lo puede elegir a mano después).`;
+    ítem equivocado (el profesional lo puede elegir a mano después).
+- "examenOcularSugerido": SOLO si más abajo te doy una lista de estructuras
+  oculares (si no te la doy, dejá esta lista vacía — es una función solo
+  para oftalmología). El oftalmólogo va a ir narrando el examen en voz alta
+  por cada ojo — reportá un ítem por cada hallazgo CONCRETO que mencione
+  sobre una estructura puntual, ej: "ojo derecho, córnea transparente",
+  "cristalino con opacidad cortical leve en el izquierdo", "retina sin
+  desprendimiento". Para cada uno:
+  · "ojo": "OD" (derecho) u "OI" (izquierdo) — tiene que quedar claro de
+    cuál ojo habla; si no lo aclaró y no se puede inferir del contexto
+    inmediato, no reportes ese hallazgo.
+  · "estructura": copiá EXACTO uno de los valores de la lista de
+    estructuras oculares válidas que te paso más abajo (son identificadores
+    en inglés/sin tildes, ej. "camara_anterior", "nervio_optico" — usalos
+    tal cual, no los traduzcas ni les pongas tildes) — el que mejor
+    corresponda a lo que describió. Si no corresponde a ninguno, no lo
+    reportes.
+  · "hallazgo": lo que dijo, tal cual (para que quede en el registro).
+  · "estado": clasificá la gravedad en "normal", "leve", "moderado" o
+    "importante", según lo que el médico haya dicho (no según tu propio
+    juicio clínico):
+      - "normal": dijo que está bien/transparente/sin alteraciones/formada.
+      - "leve": mencionó una alteración pero la calificó como leve, mínima,
+        incipiente o similar.
+      - "moderado": alteración que mencionó sin calificarla como leve ni
+        grave, o que describió como "moderada".
+      - "importante": palabras que indican urgencia o hallazgo serio —
+        desprendimiento, hemorragia, pérdida de visión, sospecha de tumor,
+        "grave", "severo".
+    Si la gravedad no queda clara por lo que dijo, usá "leve" en vez de
+    "normal" (para no esconder un hallazgo real) y en vez de "importante"
+    (para no generar una alarma que el médico no dijo). Esto se aplica
+    directo a la ficha del paciente sin que el médico lo confirme antes,
+    así que ante cualquier duda real de a qué estructura/ojo se refiere,
+    mejor no reportar ese ítem.`;
 
 function construirContexto(contexto) {
   const partes = [];
@@ -98,6 +133,9 @@ function construirContexto(contexto) {
   if (contexto?.catalogoTratamientos?.length) {
     partes.push(`Catálogo de tratamientos de este consultorio (para "tratamientosSugeridos"): ${contexto.catalogoTratamientos.join("; ")}`);
   }
+  if (contexto?.estructurasOculares?.length) {
+    partes.push(`Estructuras oculares válidas (para "examenOcularSugerido"): ${contexto.estructurasOculares.join(", ")}`);
+  }
   return `\n\n(${partes.join(" ")})`;
 }
 
@@ -110,7 +148,7 @@ async function generarNotaClinica(transcripcion, contexto) {
         { role: "system", content: PROMPT_SISTEMA },
         { role: "user", content: transcripcion + construirContexto(contexto) },
       ],
-      max_tokens: 1300,
+      max_tokens: 1600,
       temperature: 0.1,
     },
     {
