@@ -25,8 +25,12 @@ app.use(helmet({
       // El hash es del <script type="importmap"> de index.html (necesario
       // para que los addons de Three.js resuelvan `import ... from "three"`)
       // — 'wasm-unsafe-eval' es para poder instanciar el decoder Draco
-      // (WebAssembly) que descomprime el modelo 3D del odontograma.
-      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='"],
+      // (WebAssembly) que descomprime el modelo 3D del odontograma —
+      // 'blob:' es para el AudioWorklet de la vista previa en vivo de la
+      // consulta (audio.js arma el procesador de audio como blob: en vez
+      // de un archivo propio, y Chrome exige blob: en script-src —no en
+      // worker-src— para eso).
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='"],
       styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com"],
