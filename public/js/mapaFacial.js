@@ -114,41 +114,69 @@ function derivarRegionesGeometricas(lm, base) {
   const ovaloBottomY = maxY(base.ovalo);
   const ovaloLeftX = minX(base.ovalo);
   const ovaloRightX = maxX(base.ovalo);
+  const anchoOvalo = ovaloRightX - ovaloLeftX;
   const cejasTopY = Math.min(minY(base.ceja_derecha), minY(base.ceja_izquierda));
+  const labiosTopY = minY(base.labios);
   const labiosBottomY = maxY(base.labios);
-  const centroX = (ovaloLeftX + ovaloRightX) / 2;
+  // El centro de la BOCA, no el centro del óvalo -- si la cabeza está
+  // girada (algo muy común en una foto sacada a mano, no en un estudio con
+  // trípode), el óvalo detectado deja de ser simétrico respecto a la cara
+  // real y todo lo que se ancle a "su" centro queda corrido hacia un lado.
+  // La boca es un ancla más confiable porque son puntos propios, no un
+  // promedio del contorno.
+  const labiosCentroX = (minX(base.labios) + maxX(base.labios)) / 2;
+  const ojoDerBottomY = maxY(base.ojo_derecho);
+  const ojoIzqBottomY = maxY(base.ojo_izquierdo);
+  const ojoDerMinX = minX(base.ojo_derecho); // borde externo del ojo derecho, hacia esa oreja
+  const ojoIzqMaxX = maxX(base.ojo_izquierdo); // borde externo del ojo izquierdo, hacia esa oreja
 
-  // Rectángulo de la frente: entre el borde de arriba del óvalo y las cejas.
+  // Frente: entre el borde de arriba del óvalo y las cejas.
   const frente = [
-    { x: ovaloLeftX + (ovaloRightX - ovaloLeftX) * 0.12, y: ovaloTopY },
-    { x: ovaloRightX - (ovaloRightX - ovaloLeftX) * 0.12, y: ovaloTopY },
-    { x: ovaloRightX - (ovaloRightX - ovaloLeftX) * 0.08, y: cejasTopY },
-    { x: ovaloLeftX + (ovaloRightX - ovaloLeftX) * 0.08, y: cejasTopY },
+    { x: ovaloLeftX + anchoOvalo * 0.12, y: ovaloTopY },
+    { x: ovaloRightX - anchoOvalo * 0.12, y: ovaloTopY },
+    { x: ovaloRightX - anchoOvalo * 0.08, y: cejasTopY },
+    { x: ovaloLeftX + anchoOvalo * 0.08, y: cejasTopY },
   ];
-  // Mentón: debajo de los labios, hasta el borde inferior del óvalo.
+  // Mentón: centrado en la boca, desde debajo de los labios hasta el
+  // borde inferior del óvalo.
+  const anchoMenton = anchoOvalo * 0.16;
   const menton = [
-    { x: centroX - (ovaloRightX - ovaloLeftX) * 0.18, y: labiosBottomY },
-    { x: centroX + (ovaloRightX - ovaloLeftX) * 0.18, y: labiosBottomY },
-    { x: centroX + (ovaloRightX - ovaloLeftX) * 0.14, y: ovaloBottomY },
-    { x: centroX - (ovaloRightX - ovaloLeftX) * 0.14, y: ovaloBottomY },
+    { x: labiosCentroX - anchoMenton, y: labiosBottomY },
+    { x: labiosCentroX + anchoMenton, y: labiosBottomY },
+    { x: labiosCentroX + anchoMenton * 0.8, y: ovaloBottomY },
+    { x: labiosCentroX - anchoMenton * 0.8, y: ovaloBottomY },
   ];
-  // Mejillas: entre el nivel de los ojos y el de los labios, a los costados.
-  const ojosY = (minY(base.ojo_derecho) + minY(base.ojo_izquierdo)) / 2;
+  // Mejillas (pómulo): debajo del ojo -- no desde arriba, si no se come el
+  // párpado -- y solo hasta la comisura de la boca -- no hasta abajo de
+  // los labios, si no se come la boca y el mentón. El borde interno
+  // arranca en el propio borde externo del ojo de ese lado para no
+  // invadir la nariz.
   const mejillaIzquierda = [
-    { x: centroX + (ovaloRightX - centroX) * 0.15, y: ojosY },
-    { x: ovaloRightX - (ovaloRightX - ovaloLeftX) * 0.05, y: ojosY + (labiosBottomY - ojosY) * 0.15 },
-    { x: ovaloRightX - (ovaloRightX - ovaloLeftX) * 0.1, y: labiosBottomY },
-    { x: centroX + (ovaloRightX - centroX) * 0.15, y: labiosBottomY },
+    { x: ojoIzqMaxX, y: ojoIzqBottomY },
+    { x: ovaloRightX - anchoOvalo * 0.05, y: ojoIzqBottomY + (labiosTopY - ojoIzqBottomY) * 0.3 },
+    { x: ovaloRightX - anchoOvalo * 0.08, y: labiosTopY },
+    { x: ojoIzqMaxX, y: labiosTopY },
   ];
-  const mejillaDerecha = mejillaIzquierda.map(p => ({ x: centroX - (p.x - centroX), y: p.y }));
-  // Mandíbula: costados del óvalo, entre labios y mentón.
+  const mejillaDerecha = [
+    { x: ojoDerMinX, y: ojoDerBottomY },
+    { x: ovaloLeftX + anchoOvalo * 0.05, y: ojoDerBottomY + (labiosTopY - ojoDerBottomY) * 0.3 },
+    { x: ovaloLeftX + anchoOvalo * 0.08, y: labiosTopY },
+    { x: ojoDerMinX, y: labiosTopY },
+  ];
+  // Mandíbula: costados, entre la comisura de la boca y el mentón --
+  // arranca justo afuera del mentón para no superponerse con él.
   const mandibulaIzquierda = [
-    { x: ovaloRightX - (ovaloRightX - ovaloLeftX) * 0.1, y: labiosBottomY },
+    { x: ovaloRightX - anchoOvalo * 0.1, y: labiosBottomY },
     { x: ovaloRightX, y: (labiosBottomY + ovaloBottomY) / 2 },
-    { x: centroX + (ovaloRightX - ovaloLeftX) * 0.14, y: ovaloBottomY },
-    { x: centroX + (ovaloRightX - centroX) * 0.15, y: labiosBottomY },
+    { x: labiosCentroX + anchoMenton * 1.1, y: ovaloBottomY },
+    { x: labiosCentroX + anchoMenton * 1.1, y: labiosBottomY },
   ];
-  const mandibulaDerecha = mandibulaIzquierda.map(p => ({ x: centroX - (p.x - centroX), y: p.y }));
+  const mandibulaDerecha = [
+    { x: ovaloLeftX + anchoOvalo * 0.1, y: labiosBottomY },
+    { x: ovaloLeftX, y: (labiosBottomY + ovaloBottomY) / 2 },
+    { x: labiosCentroX - anchoMenton * 1.1, y: ovaloBottomY },
+    { x: labiosCentroX - anchoMenton * 1.1, y: labiosBottomY },
+  ];
 
   return { frente, menton, mejilla_izquierda: mejillaIzquierda, mejilla_derecha: mejillaDerecha, mandibula_izquierda: mandibulaIzquierda, mandibula_derecha: mandibulaDerecha };
 }
