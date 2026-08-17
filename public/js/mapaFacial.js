@@ -181,11 +181,36 @@ function cajaOvaloFacial(lm, FaceLandmarker) {
 // Mejor de más tolerante — que capture un encuadre un poco imperfecto — a
 // que nunca dispare y el médico termine igual tocando "Capturar" a mano,
 // que sigue siempre disponible como respaldo.
-function evaluarAlineacion(lm, FaceLandmarker) {
+// Proxy geométrico de cuánto giró la cabeza (para la sesión guiada de los 5
+// ángulos de Vitalis Face), usando solo las regiones que ya calculamos con
+// las constantes propias de MediaPipe (nada de índices "mágicos" sueltos):
+// cuando la cara está de frente, el centro de los ojos cae más o menos en
+// el medio del óvalo facial; al girar, ese centro se corre hacia uno de los
+// dos bordes del óvalo. 0 = de frente, positivo/negativo = girada hacia un
+// lado u otro de LA IMAGEN.
+// OJO: a qué lado del PACIENTE corresponde cada signo (si "positivo" es su
+// derecha o su izquierda) no se pudo verificar acá — este entorno no tiene
+// cámara ni una cara real para probarlo girando de verdad. Si en un
+// celular real "Girá a la derecha" resulta estar guiando para el lado
+// que no es, se arregla dando vuelta el signo de ESTA función nada más
+// (return -(...) en vez de return (...)) — los rangos de más abajo no
+// habría que tocarlos.
+function estimarYaw(lm, FaceLandmarker) {
+  const base = regionesBase(FaceLandmarker);
+  const centroX = (idxs) => idxs.reduce((s, i) => s + lm[i].x, 0) / idxs.length;
+  const ojosCentroX = (centroX(base.ojo_derecho) + centroX(base.ojo_izquierdo)) / 2;
+  const ovaloXs = base.ovalo.map(i => lm[i].x);
+  const ovaloMinX = Math.min(...ovaloXs), ovaloMaxX = Math.max(...ovaloXs);
+  const ovaloCentroX = (ovaloMinX + ovaloMaxX) / 2;
+  const ovaloAncho = (ovaloMaxX - ovaloMinX) || 0.0001;
+  return (ojosCentroX - ovaloCentroX) / (ovaloAncho / 2);
+}
+
+function evaluarCuadroVivo(lm, FaceLandmarker) {
   const caja = cajaOvaloFacial(lm, FaceLandmarker);
   const centrada = caja.cx > 0.28 && caja.cx < 0.72 && caja.cy > 0.15 && caja.cy < 0.85;
   const tamanoOk = caja.w > 0.18 && caja.w < 0.62;
-  return { alineado: centrada && tamanoOk, caja };
+  return { alineado: centrada && tamanoOk, tamanoOk, caja, yaw: estimarYaw(lm, FaceLandmarker) };
 }
 
 async function prepararDeteccionEnVivo() {
@@ -195,9 +220,26 @@ async function prepararDeteccionEnVivo() {
     detectar(videoEl) {
       const resultado = landmarker.detectForVideo(videoEl, performance.now());
       if (!resultado.faceLandmarks || !resultado.faceLandmarks.length) return null;
-      return evaluarAlineacion(resultado.faceLandmarks[0], FaceLandmarker);
+      return evaluarCuadroVivo(resultado.faceLandmarks[0], FaceLandmarker);
     },
   };
+}
+
+// Rangos de "yaw" (ver estimarYaw) para cada paso de la sesión guiada.
+// También pendientes de calibrar con una cara real — son generosos a
+// propósito para no exigir un giro perfecto.
+const YAW_RANGOS_SESION = {
+  frontal: [-0.15, 0.15],
+  angulo45_derecha: [0.2, 0.5],
+  perfil_derecho: [0.5, 0.95],
+  angulo45_izquierda: [-0.5, -0.2],
+  perfil_izquierdo: [-0.95, -0.5],
+};
+function anguloPorYaw(yaw) {
+  for (const [angulo, rango] of Object.entries(YAW_RANGOS_SESION)) {
+    if (yaw >= rango[0] && yaw <= rango[1]) return angulo;
+  }
+  return null;
 }
 
 function dibujarMapaAnatomico(ctx, img, lm, FaceLandmarker) {

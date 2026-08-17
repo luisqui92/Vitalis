@@ -72,6 +72,7 @@ function tabEstudiosHtml(estudios) {
           ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<button type="button" class="chip" data-angulo="${k}">${l}</button>`).join("")}
         </div>
         <button type="button" class="secondary" id="btnFotoGuiada" style="margin-top:6px">📸 Tomar foto guiada</button>
+        ${MEDICO_TIPO_ESPECIALIDAD === "estetica" ? `<button type="button" class="secondary" id="btnSesionFacial" style="margin-top:6px">🎥 Sesión guiada (los 5 ángulos)</button>` : ""}
       </div>
 
       <label class="file-label" for="estArchivo" style="margin-top:10px">📎 Elegir imagen o PDF</label>
@@ -194,6 +195,36 @@ function wireTabEstudios(p, estudios) {
         subirEstudioActual();
       });
     };
+  }
+
+  // Sesión guiada: sube las hasta 5 fotos una por una (si alguna falla, las
+  // demás igual quedan guardadas — el médico solo repite la que falte).
+  async function subirSesionFacial(fotos) {
+    const errBox = document.getElementById("estErr");
+    errBox.innerHTML = `<div class="hint">Guardando ${fotos.length} fotos...</div>`;
+    const fecha = document.getElementById("estFecha").value || new Date().toISOString().slice(0, 10);
+    let ok = 0;
+    for (const { angulo, blob } of fotos) {
+      try {
+        const nombre = "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo);
+        const qs = "?tipo=foto&nombre=" + encodeURIComponent(nombre) + "&fecha=" + encodeURIComponent(fecha) + "&anguloFoto=" + encodeURIComponent(angulo);
+        await api("/medico/pacientes/" + p._id + "/estudios" + qs, {
+          method: "POST",
+          headers: { "Content-Type": "image/jpeg" },
+          body: blob,
+        });
+        ok++;
+      } catch (e) { /* seguir con las demás aunque una falle */ }
+    }
+    errBox.innerHTML = ok === fotos.length
+      ? `<div class="exito">✅ Se guardaron las ${ok} fotos de la sesión</div>`
+      : `<div class="error">Se guardaron ${ok} de ${fotos.length} — a las que faltan tocales "Tomar foto guiada" una por una</div>`;
+    setTimeout(() => renderPacienteDetalle(p._id, "estudios"), 900);
+  }
+
+  const btnSesionFacial = document.getElementById("btnSesionFacial");
+  if (btnSesionFacial) {
+    btnSesionFacial.onclick = () => abrirSesionGuiadaFacial(subirSesionFacial);
   }
 
   document.querySelectorAll("[data-ver-estudio]").forEach(el => {
@@ -438,6 +469,131 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
     cerrar();
     onCapturada(blob, anguloFinal);
   };
+}
+
+// ─── SESIÓN GUIADA (los 5 ángulos de Vitalis Face en una sola pasada) ────
+// Como en la verificación facial de un banco: le va diciendo al paciente
+// hacia dónde girar y va capturando sola en cada posición, en vez de que
+// el médico repita "elegir ángulo → alinear → capturar" cinco veces.
+const SECUENCIA_SESION_FACIAL = ["frontal", "angulo45_derecha", "perfil_derecho", "angulo45_izquierda", "perfil_izquierdo"];
+const PROMPT_SESION_FACIAL = {
+  frontal: "Mirá derecho a la cámara",
+  angulo45_derecha: "Girá la cabeza despacio hacia la derecha",
+  perfil_derecho: "Seguí girando hasta quedar de perfil",
+  angulo45_izquierda: "Volvé al centro y girá hacia la izquierda",
+  perfil_izquierdo: "Seguí girando hasta quedar de perfil",
+};
+
+async function abrirSesionGuiadaFacial(onListo) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:#000;z-index:999;display:flex;flex-direction:column;";
+  overlay.innerHTML = `
+    <div style="flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
+      <video id="camVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
+      <div id="camGuia" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"></div>
+      <div id="camEstado" class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600;font-size:15px;padding:0 14px">Cargando...</div>
+      <div id="camMiniaturas" style="position:absolute;bottom:10px;left:0;right:0;display:flex;gap:6px;justify-content:center"></div>
+    </div>
+    <div style="padding:14px;background:#111;display:flex;gap:10px">
+      <button class="secondary" id="btnSesionCancelar" style="flex:1">Cancelar</button>
+      <button class="primary" id="btnSesionCapturarAhora" style="flex:1">📸 Capturar ahora</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const video = overlay.querySelector("#camVideo");
+  const guiaEl = overlay.querySelector("#camGuia");
+  const estadoEl = overlay.querySelector("#camEstado");
+  const miniaturasEl = overlay.querySelector("#camMiniaturas");
+
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    video.srcObject = stream;
+  } catch (e) {
+    overlay.remove();
+    alert("No se pudo acceder a la cámara. Podés elegir un archivo con el botón de abajo en su lugar.");
+    return;
+  }
+
+  const capturas = []; // { angulo, blob, url }
+  let pasoActual = 0;
+  let intervaloDeteccion = null;
+  let cuadrosEnRango = 0;
+  const CUADROS_PARA_CAPTURAR = 5; // giro continuo -> menos cuadros que la foto estática de un solo ángulo
+
+  function anguloDelPaso() { return SECUENCIA_SESION_FACIAL[pasoActual]; }
+
+  function pintarGuia() {
+    guiaEl.innerHTML = guiaSvgPara(anguloDelPaso(), false);
+    estadoEl.textContent = PROMPT_SESION_FACIAL[anguloDelPaso()];
+  }
+
+  function cerrar() {
+    if (intervaloDeteccion) clearInterval(intervaloDeteccion);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    capturas.forEach(c => URL.revokeObjectURL(c.url));
+    overlay.remove();
+  }
+
+  function capturarPasoActual() {
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const angulo = anguloDelPaso();
+      const url = URL.createObjectURL(blob);
+      capturas.push({ angulo, blob, url });
+      const miniatura = document.createElement("img");
+      miniatura.src = url;
+      miniatura.style.cssText = "width:44px;height:44px;object-fit:cover;border-radius:6px;border:2px solid #4ade80";
+      miniaturasEl.appendChild(miniatura);
+
+      cuadrosEnRango = 0;
+      guiaEl.innerHTML = guiaSvgPara(angulo, true);
+      estadoEl.textContent = "📸 ¡Tomada! (" + capturas.length + "/" + SECUENCIA_SESION_FACIAL.length + ")";
+      pasoActual++;
+
+      if (pasoActual >= SECUENCIA_SESION_FACIAL.length) {
+        estadoEl.textContent = "¡Listo! Se tomaron las " + SECUENCIA_SESION_FACIAL.length + " fotos";
+        const resultado = capturas.map(({ angulo, blob }) => ({ angulo, blob }));
+        setTimeout(() => { cerrar(); onListo(resultado); }, 700);
+        return;
+      }
+      setTimeout(pintarGuia, 500);
+    }, "image/jpeg", 0.92);
+  }
+
+  pintarGuia();
+
+  prepararDeteccionEnVivo().then((detector) => {
+    intervaloDeteccion = setInterval(() => {
+      if (video.readyState < 2 || pasoActual >= SECUENCIA_SESION_FACIAL.length) return;
+      let resultado;
+      try {
+        resultado = detector.detectar(video);
+      } catch (e) {
+        return; // la detección automática es un plus — "Capturar ahora" sigue disponible si falla
+      }
+      if (!resultado) { cuadrosEnRango = 0; return; }
+      // Para los ángulos de perfil no exigimos el encuadre "centrado" de
+      // evaluarCuadroVivo (una cara de perfil no cae centrada del mismo
+      // modo que una de frente) — solo que el giro (yaw) esté en el rango
+      // del paso actual y el tamaño sea razonable.
+      if (anguloPorYaw(resultado.yaw) === anguloDelPaso() && resultado.tamanoOk) {
+        cuadrosEnRango++;
+        if (cuadrosEnRango >= CUADROS_PARA_CAPTURAR) capturarPasoActual();
+      } else {
+        cuadrosEnRango = 0;
+      }
+    }, 150);
+  }).catch(() => {
+    estadoEl.textContent = PROMPT_SESION_FACIAL[anguloDelPaso()] + " — tocá \"Capturar ahora\" cuando estés listo";
+  });
+
+  overlay.querySelector("#btnSesionCancelar").onclick = cerrar;
+  overlay.querySelector("#btnSesionCapturarAhora").onclick = capturarPasoActual;
 }
 
 // ─── COMPARADOR ANTES / DESPUÉS ──────────────────────────────────────────
