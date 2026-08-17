@@ -64,58 +64,85 @@ function iniciales(nombre) {
 
 function fmt(s){ const m=String(Math.floor(s/60)).padStart(2,"0"); const r=String(s%60).padStart(2,"0"); return m+":"+r; }
 
+// Set propio de íconos de línea (SVG inline, trazo = currentColor) para las
+// pestañas del Kardex — antes eran emoji, que quedan fuera de lugar al lado
+// de una tipografía cuidada (cada plataforma los dibuja distinto, y no hay
+// forma de afinarles el trazo/color). currentColor hace que cada uno tome
+// solo el color de texto de la pestaña (mudo si está inactiva, blanco si
+// está activa) sin tener que tocar nada más.
+function svgIcono(pathInner) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${pathInner}</svg>`;
+}
+const ICONOS = {
+  persona: svgIcono(`<circle cx="12" cy="8.2" r="3.4"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>`),
+  pata: svgIcono(`<circle cx="7" cy="8.3" r="1.7"/><circle cx="12" cy="6" r="1.7"/><circle cx="17" cy="8.3" r="1.7"/><path d="M12 11c-3.3 0-6 2.4-6 5.2 0 2 1.7 3.2 3.5 2.4.8-.3 1.6-.5 2.5-.5s1.7.2 2.5.5c1.8.8 3.5-.4 3.5-2.4 0-2.8-2.7-5.2-6-5.2z"/>`),
+  mic: svgIcono(`<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M9 21h6"/>`),
+  diente: svgIcono(`<path d="M12 4c-1.7 0-2.9 1.1-4 1.1-1.3 0-2-1-2 .9 0 2.4.6 4.1 1.1 6.3.5 1.9.7 4.6 1.9 4.6 1.1 0 1-2.7 1.5-4 .3-.8.8-1.2 1.5-1.2s1.2.4 1.5 1.2c.5 1.3.4 4 1.5 4 1.2 0 1.4-2.7 1.9-4.6.5-2.2 1.1-3.9 1.1-6.3 0-1.9-.7-.9-2-.9-1.1 0-2.3-1.1-4-1.1z"/>`),
+  clipboard: svgIcono(`<rect x="5" y="4.2" width="14" height="16.8" rx="2"/><path d="M9 3.2h6a1 1 0 0 1 1 1V6H8V4.2a1 1 0 0 1 1-1z"/><path d="M8.5 11h7M8.5 14.3h7M8.5 17.6h4"/>`),
+  pastilla: svgIcono(`<rect x="3" y="9" width="18" height="6" rx="3"/><line x1="12" y1="9" x2="12" y2="15"/>`),
+  documento: svgIcono(`<path d="M7 3h7l4 4v13.2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><path d="M9 12.3h6M9 15.6h6M9 9h2"/>`),
+  jeringa: svgIcono(`<path d="M12 2.2v3"/><rect x="9" y="5.2" width="6" height="9.5" rx="1"/><path d="M10.5 14.7v5.3a1.5 1.5 0 0 0 3 0v-5.3"/>`),
+  tendencia: svgIcono(`<path d="M3 17l6-6 4 4 8-8"/><path d="M15.5 6h5.5v5.5"/>`),
+  frasco: svgIcono(`<path d="M9.2 3h5.6M9.8 3v6.3L5.4 18a1.9 1.9 0 0 0 1.7 2.7h9.8a1.9 1.9 0 0 0 1.7-2.7l-4.4-8.7V3"/><path d="M8 15.5h8"/>`),
+  camara: svgIcono(`<path d="M4 8.3h3.2l1.4-2h6.8l1.4 2H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.3a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.3" r="3.4"/>`),
+  ojo: svgIcono(`<path d="M2 12s3.6-6.6 10-6.6 10 6.6 10 6.6-3.6 6.6-10 6.6S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>`),
+  mas: svgIcono(`<path d="M12 5v14M5 12h14"/>`),
+  calendario: svgIcono(`<rect x="4" y="5.5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3.5v3M16 3.5v3"/>`),
+  escudo: svgIcono(`<path d="M12 3l7 3v6c0 4.8-3 8.3-7 9.5-4-1.2-7-4.7-7-9.5V6l7-3z"/><path d="M9 12l2 2 4-4"/>`),
+};
+
 // Ícono + etiqueta corta de cada pestaña del Kardex (ver pintarKardex en
 // pacientes.js) — en un grid fijo de 4 columnas, así que el texto tiene que
 // entrar corto sin cortarse. Medicina general y odontología necesitan
 // fichas distintas (a un odontólogo no le sirven Vacunas/Evolución, y a
 // cambio necesita el Odontograma), así que hay dos sets separados.
 const TABS_KARDEX_MEDICINA_GENERAL = {
-  paciente: { icono: "👤", label: "Paciente" },
-  consultas: { icono: "🎙️", label: "Consultas" },
-  medicamentos: { icono: "💊", label: "Medicación" },
-  antecedentes: { icono: "📋", label: "Antecedentes" },
-  vacunas: { icono: "💉", label: "Vacunas" },
-  evolucion: { icono: "📈", label: "Evolución" },
-  estudios: { icono: "🧪", label: "Estudios" },
-  recetas: { icono: "📄", label: "Recetas" },
+  paciente: { icono: ICONOS.persona, label: "Paciente" },
+  consultas: { icono: ICONOS.mic, label: "Consultas" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
+  evolucion: { icono: ICONOS.tendencia, label: "Evolución" },
+  estudios: { icono: ICONOS.frasco, label: "Estudios" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
 const TABS_KARDEX_ODONTOLOGIA = {
-  paciente: { icono: "👤", label: "Paciente" },
-  consultas: { icono: "🎙️", label: "Consultas" },
-  odontograma: { icono: "🦷", label: "Odontograma" },
-  plan: { icono: "💰", label: "Presupuesto" },
-  medicamentos: { icono: "💊", label: "Medicación" },
-  antecedentes: { icono: "📋", label: "Antecedentes" },
-  estudios: { icono: "🧪", label: "Estudios" },
-  recetas: { icono: "📄", label: "Recetas" },
+  paciente: { icono: ICONOS.persona, label: "Paciente" },
+  consultas: { icono: ICONOS.mic, label: "Consultas" },
+  odontograma: { icono: ICONOS.diente, label: "Odontograma" },
+  plan: { icono: ICONOS.clipboard, label: "Presupuesto" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  estudios: { icono: ICONOS.frasco, label: "Estudios" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
 // Vitalis Face (estética/plástica/dermatología): sin odontograma ni
 // vacunas/evolución — en cambio, Estudios se usa para las fotos clínicas
 // con ángulo guiado, y "plan" (mismo backend que el presupuesto dental)
 // pasa a llamarse Procedimientos.
 const TABS_KARDEX_ESTETICA = {
-  paciente: { icono: "👤", label: "Paciente" },
-  consultas: { icono: "🎙️", label: "Consultas" },
-  plan: { icono: "💉", label: "Procedimientos" },
-  estudios: { icono: "📷", label: "Fotos" },
-  medicamentos: { icono: "💊", label: "Medicación" },
-  antecedentes: { icono: "📋", label: "Antecedentes" },
-  recetas: { icono: "📄", label: "Recetas" },
+  paciente: { icono: ICONOS.persona, label: "Paciente" },
+  consultas: { icono: ICONOS.mic, label: "Consultas" },
+  plan: { icono: ICONOS.clipboard, label: "Procedimientos" },
+  estudios: { icono: ICONOS.camara, label: "Fotos" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
 // Vitalis Visión (oftalmología): "ojos" es el mapa ocular por estructura,
 // "evolucion" acá se usa para presión intraocular/agudeza visual (con
 // alerta si la tendencia sube), y "plan" (mismo backend de Odonto/Face)
 // pasa a llamarse Procedimientos (cirugía de catarata, láser, etc.).
 const TABS_KARDEX_OFTALMOLOGIA = {
-  paciente: { icono: "👤", label: "Paciente" },
-  consultas: { icono: "🎙️", label: "Consultas" },
-  ojos: { icono: "👁️", label: "Ojos" },
-  plan: { icono: "🏥", label: "Procedimientos" },
-  evolucion: { icono: "📈", label: "Evolución" },
-  estudios: { icono: "🧪", label: "Estudios" },
-  medicamentos: { icono: "💊", label: "Medicación" },
-  antecedentes: { icono: "📋", label: "Antecedentes" },
-  recetas: { icono: "📄", label: "Recetas" },
+  paciente: { icono: ICONOS.persona, label: "Paciente" },
+  consultas: { icono: ICONOS.mic, label: "Consultas" },
+  ojos: { icono: ICONOS.ojo, label: "Ojos" },
+  plan: { icono: ICONOS.clipboard, label: "Procedimientos" },
+  evolucion: { icono: ICONOS.tendencia, label: "Evolución" },
+  estudios: { icono: ICONOS.frasco, label: "Estudios" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
 // Vitalis Veterinaria: mismas fichas que medicina general (consultas,
 // medicación, antecedentes, vacunas, evolución de peso, estudios, recetas)
@@ -123,14 +150,14 @@ const TABS_KARDEX_OFTALMOLOGIA = {
 // Kardex es la misma; lo que cambia son los campos de "Paciente" (especie,
 // raza, dueño) y el tema visual.
 const TABS_KARDEX_VETERINARIA = {
-  paciente: { icono: "🐾", label: "Paciente" },
-  consultas: { icono: "🎙️", label: "Consultas" },
-  medicamentos: { icono: "💊", label: "Medicación" },
-  antecedentes: { icono: "📋", label: "Antecedentes" },
-  vacunas: { icono: "💉", label: "Vacunas" },
-  evolucion: { icono: "📈", label: "Peso" },
-  estudios: { icono: "🧪", label: "Estudios" },
-  recetas: { icono: "📄", label: "Recetas" },
+  paciente: { icono: ICONOS.pata, label: "Paciente" },
+  consultas: { icono: ICONOS.mic, label: "Consultas" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
+  evolucion: { icono: ICONOS.tendencia, label: "Peso" },
+  estudios: { icono: ICONOS.frasco, label: "Estudios" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
 function tabsKardexPara(tipoEspecialidad) {
   if (tipoEspecialidad === "odontologia") return TABS_KARDEX_ODONTOLOGIA;

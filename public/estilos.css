@@ -1,191 +1,217 @@
+/* ─── Tipografía ──────────────────────────────────────────────────────────
+   Fraunces (serif editorial, variable) para títulos/marca — Inter (sans,
+   variable) para todo lo demás. Autohospedadas en /fonts (mismo origen,
+   sin tocar la CSP ni sumar un CDN externo). Un solo archivo por familia
+   cubre todo el rango de peso que se usa (son fuentes variables). */
+@font-face{
+  font-family:"Fraunces";
+  font-style:normal;
+  font-weight:400 700;
+  font-display:swap;
+  src:url("/fonts/fraunces-variable.woff2") format("woff2");
+}
+@font-face{
+  font-family:"Inter";
+  font-style:normal;
+  font-weight:100 900;
+  font-display:swap;
+  src:url("/fonts/inter-variable.woff2") format("woff2");
+}
+
 :root{
-  --primary:#0e7490;
-  --primary-dark:#134e5e;
-  --accent:#06b6d4;
-  --accent-2:#22d3ee;
-  --bg:#f0f5f7;
+  --font-marca:"Fraunces",Georgia,serif;
+  --font-texto:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+
+  /* Editorial cálido: papel casi blanco, tinta cálida, acento en latón —
+     nada de gris azulado ni degradé arcoíris. */
+  --primary:#2f5d50;
+  --primary-dark:#1f4038;
+  --primary-rgb:47,93,80;
+  --accent:#b5824a;
+  --accent-2:#d4af7a;
+  --accent-rgb:181,130,74;
+  --bg:#faf8f4;
   --card:#ffffff;
-  --border:#dbe6ea;
-  --text:#0f2733;
-  --text-muted:#5b7480;
-  --success:#15803d; --success-bg:rgba(21,128,61,.1);
-  --warning:#b45309; --warning-bg:rgba(180,83,9,.1);
-  --danger:#b91c1c; --danger-bg:rgba(185,28,28,.08);
-  /* Degradado azul → turquesa → verde, el mismo del ícono de Vitalis —
-     se reutiliza en los elementos circulares/de marca (avatar, botón de
-     grabar, spinner) para que se sientan parte del mismo ícono. */
-  --gradient-vitalis: linear-gradient(135deg, #1a4f7a 0%, var(--primary) 50%, var(--success) 100%);
+  --border:#e7e0d3;
+  --text:#24211b;
+  --text-muted:#83796a;
+  --success:#3d7a52; --success-bg:rgba(61,122,82,.09);
+  --warning:#a8763a; --warning-bg:rgba(168,118,58,.09);
+  --danger:#a13e3e; --danger-bg:rgba(161,62,62,.08);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
+
+  --radius:10px;
+  --radius-sm:7px;
+  --sombra:0 1px 2px rgba(36,33,27,.04);
 }
 
-/* ─── Tema "Vitalis Dental" (oscuro) ───────────────────────────────────
-   Solo para cuentas de odontología (ver aplicarTemaSegunEspecialidad en
-   estado.js) — medicina general sigue con el tema claro de siempre. Como
-   todos los componentes ya usan var(--x), con solo redefinir las variables
-   se reskinea toda la app sin tocar cada .card/.item/.tab por separado. */
+/* ─── Tema "Vitalis Dental" (tinta azul apagado + latón) ──────────────── */
 body.tema-dental{
-  --primary:#3b82f6;
-  --primary-dark:#2563eb;
-  --accent:#22d3ee;
-  --accent-2:#67e8f9;
-  --bg:#0b1220;
-  --card:#141d2e;
-  --border:#28374d;
-  --text:#e7edf5;
-  --text-muted:#8fa1b8;
-  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
-  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
-  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
-  --gradient-vitalis: linear-gradient(135deg, #1d4ed8 0%, var(--primary) 50%, var(--accent) 100%);
+  --primary:#5b84a8;
+  --primary-dark:#3d5f7d;
+  --primary-rgb:91,132,168;
+  --accent:#c9a05f;
+  --accent-2:#dfc088;
+  --accent-rgb:201,160,95;
+  --bg:#12181f;
+  --card:#1a222c;
+  --border:#2b3542;
+  --text:#eef1f4;
+  --text-muted:#8d9aa8;
+  --success:#5a9d6e; --success-bg:rgba(90,157,110,.14);
+  --warning:#c99a52; --warning-bg:rgba(201,154,82,.14);
+  --danger:#c26262; --danger-bg:rgba(194,98,98,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
 }
-/* Estos pocos elementos usan colores fijos (no var(--x)) porque en el tema
-   claro necesitan un tono propio sutil — en oscuro hay que pisarlos aparte. */
-body.tema-dental input, body.tema-dental select, body.tema-dental textarea{background:#1a2536;}
-body.tema-dental button.secondary{background:#1c3a52;}
-body.tema-dental .segmento.h0{background:#1c3a52;}
-body.tema-dental .segmento.h1{background:#1c3320;}
-body.tema-dental .brief-card{background:linear-gradient(135deg,#132a33,#0f2530);}
+body.tema-dental input,body.tema-dental select,body.tema-dental textarea{background:#1c2530;}
+body.tema-dental button.secondary{background:rgba(91,132,168,.14);color:var(--accent-2);}
+body.tema-dental .segmento.h0{background:#1c2530;}
+body.tema-dental .segmento.h1{background:rgba(201,160,95,.14);}
+body.tema-dental .brief-card{background:linear-gradient(135deg,#1a2732,#151e27);}
 
-/* ─── Tema "Vitalis Face" (oscuro, rosa/dorado) ────────────────────────
-   Para cuentas de estética/plástica/dermatología. Mismo mecanismo que
-   tema-dental: solo variables, porque todo ya usa var(--x). */
+/* ─── Tema "Vitalis Face" (rosa ceniza + latón) ────────────────────────── */
 body.tema-estetica{
-  --primary:#c2477a;
-  --primary-dark:#9c3563;
-  --accent:#d4af7a;
-  --accent-2:#e6c99a;
-  --bg:#170f14;
-  --card:#241620;
-  --border:#3a2430;
-  --text:#f3e8ee;
-  --text-muted:#b599a8;
-  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
-  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
-  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
-  --gradient-vitalis: linear-gradient(135deg, #7c2d55 0%, var(--primary) 50%, var(--accent) 100%);
+  --primary:#a8567e;
+  --primary-dark:#7d3f5f;
+  --primary-rgb:168,86,126;
+  --accent:#c9a05f;
+  --accent-2:#dfc088;
+  --accent-rgb:201,160,95;
+  --bg:#181113;
+  --card:#231a1e;
+  --border:#382a2f;
+  --text:#f1e8ea;
+  --text-muted:#a8949a;
+  --success:#5a9d6e; --success-bg:rgba(90,157,110,.14);
+  --warning:#c99a52; --warning-bg:rgba(201,154,82,.14);
+  --danger:#c26262; --danger-bg:rgba(194,98,98,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
 }
-body.tema-estetica input, body.tema-estetica select, body.tema-estetica textarea{background:#2a1a24;}
-body.tema-estetica button.secondary{background:#3a2230;}
-body.tema-estetica .segmento.h0{background:#3a2230;}
-body.tema-estetica .segmento.h1{background:#2a2318;}
-body.tema-estetica .brief-card{background:linear-gradient(135deg,#33132a,#2a1020);}
+body.tema-estetica input,body.tema-estetica select,body.tema-estetica textarea{background:#271c21;}
+body.tema-estetica button.secondary{background:rgba(168,86,126,.16);color:var(--accent-2);}
+body.tema-estetica .segmento.h0{background:#271c21;}
+body.tema-estetica .segmento.h1{background:rgba(201,160,95,.14);}
+body.tema-estetica .brief-card{background:linear-gradient(135deg,#241a1f,#1c1418);}
 
-/* ─── Tema "Vitalis Visión" (oscuro, índigo/cian) ──────────────────────
-   Para cuentas de oftalmología. Mismo mecanismo que los otros temas. */
+/* ─── Tema "Vitalis Visión" (índigo apagado + latón) ───────────────────── */
 body.tema-oftalmologia{
-  --primary:#6366f1;
-  --primary-dark:#4338ca;
-  --accent:#22d3ee;
-  --accent-2:#67e8f9;
-  --bg:#0e0e1b;
-  --card:#181830;
-  --border:#2c2c4a;
-  --text:#e9e9f7;
-  --text-muted:#9797b8;
-  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
-  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
-  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
-  --gradient-vitalis: linear-gradient(135deg, #4338ca 0%, var(--primary) 50%, var(--accent) 100%);
+  --primary:#5c6394;
+  --primary-dark:#40456b;
+  --primary-rgb:92,99,148;
+  --accent:#c9a05f;
+  --accent-2:#dfc088;
+  --accent-rgb:201,160,95;
+  --bg:#12121a;
+  --card:#1a1a26;
+  --border:#2a2a3a;
+  --text:#e9e9f0;
+  --text-muted:#9797a8;
+  --success:#5a9d6e; --success-bg:rgba(90,157,110,.14);
+  --warning:#c99a52; --warning-bg:rgba(201,154,82,.14);
+  --danger:#c26262; --danger-bg:rgba(194,98,98,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
 }
-body.tema-oftalmologia input, body.tema-oftalmologia select, body.tema-oftalmologia textarea{background:#1e1e38;}
-body.tema-oftalmologia button.secondary{background:#232349;}
-body.tema-oftalmologia .segmento.h0{background:#232349;}
-body.tema-oftalmologia .segmento.h1{background:#1c2a38;}
-body.tema-oftalmologia .brief-card{background:linear-gradient(135deg,#1c1c3a,#131328);}
+body.tema-oftalmologia input,body.tema-oftalmologia select,body.tema-oftalmologia textarea{background:#1c1c29;}
+body.tema-oftalmologia button.secondary{background:rgba(92,99,148,.16);color:var(--accent-2);}
+body.tema-oftalmologia .segmento.h0{background:#1c1c29;}
+body.tema-oftalmologia .segmento.h1{background:rgba(201,160,95,.14);}
+body.tema-oftalmologia .brief-card{background:linear-gradient(135deg,#1b1b28,#151520);}
 
-/* ─── Tema "Vitalis Veterinaria" (oscuro, verde bosque/ámbar) ──────────
-   Para cuentas de veterinaria (y la landing pública /veterinaria, antes
-   incluso de loguearse — ver aplicarLandingVeterinariaSiCorresponde en
-   estado.js). Mismo mecanismo que los otros temas. */
+/* ─── Tema "Vitalis Veterinaria" (verde bosque apagado + ámbar) ────────── */
 body.tema-veterinaria{
-  --primary:#4f9d5a;
-  --primary-dark:#357a3f;
-  --accent:#e0a458;
-  --accent-2:#eec084;
-  --bg:#12180f;
-  --card:#1c2618;
-  --border:#30402a;
-  --text:#eef3ea;
-  --text-muted:#a3b39c;
-  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
-  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
-  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
-  --gradient-vitalis: linear-gradient(135deg, #2f6b3a 0%, var(--primary) 50%, var(--accent) 100%);
+  --primary:#4a7d54;
+  --primary-dark:#345c3c;
+  --primary-rgb:74,125,84;
+  --accent:#c9944f;
+  --accent-2:#dbb37e;
+  --accent-rgb:201,148,79;
+  --bg:#12160f;
+  --card:#1a2116;
+  --border:#2c3627;
+  --text:#edf1e8;
+  --text-muted:#99a38f;
+  --success:#5a9d6e; --success-bg:rgba(90,157,110,.14);
+  --warning:#c99a52; --warning-bg:rgba(201,154,82,.14);
+  --danger:#c26262; --danger-bg:rgba(194,98,98,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
 }
-body.tema-veterinaria input, body.tema-veterinaria select, body.tema-veterinaria textarea{background:#212d1c;}
-body.tema-veterinaria button.secondary{background:#26361f;}
-body.tema-veterinaria .segmento.h0{background:#26361f;}
-body.tema-veterinaria .segmento.h1{background:#332c18;}
-body.tema-veterinaria .brief-card{background:linear-gradient(135deg,#1c2e1a,#20250f);}
+body.tema-veterinaria input,body.tema-veterinaria select,body.tema-veterinaria textarea{background:#1d2519;}
+body.tema-veterinaria button.secondary{background:rgba(74,125,84,.16);color:var(--accent-2);}
+body.tema-veterinaria .segmento.h0{background:#1d2519;}
+body.tema-veterinaria .segmento.h1{background:rgba(201,148,79,.14);}
+body.tema-veterinaria .brief-card{background:linear-gradient(135deg,#1a2318,#161d13);}
+
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
-.header{background:var(--card);padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}
-.header .brand{display:flex;align-items:center;gap:10px;}
-.header .logo{width:36px;height:36px;object-fit:contain;}
-.header h1{font-size:18px;color:var(--primary);}
-.header p{font-size:12px;color:var(--text-muted);margin-top:2px;}
-.header button{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:6px 12px;font-size:12px;}
+body{font-family:var(--font-texto);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;}
+.header{background:var(--card);padding:16px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}
+.header .brand{display:flex;align-items:center;gap:11px;}
+.header .logo{width:34px;height:34px;object-fit:contain;}
+.header h1{font-family:var(--font-marca);font-weight:600;font-size:19px;color:var(--text);letter-spacing:.01em;}
+.header p{font-size:11.5px;color:var(--text-muted);margin-top:1px;letter-spacing:.01em;}
+.header button{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius-sm);padding:6px 13px;font-size:12px;font-family:var(--font-texto);font-weight:500;transition:border-color .15s ease,color .15s ease;}
+.header button:hover{border-color:var(--primary);color:var(--primary);}
 .wrap{max-width:480px;width:100%;margin:0 auto;padding:16px;flex:1;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,39,51,.05);}
-label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px;margin-top:14px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px;box-shadow:var(--sombra);}
+label{display:block;font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:6px;margin-top:14px;letter-spacing:.02em;text-transform:uppercase;}
 label:first-child{margin-top:0;}
-input,select,textarea{width:100%;background:#f7fafb;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px;font-size:14px;font-family:inherit;}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:11px 12px;font-size:14px;font-family:var(--font-texto);transition:border-color .15s ease;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(var(--primary-rgb),.12);}
 textarea{resize:vertical;}
-button{font-family:inherit;}
-button.primary{width:100%;background:var(--gradient-vitalis);color:#fff;border:none;border-radius:8px;padding:13px;font-size:15px;font-weight:600;margin-top:18px;transition:transform .1s ease,opacity .15s ease;}
-button.primary:disabled{opacity:.5;}
+button{font-family:var(--font-texto);cursor:pointer;}
+button.primary{width:100%;background:var(--gradient-vitalis);color:#fff;border:none;border-radius:var(--radius-sm);padding:13px;font-size:14.5px;font-weight:600;letter-spacing:.01em;margin-top:18px;transition:transform .1s ease,opacity .15s ease,box-shadow .15s ease;box-shadow:0 2px 8px rgba(var(--primary-rgb),.18);}
+button.primary:disabled{opacity:.5;box-shadow:none;}
 button.primary:active:not(:disabled){transform:scale(.98);}
-button.secondary{width:100%;background:#e6f3f6;border:1px solid var(--border);color:var(--primary);border-radius:8px;padding:12px;font-size:14px;margin-top:10px;font-weight:600;transition:transform .1s ease;}
+button.secondary{width:100%;background:rgba(var(--primary-rgb),.08);border:1px solid transparent;color:var(--primary);border-radius:var(--radius-sm);padding:12px;font-size:13.5px;margin-top:10px;font-weight:600;transition:transform .1s ease,background .15s ease;}
 button.secondary:active{transform:scale(.98);}
-button.link{background:none;border:none;color:var(--primary);font-size:13px;margin-top:16px;width:100%;text-align:center;}
-.error{background:var(--danger-bg);border:1px solid rgba(185,28,28,.25);color:var(--danger);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px;}
-.hint{font-size:12px;color:var(--text-muted);margin-top:8px;}
-.item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(15,39,51,.05);cursor:pointer;}
+button.link{background:none;border:none;color:var(--primary);font-size:13px;font-weight:500;margin-top:16px;width:100%;text-align:center;}
+.error{background:var(--danger-bg);border:1px solid rgba(var(--primary-rgb),0);color:var(--danger);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:14px;}
+.hint{font-size:12px;color:var(--text-muted);margin-top:8px;line-height:1.5;}
+.item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:9px;box-shadow:var(--sombra);cursor:pointer;transition:border-color .15s ease;}
+.item:hover{border-color:rgba(var(--primary-rgb),.4);}
 .item .top{display:flex;justify-content:space-between;align-items:center;}
-.item .nombre{font-size:15px;font-weight:600;}
+.item .nombre{font-size:14.5px;font-weight:600;}
 .item .fecha{font-size:11px;color:var(--text-muted);margin-top:4px;}
-.item .preview{font-size:12px;color:var(--text-muted);margin-top:6px;}
+.item .preview{font-size:12.5px;color:var(--text-muted);margin-top:6px;}
 .item-paciente{display:flex;align-items:center;gap:12px;}
-/* Acción compacta dentro de un .item (ej: "Marcar hecho") — antes se usaba
-   .link con estilos inline sueltos (a veces full-width y centrado, a veces
-   no), lo que se veía inconsistente entre tarjetas. */
-.item-action{display:inline-block;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--primary);}
-.badge{font-size:11px;padding:3px 9px;border-radius:12px;white-space:nowrap;font-weight:600;}
+.item-action{display:inline-block;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;font-size:12px;font-weight:600;color:var(--primary);}
+.badge{font-size:10.5px;padding:3px 10px;border-radius:20px;white-space:nowrap;font-weight:600;letter-spacing:.02em;}
 .badge-procesando{background:var(--warning-bg);color:var(--warning);}
 .badge-completado{background:var(--success-bg);color:var(--success);}
 .badge-error{background:var(--danger-bg);color:var(--danger);}
 .empty{color:var(--text-muted);text-align:center;padding:50px 20px;font-size:13px;}
 .loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px 20px;color:var(--text-muted);font-size:13px;}
-.spinner{width:38px;height:38px;border-radius:50%;background:conic-gradient(from 0deg,#1a4f7a,var(--primary),var(--success),var(--primary),#1a4f7a);animation:girar .9s linear infinite;-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 calc(100% - 4px));}
+.spinner{width:36px;height:36px;border-radius:50%;background:conic-gradient(from 0deg,var(--primary-dark),var(--primary),var(--accent),var(--primary),var(--primary-dark));animation:girar .9s linear infinite;-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 3px));}
 @keyframes girar{to{transform:rotate(360deg);}}
-.file-label{display:block;text-align:center;border:1px dashed var(--border);border-radius:8px;padding:14px;font-size:13px;color:var(--text-muted);margin-top:10px;cursor:pointer;}
-.segmento{border-radius:12px;padding:10px 14px;margin-bottom:10px;max-width:88%;}
-.segmento.h0{background:#e6f3f6;margin-right:auto;}
-.segmento.h1{background:#eef2e6;margin-left:auto;}
+.file-label{display:block;text-align:center;border:1px dashed var(--border);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--text-muted);margin-top:10px;cursor:pointer;transition:border-color .15s ease;}
+.file-label:hover{border-color:var(--primary);}
+.segmento{border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;max-width:88%;}
+.segmento.h0{background:rgba(var(--primary-rgb),.07);margin-right:auto;}
+.segmento.h1{background:rgba(var(--accent-rgb),.1);margin-left:auto;}
 .segmento .quien{font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:600;}
 .segmento .texto{font-size:14px;line-height:1.4;}
 .back{background:none;border:none;color:var(--primary);font-size:13px;margin-bottom:14px;font-weight:600;}
 /* Grid fijo de 4 columnas: con 8 pestañas eso da exactamente 2 filas
    completas, siempre — a diferencia de una tira que scrollea, acá nunca
    queda una pestaña escondida fuera de la pantalla sin que se note. */
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:5px;margin-bottom:16px;}
-.tab{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;padding:9px 2px;font-size:10.5px;font-weight:600;color:var(--text-muted);border-radius:8px;line-height:1.15;transition:background .15s ease,color .15s ease;}
-.tab .tab-icono{font-size:16px;}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:5px;margin-bottom:16px;}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:10px 2px;font-size:10.5px;font-weight:600;color:var(--text-muted);border-radius:var(--radius-sm);line-height:1.15;transition:background .15s ease,color .15s ease;font-family:var(--font-texto);}
+.tab .tab-icono{font-size:16px;line-height:1;}
+.tab .tab-icono svg{width:18px;height:18px;display:block;}
 .tab.activo{background:var(--gradient-vitalis);color:#fff;}
-.seccion-titulo{font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;margin:20px 0 8px;}
-.nota-titulo{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px;}
-.nota-campo{font-size:13px;line-height:1.5;margin-bottom:8px;}
-.nota-campo b{color:var(--text);}
+.seccion-titulo{font-family:var(--font-marca);font-size:13.5px;font-weight:600;color:var(--primary);margin:20px 0 9px;letter-spacing:.01em;}
+.nota-titulo{font-family:var(--font-marca);font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;}
+.nota-campo{font-size:13px;line-height:1.6;margin-bottom:8px;}
+.nota-campo b{color:var(--text);font-weight:600;}
 .paciente-info{font-size:13px;color:var(--text-muted);margin-top:4px;line-height:1.5;}
 .avatar-card{text-align:center;}
-.avatar{width:60px;height:60px;border-radius:50%;background:var(--gradient-vitalis);color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 3px 10px rgba(14,116,144,.25);flex:0 0 auto;}
-.avatar-sm{width:48px;height:48px;font-size:16px;margin:0;}
+.avatar{width:58px;height:58px;border-radius:50%;background:var(--gradient-vitalis);color:#fff;font-family:var(--font-marca);font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 3px 10px rgba(var(--primary-rgb),.25);flex:0 0 auto;}
+.avatar-sm{width:46px;height:46px;font-size:15px;margin:0;}
 .avatar-xs{width:38px;height:38px;font-size:13px;margin:0;box-shadow:none;}
 .stats-row{display:flex;gap:10px;margin-bottom:14px;}
-.stat{flex:1;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 8px;text-align:center;box-shadow:0 1px 3px rgba(15,39,51,.05);}
-.stat-num{font-size:18px;font-weight:700;color:var(--primary);}
-.stat-lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
-.dato-row{font-size:14px;padding:9px 0;border-bottom:1px solid var(--border);}
+.stat{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 8px;text-align:center;box-shadow:var(--sombra);}
+.stat-num{font-family:var(--font-marca);font-size:19px;font-weight:600;color:var(--primary);}
+.stat-lbl{font-size:10.5px;color:var(--text-muted);margin-top:3px;letter-spacing:.02em;text-transform:uppercase;}
+.dato-row{font-size:13.5px;padding:9px 0;border-bottom:1px solid var(--border);}
 .dato-row:last-child{border-bottom:none;}
 
 /* Ficha del paciente: identidad + contacto + notas en un solo bloque
@@ -195,8 +221,8 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 
 /* El Brief Clínico es lo primero que un médico quiere ver de un vistazo:
    más peso visual que el resto (franja de color + título más grande). */
-.brief-card{background:linear-gradient(135deg,#e6f7fa,#f0f9fa);border:1px solid var(--accent-2);border-left:4px solid var(--primary);}
-.brief-card .nota-titulo{font-size:15px;}
+.brief-card{background:linear-gradient(135deg,rgba(var(--primary-rgb),.06),rgba(var(--accent-rgb),.06));border:1px solid rgba(var(--primary-rgb),.18);border-left:3px solid var(--primary);}
+.brief-card .nota-titulo{font-size:16px;}
 .brief-alerta{color:var(--danger);}
 
 /* Tarjetas de apoyo/secundarias: mismo contenido que antes pero con menos
@@ -205,41 +231,41 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 
 /* ─── Panel "escuchando": el logo de Vitalis late con el volumen real del
    micrófono (más fuerte cuando detecta voz, casi quieto en silencio) ──── */
-.listen-panel{display:none;background:linear-gradient(160deg,var(--primary-dark),#0a2e38);border-radius:16px;padding:26px 18px 22px;text-align:center;color:#fff;margin-bottom:16px;}
-.listen-orb{position:relative;width:110px;height:110px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;}
-.listen-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(34,211,238,.6);pointer-events:none;
+.listen-panel{display:none;background:linear-gradient(160deg,var(--primary-dark),rgba(0,0,0,.55)),var(--primary-dark);background-blend-mode:multiply;border-radius:16px;padding:26px 18px 22px;text-align:center;color:#fff;margin-bottom:16px;}
+.listen-orb{position:relative;width:108px;height:108px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;}
+.listen-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.65);pointer-events:none;
   transform:scale(calc(1 + var(--nivel,0) * .5));
   opacity:calc(var(--nivel,0) * .85);
   transition:transform .12s ease-out,opacity .12s ease-out;
 }
-.listen-ring-2{border-color:rgba(74,222,128,.5);
+.listen-ring-2{border-color:rgba(255,255,255,.4);
   transform:scale(calc(1.18 + var(--nivel,0) * .78));
-  opacity:calc(var(--nivel,0) * .55);
+  opacity:calc(var(--nivel,0) * .5);
 }
-.listen-logo{position:relative;z-index:1;width:68px;height:68px;border-radius:50%;background:#fff;padding:9px;object-fit:contain;
+.listen-logo{position:relative;z-index:1;width:66px;height:66px;border-radius:50%;background:#fff;padding:9px;object-fit:contain;
   transform:scale(calc(1 + var(--nivel,0) * .2));
-  box-shadow:0 0 calc(8px + var(--nivel,0) * 28px) calc(1px + var(--nivel,0) * 10px) rgba(34,211,238,calc(.4 + var(--nivel,0) * .45));
+  box-shadow:0 0 calc(8px + var(--nivel,0) * 26px) calc(1px + var(--nivel,0) * 9px) rgba(var(--accent-rgb),calc(.4 + var(--nivel,0) * .4));
   transition:transform .1s ease-out,box-shadow .1s ease-out;
   animation:respirarLogo 2.8s ease-in-out infinite;
 }
-@keyframes respirarLogo{0%,100%{filter:brightness(1);}50%{filter:brightness(1.08);}}
-.listen-time{font-size:26px;font-family:ui-monospace,monospace;margin-top:6px;letter-spacing:1px;}
-.listen-label{font-size:12px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
-.live-caption{font-size:14px;line-height:1.5;color:#fff;opacity:.92;margin-top:14px;text-align:left;min-height:20px;max-height:120px;overflow-y:auto;}
+@keyframes respirarLogo{0%,100%{filter:brightness(1);}50%{filter:brightness(1.06);}}
+.listen-time{font-family:var(--font-marca);font-size:25px;margin-top:6px;letter-spacing:.02em;font-weight:600;}
+.listen-label{font-size:12px;opacity:.75;margin-top:2px;letter-spacing:.02em;}
+.live-caption{font-size:14px;line-height:1.5;color:#fff;opacity:.9;margin-top:14px;text-align:left;min-height:20px;max-height:120px;overflow-y:auto;}
 
 /* ─── Botón de grabar: círculo con degradé de marca, "respira" suave en
    reposo para no sentirse estático, y un pulso más marcado al grabar ──── */
 .rec-box{text-align:center;padding:10px 0 4px;}
-.rec-btn{position:relative;width:86px;height:86px;border-radius:50%;border:none;background:var(--gradient-vitalis);color:#fff;margin:6px auto;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(14,116,144,.3),0 0 0 6px rgba(14,116,144,.08);transition:transform .15s ease,box-shadow .3s ease;}
-.rec-btn svg{width:30px;height:30px;position:relative;z-index:1;}
+.rec-btn{position:relative;width:84px;height:84px;border-radius:50%;border:none;background:var(--gradient-vitalis);color:#fff;margin:6px auto;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(var(--primary-rgb),.3),0 0 0 6px rgba(var(--primary-rgb),.08);transition:transform .15s ease,box-shadow .3s ease;}
+.rec-btn svg{width:28px;height:28px;position:relative;z-index:1;}
 .rec-btn:active{transform:scale(.93);}
 .rec-btn:not(.recording){animation:respirarBtn 3s ease-in-out infinite;}
-@keyframes respirarBtn{0%,100%{box-shadow:0 6px 18px rgba(14,116,144,.3),0 0 0 6px rgba(14,116,144,.08);}50%{box-shadow:0 6px 20px rgba(14,116,144,.4),0 0 0 10px rgba(14,116,144,.04);}}
-.rec-btn.recording{background:linear-gradient(135deg,#dc2626,#991b1b);animation:pulseBtn 1.5s ease-out infinite;}
-@keyframes pulseBtn{0%{box-shadow:0 6px 18px rgba(185,28,28,.35),0 0 0 0 rgba(185,28,28,.45);}70%{box-shadow:0 6px 18px rgba(185,28,28,.35),0 0 0 18px rgba(185,28,28,0);}100%{box-shadow:0 6px 18px rgba(185,28,28,.35),0 0 0 0 rgba(185,28,28,0);}}
-.rec-status{font-size:13px;color:var(--text-muted);margin-top:8px;}
+@keyframes respirarBtn{0%,100%{box-shadow:0 6px 18px rgba(var(--primary-rgb),.3),0 0 0 6px rgba(var(--primary-rgb),.08);}50%{box-shadow:0 6px 20px rgba(var(--primary-rgb),.4),0 0 0 10px rgba(var(--primary-rgb),.04);}}
+.rec-btn.recording{background:linear-gradient(135deg,#b8534a,#8a3d36);animation:pulseBtn 1.5s ease-out infinite;}
+@keyframes pulseBtn{0%{box-shadow:0 6px 18px rgba(161,62,62,.35),0 0 0 0 rgba(161,62,62,.4);}70%{box-shadow:0 6px 18px rgba(161,62,62,.35),0 0 0 18px rgba(161,62,62,0);}100%{box-shadow:0 6px 18px rgba(161,62,62,.35),0 0 0 0 rgba(161,62,62,0);}}
+.rec-status{font-size:12.5px;color:var(--text-muted);margin-top:8px;}
 
-.footer{text-align:center;font-size:11px;color:var(--text-muted);padding:18px 16px 22px;}
+.footer{text-align:center;font-family:var(--font-marca);font-size:11px;letter-spacing:.03em;color:var(--text-muted);padding:18px 16px 22px;}
 
 /* ─── Transición de entrada: cada vez que se pinta una pantalla nueva
    (app.innerHTML = ...), estos son los bloques que se crean de cero, así
@@ -256,7 +282,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 
 /* ─── Evolución clínica: chips de tipo + gráfico de tendencia ──────────── */
 .chip-row{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
-.chip{flex:0 0 auto;background:var(--card);border:1px solid var(--border);color:var(--text-muted);border-radius:16px;padding:7px 14px;font-size:12px;font-weight:600;white-space:nowrap;}
+.chip{flex:0 0 auto;background:var(--card);border:1px solid var(--border);color:var(--text-muted);border-radius:16px;padding:7px 14px;font-size:12px;font-weight:600;white-space:nowrap;transition:background .15s ease,color .15s ease,border-color .15s ease;}
 .chip.activo{background:var(--primary);border-color:var(--primary);color:#fff;}
 .chart-legend{display:flex;gap:14px;font-size:11px;color:var(--text-muted);margin-top:8px;}
 .chart-legend span{display:inline-flex;align-items:center;gap:5px;}
@@ -265,37 +291,37 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 /* ─── Memoria Clínica Conversacional: chat de preguntas sobre el paciente ── */
 #memoriaChat{max-height:260px;overflow-y:auto;margin-bottom:12px;}
 .memoria-pregunta{font-size:13px;font-weight:600;margin-top:12px;}
-.memoria-respuesta{font-size:13px;color:var(--text-muted);line-height:1.5;margin-top:4px;padding-left:10px;border-left:2px solid var(--accent-2);}
-.mic-btn{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--primary);font-size:17px;display:flex;align-items:center;justify-content:center;}
+.memoria-respuesta{font-size:13px;color:var(--text-muted);line-height:1.55;margin-top:4px;padding-left:10px;border-left:2px solid var(--accent-2);}
+.mic-btn{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--primary);font-size:17px;display:flex;align-items:center;justify-content:center;transition:border-color .15s ease;}
 .mic-btn:disabled{opacity:.4;}
 .mic-btn.escuchando{background:var(--danger);border-color:var(--danger);color:#fff;animation:pulse 1.6s infinite;}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(185,28,28,.45);}70%{box-shadow:0 0 0 12px rgba(185,28,28,0);}100%{box-shadow:0 0 0 0 rgba(185,28,28,0);}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(161,62,62,.4);}70%{box-shadow:0 0 0 12px rgba(161,62,62,0);}100%{box-shadow:0 0 0 0 rgba(161,62,62,0);}}
 
 /* ─── Receta Digital ─────────────────────────────────────────────────── */
-.rec-row{border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px;}
+.rec-row{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-top:10px;}
 .rec-row .quitar-fila{background:none;border:none;color:var(--danger);font-size:12px;font-weight:600;margin-top:8px;}
 
 /* ─── Selector de día en chips — lo usa tanto la reserva pública (elegir
    horario libre) como el calendario de Agenda del médico (elegir qué día
    ver) ──────────────────────────────────────────────────────────────── */
 .reserva-dias{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-top:10px;}
-.reserva-dia-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;width:58px;padding:10px 4px;background:var(--bg);border:1px solid var(--border);border-radius:12px;position:relative;}
+.reserva-dia-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;width:56px;padding:10px 4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);position:relative;transition:background .15s ease,border-color .15s ease;}
 .reserva-dia-chip.activo{background:var(--gradient-vitalis);border-color:transparent;}
 .reserva-dia-chip.activo *{color:#fff;}
-.reserva-dia-semana{font-size:10px;text-transform:uppercase;color:var(--text-muted);font-weight:600;}
-.reserva-dia-numero{font-size:20px;font-weight:700;}
+.reserva-dia-semana{font-size:10px;text-transform:uppercase;color:var(--text-muted);font-weight:600;letter-spacing:.02em;}
+.reserva-dia-numero{font-family:var(--font-marca);font-size:19px;font-weight:600;}
 .reserva-dia-mes{font-size:10px;color:var(--text-muted);text-transform:uppercase;}
 .reserva-dia-badge{font-size:10px;font-weight:700;color:var(--primary);background:var(--card);border-radius:8px;padding:0 6px;line-height:1.5;}
 .reserva-dia-chip.activo .reserva-dia-badge{color:var(--primary);background:#fff;}
 .reserva-horas{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
-.reserva-hora-chip{flex:0 0 auto;padding:9px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;}
+.reserva-hora-chip{flex:0 0 auto;padding:9px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;transition:background .15s ease;}
 .reserva-hora-chip.activo{background:var(--gradient-vitalis);border-color:transparent;color:#fff;}
 
 /* ─── Plan de tratamiento / presupuesto ────────────────────────────────── */
 .plan-resumen{display:flex;gap:8px;margin:10px 0 14px;}
-.plan-resumen>div{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 6px;text-align:center;}
-.plan-resumen-num{font-size:15px;font-weight:700;}
-.plan-resumen-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-top:2px;}
+.plan-resumen>div{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 6px;text-align:center;}
+.plan-resumen-num{font-family:var(--font-marca);font-size:15px;font-weight:600;}
+.plan-resumen-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-top:2px;letter-spacing:.02em;}
 
 @media print{
   .no-imprimir{display:none !important;}
@@ -318,4 +344,3 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;marg
 .odonto-timeline-icono{position:absolute;left:-38px;top:0;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 0 0 3px var(--card);}
 .odonto-timeline-fecha{font-size:11px;color:var(--text-muted);}
 .odonto-timeline-titulo{font-size:14px;font-weight:600;margin-top:1px;}
-.odonto-timeline-notas{font-size:12px;color:var(--text-muted);margin-top:3px;line-height:1.4;}

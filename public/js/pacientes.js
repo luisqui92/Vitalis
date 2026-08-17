@@ -34,10 +34,10 @@ async function renderDashboard() {
     app.innerHTML = `
       ${tabRecordatoriosHtml(dataRecordatorios.recordatorios || [], items)}
       <div class="tabs" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-        <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">➕</span>Nuevo<br>paciente</button>
-        <button class="tab" id="btnAgenda"><span class="tab-icono">📅</span>Agenda</button>
-        <button class="tab" id="btnVincular"><span class="tab-icono">🎙️</span>Vincular<br>celular</button>
-        <button class="tab" id="btnSeguridad"><span class="tab-icono">🛡️</span>Seguridad</button>
+        <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>Nuevo<br>paciente</button>
+        <button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>Agenda</button>
+        <button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>Vincular<br>celular</button>
+        <button class="tab" id="btnSeguridad"><span class="tab-icono">${ICONOS.escudo}</span>Seguridad</button>
       </div>
       ${items.length === 0 ? `<div class="empty">Todavía no registraste ningún paciente.</div>` : `
         <input id="buscarPaciente" type="text" placeholder="🔍 Buscar paciente..." style="margin:16px 0 12px">
