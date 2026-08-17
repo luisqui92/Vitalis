@@ -455,7 +455,13 @@ async function renderDetalle(id, esRefrescoAutomatico) {
             });
           } else if (tipo === "vacuna") {
             const v = n.vacunasMencionadas[i];
-            const fecha = v.fecha || new Date(c.createdAt).toISOString().slice(0, 10);
+            // toISOString() es siempre UTC — una consulta cargada de noche
+            // en Bolivia (UTC-4) ya cae en el día siguiente en UTC, y la
+            // vacuna quedaba anotada un día adelantada. Mismo truco que la
+            // línea de arriba (reconsulta): restar el offset local antes
+            // de cortar a solo la fecha.
+            const fCreada = new Date(c.createdAt);
+            const fecha = v.fecha || new Date(fCreada.getTime() - fCreada.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
             await api("/medico/pacientes/" + c.pacienteId + "/vacunas", {
               method: "POST", headers: {"Content-Type":"application/json"},
               body: JSON.stringify({ nombre: v.nombre, dosis: v.dosis || "", fecha }),

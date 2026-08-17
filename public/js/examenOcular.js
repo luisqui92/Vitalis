@@ -140,12 +140,18 @@ function pintarDetalleEstructura(pacienteId, ojo, item) {
     errBox.innerHTML = "";
     const estado = document.getElementById("estrEstado").value;
     const notas = document.getElementById("estrNotas").value.trim();
+    const btn = document.getElementById("btnGuardarEstructura");
+    // Mismo guard que el odontograma: sin esto, un doble clic manda dos
+    // PATCH casi juntos que leen el mismo historial y cada uno agrega su
+    // entrada por separado — el que guarda último pisa al otro.
+    btn.disabled = true;
     try {
       await api(`/medico/pacientes/${pacienteId}/examen-ocular/${ojo}/${item.estructura}`, {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ estado, notas }),
       });
       renderTabExamenOcular(pacienteId);
     } catch (e) {
+      btn.disabled = false;
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
     }
   };

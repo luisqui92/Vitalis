@@ -381,15 +381,31 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   }
 
   if (tabActiva === "antecedentes") {
+    // Cada botón de acá arma su "nuevos" a partir del mismo array p.* que
+    // quedó fijo desde que se pintó esta pestaña — si se dispara un segundo
+    // click (agregar u otro borrar) antes de que el primero termine y
+    // vuelva a pintar, ambos parten del mismo array viejo, y el que guarda
+    // último pisa al otro (una baja "vuelve" sin que el médico se entere).
+    // Se bloquean TODOS los botones de antecedentes apenas se dispara
+    // cualquiera de ellos — se destraban solos al repintar la pestaña.
+    const botonesAntecedentes = () => document.querySelectorAll(
+      "#btnAgregarAntP, [data-borrar-antp], #btnAgregarAntF, [data-borrar-antf]"
+    );
+    function bloquearBotonesAntecedentes() {
+      botonesAntecedentes().forEach(b => b.disabled = true);
+    }
+
     document.getElementById("btnAgregarAntP").onclick = async () => {
       const texto = document.getElementById("antpNuevo").value.trim();
       if (!texto) return;
+      bloquearBotonesAntecedentes();
       const nuevos = [...(p.antecedentesPersonales||[]), texto];
       await api("/medico/pacientes/" + p._id, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ antecedentesPersonales: nuevos }) });
       renderPacienteDetalle(p._id, "antecedentes");
     };
     document.querySelectorAll("[data-borrar-antp]").forEach(btn => {
       btn.onclick = async () => {
+        bloquearBotonesAntecedentes();
         const idx = Number(btn.dataset.borrarAntp);
         const nuevos = (p.antecedentesPersonales||[]).filter((_,i) => i !== idx);
         await api("/medico/pacientes/" + p._id, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ antecedentesPersonales: nuevos }) });
@@ -400,12 +416,14 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       const parentesco = document.getElementById("antfParentesco").value.trim();
       const condicion = document.getElementById("antfCondicion").value.trim();
       if (!parentesco && !condicion) return;
+      bloquearBotonesAntecedentes();
       const nuevos = [...(p.antecedentesFamiliares||[]), { parentesco, condicion }];
       await api("/medico/pacientes/" + p._id, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ antecedentesFamiliares: nuevos }) });
       renderPacienteDetalle(p._id, "antecedentes");
     };
     document.querySelectorAll("[data-borrar-antf]").forEach(btn => {
       btn.onclick = async () => {
+        bloquearBotonesAntecedentes();
         const idx = Number(btn.dataset.borrarAntf);
         const nuevos = (p.antecedentesFamiliares||[]).filter((_,i) => i !== idx);
         await api("/medico/pacientes/" + p._id, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ antecedentesFamiliares: nuevos }) });

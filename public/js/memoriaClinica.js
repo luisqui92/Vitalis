@@ -38,6 +38,8 @@ function crearReconocedorVozMemoria() {
   return r;
 }
 
+let proximoIdMemoria = 1;
+
 function wireTabMemoria(p) {
   const btn = document.getElementById("btnPreguntar");
   const input = document.getElementById("memoriaInput");
@@ -60,7 +62,16 @@ function wireTabMemoria(p) {
 
     if (!memoriaHistorialPorPaciente[p._id]) memoriaHistorialPorPaciente[p._id] = [];
     const historial = memoriaHistorialPorPaciente[p._id];
-    historial.push({ pregunta, respuesta: "…" });
+    // Con el botón "Preguntar" y el mic (por voz) pudiendo disparar
+    // preguntas casi juntas (el mic se reactiva con onend antes de que la
+    // pregunta anterior termine), dos respuestas podían llegar mientras
+    // ambas "…" estaban en el chat — antes se escribía/borraba siempre "la
+    // última" del array, así que una respuesta podía terminar puesta en la
+    // pregunta equivocada, o borrar la pregunta de otra por un error ajeno.
+    // Con un id propio por pregunta, cada una encuentra su propio lugar sin
+    // importar qué más se agregó o sacó mientras tanto.
+    const id = proximoIdMemoria++;
+    historial.push({ id, pregunta, respuesta: "…" });
     repintar();
 
     try {
@@ -68,9 +79,11 @@ function wireTabMemoria(p) {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ pregunta }),
       });
-      historial[historial.length - 1].respuesta = data.respuesta;
+      const entrada = historial.find(h => h.id === id);
+      if (entrada) entrada.respuesta = data.respuesta;
     } catch (e) {
-      historial.pop();
+      const idx = historial.findIndex(h => h.id === id);
+      if (idx !== -1) historial.splice(idx, 1);
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo responder la pregunta")}</div>`;
     }
     btn.disabled = false;

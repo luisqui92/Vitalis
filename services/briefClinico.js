@@ -64,7 +64,30 @@ async function generarBrief(historialTexto) {
     { headers: { Authorization: `Bearer ${CONFIG.OPENAI_KEY}` }, timeout: CONFIG.TIMEOUT_OPENAI }
   );
   const content = res.data.choices[0].message.content.replace(/```json|```/g, "").trim();
-  return JSON.parse(content);
+  return sanearBrief(JSON.parse(content));
+}
+
+// Mismo motivo que sanearNota() en notaClinica.js: paciente.briefClinico
+// tiene campos String/[String] estrictos, y la IA puede confundir esta
+// forma con la de notaClinica.medicamentosRecetados (que SÍ son objetos
+// {nombre,dosis,frecuencia}) — si eso se guarda tal cual, el .save() revienta
+// con un CastError, y como acá no se limpiaba antes de reintentar, el
+// paciente quedaba con briefClinicoEstado:"generando" para siempre (el
+// Kardex lo muestra "generando..." sin parar).
+function sanearBrief(brief) {
+  if (!brief || typeof brief !== "object") return {};
+  const comoTexto = (v) => (typeof v === "string" ? v : null);
+  const comoListaTexto = (v) => (Array.isArray(v) ? v.filter(x => typeof x === "string") : []);
+  return {
+    estadoActual: comoTexto(brief.estadoActual),
+    cambiosDesdeUltimaConsulta: comoTexto(brief.cambiosDesdeUltimaConsulta),
+    medicamentosActivos: comoListaTexto(brief.medicamentosActivos),
+    examenesPendientes: comoListaTexto(brief.examenesPendientes),
+    alertas: comoListaTexto(brief.alertas),
+    factoresRiesgo: comoListaTexto(brief.factoresRiesgo),
+    preguntasSugeridas: comoListaTexto(brief.preguntasSugeridas),
+    diagnosticosDiferenciales: comoListaTexto(brief.diagnosticosDiferenciales),
+  };
 }
 
 async function regenerarBriefClinico(pacienteId) {
@@ -87,9 +110,14 @@ async function regenerarBriefClinico(pacienteId) {
     await paciente.save();
   } catch (e) {
     log.error("[BRIEF_CLINICO]", e.response?.data || e.message);
-    paciente.briefClinicoEstado = "error";
-    paciente.briefClinicoError = e.message;
-    await paciente.save();
+    // updateOne directo (no volver a guardar "paciente" en memoria): si el
+    // error fue un CastError de Mongoose, el mismo documento en memoria
+    // sigue con la ruta inválida marcada adentro y un segundo .save() falla
+    // idéntico (comprobado) — updateOne no arrastra ese estado.
+    await Paciente.updateOne(
+      { _id: paciente._id },
+      { $unset: { briefClinico: 1 }, $set: { briefClinicoEstado: "error", briefClinicoError: e.message } }
+    ).catch(e2 => log.error("[BRIEF_CLINICO] Tampoco se pudo guardar el estado de error:", e2.message));
   }
 }
 
