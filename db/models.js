@@ -27,7 +27,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -300,6 +300,30 @@ const recetaOpticaSchema = new mongoose.Schema({
 }, { timestamps: true });
 const RecetaOptica = mongoose.model("RecetaOptica", recetaOpticaSchema);
 
+// ─── Vitalis Obstetricia (ginecología y obstetricia) ────────────────────
+// Un embarazo por vez: se abre con la FUM (fecha de última menstruación),
+// que es lo único que hace falta para calcular la FPP (fecha probable de
+// parto, regla de Naegele: FUM + 280 días / 40 semanas) y las semanas de
+// gestación actuales — eso se calcula al vuelo en el backend y el
+// frontend, nunca se guarda, para no desincronizarse con el paso de los
+// días. La FPP queda como campo propio (no solo derivado) porque el
+// médico puede ajustarla a mano si una ecografía temprana da una edad
+// gestacional distinta a la calculada por FUM — un ajuste clínico
+// habitual, no un error de carga.
+const DESENLACES_EMBARAZO = ["parto_vaginal", "cesarea", "aborto", "otro"];
+const embarazoSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  fum: { type: Date, required: true },
+  fpp: { type: Date, required: true },
+  activo: { type: Boolean, default: true },
+  fechaFin: { type: Date, default: null },
+  desenlace: { type: String, enum: ["", ...DESENLACES_EMBARAZO], default: "" },
+  notas: { type: String, default: "" },
+}, { timestamps: true });
+embarazoSchema.index({ pacienteId: 1, activo: 1 });
+const Embarazo = mongoose.model("Embarazo", embarazoSchema);
+
 // Catálogo de tratamientos del odontólogo: se carga una vez (nombre +
 // precio) y se reutiliza al armar el plan de cada paciente, en vez de
 // escribir el precio a mano cada vez.
@@ -498,4 +522,4 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, CorreccionIA };
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };

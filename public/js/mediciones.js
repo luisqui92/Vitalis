@@ -16,6 +16,10 @@ const TIPOS_MEDICION = {
   // clínico para sospecha de glaucoma.
   presionIntraocularOD: { label: "Presión intraocular OD", unidad: "mmHg", alertaUmbral: 21 },
   presionIntraocularOI: { label: "Presión intraocular OI", unidad: "mmHg", alertaUmbral: 21 },
+  // Vitalis Obstetricia: controles prenatales, control a control.
+  pesoMaterno:         { label: "Peso materno",       unidad: "kg" },
+  alturaUterina:       { label: "Altura uterina",      unidad: "cm" },
+  fcf:                 { label: "Frec. cardíaca fetal", unidad: "lpm" },
 };
 
 let evolucionTipoActivo = null;

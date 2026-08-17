@@ -141,6 +141,30 @@ body.tema-veterinaria .segmento.h0{background:#1d2519;}
 body.tema-veterinaria .segmento.h1{background:rgba(201,148,79,.14);}
 body.tema-veterinaria .brief-card{background:linear-gradient(135deg,#1a2318,#161d13);}
 
+/* ─── Tema "Vitalis Obstetricia" (terracota apagado + latón) ───────────── */
+body.tema-ginecologia{
+  --primary:#bd6b4f;
+  --primary-dark:#8f4f39;
+  --primary-rgb:189,107,79;
+  --accent:#c9a05f;
+  --accent-2:#dfc088;
+  --accent-rgb:201,160,95;
+  --bg:#161210;
+  --card:#221b18;
+  --border:#372c27;
+  --text:#f1e9e4;
+  --text-muted:#a89890;
+  --success:#5a9d6e; --success-bg:rgba(90,157,110,.14);
+  --warning:#c99a52; --warning-bg:rgba(201,154,82,.14);
+  --danger:#c26262; --danger-bg:rgba(194,98,98,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
+}
+body.tema-ginecologia input,body.tema-ginecologia select,body.tema-ginecologia textarea{background:#271e1a;}
+body.tema-ginecologia button.secondary{background:rgba(189,107,79,.16);color:var(--accent-2);}
+body.tema-ginecologia .segmento.h0{background:#271e1a;}
+body.tema-ginecologia .segmento.h1{background:rgba(201,160,95,.14);}
+body.tema-ginecologia .brief-card{background:linear-gradient(135deg,#241c18,#1c1512);}
+
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:var(--font-texto);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;}
 .header{background:var(--card);padding:16px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}
