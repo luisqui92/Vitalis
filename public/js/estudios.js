@@ -90,6 +90,8 @@ function tabEstudiosHtml(estudios) {
         </div>
         <div class="fecha">${new Date(e.fecha).toLocaleDateString("es-BO")}</div>
         ${e.notas ? `<div class="paciente-info">📝 ${esc(e.notas)}</div>` : ""}
+        ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" && e.anguloFoto === "frontal" ? `
+        <button class="item-action" data-mapa-facial="${e._id}" style="margin-top:10px">🧭 Ver mapa anatómico y simetría</button>` : ""}
       </div>`).join("")}
   `;
 }
@@ -174,6 +176,14 @@ function wireTabEstudios(p, estudios) {
 
   document.querySelectorAll("[data-ver-estudio]").forEach(el => {
     el.onclick = () => abrirArchivoEstudio(el.dataset.verEstudio);
+  });
+  document.querySelectorAll("[data-mapa-facial]").forEach(btn => {
+    btn.onclick = async (ev) => {
+      ev.stopPropagation();
+      const blob = await traerBlobEstudio(btn.dataset.mapaFacial);
+      if (!blob) { alert("No se pudo cargar la foto"); return; }
+      abrirAnalisisFacial(blob);
+    };
   });
   document.querySelectorAll("[data-borrar-estudio]").forEach(btn => {
     btn.onclick = async (ev) => {

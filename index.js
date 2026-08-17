@@ -42,7 +42,11 @@ app.use(helmet({
       // worker-src— para eso).
       scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='"],
       styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
-      imgSrc: ["'self'", "data:"],
+      // 'blob:' es para las fotos clínicas que se traen con Authorization
+      // por header (no por URL) y se abren como blob local — el comparador
+      // antes/después y el mapa anatómico de Vitalis Face las muestran
+      // como <img> directo en la página, no en una pestaña aparte.
+      imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
