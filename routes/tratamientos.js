@@ -5,6 +5,7 @@ const { Paciente, CatalogoTratamiento, TratamientoPlan } = require("../db/models
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -24,6 +25,7 @@ module.exports = function (app) {
     if (!Number.isFinite(precio) || precio < 0) throw new ErrorHttp(400, "precio inválido");
 
     const item = await CatalogoTratamiento.create({ medicoPhone, nombre, precio });
+    registrar({ req, medicoPhone, accion: "crear_catalogo_tratamiento", recurso: `CatalogoTratamiento:${item._id}` });
     res.status(201).json({ ok: true, item });
   }));
 
@@ -37,6 +39,7 @@ module.exports = function (app) {
       item.precio = precio;
     }
     await item.save();
+    registrar({ req, medicoPhone, accion: "editar_catalogo_tratamiento", recurso: `CatalogoTratamiento:${item._id}` });
     res.json({ ok: true, item });
   }));
 
@@ -44,6 +47,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const r = await CatalogoTratamiento.deleteOne({ _id: req.params.id, medicoPhone });
     if (r.deletedCount === 0) throw new ErrorHttp(404, "No encontrado");
+    registrar({ req, medicoPhone, accion: "borrar_catalogo_tratamiento", recurso: `CatalogoTratamiento:${req.params.id}` });
     res.json({ ok: true });
   }));
 
@@ -70,6 +74,7 @@ module.exports = function (app) {
       pacienteId: paciente._id, medicoPhone, nombre, precio, piezaFdi, regionFacial,
       notas: String(req.body?.notas || "").trim(),
     });
+    registrar({ req, medicoPhone, accion: "crear_tratamiento_plan", recurso: `TratamientoPlan:${item._id}` });
     res.status(201).json({ ok: true, item });
   }));
 
@@ -90,6 +95,7 @@ module.exports = function (app) {
       item.estado = req.body.estado;
     }
     await item.save();
+    registrar({ req, medicoPhone, accion: "editar_tratamiento_plan", recurso: `TratamientoPlan:${item._id}` });
     res.json({ ok: true, item });
   }));
 
@@ -97,6 +103,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const r = await TratamientoPlan.deleteOne({ _id: req.params.id, medicoPhone });
     if (r.deletedCount === 0) throw new ErrorHttp(404, "No encontrado");
+    registrar({ req, medicoPhone, accion: "borrar_tratamiento_plan", recurso: `TratamientoPlan:${req.params.id}` });
     res.json({ ok: true });
   }));
 
@@ -108,6 +115,8 @@ module.exports = function (app) {
     if (!Number.isFinite(monto) || monto <= 0) throw new ErrorHttp(400, "monto inválido");
     item.pagos.push({ monto, notas: String(req.body?.notas || "").trim() });
     await item.save();
+    const pago = item.pagos[item.pagos.length - 1];
+    registrar({ req, medicoPhone, accion: "registrar_pago", recurso: `TratamientoPlan:${item._id}`, detalle: `pago ${pago._id} monto ${monto}` });
     res.status(201).json({ ok: true, item });
   }));
 
@@ -118,6 +127,7 @@ module.exports = function (app) {
     item.pagos = item.pagos.filter(p => String(p._id) !== req.params.pagoId);
     if (item.pagos.length === antes) throw new ErrorHttp(404, "Pago no encontrado");
     await item.save();
-    res.json({ ok: true, item });
+    registrar({ req, medicoPhone, accion: "borrar_pago", recurso: `TratamientoPlan:${item._id}`, detalle: `pago ${req.params.pagoId}` });
+    res.json({ ok: true });
   }));
 };

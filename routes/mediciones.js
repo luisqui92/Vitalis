@@ -4,6 +4,7 @@ const { Paciente, Medicion } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -31,6 +32,7 @@ module.exports = function (app) {
       fecha,
       notas: String(req.body?.notas || "").trim(),
     });
+    registrar({ req, medicoPhone, accion: "crear_medicion", recurso: `Medicion:${medicion._id}` });
     res.status(201).json({ ok: true, medicion });
   }));
 
@@ -39,6 +41,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const r = await Medicion.deleteOne({ _id: req.params.id, medicoPhone });
     if (r.deletedCount === 0) throw new ErrorHttp(404, "Medición no encontrada");
+    registrar({ req, medicoPhone, accion: "borrar_medicion", recurso: `Medicion:${req.params.id}` });
     res.json({ ok: true });
   }));
 };

@@ -60,7 +60,12 @@ function verificarToken(token) {
       .update(b64)
       .digest("hex")
       .slice(0, 32);
-    if (sig !== expectedSig) return null;
+    // Comparación en tiempo constante — con !== un atacante podría medir
+    // cuántos bytes iniciales coinciden por la diferencia de tiempo de
+    // respuesta y reconstruir la firma byte a byte.
+    const sigBuf = Buffer.from(sig || "", "hex");
+    const expectedBuf = Buffer.from(expectedSig, "hex");
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
     const payload = JSON.parse(Buffer.from(b64, "base64url").toString());
     if (Date.now() > payload.exp) return null; // expirado
     return payload;

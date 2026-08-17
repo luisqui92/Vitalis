@@ -10,6 +10,7 @@ const { Paciente, Estudio } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -27,7 +28,14 @@ function extensionParaMime(mime) {
 }
 
 // Acepta el archivo como body crudo, igual que el audio de las consultas.
-const archivoRaw = express.raw({ type: ["image/*", "application/pdf"], limit: "20mb" });
+// Lista blanca explícita (no "image/*"): un SVG también matchea ese glob,
+// y como el archivo se sirve después con el mismo Content-Type que se
+// subió y el navegador lo abre en una pestaña propia (mismo origen), un
+// SVG con <script> adentro correría con acceso al localStorage del
+// médico — ahí vive el token de sesión. Nadie sube estudios/fotos
+// clínicas en SVG, así que sacarlo de la lista no le saca nada a nadie.
+const TIPOS_ARCHIVO_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+const archivoRaw = express.raw({ type: TIPOS_ARCHIVO_PERMITIDOS, limit: "20mb" });
 
 module.exports = function (app) {
   // ─── SUBIR ESTUDIO ───────────────────────────────────────────────────────
@@ -37,7 +45,7 @@ module.exports = function (app) {
 
     const archivo = req.body;
     if (!Buffer.isBuffer(archivo) || archivo.length === 0) {
-      throw new ErrorHttp(400, "Falta el archivo (Content-Type debe ser image/* o application/pdf)");
+      throw new ErrorHttp(400, "Falta el archivo, o el tipo no está permitido (jpg, png, webp, gif o pdf)");
     }
     const nombre = String(req.query.nombre || "").trim();
     const fecha = req.query.fecha ? new Date(req.query.fecha) : null;
@@ -55,6 +63,7 @@ module.exports = function (app) {
       anguloFoto: tipo === "foto" ? String(req.query.anguloFoto || "").trim() : "",
       ladoOjo: String(req.query.ladoOjo || "").trim(),
     });
+    registrar({ req, medicoPhone, accion: "subir_estudio", recurso: `Estudio:${estudio._id}` });
     res.status(201).json({ ok: true, estudio });
   }));
 
@@ -64,6 +73,7 @@ module.exports = function (app) {
     const estudio = await obtenerOFallar(Estudio, { _id: req.params.id, medicoPhone }, "Estudio no encontrado");
     const ruta = path.join(DIR_ESTUDIOS, estudio.archivoNombre);
     if (!fs.existsSync(ruta)) throw new ErrorHttp(404, "Archivo no encontrado");
+    registrar({ req, medicoPhone, accion: "ver_estudio", recurso: `Estudio:${estudio._id}` });
     res.setHeader("Content-Type", estudio.archivoMime);
     res.setHeader("Cache-Control", "private, max-age=0, no-store");
     res.sendFile(ruta);
@@ -75,6 +85,7 @@ module.exports = function (app) {
     const estudio = await Estudio.findOneAndDelete({ _id: req.params.id, medicoPhone });
     if (!estudio) throw new ErrorHttp(404, "Estudio no encontrado");
     fs.unlink(path.join(DIR_ESTUDIOS, estudio.archivoNombre), () => {});
+    registrar({ req, medicoPhone, accion: "borrar_estudio", recurso: `Estudio:${req.params.id}` });
     res.json({ ok: true });
   }));
 };

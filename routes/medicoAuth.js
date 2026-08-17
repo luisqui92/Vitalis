@@ -5,7 +5,7 @@ const { Medico, AuditLog } = require("../db/models");
 const { generarToken, verificarToken, hashPassword, verificarPassword, requireAuth } = require("../services/auth");
 const { generarSecreto, generarUriOtpAuth, verificarCodigo } = require("../services/totp");
 const { registrar } = require("../services/auditoria");
-const { limitMedico, limitAuth } = require("../services/ratelimit");
+const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -32,7 +32,7 @@ module.exports = function (app) {
   // ─── LOGIN (paso 1: teléfono + contraseña) ──────────────────────────────
   // Si el médico tiene 2FA activo, no devuelve el token real todavía: da un
   // token de corta duración que solo sirve para el paso 2 (/medico/login/2fa).
-  app.post("/medico/login", limitAuth, asyncRoute(async (req, res) => {
+  app.post("/medico/login", limitAuth, limitLoginPorCuenta, asyncRoute(async (req, res) => {
     const phone = String(req.body?.phone || "").trim();
     const password = String(req.body?.password || "");
     if (!phone || !password) throw new ErrorHttp(400, "phone y password son requeridos");
@@ -66,7 +66,7 @@ module.exports = function (app) {
   }));
 
   // ─── LOGIN (paso 2: código de 2FA) ───────────────────────────────────────
-  app.post("/medico/login/2fa", limitAuth, asyncRoute(async (req, res) => {
+  app.post("/medico/login/2fa", limitAuth, limit2faPorSesion, asyncRoute(async (req, res) => {
     const tempToken = String(req.body?.tempToken || "");
     const codigo = String(req.body?.codigo || "").trim();
     const payload = verificarToken(tempToken);

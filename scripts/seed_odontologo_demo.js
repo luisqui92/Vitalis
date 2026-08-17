@@ -8,6 +8,7 @@
 //
 // Es idempotente: si el médico ya existe no le toca la contraseña ni el
 // nombre; si un paciente de demo ya existe (mismo nombre) lo saltea.
+const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const { Medico, Paciente, Odontograma } = require("../db/models");
@@ -75,7 +76,11 @@ const PACIENTES_DEMO = [
 async function main() {
   const phone = String(process.argv[2] || "").trim();
   const nombre = String(process.argv[3] || "Dr. Carlos Mendoza").trim();
-  const password = String(process.argv[4] || "odonto2026").trim();
+  // Sin contraseña sin generar una al azar: un default fijo ("odonto2026")
+  // es peligroso si alguna vez se corre este script contra producción sin
+  // pasar el tercer argumento — quedaría una cuenta con clave adivinable.
+  const passwordGenerada = !process.argv[4];
+  const password = String(process.argv[4] || crypto.randomBytes(9).toString("base64url")).trim();
   if (!phone) {
     console.error('Uso: node scripts/seed_odontologo_demo.js <telefono> ["Nombre"] [password]');
     process.exit(1);
@@ -90,7 +95,7 @@ async function main() {
       phone, nombre, especialidad: "Odontología general", tipoEspecialidad: "odontologia",
       passwordHash: await hashPassword(password), activo: true,
     });
-    console.log(`✅ Cuenta creada: ${nombre} (+${phone}) — contraseña: ${password}`);
+    console.log(`✅ Cuenta creada: ${nombre} (+${phone}) — contraseña${passwordGenerada ? " generada" : ""}: ${password}`);
   } else {
     if (medico.tipoEspecialidad !== "odontologia") {
       medico.tipoEspecialidad = "odontologia";

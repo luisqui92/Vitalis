@@ -6,6 +6,7 @@ const { Paciente, Medico, Receta, RecetaOptica } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -37,6 +38,7 @@ module.exports = function (app) {
       indicaciones: String(req.body?.indicaciones || "").trim(),
       fecha,
     });
+    registrar({ req, medicoPhone, accion: "crear_receta", recurso: `Receta:${receta._id}` });
     res.status(201).json({ ok: true, receta });
   }));
 
@@ -48,6 +50,7 @@ module.exports = function (app) {
       Paciente.findById(receta.pacienteId).select("nombre fechaNacimiento sexo").lean(),
       Medico.findOne({ phone: medicoPhone }).select("nombre especialidad").lean(),
     ]);
+    registrar({ req, medicoPhone, accion: "ver_receta", recurso: `Receta:${receta._id}` });
     res.json({ receta, paciente, medico });
   }));
 
@@ -56,6 +59,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const r = await Receta.deleteOne({ _id: req.params.id, medicoPhone });
     if (r.deletedCount === 0) throw new ErrorHttp(404, "Receta no encontrada");
+    registrar({ req, medicoPhone, accion: "borrar_receta", recurso: `Receta:${req.params.id}` });
     res.json({ ok: true });
   }));
 
@@ -86,6 +90,7 @@ module.exports = function (app) {
       pacienteId: paciente._id, medicoPhone, consultaId: req.body?.consultaId || null,
       od, oi, distanciaPupilar, notas: String(req.body?.notas || "").trim(), fecha,
     });
+    registrar({ req, medicoPhone, accion: "crear_receta_optica", recurso: `RecetaOptica:${receta._id}` });
     res.status(201).json({ ok: true, receta });
   }));
 
@@ -103,6 +108,7 @@ module.exports = function (app) {
       Paciente.findById(receta.pacienteId).select("nombre fechaNacimiento sexo").lean(),
       Medico.findOne({ phone: medicoPhone }).select("nombre especialidad").lean(),
     ]);
+    registrar({ req, medicoPhone, accion: "ver_receta_optica", recurso: `RecetaOptica:${receta._id}` });
     res.json({ receta, paciente, medico });
   }));
 
@@ -110,6 +116,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const r = await RecetaOptica.deleteOne({ _id: req.params.id, medicoPhone });
     if (r.deletedCount === 0) throw new ErrorHttp(404, "Receta óptica no encontrada");
+    registrar({ req, medicoPhone, accion: "borrar_receta_optica", recurso: `RecetaOptica:${req.params.id}` });
     res.json({ ok: true });
   }));
 };

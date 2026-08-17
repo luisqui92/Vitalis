@@ -75,7 +75,7 @@ function tabEstudiosHtml(estudios) {
       </div>
 
       <label class="file-label" for="estArchivo" style="margin-top:10px">📎 Elegir imagen o PDF</label>
-      <input type="file" id="estArchivo" accept="image/*,application/pdf" style="display:none">
+      <input type="file" id="estArchivo" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" style="display:none">
       <div id="estArchivoNombre" class="hint"></div>
       <div id="estErr"></div>
       <button class="secondary" id="btnSubirEstudio">⬆️ Subir</button>

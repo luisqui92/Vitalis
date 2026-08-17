@@ -4,6 +4,7 @@ const { Paciente, Medicamento } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -26,6 +27,7 @@ module.exports = function (app) {
       fechaFin: req.body?.fechaFin ? new Date(req.body.fechaFin) : null,
       notas: String(req.body?.notas || "").trim(),
     });
+    registrar({ req, medicoPhone, accion: "crear_medicamento", recurso: `Medicamento:${medicamento._id}` });
     res.status(201).json({ ok: true, medicamento });
   }));
 
@@ -42,6 +44,7 @@ module.exports = function (app) {
     if (req.body?.fechaFin !== undefined) medicamento.fechaFin = req.body.fechaFin ? new Date(req.body.fechaFin) : null;
 
     await medicamento.save();
+    registrar({ req, medicoPhone, accion: "editar_medicamento", recurso: `Medicamento:${medicamento._id}` });
     res.json({ ok: true, medicamento });
   }));
 
@@ -50,6 +53,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const r = await Medicamento.deleteOne({ _id: req.params.id, medicoPhone });
     if (r.deletedCount === 0) throw new ErrorHttp(404, "Medicamento no encontrado");
+    registrar({ req, medicoPhone, accion: "borrar_medicamento", recurso: `Medicamento:${req.params.id}` });
     res.json({ ok: true });
   }));
 };

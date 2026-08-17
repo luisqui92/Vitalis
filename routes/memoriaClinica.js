@@ -7,6 +7,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { responderPregunta } = require("../services/memoriaClinica");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -40,6 +41,7 @@ module.exports = function (app) {
         antecedentesFamiliares: paciente.antecedentesFamiliares || [],
         medicamentos, vacunas, mediciones, estudios, consultas,
       });
+      registrar({ req, medicoPhone, accion: "preguntar_memoria_clinica", recurso: `Paciente:${paciente._id}`, detalle: pregunta.slice(0, 200) });
       res.json({ ok: true, respuesta });
     } catch (e) {
       log.error("[MEMORIA_CLINICA]", e.response?.data || e.message);

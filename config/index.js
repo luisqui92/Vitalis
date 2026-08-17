@@ -41,8 +41,11 @@ if (process.env.SALUD_WHATSAPP_MEDICO_PHONE && !process.env.APP_URL) {
 
 // ─── VALIDACIÓN DE VARIABLES DE ENTORNO ─────────────────────────────────────
 function validateConfig() {
-  const required = ["MONGODB_URI", "OPENAI_KEY"];
-  const warned = ["JWT_SECRET", "ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL"];
+  // JWT_SECRET es requerida (no solo advertida): sin ella, crypto.createHmac
+  // revienta en el primer login/request autenticado con un error críptico en
+  // vez de fallar limpio al arrancar.
+  const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 
