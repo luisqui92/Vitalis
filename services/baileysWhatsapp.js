@@ -147,8 +147,18 @@ function limpiarSesionYReiniciar() {
 
 // Para vincular un número distinto: cierra la sesión actual y pide un QR nuevo.
 async function reiniciarSesion() {
-  if (sock) { try { await sock.logout(); } catch (e) { /* seguimos igual */ } }
-  limpiarSesionYReiniciar();
+  if (sock) {
+    // sock.logout() ya dispara sola el evento "close" (motivo loggedOut),
+    // que a su vez llama a limpiarSesionYReiniciar() más arriba — llamarla
+    // OTRA VEZ acá después duplicaba todo el reinicio (dos handshakes casi
+    // simultáneos pisándose la carpeta de credenciales entre sí, y el
+    // médico veía el QR resetearse solo una o dos veces antes de asentarse).
+    // Si logout() falla, ahí sí no queda nadie más que limpie, así que se
+    // hace acá como respaldo.
+    try { await sock.logout(); } catch (e) { limpiarSesionYReiniciar(); }
+  } else {
+    limpiarSesionYReiniciar();
+  }
 }
 
 module.exports = { iniciarWhatsapp, enviarTexto, obtenerEstado, reiniciarSesion };

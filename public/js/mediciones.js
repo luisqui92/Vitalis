@@ -61,15 +61,23 @@ function dibujarGraficoEvolucion(canvas, puntos, doble) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.beginPath();
+    // getVal(p) puede dar null (ej: un registro viejo de presión sin la
+    // diastólica cargada) — sin este chequeo, x/NaN cortaba el trazo en
+    // silencio desde ese punto en vez de simplemente saltarlo.
+    let enTrazo = false;
     puntos.forEach((p, i) => {
-      const px = x(i), py = y(getVal(p));
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      const v = getVal(p);
+      if (v == null) { enTrazo = false; return; }
+      const px = x(i), py = y(v);
+      if (!enTrazo) { ctx.moveTo(px, py); enTrazo = true; } else ctx.lineTo(px, py);
     });
     ctx.stroke();
     ctx.fillStyle = color;
     puntos.forEach((p, i) => {
+      const v = getVal(p);
+      if (v == null) return;
       ctx.beginPath();
-      ctx.arc(x(i), y(getVal(p)), 3, 0, Math.PI * 2);
+      ctx.arc(x(i), y(v), 3, 0, Math.PI * 2);
       ctx.fill();
     });
   }

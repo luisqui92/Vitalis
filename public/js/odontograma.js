@@ -168,12 +168,19 @@ function pintarDetallePieza(pacienteId, pieza) {
     errBox.innerHTML = "";
     const estado = document.getElementById("piezaEstado").value;
     const notas = document.getElementById("piezaNotas").value.trim();
+    const btn = document.getElementById("btnGuardarPieza");
+    // Sin este guard, un doble clic (o dos pestañas en la misma pieza)
+    // manda dos PATCH casi juntos que leen el mismo historial y empujan
+    // cada uno su entrada por separado — el que guarda último pisa al otro
+    // (o Mongo tira un error de versión) y se pierde una nota del historial.
+    btn.disabled = true;
     try {
       await api(`/medico/pacientes/${pacienteId}/odontograma/${pieza.numero}`, {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ estado, notas }),
       });
       renderTabOdontograma(pacienteId);
     } catch (e) {
+      btn.disabled = false;
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
     }
   };

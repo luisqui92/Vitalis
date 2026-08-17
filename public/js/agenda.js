@@ -105,13 +105,13 @@ function pintarAgenda(citas, pacientes, wa) {
       <div class="seccion-titulo" style="margin-top:0">Calendario</div>
       <div class="reserva-dias">
         ${dias.map(f => {
-          const fd = new Date(f + "T00:00:00");
+          const fd = new Date(f + "T00:00:00Z");
           const activo = f === diaAgendaElegido;
           const cant = porDia[f]?.length || 0;
           return `
             <button class="reserva-dia-chip ${activo ? "activo" : ""}" data-dia="${f}">
-              <span class="reserva-dia-semana">${DIAS_SEMANA_CORTO[fd.getDay()]}</span>
-              <span class="reserva-dia-numero">${fd.getDate()}</span>
+              <span class="reserva-dia-semana">${DIAS_SEMANA_CORTO[fd.getUTCDay()]}</span>
+              <span class="reserva-dia-numero">${fd.getUTCDate()}</span>
               ${cant ? `<span class="reserva-dia-badge">${cant}</span>` : `<span class="reserva-dia-mes">&nbsp;</span>`}
             </button>`;
         }).join("")}
@@ -119,14 +119,14 @@ function pintarAgenda(citas, pacientes, wa) {
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">${new Date(diaAgendaElegido + "T00:00:00").toLocaleDateString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit" })}</div>
+      <div class="seccion-titulo" style="margin-top:0">${new Date(diaAgendaElegido + "T00:00:00Z").toLocaleDateString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" })}</div>
       ${citasDelDia.length === 0 ? `<div class="empty">No hay citas este día.</div>` : citasDelDia.map(c => `
         <div class="item" style="cursor:default">
           <div class="top">
             <div class="nombre">${ORIGEN_ICONO[c.origen] || ""} ${esc(c.pacienteNombre)}</div>
             <button class="link" data-cancelar-cita="${c._id}" style="margin:0;width:auto;color:var(--danger)">Cancelar</button>
           </div>
-          <div class="fecha">${new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })}</div>
+          <div class="fecha">${new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", timeZone: "America/La_Paz" })}</div>
           ${c.motivo ? `<div class="paciente-info">${esc(c.motivo)}</div>` : ""}
           ${!c.pacienteId ? `
             <button class="link" data-abrir-crear-paciente="${c._id}" style="margin:6px 0 0">➕ Crear ficha de paciente</button>
@@ -167,7 +167,7 @@ function pintarAgenda(citas, pacientes, wa) {
       return;
     }
     try {
-      await api("/medico/citas", {
+      const data = await api("/medico/citas", {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
           pacienteId: pacienteId || undefined,
@@ -177,6 +177,7 @@ function pintarAgenda(citas, pacientes, wa) {
           motivo: document.getElementById("citaMotivo").value.trim(),
         }),
       });
+      if (data?.avisoCalendario) alert(data.avisoCalendario);
       renderAgenda();
     } catch (e) {
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar la cita")}</div>`;
@@ -186,9 +187,10 @@ function pintarAgenda(citas, pacientes, wa) {
   document.querySelectorAll("[data-cancelar-cita]").forEach(btn => {
     btn.onclick = async () => {
       if (!confirm("¿Cancelar esta cita?")) return;
-      await api("/medico/citas/" + btn.dataset.cancelarCita, {
+      const data = await api("/medico/citas/" + btn.dataset.cancelarCita, {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ estado: "cancelada" }),
       });
+      if (data?.avisoCalendario) alert(data.avisoCalendario);
       renderAgenda();
     };
   });

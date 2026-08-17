@@ -5,6 +5,7 @@ const { Medico, Paciente, Cita } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { obtenerHorariosDisponibles } = require("../services/agenda");
+const { fechaLocalBoliviaAInstante } = require("../services/utils");
 const { crearEvento, actualizarEvento, eliminarEvento } = require("../services/googleCalendar");
 const { enviarTexto } = require("../services/baileysWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
@@ -61,8 +62,13 @@ module.exports = function (app) {
   // ─── CREAR CITA A MANO ───────────────────────────────────────────────────
   app.post("/medico/citas", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const fecha = req.body?.fecha ? new Date(req.body.fecha) : null;
-    if (!fecha) throw new ErrorHttp(400, "fecha es requerida");
+    // Viene de un <input type="datetime-local"> ("YYYY-MM-DDTHH:mm", sin
+    // timezone) — el médico lo tipeó pensando en hora boliviana, no en la
+    // hora del server (que en producción corre en UTC). Un new Date(...)
+    // directo lo interpretaría como hora del server, corriendo la cita
+    // varias horas del horario real que se cargó.
+    const fecha = req.body?.fecha ? fechaLocalBoliviaAInstante(req.body.fecha) : null;
+    if (!fecha || isNaN(fecha.getTime())) throw new ErrorHttp(400, "fecha es requerida");
 
     let pacienteNombre = String(req.body?.pacienteNombre || "").trim();
     let pacienteId = null;
@@ -82,9 +88,11 @@ module.exports = function (app) {
       estado: "confirmada", origen: "manual",
     });
 
+    let avisoCalendario = null;
     if (medico?.googleCalendarId) {
       const eventId = await crearEvento(medico.googleCalendarId, cita);
       if (eventId) { cita.googleEventId = eventId; await cita.save(); }
+      else avisoCalendario = "La cita se guardó bien en Vitalis, pero no se pudo crear en Google Calendar.";
     }
 
     // Si se cargó un teléfono, avisamos por WhatsApp igual que cuando la
@@ -95,7 +103,7 @@ module.exports = function (app) {
         .catch(e => log.error(`[CITAS] no se pudo mandar la confirmación por WhatsApp a ${cita.pacienteTelefono}:`, e.message));
     }
 
-    res.status(201).json({ ok: true, cita });
+    res.status(201).json({ ok: true, cita, avisoCalendario });
   }));
 
   // ─── CREAR FICHA DE PACIENTE A PARTIR DE UNA CITA (ej: reservó por
@@ -131,17 +139,25 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const cita = await obtenerOFallar(Cita, { _id: req.params.id, medicoPhone }, "Cita no encontrada");
 
-    if (req.body?.fecha !== undefined) cita.fecha = new Date(req.body.fecha);
+    if (req.body?.fecha !== undefined) cita.fecha = fechaLocalBoliviaAInstante(req.body.fecha);
     if (req.body?.motivo !== undefined) cita.motivo = String(req.body.motivo).trim();
     if (req.body?.estado !== undefined && DIAS_VALIDOS.includes(req.body.estado)) cita.estado = req.body.estado;
     await cita.save();
 
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+    // El calendario es un espejo (no la fuente de verdad, ver
+    // services/googleCalendar.js) — si esto falla la cita en Vitalis ya
+    // quedó bien guardada igual, pero antes el médico nunca se enteraba: el
+    // evento viejo seguía "ocupando" ese horario en Google Calendar para
+    // siempre. Se avisa en la respuesta para que lo revise a mano ahí.
+    let avisoCalendario = null;
     if (medico?.googleCalendarId && cita.googleEventId) {
-      if (cita.estado === "cancelada") await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
-      else await actualizarEvento(medico.googleCalendarId, cita.googleEventId, cita);
+      const sincronizo = cita.estado === "cancelada"
+        ? await eliminarEvento(medico.googleCalendarId, cita.googleEventId)
+        : await actualizarEvento(medico.googleCalendarId, cita.googleEventId, cita);
+      if (!sincronizo) avisoCalendario = "La cita se guardó bien en Vitalis, pero no se pudo actualizar en Google Calendar — revisalo ahí a mano.";
     }
-    res.json({ ok: true, cita });
+    res.json({ ok: true, cita, avisoCalendario });
   }));
 
   // ─── ELIMINAR ────────────────────────────────────────────────────────────
@@ -150,7 +166,11 @@ module.exports = function (app) {
     const cita = await Cita.findOneAndDelete({ _id: req.params.id, medicoPhone });
     if (!cita) throw new ErrorHttp(404, "Cita no encontrada");
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-    if (medico?.googleCalendarId && cita.googleEventId) await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
-    res.json({ ok: true });
+    let avisoCalendario = null;
+    if (medico?.googleCalendarId && cita.googleEventId) {
+      const sincronizo = await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
+      if (!sincronizo) avisoCalendario = "La cita se borró de Vitalis, pero no se pudo borrar en Google Calendar — revisalo ahí a mano.";
+    }
+    res.json({ ok: true, avisoCalendario });
   }));
 };

@@ -12,15 +12,20 @@ const { CONFIG, log } = require("../config");
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
+// Estas tres corren en el server, que en producción corre en UTC (no en
+// hora boliviana) — sin timeZone explícito, "es-BO" solo cambia el idioma
+// del formato, no convierte nada de zona horaria (error común). fechaStr ya
+// es un día boliviano (viene de services/agenda.js), así que se parsea
+// forzando UTC para no volver a mezclarlo con la zona del server.
 function formatearDia(fechaStr) {
-  const d = new Date(fechaStr + "T00:00:00");
-  return `${DIAS_SEMANA[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+  const d = new Date(fechaStr + "T00:00:00Z");
+  return `${DIAS_SEMANA[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
 }
 function formatearHora(fecha) {
-  return new Date(fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/La_Paz" });
 }
 function formatearFechaCompleta(fecha) {
-  return new Date(fecha).toLocaleString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return new Date(fecha).toLocaleString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/La_Paz" });
 }
 
 async function obtenerSesion(numero) {

@@ -81,32 +81,42 @@ async function crearEvento(calendarId, cita) {
   }
 }
 
+// Devuelven true/false (se sincronizó o no) — el calendario sigue sin ser
+// la fuente de verdad (si esto falla, la cita en Vitalis ya quedó guardada
+// igual), pero antes esto se perdía en silencio: un evento que no se pudo
+// borrar/mover en Google Calendar seguía figurando "ocupado" ahí para
+// siempre, bloqueando horarios que en Vitalis ya estaban libres, sin que
+// nadie se entere. Ahora el caller puede avisar.
 async function actualizarEvento(calendarId, eventId, cita) {
-  if (!calendarId || !eventId) return;
+  if (!calendarId || !eventId) return false;
   try {
     const token = await obtenerAccessToken();
-    if (!token) return;
+    if (!token) return false;
     await axios.patch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
       eventoDesdeCita(cita),
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    return true;
   } catch (e) {
     log.error("[GOOGLE_CALENDAR] actualizarEvento:", e.response?.data || e.message);
+    return false;
   }
 }
 
 async function eliminarEvento(calendarId, eventId) {
-  if (!calendarId || !eventId) return;
+  if (!calendarId || !eventId) return false;
   try {
     const token = await obtenerAccessToken();
-    if (!token) return;
+    if (!token) return false;
     await axios.delete(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    return true;
   } catch (e) {
     log.error("[GOOGLE_CALENDAR] eliminarEvento:", e.response?.data || e.message);
+    return false;
   }
 }
 

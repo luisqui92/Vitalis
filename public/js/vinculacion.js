@@ -47,9 +47,26 @@ function pintarVincular(v) {
       <div class="hint">📱 Celular vinculado. Dejalo con la pantalla prendida al lado de la compu.</div>
       <div class="hint" style="margin-top:10px" id="vEstado">🟢 Esperando la orden de grabar...</div>
     </div>`;
-  document.getElementById("btnBack").onclick = renderDashboard;
 
   let mediaRecorder = null, chunks = [], mimeType = "audio/webm", stream = null;
+
+  // "← Volver" vive afuera de #vCard (nunca se reescribe al arrancar una
+  // grabación), así que sin este chequeo se podía salir de esta pantalla
+  // con el micrófono todavía grabando: el poll que detiene todo
+  // (ciclo() más abajo) se corta con detenerPolling(), pero nadie más
+  // llama a mediaRecorder.stop() — el micrófono queda prendido y lo que se
+  // grabó hasta ahí se pierde (nunca se sube). Si hay una grabación en
+  // curso, primero se detiene por la misma vía seria de siempre (la que ya
+  // usa "Detener acá mismo": sube lo grabado y libera el micrófono) en vez
+  // de navegar directo.
+  document.getElementById("btnBack").onclick = () => {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      if (!confirm('Hay una grabación en curso. Hay que detenerla antes de salir (se sube la consulta grabada hasta ahora). ¿Detener y volver?')) return;
+      mediaRecorder.stop();
+      return;
+    }
+    renderDashboard();
+  };
   let pacienteActual = null;
 
   async function arrancarGrabacionRemota(pacienteId, pacienteNombre) {

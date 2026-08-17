@@ -6,16 +6,18 @@
 // cita a mano) como la reserva conversacional por WhatsApp.
 const { Medico, Cita } = require("../db/models");
 const { obtenerOcupadoEnRango } = require("./googleCalendar");
+const { hoyBolivia, instanteBolivia } = require("./utils");
 
 function seSuperponen(inicioA, finA, inicioB, finB) {
   return inicioA < finB && finA > inicioB;
 }
 
-function combinarFechaHora(fecha, horaStr) {
+// fechaDia: {anio, mesIndex, dia} de un día boliviano concreto (nunca un
+// Date de "hora local del server" — el server puede no correr en la
+// timezone de Bolivia, ver services/utils.js).
+function combinarFechaHora(fechaDia, horaStr) {
   const [h, m] = String(horaStr || "00:00").split(":").map(Number);
-  const d = new Date(fecha);
-  d.setHours(h, m, 0, 0);
-  return d;
+  return instanteBolivia(fechaDia.anio, fechaDia.mesIndex, fechaDia.dia, h, m);
 }
 
 // [{ fecha: "2026-08-11", slots: [Date, ...] }, ...] — solo días con al
@@ -27,9 +29,12 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
   const horario = medico.horarioAtencion || [];
   if (horario.length === 0) return [];
 
+  // "Hoy" en Bolivia, no en la zona horaria del server (que en producción
+  // corre en UTC) — si no, cerca de la medianoche boliviana esto podía
+  // arrancar la ventana de 7 días un día antes o después del real.
+  const hoy = hoyBolivia();
   const desde = new Date();
-  const hasta = new Date();
-  hasta.setDate(hasta.getDate() + diasAdelante);
+  const hasta = instanteBolivia(hoy.anio, hoy.mesIndex, hoy.dia + diasAdelante, 0, 0);
 
   const citasOcupadas = await Cita.find({
     medicoPhone, estado: "confirmada", fecha: { $gte: desde, $lt: hasta },
@@ -41,16 +46,19 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
 
   const dias = [];
   for (let i = 0; i < diasAdelante; i++) {
-    const dia = new Date();
-    dia.setDate(dia.getDate() + i);
-    dia.setHours(0, 0, 0, 0);
-    const bloques = horario.filter(h => h.diaSemana === dia.getDay());
+    // Date.UTC normaliza solo si "dia" se pasa de fin de mes (día 32 de
+    // enero → 1 de febrero) — no hace falta lógica aparte para cruzar
+    // meses/años.
+    const cursorDia = new Date(Date.UTC(hoy.anio, hoy.mesIndex, hoy.dia + i));
+    const fechaDia = { anio: cursorDia.getUTCFullYear(), mesIndex: cursorDia.getUTCMonth(), dia: cursorDia.getUTCDate() };
+    const diaSemana = cursorDia.getUTCDay();
+    const bloques = horario.filter(h => h.diaSemana === diaSemana);
     if (bloques.length === 0) continue;
 
     const slots = [];
     for (const bloque of bloques) {
-      let cursor = combinarFechaHora(dia, bloque.horaInicio);
-      const fin = combinarFechaHora(dia, bloque.horaFin);
+      let cursor = combinarFechaHora(fechaDia, bloque.horaInicio);
+      const fin = combinarFechaHora(fechaDia, bloque.horaFin);
       while (cursor.getTime() + duracion * 60000 <= fin.getTime()) {
         if (cursor.getTime() > Date.now()) {
           const inicioSlot = cursor.getTime();
@@ -66,7 +74,10 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
         cursor = new Date(cursor.getTime() + duracion * 60000);
       }
     }
-    if (slots.length) dias.push({ fecha: dia.toISOString().slice(0, 10), slots });
+    if (slots.length) {
+      const fechaStr = `${fechaDia.anio}-${String(fechaDia.mesIndex + 1).padStart(2, "0")}-${String(fechaDia.dia).padStart(2, "0")}`;
+      dias.push({ fecha: fechaStr, slots });
+    }
   }
   return dias;
 }
