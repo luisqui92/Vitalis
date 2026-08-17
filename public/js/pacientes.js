@@ -2,13 +2,19 @@
 // (pestañas: Paciente, Consultas, Medicación, Antecedentes, Vacunas).
 
 function pacienteItemHtml(p) {
-  const edad = edadDesde(p.fechaNacimiento);
+  const esVet = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
+  const info = esVet
+    ? [p.especie, p.raza].filter(Boolean).join(" · ")
+    : (() => {
+        const edad = edadDesde(p.fechaNacimiento);
+        return `${edad != null ? edad + " años" : ""}${edad != null && p.sexo ? " · " : ""}${p.sexo || ""}`;
+      })();
   return `
     <div class="item item-paciente" data-id="${p._id}" data-nombre="${esc(p.nombre.toLowerCase())}">
       <div class="avatar avatar-xs">${esc(iniciales(p.nombre))}</div>
       <div>
         <div class="nombre">${esc(p.nombre)}</div>
-        <div class="paciente-info">${edad != null ? edad + " años" : ""}${edad != null && p.sexo ? " · " : ""}${esc(p.sexo || "")}</div>
+        <div class="paciente-info">${esc(info)}</div>
       </div>
     </div>`;
 }
@@ -71,21 +77,33 @@ async function renderDashboard() {
 // ─── NUEVO PACIENTE ──────────────────────────────────────────────────────
 function renderNuevoPaciente() {
   detenerPolling();
+  const esVet = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
   app.innerHTML = `
     <button class="back" id="btnBack">← Volver</button>
     <div class="card">
-      <label>Nombre completo</label>
-      <input id="pNombre" type="text" placeholder="Ej: Juan Pérez">
+      <label>${esVet ? "Nombre de la mascota" : "Nombre completo"}</label>
+      <input id="pNombre" type="text" placeholder="${esVet ? "Ej: Firulais" : "Ej: Juan Pérez"}">
+      ${esVet ? `
+      <label>Especie</label>
+      <input id="pEspecie" type="text" placeholder="Ej: Perro, Gato...">
+      <label>Raza (opcional)</label>
+      <input id="pRaza" type="text" placeholder="Ej: Labrador">` : ""}
       <label>Fecha de nacimiento (opcional)</label>
       <input id="pFecha" type="date">
       <label>Sexo (opcional)</label>
       <select id="pSexo">
         <option value="">— Sin especificar —</option>
+        ${esVet ? `
+        <option value="Hembra">Hembra</option>
+        <option value="Macho">Macho</option>` : `
         <option value="Femenino">Femenino</option>
         <option value="Masculino">Masculino</option>
-        <option value="Otro">Otro</option>
+        <option value="Otro">Otro</option>`}
       </select>
-      <label>Teléfono (opcional)</label>
+      ${esVet ? `
+      <label>Nombre del dueño (opcional)</label>
+      <input id="pDuenoNombre" type="text" placeholder="Ej: María Pérez">` : ""}
+      <label>Teléfono${esVet ? " del dueño" : ""} (opcional)</label>
       <input id="pTelefono" type="tel" placeholder="591XXXXXXXX">
       <label>Notas (opcional)</label>
       <input id="pNotas" type="text" placeholder="Alergias, observaciones generales...">
@@ -99,13 +117,16 @@ function renderNuevoPaciente() {
     const sexo = document.getElementById("pSexo").value;
     const telefono = document.getElementById("pTelefono").value.trim();
     const notas = document.getElementById("pNotas").value.trim();
+    const especie = esVet ? document.getElementById("pEspecie").value.trim() : "";
+    const raza = esVet ? document.getElementById("pRaza").value.trim() : "";
+    const duenoNombre = esVet ? document.getElementById("pDuenoNombre").value.trim() : "";
     const errBox = document.getElementById("pErr");
     errBox.innerHTML = "";
-    if (!nombre) { errBox.innerHTML = `<div class="error">El nombre es obligatorio</div>`; return; }
+    if (!nombre) { errBox.innerHTML = `<div class="error">${esVet ? "El nombre de la mascota es obligatorio" : "El nombre es obligatorio"}</div>`; return; }
     try {
       const data = await api("/medico/pacientes", {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ nombre, fechaNacimiento, sexo, telefono, notas }),
+        body: JSON.stringify({ nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre }),
       });
       renderPacienteDetalle(data.paciente._id);
     } catch (e) {
@@ -173,9 +194,14 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         </div>
       </div>
       <div class="ficha-datos">
+        ${MEDICO_TIPO_ESPECIALIDAD === "veterinaria" ? `
+        <div class="dato-row">🐾 ${[p.especie, p.raza].filter(Boolean).map(esc).join(" · ") || "Especie no registrada"}</div>
+        <div class="dato-row">🧑 ${p.duenoNombre ? esc(p.duenoNombre) : "Dueño no registrado"}</div>
+        <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : "No registrado"}</div>
+        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : "Sin notas registradas"}</div>` : `
         <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : "No registrado"}</div>
         <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString("es-BO") : "No registrada"}</div>
-        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : "Sin notas registradas"}</div>
+        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : "Sin notas registradas"}</div>`}
       </div>
     </div>
 

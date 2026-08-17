@@ -83,6 +83,7 @@ module.exports = function (app) {
           // Solo para oftalmología (Vitalis Visión): la lista de estructuras
           // oculares válidas, para que la IA narre el examen por ojo.
           const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
+          const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
 
           consulta.notaClinica = await generarNotaClinica(transcripcionCompleta, {
             antecedentesPersonales: paciente.antecedentesPersonales || [],
@@ -90,6 +91,9 @@ module.exports = function (app) {
             medicamentosActivos: medicamentosActivos.map(m => m.nombre),
             catalogoTratamientos,
             estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
+            veterinaria: esVeterinaria,
+            especie: esVeterinaria ? paciente.especie : "",
+            raza: esVeterinaria ? paciente.raza : "",
           });
           consulta.notaClinicaEstado = "completado";
 

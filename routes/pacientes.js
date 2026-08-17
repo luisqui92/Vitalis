@@ -20,8 +20,11 @@ module.exports = function (app) {
     const sexo = String(req.body?.sexo || "").trim();
     const telefono = String(req.body?.telefono || "").trim();
     const notas = String(req.body?.notas || "").trim();
+    const especie = String(req.body?.especie || "").trim();
+    const raza = String(req.body?.raza || "").trim();
+    const duenoNombre = String(req.body?.duenoNombre || "").trim();
 
-    const paciente = await Paciente.create({ medicoPhone, nombre, fechaNacimiento, sexo, telefono, notas });
+    const paciente = await Paciente.create({ medicoPhone, nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre });
     res.status(201).json({ ok: true, paciente });
   }));
 
@@ -60,7 +63,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.id, medicoPhone }, "Paciente no encontrado");
 
-    const campos = ["nombre", "sexo", "telefono", "notas"];
+    const campos = ["nombre", "sexo", "telefono", "notas", "especie", "raza", "duenoNombre"];
     for (const campo of campos) {
       if (req.body?.[campo] !== undefined) paciente[campo] = String(req.body[campo]).trim();
     }

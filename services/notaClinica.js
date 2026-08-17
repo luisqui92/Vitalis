@@ -121,6 +121,9 @@ function construirContexto(contexto) {
   const partes = [];
   const hoy = new Date();
   partes.push(`Hoy es ${DIAS_SEMANA[hoy.getDay()]} ${fechaStrBolivia(hoy)}.`);
+  if (contexto?.veterinaria) {
+    partes.push(`Esta consulta es de medicina VETERINARIA — el paciente es un animal, no una persona${contexto.especie ? ` (${contexto.especie}${contexto.raza ? ", raza " + contexto.raza : ""})` : ""}. Interpretá "el paciente"/"el/la ${contexto.especie || "animal"}" en ese sentido, y las dosis de medicamentos en relación al peso del animal si se menciona.`);
+  }
   if (contexto?.antecedentesPersonales?.length) {
     partes.push(`Antecedentes personales ya registrados: ${contexto.antecedentesPersonales.join("; ")}`);
   }

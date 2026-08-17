@@ -65,21 +65,28 @@ function renderLogin2FA(tempToken) {
 
 function renderRegistro() {
   detenerPolling();
-  app.innerHTML = `
-    <div class="card">
-      <label>Teléfono</label>
-      <input id="rPhone" type="tel" placeholder="591XXXXXXXX">
-      <label>Nombre completo</label>
-      <input id="rNombre" type="text" placeholder="Dra. Fulana Pérez">
-      <label>Área</label>
+  // /veterinaria es una landing dedicada — el selector de área no aporta
+  // nada ahí (todo el que se registra por esa puerta es veterinaria), así
+  // que se reemplaza por un valor fijo en vez de obligar a elegirlo.
+  const selectorArea = ES_LANDING_VETERINARIA
+    ? `<input type="hidden" id="rTipoEsp" value="veterinaria">`
+    : `<label>Área</label>
       <select id="rTipoEsp">
         <option value="medicina_general">🩺 Medicina general</option>
         <option value="odontologia">🦷 Odontología</option>
         <option value="estetica">💉 Estética / Plástica / Dermatología</option>
         <option value="oftalmologia">👁️ Oftalmología</option>
-      </select>
+        <option value="veterinaria">🐾 Veterinaria</option>
+      </select>`;
+  app.innerHTML = `
+    <div class="card">
+      <label>Teléfono</label>
+      <input id="rPhone" type="tel" placeholder="591XXXXXXXX">
+      <label>Nombre completo</label>
+      <input id="rNombre" type="text" placeholder="${ES_LANDING_VETERINARIA ? "Dra. Fulana Pérez (veterinaria)" : "Dra. Fulana Pérez"}">
+      ${selectorArea}
       <label>Especialidad (opcional)</label>
-      <input id="rEsp" type="text" placeholder="Medicina general">
+      <input id="rEsp" type="text" placeholder="${ES_LANDING_VETERINARIA ? "Medicina veterinaria general" : "Medicina general"}">
       <label>Contraseña (mínimo 8 caracteres)</label>
       <input id="rPass" type="password" placeholder="••••••••">
       <div id="rErr"></div>

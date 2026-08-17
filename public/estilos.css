@@ -91,6 +91,31 @@ body.tema-oftalmologia button.secondary{background:#232349;}
 body.tema-oftalmologia .segmento.h0{background:#232349;}
 body.tema-oftalmologia .segmento.h1{background:#1c2a38;}
 body.tema-oftalmologia .brief-card{background:linear-gradient(135deg,#1c1c3a,#131328);}
+
+/* ─── Tema "Vitalis Veterinaria" (oscuro, verde bosque/ámbar) ──────────
+   Para cuentas de veterinaria (y la landing pública /veterinaria, antes
+   incluso de loguearse — ver aplicarLandingVeterinariaSiCorresponde en
+   estado.js). Mismo mecanismo que los otros temas. */
+body.tema-veterinaria{
+  --primary:#4f9d5a;
+  --primary-dark:#357a3f;
+  --accent:#e0a458;
+  --accent-2:#eec084;
+  --bg:#12180f;
+  --card:#1c2618;
+  --border:#30402a;
+  --text:#eef3ea;
+  --text-muted:#a3b39c;
+  --success:#22c55e; --success-bg:rgba(34,197,94,.12);
+  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
+  --danger:#ef4444; --danger-bg:rgba(239,68,68,.12);
+  --gradient-vitalis: linear-gradient(135deg, #2f6b3a 0%, var(--primary) 50%, var(--accent) 100%);
+}
+body.tema-veterinaria input, body.tema-veterinaria select, body.tema-veterinaria textarea{background:#212d1c;}
+body.tema-veterinaria button.secondary{background:#26361f;}
+body.tema-veterinaria .segmento.h0{background:#26361f;}
+body.tema-veterinaria .segmento.h1{background:#332c18;}
+body.tema-veterinaria .brief-card{background:linear-gradient(135deg,#1c2e1a,#20250f);}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 .header{background:var(--card);padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}

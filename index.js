@@ -75,7 +75,10 @@ app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
 
 // ─── ESTÁTICOS + LA APP ───────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
-app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+// Vitalis Veterinaria vive en /veterinaria como landing propia (mismo
+// frontend/SPA de siempre — el JS detecta la ruta y ajusta marca/tema/
+// registro antes incluso de loguearse; ver public/js/auth.js y estado.js).
+app.get(["/", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

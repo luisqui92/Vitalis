@@ -27,7 +27,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -70,6 +70,11 @@ const pacienteSchema = new mongoose.Schema({
   sexo: { type: String, default: "" },
   telefono: { type: String, default: "" },
   notas: { type: String, default: "" },
+  // Solo Vitalis Veterinaria: acá "nombre" es el de la mascota y "telefono"
+  // ya venía siendo el de contacto (el dueño), así que solo faltan estos 3.
+  especie: { type: String, default: "" },
+  raza: { type: String, default: "" },
+  duenoNombre: { type: String, default: "" },
   antecedentesPersonales: { type: [String], default: [] }, // ej: "Hipertensión desde 2019", "Alergia a penicilina"
   antecedentesFamiliares: { type: [{ parentesco: String, condicion: String }], default: [] },
   // Brief Clínico Inteligente: resumen ejecutivo generado por IA a partir del

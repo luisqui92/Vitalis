@@ -3,4 +3,5 @@
 btnLogout.onclick = logout;
 
 aplicarTemaSegunEspecialidad();
+aplicarLandingVeterinariaSiCorresponde();
 if (TOKEN) renderDashboard(); else renderLogin();
