@@ -246,27 +246,28 @@ async function traerBlobEstudio(id) {
 // Overlay de pantalla completa (fuera de #app, para no perder el formulario
 // de abajo) con un dibujo guía según el ángulo elegido, para que la foto de
 // hoy quede alineada igual que la de la próxima visita.
-function guiaSvgPara(angulo) {
+function guiaSvgPara(angulo, alineado) {
   // "perfil_izquierdo" / "angulo45_izquierda" reusan el mismo dibujo que su
   // versión derecha, solo espejado — así no hay que dibujar cada guía dos veces.
   const espejado = angulo.includes("izquierd");
+  const color = alineado ? "#4ade80" : "#fff"; // verde cuando la detección en vivo dice que ya está bien encuadrada
   const formaPerfil = "M 190 90 Q 230 100 232 150 Q 234 180 250 195 Q 235 205 232 215 Q 236 235 220 245 Q 224 260 205 268 L 195 300 Q 190 330 180 350 L 130 350 L 130 90 Z";
   let interior, mascara;
   if (angulo.startsWith("perfil")) {
     interior = `
-      <path d="${formaPerfil}" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 5"/>
+      <path d="${formaPerfil}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="8 5"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>`;
     mascara = `<path d="${formaPerfil}" fill="#000"/>`;
   } else if (angulo.startsWith("angulo45") || angulo === "tres_cuartos") {
     interior = `
-      <ellipse cx="160" cy="190" rx="95" ry="130" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 5"/>
+      <ellipse cx="160" cy="190" rx="95" ry="130" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="8 5"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
       <line x1="185" y1="70" x2="185" y2="310" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>`;
     mascara = `<ellipse cx="160" cy="190" rx="95" ry="130" fill="#000"/>`;
   } else {
     // frontal (default)
     interior = `
-      <ellipse cx="150" cy="190" rx="90" ry="130" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 5"/>
+      <ellipse cx="150" cy="190" rx="90" ry="130" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="8 5"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
       <line x1="150" y1="60" x2="150" y2="320" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>`;
     mascara = `<ellipse cx="150" cy="190" rx="90" ry="130" fill="#000"/>`;
@@ -291,7 +292,7 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
     <div id="camVista" style="flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
       <video id="camVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
       <div id="camGuia" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${guiaSvgPara(angulo)}</div>
-      <div class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">Alineá la cara con la guía</div>
+      <div id="camEstado" class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">Alineá la cara con la guía</div>
     </div>
     <div id="camRevision" style="flex:1;position:relative;overflow:hidden;display:none;align-items:center;justify-content:center;background:#000">
       <img id="camFotoTomada" style="max-width:100%;max-height:100%;object-fit:contain">
@@ -319,6 +320,7 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
   const anguloChips = overlay.querySelector("#camAnguloChips");
   const botonesCaptura = overlay.querySelector("#camBotonesCaptura");
   const botonesRevision = overlay.querySelector("#camBotonesRevision");
+  const estadoEl = overlay.querySelector("#camEstado");
   let stream = null;
   let blobCapturado = null;
   let urlCapturada = null;
@@ -332,34 +334,20 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
   }
 
   function cerrar() {
+    detenerDeteccionEnVivo();
     if (stream) stream.getTracks().forEach(t => t.stop());
     if (urlCapturada) URL.revokeObjectURL(urlCapturada);
     overlay.remove();
   }
 
-  function volverACamara() {
-    vistaCamara.style.display = "flex";
-    vistaRevision.style.display = "none";
-    anguloChips.style.display = "flex";
-    botonesCaptura.style.display = "flex";
-    botonesRevision.style.display = "none";
-  }
-
-  overlay.querySelectorAll("[data-cam-angulo]").forEach(btn => {
-    btn.onclick = () => {
-      angulo = btn.dataset.camAngulo;
-      overlay.querySelectorAll("[data-cam-angulo]").forEach(b => b.classList.toggle("activo", b === btn));
-      overlay.querySelector("#camGuia").innerHTML = guiaSvgPara(angulo);
-    };
-  });
-  overlay.querySelector("#btnCamCancelar").onclick = cerrar;
-  overlay.querySelector("#btnCamCapturar").onclick = () => {
+  function capturarCuadro() {
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
     canvas.toBlob((blob) => {
       if (!blob) return;
+      detenerDeteccionEnVivo();
       blobCapturado = blob;
       if (urlCapturada) URL.revokeObjectURL(urlCapturada);
       urlCapturada = URL.createObjectURL(blob);
@@ -370,7 +358,79 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
       botonesCaptura.style.display = "none";
       botonesRevision.style.display = "flex";
     }, "image/jpeg", 0.92);
-  };
+  }
+
+  function volverACamara() {
+    vistaCamara.style.display = "flex";
+    vistaRevision.style.display = "none";
+    anguloChips.style.display = "flex";
+    botonesCaptura.style.display = "flex";
+    botonesRevision.style.display = "none";
+    iniciarDeteccionEnVivo();
+  }
+
+  // ─── Auto-captura: cuando la detección facial en vivo dice que la cara
+  // quedó encuadrada dentro de la guía por varios cuadros seguidos (no un
+  // instante suelto), se dispara sola — como respaldo, "Capturar" a mano
+  // sigue funcionando en todo momento, incluso si la detección no cargó,
+  // no encuentra cara (ej. un perfil muy cerrado) o el navegador no soporta
+  // WebAssembly con hilos.
+  let intervaloDeteccion = null;
+  let cuadrosAlineado = 0;
+  let alineadoActual = false;
+  const CUADROS_PARA_CAPTURAR = 8; // ~1.2s de encuadre sostenido a 150ms/cuadro
+  function actualizarGuia(alineado) {
+    if (alineado === alineadoActual) return;
+    alineadoActual = alineado;
+    overlay.querySelector("#camGuia").innerHTML = guiaSvgPara(angulo, alineado);
+  }
+  function iniciarDeteccionEnVivo() {
+    cuadrosAlineado = 0;
+    alineadoActual = false;
+    prepararDeteccionEnVivo().then((detector) => {
+      if (!vistaCamara || vistaCamara.style.display === "none") return; // ya se cerró o pasó a revisión
+      intervaloDeteccion = setInterval(() => {
+        if (video.readyState < 2) return;
+        let resultado;
+        try {
+          resultado = detector.detectar(video);
+        } catch (e) {
+          return; // detección en vivo es un plus, no un requisito — si falla, se sigue con captura manual
+        }
+        if (!resultado) {
+          cuadrosAlineado = 0;
+          actualizarGuia(false);
+          estadoEl.textContent = "Buscando cara...";
+          return;
+        }
+        actualizarGuia(resultado.alineado);
+        if (resultado.alineado) {
+          cuadrosAlineado++;
+          estadoEl.textContent = cuadrosAlineado >= CUADROS_PARA_CAPTURAR ? "📸 ¡Listo!" : "¡Alineado! Manteniendo...";
+          if (cuadrosAlineado >= CUADROS_PARA_CAPTURAR) capturarCuadro();
+        } else {
+          cuadrosAlineado = 0;
+          estadoEl.textContent = "Alineá la cara con la guía";
+        }
+      }, 150);
+    }).catch(() => { /* sin detección automática disponible — igual queda el botón manual */ });
+  }
+  function detenerDeteccionEnVivo() {
+    if (intervaloDeteccion) { clearInterval(intervaloDeteccion); intervaloDeteccion = null; }
+  }
+  iniciarDeteccionEnVivo();
+
+  overlay.querySelectorAll("[data-cam-angulo]").forEach(btn => {
+    btn.onclick = () => {
+      angulo = btn.dataset.camAngulo;
+      overlay.querySelectorAll("[data-cam-angulo]").forEach(b => b.classList.toggle("activo", b === btn));
+      cuadrosAlineado = 0;
+      alineadoActual = false;
+      overlay.querySelector("#camGuia").innerHTML = guiaSvgPara(angulo, false);
+    };
+  });
+  overlay.querySelector("#btnCamCancelar").onclick = cerrar;
+  overlay.querySelector("#btnCamCapturar").onclick = capturarCuadro;
   overlay.querySelector("#btnCamRepetir").onclick = volverACamara;
   overlay.querySelector("#btnCamUsar").onclick = () => {
     const blob = blobCapturado;

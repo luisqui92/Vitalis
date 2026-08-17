@@ -20,14 +20,29 @@ function cargarFaceLandmarker() {
     _faceLandmarkerPromise = (async () => {
       const { FaceLandmarker, FilesetResolver } = await import("/vendor/mediapipe/vision_bundle.js");
       const fileset = await FilesetResolver.forVisionTasks("/vendor/mediapipe/wasm");
-      return { FaceLandmarker, landmarker: await FaceLandmarker.createFromOptions(fileset, {
+      const landmarker = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: "/vendor/mediapipe/face_landmarker.task", delegate: "CPU" },
         runningMode: "IMAGE",
         numFaces: 1,
-      }) };
+      });
+      landmarker.__vitalisModo = "IMAGE";
+      return { FaceLandmarker, landmarker };
     })();
   }
   return _faceLandmarkerPromise;
+}
+
+// El mismo modelo se usa para analizar una foto ya tomada (modo IMAGE, en
+// abrirAnalisisFacial) y para la detección en vivo de la cámara guiada
+// (modo VIDEO, en prepararDeteccionEnVivo) — nunca al mismo tiempo, así que
+// alcanza con una sola instancia que cambia de modo según quién la pida.
+async function landmarkerEnModo(modo) {
+  const { FaceLandmarker, landmarker } = await cargarFaceLandmarker();
+  if (landmarker.__vitalisModo !== modo) {
+    await landmarker.setOptions({ runningMode: modo });
+    landmarker.__vitalisModo = modo;
+  }
+  return { FaceLandmarker, landmarker };
 }
 
 // Los connectors de MediaPipe son pares {start,end} sin orden — para poder
@@ -139,10 +154,50 @@ function derivarRegionesGeometricas(lm, base) {
 }
 
 async function detectarEnImagen(imgEl) {
-  const { FaceLandmarker, landmarker } = await cargarFaceLandmarker();
+  const { FaceLandmarker, landmarker } = await landmarkerEnModo("IMAGE");
   const resultado = landmarker.detect(imgEl);
   if (!resultado.faceLandmarks || !resultado.faceLandmarks.length) return null;
   return { FaceLandmarker, landmarks: resultado.faceLandmarks[0] };
+}
+
+// ─── DETECCIÓN EN VIVO (cámara guiada) ────────────────────────────────────
+// Para que la cámara se dispare sola cuando la cara está bien encuadrada,
+// no cuando el médico se acuerde de tocar el botón.
+function cajaOvaloFacial(lm, FaceLandmarker) {
+  const ovalo = connectorsAPoligono(FaceLandmarker.FACE_LANDMARKS_FACE_OVAL);
+  let minX = 1, maxX = 0, minY = 1, maxY = 0;
+  for (const i of ovalo) {
+    const p = lm[i];
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY };
+}
+
+// Rangos deliberadamente generosos (no es una calibración de cámara real,
+// solo "¿la cara está más o menos centrada y a una distancia razonable?").
+// Mejor de más tolerante — que capture un encuadre un poco imperfecto — a
+// que nunca dispare y el médico termine igual tocando "Capturar" a mano,
+// que sigue siempre disponible como respaldo.
+function evaluarAlineacion(lm, FaceLandmarker) {
+  const caja = cajaOvaloFacial(lm, FaceLandmarker);
+  const centrada = caja.cx > 0.28 && caja.cx < 0.72 && caja.cy > 0.15 && caja.cy < 0.85;
+  const tamanoOk = caja.w > 0.18 && caja.w < 0.62;
+  return { alineado: centrada && tamanoOk, caja };
+}
+
+async function prepararDeteccionEnVivo() {
+  const { FaceLandmarker, landmarker } = await landmarkerEnModo("VIDEO");
+  return {
+    FaceLandmarker,
+    detectar(videoEl) {
+      const resultado = landmarker.detectForVideo(videoEl, performance.now());
+      if (!resultado.faceLandmarks || !resultado.faceLandmarks.length) return null;
+      return evaluarAlineacion(resultado.faceLandmarks[0], FaceLandmarker);
+    },
+  };
 }
 
 function dibujarMapaAnatomico(ctx, img, lm, FaceLandmarker) {
