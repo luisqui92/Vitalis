@@ -75,10 +75,11 @@ function tabEstudiosHtml(estudios) {
         ${MEDICO_TIPO_ESPECIALIDAD === "estetica" ? `<button type="button" class="secondary" id="btnSesionFacial" style="margin-top:6px">🎥 Sesión guiada (los 5 ángulos)</button>` : ""}
       </div>
 
-      <label class="file-label" for="estArchivo" style="margin-top:10px">📎 Elegir imagen o PDF</label>
-      <input type="file" id="estArchivo" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" style="display:none">
+      <label class="file-label" for="estArchivo" style="margin-top:10px">📎 Elegir imagen(es) o PDF</label>
+      <input type="file" id="estArchivo" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
       <div id="estArchivoNombre" class="hint"></div>
       <div id="estArchivoPreview" style="display:none;margin-top:8px"></div>
+      <div id="estArchivoMultiple" style="display:none;margin-top:10px"></div>
       <div id="estErr"></div>
       <button class="secondary" id="btnSubirEstudio">⬆️ Subir</button>
     </div>
@@ -103,14 +104,17 @@ function wireTabEstudios(p, estudios) {
   let anguloElegido = null;
   let ladoOjoElegido = null;
   let previewUrl = null;
+  let archivosMultiples = []; // [{file, angulo, url}] cuando se eligen 2+ de una — cada foto puede ser de un ángulo distinto
   const inputArchivo = document.getElementById("estArchivo");
   const nombreArchivoEl = document.getElementById("estArchivoNombre");
   const previewEl = document.getElementById("estArchivoPreview");
+  const multipleEl = document.getElementById("estArchivoMultiple");
   const tipoSelect = document.getElementById("estTipo");
   const anguloBox = document.getElementById("estAnguloBox");
 
   function actualizarVisibilidadAngulo() {
     anguloBox.style.display = tipoSelect.value === "foto" ? "block" : "none";
+    if (archivosMultiples.length > 0) pintarSeleccionMultiple();
   }
   tipoSelect.onchange = actualizarVisibilidadAngulo;
   actualizarVisibilidadAngulo();
@@ -143,7 +147,94 @@ function wireTabEstudios(p, estudios) {
     }
   }
 
-  inputArchivo.onchange = (e) => setArchivoSeleccionado(e.target.files[0] || null);
+  function limpiarSeleccionMultiple() {
+    archivosMultiples.forEach(a => a.url && URL.revokeObjectURL(a.url));
+    archivosMultiples = [];
+    multipleEl.innerHTML = "";
+    multipleEl.style.display = "none";
+  }
+
+  function pintarSeleccionMultiple() {
+    const necesitaAngulo = tipoSelect.value === "foto";
+    multipleEl.style.display = "block";
+    multipleEl.innerHTML = `
+      <div class="hint">${archivosMultiples.length} archivos elegidos${necesitaAngulo ? " — asignale un ángulo a cada uno" : ""}</div>
+      ${archivosMultiples.map((a, i) => `
+        <div class="item" style="display:flex;gap:10px;align-items:center;padding:8px 10px;margin-top:6px">
+          ${a.url
+            ? `<img src="${a.url}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;flex-shrink:0">`
+            : `<div style="width:52px;height:52px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);border:1px solid var(--border);border-radius:6px">PDF</div>`}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.file.name)}</div>
+            ${necesitaAngulo ? `
+            <select data-multi-angulo="${i}" style="margin-top:4px">
+              <option value="">— Elegí el ángulo —</option>
+              ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<option value="${k}" ${a.angulo === k ? "selected" : ""}>${l}</option>`).join("")}
+            </select>` : ""}
+          </div>
+        </div>`).join("")}
+      <button type="button" class="primary" id="btnSubirMultiples" style="margin-top:10px">⬆️ Subir las ${archivosMultiples.length} fotos</button>`;
+    multipleEl.querySelectorAll("[data-multi-angulo]").forEach(sel => {
+      sel.onchange = () => { archivosMultiples[Number(sel.dataset.multiAngulo)].angulo = sel.value || null; };
+    });
+    document.getElementById("btnSubirMultiples").onclick = subirSeleccionMultiple;
+  }
+
+  // Sube cada archivo con su propio ángulo (si aplica); si alguno falla las
+  // demás igual quedan guardadas — el médico solo repite el que faltó.
+  async function subirSeleccionMultiple() {
+    const errBox = document.getElementById("estErr");
+    errBox.innerHTML = "";
+    const tipo = tipoSelect.value;
+    const fecha = document.getElementById("estFecha").value;
+    if (!fecha) { errBox.innerHTML = `<div class="error">La fecha es obligatoria</div>`; return; }
+    if (tipo === "foto" && archivosMultiples.some(a => !a.angulo)) {
+      errBox.innerHTML = `<div class="error">Elegí el ángulo de cada foto antes de subir</div>`;
+      return;
+    }
+    const nombreBase = document.getElementById("estNombre").value.trim();
+    const btnMulti = document.getElementById("btnSubirMultiples");
+    btnMulti.disabled = true;
+    btnMulti.textContent = "Subiendo...";
+    let ok = 0;
+    for (const { file, angulo } of archivosMultiples) {
+      try {
+        const nombre = nombreBase || (tipo === "foto" ? "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo) : file.name);
+        let qs = "?tipo=" + encodeURIComponent(tipo) + "&nombre=" + encodeURIComponent(nombre) + "&fecha=" + encodeURIComponent(fecha);
+        if (tipo === "foto" && angulo) qs += "&anguloFoto=" + encodeURIComponent(angulo);
+        if (ladoOjoElegido) qs += "&ladoOjo=" + encodeURIComponent(ladoOjoElegido);
+        await api("/medico/pacientes/" + p._id + "/estudios" + qs, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        ok++;
+      } catch (e) { /* seguir con las demás aunque una falle */ }
+    }
+    const total = archivosMultiples.length;
+    errBox.innerHTML = ok === total
+      ? `<div class="exito">✅ Se guardaron las ${ok} fotos</div>`
+      : `<div class="error">Se guardaron ${ok} de ${total} — a las que faltan subilas de nuevo</div>`;
+    limpiarSeleccionMultiple();
+    setTimeout(() => renderPacienteDetalle(p._id, "estudios"), 900);
+  }
+
+  inputArchivo.onchange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length <= 1) {
+      limpiarSeleccionMultiple();
+      setArchivoSeleccionado(files[0] || null);
+      return;
+    }
+    // Selección múltiple: cada foto puede necesitar un ángulo distinto, así
+    // que en vez de subir de una, se arma una lista para asignarlos.
+    setArchivoSeleccionado(null);
+    archivosMultiples = files.map(file => ({
+      file, angulo: null,
+      url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+    }));
+    pintarSeleccionMultiple();
+  };
 
   const btnSubir = document.getElementById("btnSubirEstudio");
 
