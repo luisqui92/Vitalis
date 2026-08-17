@@ -58,9 +58,18 @@ module.exports = function (app) {
     const libre = await horarioSigueLibre(medicoPhone, fecha, medico.duracionConsultaMinutos || 30);
     if (!libre) throw new ErrorHttp(409, "Ups, ese horario se acaba de ocupar. Elegí otro.");
 
-    const cita = await crearCitaConfirmada({
-      medicoPhone, medico, pacienteTelefono: numero, pacienteNombre, fecha, motivo, origen: "whatsapp_web",
-    });
+    let cita;
+    try {
+      cita = await crearCitaConfirmada({
+        medicoPhone, medico, pacienteTelefono: numero, pacienteNombre, fecha, motivo, origen: "whatsapp_web",
+      });
+    } catch (e) {
+      // crearCitaConfirmada revalida por su cuenta (más cerca del guardado
+      // real que la revisión de arriba) — si perdió la carrera contra otra
+      // reserva casi simultánea, cae acá en vez de un 500 genérico.
+      if (e.horarioOcupado) throw new ErrorHttp(409, "Ups, ese horario se acaba de ocupar. Elegí otro.");
+      throw e;
+    }
 
     const primerNombre = pacienteNombre.split(" ")[0];
     enviarTexto(jid, `✅ ${primerNombre}, tu cita con ${medico.nombre} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)

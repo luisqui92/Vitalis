@@ -425,6 +425,15 @@ const citaSchema = new mongoose.Schema({
   googleEventId: { type: String, default: null }, // id del evento en Google Calendar, para poder editarlo/cancelarlo
 }, { timestamps: true });
 citaSchema.index({ medicoPhone: 1, fecha: 1 });
+// Índice adicional aparte (nombre propio para no chocar con el de arriba,
+// que ya puede existir en producción con otras opciones): entre citas
+// CONFIRMADAS no permite dos con el mismo médico+horario exacto — último
+// resguardo real (a nivel de base) contra reservar el mismo horario dos
+// veces si dos pedidos llegan casi al mismo tiempo (ver services/crearCita.js).
+citaSchema.index(
+  { medicoPhone: 1, fecha: 1 },
+  { unique: true, partialFilterExpression: { estado: "confirmada" }, name: "cita_slot_confirmada_unico" }
+);
 const Cita = mongoose.model("Cita", citaSchema);
 
 // Estado de la conversación de reserva por WhatsApp, por número de paciente

@@ -130,7 +130,29 @@ module.exports = function (app) {
           consulta.notaClinicaEstado = "error";
           consulta.notaClinicaError = e.message;
         }
-        await consulta.save();
+        // Guardado defensivo: aparte de sanearNota() en notaClinica.js, si
+        // por lo que sea el documento igual queda con algo que Mongo no
+        // puede castear, que se pierda SOLO la nota clínica de esta
+        // consulta (nunca el resto del servidor). Antes esto podía tirar
+        // el mismo CastError de nuevo en el .catch de abajo — como esa
+        // segunda falla no la agarraba nadie, tumbaba el proceso entero
+        // para todos los médicos, no solo a esta consulta.
+        try {
+          await consulta.save();
+        } catch (e) {
+          log.error("[NOTA_CLINICA] No se pudo guardar la nota clínica generada (dato inesperado de la IA):", e.message);
+          // OJO: reasignar consulta.notaClinica = undefined y volver a
+          // guardar ESTE MISMO documento en memoria NO alcanza — Mongoose
+          // deja la ruta inválida marcada adentro del subdocumento y el
+          // segundo consulta.save() revienta con el mismo CastError
+          // (comprobado). Un update directo a la base, en cambio, no
+          // arrastra ese estado inválido en memoria.
+          await ConsultaMedica.updateOne(
+            { _id: consulta._id },
+            { $unset: { notaClinica: 1 }, $set: { notaClinicaEstado: "error", notaClinicaError: "No se pudo guardar la nota clínica (formato inesperado)." } }
+          ).catch(e2 => log.error("[NOTA_CLINICA] Tampoco se pudo guardar el estado de error:", e2.message));
+          consulta.notaClinicaEstado = "error"; // para que el chequeo de brief clínico de abajo no dispare con datos corruptos
+        }
 
         if (consulta.notaClinicaEstado === "completado") {
           regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
@@ -140,7 +162,7 @@ module.exports = function (app) {
         log.error("[CONSULTA_MEDICA] Error transcribiendo:", e.response?.data || e.message);
         consulta.estado = "error";
         consulta.error = e.response?.data?.error || e.message;
-        await consulta.save();
+        await consulta.save().catch(e2 => log.error("[CONSULTA_MEDICA] No se pudo guardar el estado de error:", e2.message));
       });
   }));
 

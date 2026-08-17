@@ -160,7 +160,31 @@ async function generarNotaClinica(transcripcion, contexto) {
     }
   );
   const content = res.data.choices[0].message.content.replace(/```json|```/g, "").trim();
-  return JSON.parse(content);
+  return sanearNota(JSON.parse(content));
+}
+
+// La IA a veces no respeta el formato pedido en el prompt para los dos
+// campos que después se guardan en tipos estrictos de Mongo (fechaHora es
+// Date, piezaFdi es Number) — ej. deja la fecha en texto libre en vez de
+// resolverla, o repite "primera muela" en vez de un número. Si eso se
+// guarda tal cual, el .save() de la consulta revienta con un CastError que
+// ni el propio manejo de errores puede recuperar (el documento queda con
+// el valor inválido pegado). Mejor limpiarlo acá, con la IA todavía fresca
+// en el flujo, que descubrirlo como un 500 en producción.
+function sanearNota(nota) {
+  if (nota?.reconsultaSugerida?.fechaHora) {
+    const d = new Date(nota.reconsultaSugerida.fechaHora);
+    if (isNaN(d.getTime())) nota.reconsultaSugerida.fechaHora = null;
+  }
+  if (Array.isArray(nota?.tratamientosSugeridos)) {
+    for (const t of nota.tratamientosSugeridos) {
+      if (t && t.piezaFdi !== null && t.piezaFdi !== undefined) {
+        const n = Number(t.piezaFdi);
+        t.piezaFdi = Number.isFinite(n) ? n : null;
+      }
+    }
+  }
+  return nota;
 }
 
 module.exports = { generarNotaClinica };

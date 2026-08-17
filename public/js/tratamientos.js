@@ -53,7 +53,7 @@ function pintarPlan(pacienteId, items) {
       <div class="plan-resumen">
         <div><div class="plan-resumen-num">${money(total)}</div><div class="plan-resumen-lbl">Total</div></div>
         <div><div class="plan-resumen-num" style="color:var(--success)">${money(pagado)}</div><div class="plan-resumen-lbl">Pagado</div></div>
-        <div><div class="plan-resumen-num" style="color:${saldo > 0 ? "var(--danger)" : "var(--success)"}">${money(saldo)}</div><div class="plan-resumen-lbl">Saldo</div></div>
+        <div><div class="plan-resumen-num" style="color:${saldo > 0 ? "var(--danger)" : saldo < 0 ? "var(--warning)" : "var(--success)"}">${money(saldo)}</div><div class="plan-resumen-lbl">Saldo</div></div>
       </div>
       <button class="secondary" id="btnAgregarTratamiento">➕ Agregar tratamiento</button>
       <button class="link" id="btnGestionarCatalogo">⚙️ Gestionar catálogo de precios</button>
@@ -87,7 +87,7 @@ function itemPlanHtml(item) {
         <div class="nombre">${esc(item.nombre)}${item.piezaFdi ? ` — pieza ${item.piezaFdi}` : item.regionFacial ? ` — ${esc(item.regionFacial)}` : ""}</div>
         <span class="badge ${info.clase}">${info.label}</span>
       </div>
-      <div class="paciente-info">${money(item.precio)}${pagado > 0 ? ` · pagado ${money(pagado)} · saldo ${money(saldo)}` : ""}</div>
+      <div class="paciente-info">${money(item.precio)}${pagado > 0 ? ` · pagado ${money(pagado)} · ${saldo < 0 ? `<span style="color:var(--warning)">pagó de más: ${money(-saldo)}</span>` : `saldo ${money(saldo)}`}` : ""}</div>
       ${item.notas ? `<div class="preview">${esc(item.notas)}</div>` : ""}
     </div>
     <div id="det_${item._id}" class="card" style="display:none;margin-top:-4px">

@@ -164,10 +164,23 @@ async function pedirNombre(numero, textoOriginal, datos) {
 async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
   const motivo = textoOriginal.trim().toLowerCase() === "ninguno" ? "" : textoOriginal.trim();
 
-  const cita = await crearCitaConfirmada({
-    medicoPhone, medico, pacienteTelefono: numero, pacienteNombre: datos.pacienteNombre,
-    fecha: new Date(datos.horaElegida), motivo, origen: "whatsapp",
-  });
+  let cita;
+  try {
+    cita = await crearCitaConfirmada({
+      medicoPhone, medico, pacienteTelefono: numero, pacienteNombre: datos.pacienteNombre,
+      fecha: new Date(datos.horaElegida), motivo, origen: "whatsapp",
+    });
+  } catch (e) {
+    // Entre que se eligió el horario (elegirHora) y este paso pasaron varios
+    // mensajes (nombre, motivo) — si alguien más se lo llevó mientras tanto,
+    // crearCitaConfirmada lo revalida y cae acá en vez de cortar la
+    // conversación con un error sin respuesta (ver services/baileysWhatsapp.js).
+    if (e.horarioOcupado) {
+      await limpiarSesion(numero);
+      return "Ups, justo se ocupó ese horario mientras conversábamos. Escribí cualquier cosa para volver a ver los horarios disponibles.";
+    }
+    throw e;
+  }
 
   await limpiarSesion(numero);
   return `✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" en cualquier momento.`;

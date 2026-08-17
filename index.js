@@ -9,6 +9,16 @@ const app = express();
 const { CONFIG, log, validateConfig } = require("./config");
 validateConfig();
 
+// Última red de contención: los trabajos en segundo plano (transcripción,
+// nota clínica por IA, WhatsApp) ya deberían atajar sus propios errores,
+// pero si algún caso se escapa, Node por defecto tumba TODO el proceso ante
+// una promesa rechazada sin catch — eso apaga Vitalis para todos los
+// médicos por un solo trabajo de fondo que falló. Mejor perder ese trabajo
+// puntual (y que quede en el log para revisar) que el servidor entero.
+process.on("unhandledRejection", (err) => {
+  log.error("[UNHANDLED_REJECTION]", err?.stack || err?.message || err);
+});
+
 // Detrás de nginx (reverse proxy) — sin esto, Express ve todo como si
 // viniera de 127.0.0.1 y cosas como el rate limiting por IP real (X-Forwarded-For) no funcionan.
 app.set("trust proxy", 1);
