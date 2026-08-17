@@ -77,6 +77,7 @@ function tabEstudiosHtml(estudios) {
       <label class="file-label" for="estArchivo" style="margin-top:10px">📎 Elegir imagen o PDF</label>
       <input type="file" id="estArchivo" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" style="display:none">
       <div id="estArchivoNombre" class="hint"></div>
+      <div id="estArchivoPreview" style="display:none;margin-top:8px"></div>
       <div id="estErr"></div>
       <button class="secondary" id="btnSubirEstudio">⬆️ Subir</button>
     </div>
@@ -100,8 +101,10 @@ function wireTabEstudios(p, estudios) {
   let archivoSeleccionado = null;
   let anguloElegido = null;
   let ladoOjoElegido = null;
+  let previewUrl = null;
   const inputArchivo = document.getElementById("estArchivo");
   const nombreArchivoEl = document.getElementById("estArchivoNombre");
+  const previewEl = document.getElementById("estArchivoPreview");
   const tipoSelect = document.getElementById("estTipo");
   const anguloBox = document.getElementById("estAnguloBox");
 
@@ -128,24 +131,26 @@ function wireTabEstudios(p, estudios) {
   function setArchivoSeleccionado(file, nombreVisible) {
     archivoSeleccionado = file;
     nombreArchivoEl.textContent = file ? "Archivo: " + (nombreVisible || file.name) : "";
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    if (file && file.type.startsWith("image/")) {
+      previewUrl = URL.createObjectURL(file);
+      previewEl.innerHTML = `<img src="${previewUrl}" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--border);display:block">`;
+      previewEl.style.display = "block";
+    } else {
+      previewEl.innerHTML = "";
+      previewEl.style.display = "none";
+    }
   }
 
   inputArchivo.onchange = (e) => setArchivoSeleccionado(e.target.files[0] || null);
 
-  const btnFotoGuiada = document.getElementById("btnFotoGuiada");
-  if (btnFotoGuiada) {
-    btnFotoGuiada.onclick = () => {
-      abrirCamaraGuiada(anguloElegido, (blob, angulo) => {
-        setArchivoSeleccionado(new File([blob], "foto-" + angulo + ".jpg", { type: "image/jpeg" }), "foto tomada ahora");
-        if (!document.getElementById("estNombre").value.trim()) {
-          document.getElementById("estNombre").value = "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo);
-        }
-      });
-    };
-  }
-
   const btnSubir = document.getElementById("btnSubirEstudio");
-  btnSubir.onclick = async () => {
+
+  // Compartida entre el botón manual "Subir" y la foto guiada por cámara —
+  // esta última la llama sola apenas el médico confirma "Usar esta foto",
+  // para que capturar y guardar sea un solo paso sin depender de que se
+  // acuerde de tocar "Subir" después.
+  async function subirEstudioActual() {
     const errBox = document.getElementById("estErr");
     errBox.innerHTML = "";
     const nombre = document.getElementById("estNombre").value.trim();
@@ -166,13 +171,30 @@ function wireTabEstudios(p, estudios) {
         headers: { "Content-Type": archivoSeleccionado.type || "application/octet-stream" },
         body: archivoSeleccionado,
       });
-      renderPacienteDetalle(p._id, "estudios");
+      errBox.innerHTML = `<div class="exito">✅ Estudio guardado</div>`;
+      setTimeout(() => renderPacienteDetalle(p._id, "estudios"), 800);
     } catch (e) {
       btnSubir.disabled = false;
       btnSubir.textContent = "⬆️ Subir";
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo subir el archivo")}</div>`;
     }
-  };
+  }
+  btnSubir.onclick = subirEstudioActual;
+
+  const btnFotoGuiada = document.getElementById("btnFotoGuiada");
+  if (btnFotoGuiada) {
+    btnFotoGuiada.onclick = () => {
+      abrirCamaraGuiada(anguloElegido, (blob, angulo) => {
+        anguloElegido = angulo;
+        document.querySelectorAll("#estAnguloChips [data-angulo]").forEach(b => b.classList.toggle("activo", b.dataset.angulo === angulo));
+        setArchivoSeleccionado(new File([blob], "foto-" + angulo + ".jpg", { type: "image/jpeg" }), "foto tomada ahora");
+        if (!document.getElementById("estNombre").value.trim()) {
+          document.getElementById("estNombre").value = "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo);
+        }
+        subirEstudioActual();
+      });
+    };
+  }
 
   document.querySelectorAll("[data-ver-estudio]").forEach(el => {
     el.onclick = () => abrirArchivoEstudio(el.dataset.verEstudio);
@@ -228,26 +250,37 @@ function guiaSvgPara(angulo) {
   // "perfil_izquierdo" / "angulo45_izquierda" reusan el mismo dibujo que su
   // versión derecha, solo espejado — así no hay que dibujar cada guía dos veces.
   const espejado = angulo.includes("izquierd");
-  let interior;
+  const formaPerfil = "M 190 90 Q 230 100 232 150 Q 234 180 250 195 Q 235 205 232 215 Q 236 235 220 245 Q 224 260 205 268 L 195 300 Q 190 330 180 350 L 130 350 L 130 90 Z";
+  let interior, mascara;
   if (angulo.startsWith("perfil")) {
     interior = `
-      <path d="M 190 90 Q 230 100 232 150 Q 234 180 250 195 Q 235 205 232 215 Q 236 235 220 245 Q 224 260 205 268 L 195 300 Q 190 330 180 350 L 130 350 L 130 90 Z"
-            fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
+      <path d="${formaPerfil}" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 5"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>`;
+    mascara = `<path d="${formaPerfil}" fill="#000"/>`;
   } else if (angulo.startsWith("angulo45") || angulo === "tres_cuartos") {
     interior = `
-      <ellipse cx="160" cy="190" rx="95" ry="130" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
+      <ellipse cx="160" cy="190" rx="95" ry="130" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 5"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
       <line x1="185" y1="70" x2="185" y2="310" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>`;
+    mascara = `<ellipse cx="160" cy="190" rx="95" ry="130" fill="#000"/>`;
   } else {
     // frontal (default)
     interior = `
-      <ellipse cx="150" cy="190" rx="90" ry="130" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="6 5" opacity="0.85"/>
+      <ellipse cx="150" cy="190" rx="90" ry="130" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 5"/>
       <line x1="0" y1="170" x2="300" y2="170" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.5"/>
       <line x1="150" y1="60" x2="150" y2="320" stroke="#fff" stroke-width="1" stroke-dasharray="3 6" opacity="0.4"/>`;
+    mascara = `<ellipse cx="150" cy="190" rx="90" ry="130" fill="#000"/>`;
   }
-  const grupo = espejado ? `<g transform="scale(-1,1) translate(-300,0)">${interior}</g>` : interior;
-  return `<svg viewBox="0 0 300 400" width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none">${grupo}</svg>`;
+  const idMascara = "mascaraGuia" + Math.random().toString(36).slice(2, 8);
+  // El rectángulo oscuro fuera del óvalo/silueta (recortado con una máscara)
+  // hace que la zona a encuadrar salte a la vista de inmediato, en vez de
+  // depender solo de una línea punteada tenue sobre el video en vivo.
+  const grupo = `
+    <defs><mask id="${idMascara}"><rect width="300" height="400" fill="#fff"/>${mascara}</mask></defs>
+    <rect width="300" height="400" fill="rgba(0,0,0,.5)" mask="url(#${idMascara})"/>
+    ${interior}`;
+  const contenido = espejado ? `<g transform="scale(-1,1) translate(-300,0)">${grupo}</g>` : grupo;
+  return `<svg viewBox="0 0 300 400" width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none">${contenido}</svg>`;
 }
 
 async function abrirCamaraGuiada(anguloInicial, onCapturada) {
@@ -255,24 +288,40 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed;inset:0;background:#000;z-index:999;display:flex;flex-direction:column;";
   overlay.innerHTML = `
-    <div style="flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
+    <div id="camVista" style="flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
       <video id="camVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
       <div id="camGuia" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${guiaSvgPara(angulo)}</div>
-      <div class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000">Alineá la cara con la guía</div>
+      <div class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">Alineá la cara con la guía</div>
+    </div>
+    <div id="camRevision" style="flex:1;position:relative;overflow:hidden;display:none;align-items:center;justify-content:center;background:#000">
+      <img id="camFotoTomada" style="max-width:100%;max-height:100%;object-fit:contain">
+      <div class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">¿Quedó bien la foto?</div>
     </div>
     <div style="padding:14px;background:#111">
       <div class="chip-row" id="camAnguloChips" style="justify-content:center;margin-bottom:10px">
         ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<button type="button" class="chip ${k === angulo ? "activo" : ""}" data-cam-angulo="${k}">${l}</button>`).join("")}
       </div>
-      <div style="display:flex;gap:10px">
+      <div style="display:flex;gap:10px" id="camBotonesCaptura">
         <button class="secondary" id="btnCamCancelar" style="flex:1">Cancelar</button>
         <button class="primary" id="btnCamCapturar" style="flex:1">📸 Capturar</button>
+      </div>
+      <div style="display:none;gap:10px" id="camBotonesRevision">
+        <button class="secondary" id="btnCamRepetir" style="flex:1">🔄 Repetir</button>
+        <button class="primary" id="btnCamUsar" style="flex:1">✅ Usar esta foto</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
 
   const video = overlay.querySelector("#camVideo");
+  const vistaCamara = overlay.querySelector("#camVista");
+  const vistaRevision = overlay.querySelector("#camRevision");
+  const imgTomada = overlay.querySelector("#camFotoTomada");
+  const anguloChips = overlay.querySelector("#camAnguloChips");
+  const botonesCaptura = overlay.querySelector("#camBotonesCaptura");
+  const botonesRevision = overlay.querySelector("#camBotonesRevision");
   let stream = null;
+  let blobCapturado = null;
+  let urlCapturada = null;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
     video.srcObject = stream;
@@ -284,7 +333,16 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
 
   function cerrar() {
     if (stream) stream.getTracks().forEach(t => t.stop());
+    if (urlCapturada) URL.revokeObjectURL(urlCapturada);
     overlay.remove();
+  }
+
+  function volverACamara() {
+    vistaCamara.style.display = "flex";
+    vistaRevision.style.display = "none";
+    anguloChips.style.display = "flex";
+    botonesCaptura.style.display = "flex";
+    botonesRevision.style.display = "none";
   }
 
   overlay.querySelectorAll("[data-cam-angulo]").forEach(btn => {
@@ -301,9 +359,24 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
     canvas.toBlob((blob) => {
-      cerrar();
-      if (blob) onCapturada(blob, angulo);
+      if (!blob) return;
+      blobCapturado = blob;
+      if (urlCapturada) URL.revokeObjectURL(urlCapturada);
+      urlCapturada = URL.createObjectURL(blob);
+      imgTomada.src = urlCapturada;
+      vistaCamara.style.display = "none";
+      vistaRevision.style.display = "flex";
+      anguloChips.style.display = "none";
+      botonesCaptura.style.display = "none";
+      botonesRevision.style.display = "flex";
     }, "image/jpeg", 0.92);
+  };
+  overlay.querySelector("#btnCamRepetir").onclick = volverACamara;
+  overlay.querySelector("#btnCamUsar").onclick = () => {
+    const blob = blobCapturado;
+    const anguloFinal = angulo;
+    cerrar();
+    onCapturada(blob, anguloFinal);
   };
 }
 
