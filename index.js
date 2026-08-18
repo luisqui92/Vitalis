@@ -78,6 +78,7 @@ require("./routes/recetas")(app);
 require("./routes/recordatorios")(app);
 require("./routes/citas")(app);
 require("./routes/whatsappSalud")(app);
+require("./routes/vapi")(app);
 require("./routes/vinculacion")(app);
 require("./routes/reservaPublica")(app);
 

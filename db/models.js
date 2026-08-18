@@ -445,7 +445,7 @@ const citaSchema = new mongoose.Schema({
   duracionMinutos: { type: Number, default: 30 },
   motivo: { type: String, default: "" },
   estado: { type: String, enum: ["confirmada", "cancelada", "completada"], default: "confirmada" },
-  origen: { type: String, enum: ["whatsapp", "whatsapp_web", "manual"], default: "manual" },
+  origen: { type: String, enum: ["whatsapp", "whatsapp_web", "manual", "voz"], default: "manual" },
   googleEventId: { type: String, default: null }, // id del evento en Google Calendar, para poder editarlo/cancelarlo
 }, { timestamps: true });
 citaSchema.index({ medicoPhone: 1, fecha: 1 });

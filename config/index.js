@@ -19,6 +19,13 @@ const CONFIG = {
   // controlada (no rompen el resto de la app).
   SALUD_WHATSAPP_MEDICO_PHONE: process.env.SALUD_WHATSAPP_MEDICO_PHONE || "",
   GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "",
+
+  // Recepcionista de voz (Vapi): secreto compartido para verificar que un
+  // webhook de /vapi/webhook/:medicoPhone realmente viene de Vapi (se
+  // configura igual en el dashboard de Vapi, como credencial del Server
+  // URL) — sin esto, cualquiera que adivine la URL podría agendar/cancelar
+  // citas a nombre de un paciente.
+  VAPI_SERVER_SECRET: process.env.VAPI_SERVER_SECRET || "",
 };
 
 // ─── LOGGER ────────────────────────────────────────────────────────────────
@@ -45,7 +52,7 @@ function validateConfig() {
   // revienta en el primer login/request autenticado con un error críptico en
   // vez de fallar limpio al arrancar.
   const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
-  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 
