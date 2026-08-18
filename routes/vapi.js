@@ -20,38 +20,75 @@ const HERRAMIENTAS = {
   cancelar_cita: cancelarCita,
 };
 
+// Confirma el secreto compartido, y devuelve el medicoPhone a usar (o null
+// en modo súper número, para que services/vapiHerramientas.js lo resuelva
+// por especialidad) — compartido entre las dos formas de conectar Vapi de
+// abajo (el webhook de "función" clásico, y la herramienta "Solicitud de
+// API" que es la que ofrece el dashboard actual de Vapi).
+async function autorizarYResolverMedico(req, res) {
+  if (!CONFIG.VAPI_SERVER_SECRET) {
+    log.error("[VAPI] VAPI_SERVER_SECRET no configurado — rechazando webhook");
+    res.status(503).json({ error: "No configurado" });
+    return null;
+  }
+  const secretoRecibido = req.get("x-vapi-secret") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (secretoRecibido !== CONFIG.VAPI_SERVER_SECRET) {
+    res.status(401).json({ error: "No autorizado" });
+    return null;
+  }
+
+  const paramMedicoPhone = String(req.params.medicoPhone || "").trim();
+  if (paramMedicoPhone === "super") {
+    if (!CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length) {
+      res.status(503).json({ error: "Súper número no configurado" });
+      return null;
+    }
+    return { medicoPhone: null };
+  }
+  const medico = await Medico.findOne({ phone: paramMedicoPhone, activo: true }).select("_id").lean();
+  if (!medico) {
+    res.status(404).json({ error: "Consultorio no encontrado" });
+    return null;
+  }
+  return { medicoPhone: paramMedicoPhone };
+}
+
 module.exports = function (app) {
-  // Cada médico/consultorio tiene su propio Assistant en Vapi, configurado
-  // con esta URL (con SU teléfono en la ruta) como Server URL — salvo el
-  // "súper número" (/vapi/webhook/super), que atiende a TODOS los
-  // consultorios de WHATSAPP_ESPECIALIDADES_MEDICOS: ahí el asistente
-  // pregunta la especialidad primero y la manda como argumento en cada
-  // herramienta (ver services/vapiHerramientas.js), en vez de tener un
-  // médico fijo en la URL.
+  // ─── "Solicitud de API" (el tipo de herramienta que ofrece hoy el
+  // dashboard de Vapi): una URL por herramienta, cuerpo JSON plano de
+  // entrada y de salida — sin ningún envoltorio. El teléfono de quien
+  // llama se manda como campo estático de la herramienta en Vapi
+  // ({{customer.number}} → pacienteTelefono), no hace falta extraerlo acá.
+  app.post("/vapi/api-tool/:medicoPhone/:herramienta", async (req, res) => {
+    try {
+      const resuelto = await autorizarYResolverMedico(req, res);
+      if (!resuelto) return; // ya mandó la respuesta de error
+
+      const handler = HERRAMIENTAS[req.params.herramienta];
+      if (!handler) return res.status(404).json({ error: "Herramienta desconocida" });
+
+      const resultado = await handler(resuelto.medicoPhone, req.body || {}).catch(e => {
+        log.error("[VAPI api-tool]", req.params.herramienta, e.message);
+        return "Hubo un problema técnico procesando esto — pedile disculpas y sugerile que llame de nuevo en un momento, o que se comunique directo con la clínica.";
+      });
+      res.json({ resultado });
+    } catch (e) {
+      log.error("[VAPI api-tool]", e.message);
+      res.status(500).json({ error: "Error interno" });
+    }
+  });
+
+  // ─── Webhook de "función" clásico (docs.vapi.ai/tools/custom-tools) —
+  // se deja andando por si en algún momento se configura una tool así vía
+  // la API/JSON de Vapi en vez del dashboard, aunque hoy el dashboard solo
+  // ofrece "Solicitud de API" (la ruta de arriba). Cada médico/consultorio
+  // usa esta URL con SU teléfono en la ruta, o "super" para el modo de
+  // varias especialidades.
   app.post("/vapi/webhook/:medicoPhone", async (req, res) => {
     try {
-      // Sin secreto configurado no hay forma segura de confirmar que esto
-      // viene de Vapi y no de cualquiera que adivine la URL — mejor
-      // rechazar todo que dejar la agenda del consultorio abierta.
-      if (!CONFIG.VAPI_SERVER_SECRET) {
-        log.error("[VAPI] VAPI_SERVER_SECRET no configurado — rechazando webhook");
-        return res.status(503).json({ error: "No configurado" });
-      }
-      const secretoRecibido = req.get("x-vapi-secret") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
-      if (secretoRecibido !== CONFIG.VAPI_SERVER_SECRET) {
-        return res.status(401).json({ error: "No autorizado" });
-      }
-
-      const paramMedicoPhone = String(req.params.medicoPhone || "").trim();
-      const esSuperNumero = paramMedicoPhone === "super";
-      let medicoPhone = null;
-      if (esSuperNumero) {
-        if (!CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length) return res.status(503).json({ error: "Súper número no configurado" });
-      } else {
-        const medico = await Medico.findOne({ phone: paramMedicoPhone, activo: true }).select("_id").lean();
-        if (!medico) return res.status(404).json({ error: "Consultorio no encontrado" });
-        medicoPhone = paramMedicoPhone;
-      }
+      const resuelto = await autorizarYResolverMedico(req, res);
+      if (!resuelto) return;
+      const medicoPhone = resuelto.medicoPhone;
 
       const msg = req.body?.message;
       if (msg?.type !== "tool-calls") {
