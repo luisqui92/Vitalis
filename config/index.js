@@ -1,5 +1,12 @@
 // Vitalis — Config y Logger
 
+// Sin esto, un .env en el servidor es solo un archivo de texto sin efecto —
+// las variables de entorno tienen que venir sí o sí del entorno real del
+// proceso (systemd, el ecosystem de PM2, o exportadas a mano en la shell).
+// Con dotenv, .env también sirve — y nunca pisa una variable que ya venga
+// puesta por afuera (esa es la prioridad por defecto del paquete).
+require("dotenv").config();
+
 const CONFIG = {
   OPENAI_KEY: process.env.OPENAI_KEY,
   ASSEMBLYAI_API_KEY: process.env.ASSEMBLYAI_API_KEY,
