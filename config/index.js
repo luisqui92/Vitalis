@@ -20,6 +20,16 @@ const CONFIG = {
   SALUD_WHATSAPP_MEDICO_PHONE: process.env.SALUD_WHATSAPP_MEDICO_PHONE || "",
   GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "",
 
+  // WhatsApp de reservas — API oficial de Meta (reemplaza a Baileys/QR).
+  // WHATSAPP_TOKEN: token de acceso (Meta → tu app → WhatsApp → API Setup).
+  // WHATSAPP_PHONE_NUMBER_ID: el ID interno del número (no el número en sí).
+  // WHATSAPP_VERIFY_TOKEN: string que vos definís, y se configura IGUAL del
+  // lado de Meta al guardar la Callback URL — confirma que la verificación
+  // del webhook la está pidiendo realmente Meta.
+  WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN || "",
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+  WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || "",
+
   // Recepcionista de voz (Vapi): secreto compartido para verificar que un
   // webhook de /vapi/webhook/:medicoPhone realmente viene de Vapi (se
   // configura igual en el dashboard de Vapi, como credencial del Server
@@ -52,7 +62,7 @@ function validateConfig() {
   // revienta en el primer login/request autenticado con un error críptico en
   // vez de fallar limpio al arrancar.
   const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
-  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 

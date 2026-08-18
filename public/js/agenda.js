@@ -1,7 +1,7 @@
 // Vitalis — Agenda: citas del médico (manuales + las que llegan solas por
 // WhatsApp), y configuración del horario de atención / calendario de Google.
 
-const ORIGEN_ICONO = { whatsapp: "💬", manual: "🖊️" };
+const ORIGEN_ICONO = { whatsapp: "💬", whatsapp_web: "💬", manual: "🖊️", voz: "📞" };
 const DIAS_SEMANA_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 async function renderAgenda() {
@@ -28,23 +28,11 @@ function whatsappCardHtml(wa) {
         <div class="hint">Todavía no está configurado. Podés seguir usando la Agenda a mano mientras tanto.</div>
       </div>`;
   }
-  if (wa.conectado) {
-    return `
-      <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">💬 WhatsApp de reservas</div>
-        <div class="hint" style="color:var(--success)">✅ Conectado — los pacientes ya pueden reservar por WhatsApp.</div>
-        <button class="link" id="btnReiniciarWA" style="color:var(--danger)">Vincular otro número</button>
-      </div>`;
-  }
-  if (wa.qr) {
-    return `
-      <div class="card" style="text-align:center">
-        <div class="seccion-titulo" style="margin-top:0;text-align:left">💬 WhatsApp de reservas</div>
-        <div class="hint" style="margin-bottom:10px">Escaneá este código con el WhatsApp que vas a usar para las reservas: abrí WhatsApp → Dispositivos vinculados → Vincular un dispositivo.</div>
-        <img src="${wa.qr}" style="width:220px;max-width:100%;border-radius:8px">
-      </div>`;
-  }
-  return `<div class="card"><div class="seccion-titulo" style="margin-top:0">💬 WhatsApp de reservas</div><div class="hint">Conectando...</div></div>`;
+  return `
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">💬 WhatsApp de reservas</div>
+      <div class="hint" style="color:var(--success)">✅ Conectado — los pacientes ya pueden reservar por WhatsApp.</div>
+    </div>`;
 }
 
 let diaAgendaElegido = null; // "YYYY-MM-DD" — se mantiene al refrescar (guardar/cancelar cita)
@@ -224,20 +212,6 @@ function pintarAgenda(citas, pacientes, wa) {
     };
   });
 
-  const btnReiniciarWA = document.getElementById("btnReiniciarWA");
-  if (btnReiniciarWA) {
-    btnReiniciarWA.onclick = async () => {
-      if (!confirm("Esto desconecta el WhatsApp actual y vas a tener que escanear un QR nuevo. ¿Seguro?")) return;
-      await api("/medico/whatsapp/reiniciar", { method: "POST" });
-      renderAgenda();
-    };
-  }
-
-  // Mientras esté configurado pero no conectado (mostrando el QR o "Conectando..."),
-  // se refresca sola cada 5s hasta que el médico escanee.
-  if (wa && wa.configurado && !wa.conectado) {
-    pollTimeout = setTimeout(renderAgenda, 5000);
-  }
 }
 
 async function renderConfigHorario() {

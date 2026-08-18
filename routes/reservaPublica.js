@@ -10,20 +10,19 @@ const { generarToken, verificarToken } = require("../services/auth");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("../services/agenda");
 const { crearCitaConfirmada } = require("../services/crearCita");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
-const { enviarTexto } = require("../services/baileysWhatsapp");
+const { enviarTexto } = require("../services/metaWhatsapp");
 const { limitReservaPublica } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { CONFIG, log } = require("../config");
 
-// El token firma el JID completo de WhatsApp (no solo el número — ver la
-// nota en services/reservaCitas.js sobre los LID). "numero" (para guardar
-// en la cita, buscar al paciente, etc.) es la parte antes del "@"; el JID
-// entero es lo único que sirve para poder escribirle de vuelta.
+// El token firma el número de teléfono del paciente (API oficial de Meta,
+// no hace falta ninguna dirección especial para poder escribirle de vuelta
+// más adelante — a diferencia de Baileys, que a veces identificaba al
+// paciente con un LID en vez del número real).
 function datosDesdeToken(token) {
   const payload = verificarToken(token);
   if (!payload || payload.rol !== "reserva_publica") return null;
-  const jid = payload.usuario;
-  return { jid, numero: String(jid).split("@")[0] };
+  return { numero: payload.usuario };
 }
 
 module.exports = function (app) {
@@ -42,7 +41,7 @@ module.exports = function (app) {
   app.post("/reserva-publica/confirmar", limitReservaPublica, asyncRoute(async (req, res) => {
     const datos = datosDesdeToken(String(req.body?.token || ""));
     if (!datos) throw new ErrorHttp(401, "Este link venció o no es válido. Escribile de nuevo al WhatsApp del consultorio para conseguir uno nuevo.");
-    const { jid, numero } = datos;
+    const { numero } = datos;
 
     const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
     const medico = await Medico.findOne({ phone: medicoPhone, activo: true }).lean();
@@ -72,8 +71,8 @@ module.exports = function (app) {
     }
 
     const primerNombre = pacienteNombre.split(" ")[0];
-    enviarTexto(jid, `✅ ${primerNombre}, tu cita con ${medico.nombre} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)
-      .catch(e => log.error(`[RESERVA_PUBLICA] no se pudo mandar la confirmación por WhatsApp a ${jid}:`, e.message));
+    enviarTexto(numero, `✅ ${primerNombre}, tu cita con ${medico.nombre} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)
+      .catch(e => log.error(`[RESERVA_PUBLICA] no se pudo mandar la confirmación por WhatsApp a ${numero}:`, e.message));
 
     res.json({ ok: true, fecha: cita.fecha });
   }));

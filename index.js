@@ -82,10 +82,6 @@ require("./routes/vapi")(app);
 require("./routes/vinculacion")(app);
 require("./routes/reservaPublica")(app);
 
-// WhatsApp de reservas (Baileys) — corre en este mismo proceso. No hace
-// nada si no está configurado SALUD_WHATSAPP_MEDICO_PHONE.
-require("./services/baileysWhatsapp").iniciarWhatsapp().catch(e => log.error("[VITALIS_WHATSAPP]", e.message));
-
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
 

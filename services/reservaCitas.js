@@ -1,25 +1,27 @@
-// ChatGo Salud — Reserva de citas por WhatsApp: conversación guiada con
-// opciones numeradas (no IA libre) — para algo tan estructurado como elegir
-// un turno, una máquina de estados es más confiable que dejar que el
+// Vitalis — Reserva de citas por WhatsApp: conversación guiada con listas y
+// botones interactivos de la API oficial de Meta (no texto numerado — eso
+// era necesario con Baileys/texto plano, la API de Meta permite algo más
+// prolijo). Sigue siendo una máquina de estados (no IA libre): para algo
+// tan estructurado como elegir un turno, es más confiable que dejar que el
 // paciente escriba libre y una IA interprete la fecha/hora.
 const { Medico, Cita, SesionCitaWA } = require("../db/models");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
 const { eliminarEvento } = require("./googleCalendar");
 const { enrutarMensaje } = require("./asistenteWhatsapp");
 const { crearCitaConfirmada } = require("./crearCita");
-const { generarToken } = require("./auth");
 const { CONFIG, log } = require("../config");
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const DIAS_SEMANA_CORTO = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
-// Estas tres corren en el server, que en producción corre en UTC (no en
-// hora boliviana) — sin timeZone explícito, "es-BO" solo cambia el idioma
-// del formato, no convierte nada de zona horaria (error común). fechaStr ya
-// es un día boliviano (viene de services/agenda.js), así que se parsea
+// Estas corren en el server, que en producción corre en UTC (no en hora
+// boliviana) — sin timeZone explícito, "es-BO" solo cambia el idioma del
+// formato, no convierte nada de zona horaria (error común). fechaStr ya es
+// un día boliviano (viene de services/agenda.js), así que se parsea
 // forzando UTC para no volver a mezclarlo con la zona del server.
-function formatearDia(fechaStr) {
+function formatearDiaCorto(fechaStr) {
   const d = new Date(fechaStr + "T00:00:00Z");
-  return `${DIAS_SEMANA[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
+  return `${DIAS_SEMANA_CORTO[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
 }
 function formatearHora(fecha) {
   return new Date(fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/La_Paz" });
@@ -27,6 +29,12 @@ function formatearHora(fecha) {
 function formatearFechaCompleta(fecha) {
   return new Date(fecha).toLocaleString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/La_Paz" });
 }
+
+// ─── Helpers para armar la respuesta (el webhook decide con qué función de
+// services/metaWhatsapp.js mandarla, según "tipo") ────────────────────────
+function comoTexto(texto) { return { tipo: "texto", texto }; }
+function comoBotones(texto, botones) { return { tipo: "botones", texto, botones }; }
+function comoLista(texto, textoBoton, filas) { return { tipo: "lista", texto, textoBoton, filas }; }
 
 async function obtenerSesion(numero) {
   const doc = await SesionCitaWA.findOne({ numero }).lean();
@@ -39,11 +47,11 @@ async function limpiarSesion(numero) {
   await SesionCitaWA.deleteOne({ numero });
 }
 
-async function procesarMensajeEntrante(numero, texto, nombrePerfil, jid) {
+async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
   const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
-  if (!medicoPhone) return "Este número todavía no está configurado. Avisale a la clínica.";
+  if (!medicoPhone) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
   const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-  if (!medico) return "Este número todavía no está configurado. Avisale a la clínica.";
+  if (!medico) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
 
   const sesion = await obtenerSesion(numero);
   const t = texto.trim().toLowerCase();
@@ -64,19 +72,18 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil, jid) {
     case "pedir_motivo":
       return pedirMotivo(medicoPhone, numero, texto, sesion.datos, medico);
     default:
-      return manejarMensajeLibre(medicoPhone, numero, texto, medico, jid);
+      return manejarMensajeLibre(medicoPhone, numero, texto, medico);
   }
 }
 
 // Cuando el paciente está en medio de elegir día/hora o confirmar una
-// cancelación y escribe algo que NO es la opción esperada, puede ser que
-// simplemente esté preguntando algo ("¿qué días atienden?") en vez de estar
-// perdido — antes eso siempre caía en un seco "no entendí". Antes de darnos
-// por vencidos, probamos con la misma IA que ya usa el mensaje inicial:
-// si reconoce una pregunta respondible con la info del consultorio, la
-// responde ahí mismo (sin sacar al paciente del paso en el que estaba); si
-// reconoce que quiere cancelar, lo manda a ese flujo. Si no es ninguna de
-// las dos, seguimos con el "no entendí" de siempre.
+// cancelación y escribe algo que NO es la opción esperada (tocó mal, o
+// directamente escribió una pregunta en vez de usar la lista/botones),
+// probamos con la misma IA que ya usa el mensaje inicial: si reconoce una
+// pregunta respondible con la info del consultorio, la responde ahí mismo
+// (sin sacar al paciente del paso en el que estaba); si reconoce que
+// quiere cancelar, lo manda a ese flujo. Si no es ninguna de las dos,
+// seguimos con el "no entendí" de siempre.
 async function intentarDesvioLibre(texto, medico) {
   try {
     const { intencion, respuesta } = await enrutarMensaje(texto, medico);
@@ -90,80 +97,92 @@ async function intentarDesvioLibre(texto, medico) {
 
 // Sin una conversación de reserva ya en curso: primero se fija si es una
 // pregunta general (responde con la info del consultorio) o si de verdad
-// quiere agendar — recién ahí arranca el flujo de horarios numerados.
-async function manejarMensajeLibre(medicoPhone, numero, texto, medico, jid) {
+// quiere agendar — recién ahí arranca la lista de días.
+async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
   try {
     const { intencion, respuesta } = await enrutarMensaje(texto, medico);
     if (intencion === "cancelar") return iniciarCancelacion(medicoPhone, numero);
-    if (intencion === "pregunta" && respuesta) return respuesta;
+    if (intencion === "pregunta" && respuesta) return comoTexto(respuesta);
   } catch (e) {
     log.error("[RESERVA_CITAS] enrutarMensaje falló, sigo con la reserva normal:", e.message);
   }
-  return iniciarReserva(medicoPhone, numero, jid);
+  return iniciarReserva(medicoPhone, numero);
 }
 
-// El paciente ve la disponibilidad real en un calendario propio (más claro
-// que contar días en una lista de texto) — el link tiene el JID de
-// WhatsApp del paciente firmado adentro (mismo mecanismo que ya usa el
-// login de médicos), vence solo, y no hace falta guardar sesión acá: toda
-// la elección de día/hora/nombre pasa en esa página, en un solo POST final.
-// Se firma el JID completo (no solo el número): a veces WhatsApp identifica
-// al paciente con un LID en vez del número real, y solo el JID original
-// sirve para poder escribirle de vuelta la confirmación más tarde.
-async function iniciarReserva(medicoPhone, numero, jid) {
+// Las listas interactivas de WhatsApp permiten como máximo 10 filas — se
+// muestran los primeros 10 días con algún horario libre (de los hasta 21
+// que trae obtenerHorariosDisponibles). Si el consultorio tiene tantísima
+// disponibilidad que eso no alcanza, el paciente igual puede escribir
+// "cancelar" o preguntar directo — no es una limitación real en la práctica.
+async function iniciarReserva(medicoPhone, numero) {
   const dias = await obtenerHorariosDisponibles(medicoPhone, 21);
   if (dias.length === 0) {
-    return "Por ahora no tengo horarios disponibles cargados. Comunicate directo con la clínica para coordinar tu cita.";
+    return comoTexto("Por ahora no tengo horarios disponibles cargados. Comunicate directo con la clínica para coordinar tu cita.");
   }
-  const token = generarToken(jid || numero, "reserva_publica", 45 * 60 * 1000);
-  const url = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
-  return `¡Hola! 👋 Elegí tu horario acá, vas a ver el calendario completo:\n\n${url}\n\n(el link es válido por 45 minutos)\n\nSi querés cancelar una cita ya agendada, escribí "cancelar" en cualquier momento.`;
+  const diasMostrados = dias.slice(0, 10);
+  await guardarSesion(numero, "elegir_dia", { dias: diasMostrados });
+  return comoLista(
+    "¡Hola! 👋 Elegí el día que te sirva para tu cita:",
+    "Ver días",
+    diasMostrados.map((d, i) => ({
+      id: `dia_${i}`,
+      title: formatearDiaCorto(d.fecha),
+      description: `${d.slots.length} horario${d.slots.length === 1 ? "" : "s"} libre${d.slots.length === 1 ? "" : "s"}`,
+    })),
+  );
 }
 
-function listaDias(dias) {
-  return dias.map((d, i) => `${i + 1}) ${formatearDia(d.fecha)} — ${d.slots.length} horario${d.slots.length === 1 ? "" : "s"} libre${d.slots.length === 1 ? "" : "s"}`).join("\n");
-}
-function listaHoras(slots) {
-  return slots.map((s, i) => `${i + 1}) ${formatearHora(s)}`).join("\n");
+function listaDeHorarios(dia) {
+  const slots = dia.slots.slice(0, 10);
+  return comoLista(
+    `Horarios para el ${formatearDiaCorto(dia.fecha)}:`,
+    "Ver horarios",
+    slots.map((s, i) => ({ id: `hora_${i}`, title: formatearHora(s) })),
+  );
 }
 
 async function elegirDia(medicoPhone, numero, t, texto, datos, medico) {
-  const idx = parseInt(t, 10) - 1;
-  const dia = datos.dias?.[idx];
+  const idx = t.startsWith("dia_") ? parseInt(t.slice(4), 10) : NaN;
+  const dia = Number.isInteger(idx) ? datos.dias?.[idx] : null;
   if (!dia) {
     const desvio = await intentarDesvioLibre(texto, medico);
-    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita, elegí un día:\n\n${listaDias(datos.dias || [])}`;
+    if (desvio?.tipo === "respuesta") return comoTexto(`${desvio.texto}\n\nCuando quieras, elegí un día de la lista para seguir con tu cita.`);
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
-    // No es ni un número válido ni algo que la IA haya reconocido (puede
-    // ser solo un saludo, "hola") — se re-muestra la lista con un tono
-    // amable en vez de un seco "no entendí", que suena a error.
-    return `¡Hola! 👋 Para tu cita, elegí un día respondiendo con el número:\n\n${listaDias(datos.dias || [])}`;
+    return comoTexto("Elegí uno de los días de la lista de arriba para seguir con tu cita (o escribí qué necesitás).");
   }
-  const lineas = dia.slots.map((s, i) => `${i + 1}) ${formatearHora(s)}`);
   await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: dia });
-  return `Horarios para el ${formatearDia(dia.fecha)}:\n\n${lineas.join("\n")}\n\nRespondé con el número del horario que te sirva.`;
+  return listaDeHorarios(dia);
 }
 
 async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
-  const idx = parseInt(t, 10) - 1;
-  const slot = datos.diaElegido?.slots?.[idx];
+  const idx = t.startsWith("hora_") ? parseInt(t.slice(5), 10) : NaN;
+  const slot = Number.isInteger(idx) ? datos.diaElegido?.slots?.[idx] : null;
   if (!slot) {
     const desvio = await intentarDesvioLibre(texto, medico);
-    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\nCuando quieras seguí con tu cita, elegí un horario para el ${formatearDia(datos.diaElegido?.fecha)}:\n\n${listaHoras(datos.diaElegido?.slots || [])}`;
+    if (desvio?.tipo === "respuesta") return comoTexto(`${desvio.texto}\n\nCuando quieras, elegí un horario de la lista para el ${formatearDiaCorto(datos.diaElegido?.fecha)}.`);
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
-    return `Para el ${formatearDia(datos.diaElegido?.fecha)}, elegí un horario respondiendo con el número:\n\n${listaHoras(datos.diaElegido?.slots || [])}`;
+    return comoTexto("Elegí uno de los horarios de la lista de arriba (o escribí qué necesitás).");
   }
   const libre = await horarioSigueLibre(medicoPhone, slot, medico.duracionConsultaMinutos || 30);
-  if (!libre) return 'Ups, ese horario se acaba de ocupar. Escribí cualquier cosa para ver los horarios disponibles de nuevo.';
+  if (!libre) {
+    // Se re-arma la lista de ese mismo día por si sigue teniendo otros
+    // horarios libres, en vez de mandar al paciente de vuelta al principio.
+    const diasActualizados = await obtenerHorariosDisponibles(medicoPhone, 21);
+    const diaActualizado = diasActualizados.find(d => d.fecha === datos.diaElegido?.fecha);
+    if (!diaActualizado) return comoTexto("Ups, ese horario se acaba de ocupar y no quedan más libres ese día. Escribí cualquier cosa para ver los días disponibles de nuevo.");
+    await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: diaActualizado });
+    const lista = listaDeHorarios(diaActualizado);
+    return { ...lista, texto: `Ups, ese horario se acaba de ocupar. ${lista.texto}` };
+  }
   await guardarSesion(numero, "pedir_nombre", { ...datos, horaElegida: slot });
-  return "¿A nombre de quién es la cita? Escribí el nombre completo.";
+  return comoTexto("¿A nombre de quién es la cita? Escribí el nombre completo.");
 }
 
 async function pedirNombre(numero, textoOriginal, datos) {
   const nombre = textoOriginal.trim();
-  if (nombre.length < 2) return "Necesito un nombre válido para la cita.";
+  if (nombre.length < 2) return comoTexto("Necesito un nombre válido para la cita.");
   await guardarSesion(numero, "pedir_motivo", { ...datos, pacienteNombre: nombre });
-  return `Gracias, ${nombre.split(" ")[0]}. Por último, ¿cuál es el motivo de la consulta? (podés escribir "ninguno" si preferís no decirlo)`;
+  return comoTexto(`Gracias, ${nombre.split(" ")[0]}. Por último, ¿cuál es el motivo de la consulta? (podés escribir "ninguno" si preferís no decirlo)`);
 }
 
 async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
@@ -179,36 +198,41 @@ async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
     // Entre que se eligió el horario (elegirHora) y este paso pasaron varios
     // mensajes (nombre, motivo) — si alguien más se lo llevó mientras tanto,
     // crearCitaConfirmada lo revalida y cae acá en vez de cortar la
-    // conversación con un error sin respuesta (ver services/baileysWhatsapp.js).
+    // conversación con un error sin respuesta.
     if (e.horarioOcupado) {
       await limpiarSesion(numero);
-      return "Ups, justo se ocupó ese horario mientras conversábamos. Escribí cualquier cosa para volver a ver los horarios disponibles.";
+      return comoTexto("Ups, justo se ocupó ese horario mientras conversábamos. Escribí cualquier cosa para volver a ver los días disponibles.");
     }
     throw e;
   }
 
   await limpiarSesion(numero);
-  return `✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" en cualquier momento.`;
+  return comoTexto(`✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" en cualquier momento.`);
 }
 
 async function iniciarCancelacion(medicoPhone, numero) {
   const cita = await Cita.findOne({ medicoPhone, pacienteTelefono: numero, estado: "confirmada", fecha: { $gte: new Date() } }).sort({ fecha: 1 });
   if (!cita) {
     await limpiarSesion(numero);
-    return "No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí cualquier cosa.";
+    return comoTexto("No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí cualquier cosa.");
   }
   await guardarSesion(numero, "confirmar_cancelacion", { citaId: String(cita._id) });
-  return `Tenés una cita para el ${formatearFechaCompleta(cita.fecha)}. ¿Confirmás que querés cancelarla? Respondé "sí" o "no".`;
+  return comoBotones(
+    `Tenés una cita para el ${formatearFechaCompleta(cita.fecha)}. ¿Confirmás que querés cancelarla?`,
+    [{ id: "si_cancelar", title: "Sí, cancelar" }, { id: "no_cancelar", title: "No" }],
+  );
 }
 
 async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico) {
-  if (t !== "si" && t !== "sí" && t !== "no") {
+  const esSi = t === "si_cancelar" || t === "si" || t === "sí";
+  const esNo = t === "no_cancelar" || t === "no";
+  if (!esSi && !esNo) {
     const desvio = await intentarDesvioLibre(texto, medico);
-    if (desvio?.tipo === "respuesta") return `${desvio.texto}\n\n¿Confirmás que querés cancelar tu cita? Respondé "sí" o "no".`;
+    if (desvio?.tipo === "respuesta") return comoTexto(`${desvio.texto}\n\n¿Confirmás que querés cancelar tu cita?`);
   }
-  if (t !== "si" && t !== "sí") {
+  if (!esSi) {
     await limpiarSesion(numero);
-    return "Ok, no cancelé nada.";
+    return comoTexto("Ok, no cancelé nada.");
   }
   const cita = await Cita.findById(datos.citaId);
   if (cita) {
@@ -219,7 +243,7 @@ async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico
     }
   }
   await limpiarSesion(numero);
-  return "Listo, cancelé tu cita. Si querés agendar otra, escribí cualquier cosa.";
+  return comoTexto("Listo, cancelé tu cita. Si querés agendar otra, escribí cualquier cosa.");
 }
 
 module.exports = { procesarMensajeEntrante, formatearFechaCompleta };
