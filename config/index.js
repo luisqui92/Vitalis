@@ -3,9 +3,12 @@
 // Sin esto, un .env en el servidor es solo un archivo de texto sin efecto —
 // las variables de entorno tienen que venir sí o sí del entorno real del
 // proceso (systemd, el ecosystem de PM2, o exportadas a mano en la shell).
-// Con dotenv, .env también sirve — y nunca pisa una variable que ya venga
-// puesta por afuera (esa es la prioridad por defecto del paquete).
-require("dotenv").config();
+// override:true es a propósito: PM2 puede tener variables viejas guardadas
+// internamente desde el primer arranque del proceso (ej. una contraseña de
+// Mongo ya rotada) que sobreviven a "pm2 restart --update-env" — sin esto,
+// dotenv las respeta y el .env del disco queda sin efecto aunque lo edites.
+// El .env tiene que ser siempre la fuente de verdad.
+require("dotenv").config({ override: true });
 
 const CONFIG = {
   OPENAI_KEY: process.env.OPENAI_KEY,
