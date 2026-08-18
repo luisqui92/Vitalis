@@ -170,7 +170,7 @@ module.exports = function (app) {
   app.get("/medico/consultas", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const consultas = await ConsultaMedica.find({ medicoPhone })
-      .select("pacienteNombre estado duracionSegundos createdAt")
+      .select("pacienteId pacienteNombre estado notaClinicaEstado duracionSegundos createdAt")
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();

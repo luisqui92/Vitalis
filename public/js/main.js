@@ -4,4 +4,9 @@ btnLogout.onclick = logout;
 
 aplicarTemaSegunEspecialidad();
 aplicarLandingVeterinariaSiCorresponde();
-if (TOKEN) renderDashboard(); else renderLogin();
+if (TOKEN) {
+  if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
+  else renderDashboard();
+} else {
+  renderLogin();
+}

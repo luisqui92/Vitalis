@@ -36,7 +36,8 @@ function completarLogin(data) {
   localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
   localStorage.setItem("salud_tipo_especialidad", MEDICO_TIPO_ESPECIALIDAD);
   aplicarTemaSegunEspecialidad();
-  renderDashboard();
+  if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
+  else renderDashboard();
 }
 
 // ─── LOGIN, paso 2: código de la app autenticadora (si el médico tiene 2FA) ──

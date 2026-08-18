@@ -80,6 +80,7 @@ require("./routes/citas")(app);
 require("./routes/whatsappSalud")(app);
 require("./routes/vapi")(app);
 require("./routes/vinculacion")(app);
+require("./routes/dashboardEscritorio")(app);
 require("./routes/reservaPublica")(app);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────

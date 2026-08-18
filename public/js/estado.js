@@ -4,7 +4,11 @@ const API = ""; // mismo dominio que la API — todo este server ES Vitalis
 let TOKEN = localStorage.getItem("salud_token") || null;
 let MEDICO_NOMBRE = localStorage.getItem("salud_nombre") || "";
 let MEDICO_TIPO_ESPECIALIDAD = localStorage.getItem("salud_tipo_especialidad") || "medicina_general";
-const app = document.getElementById("app");
+// En escritorio ancho (ver escritorio.js) esto se reapunta al contenedor
+// del panel de escritorio — así ninguna pantalla existente (renderDashboard,
+// renderAgenda, etc.) necesita saber si está en celular o en escritorio,
+// todas simplemente escriben en `app`.
+let app = document.getElementById("app");
 const headerSub = document.getElementById("headerSub");
 const btnLogout = document.getElementById("btnLogout");
 
@@ -203,6 +207,7 @@ function logout() {
   localStorage.removeItem("salud_nombre");
   localStorage.removeItem("salud_tipo_especialidad");
   aplicarTemaSegunEspecialidad();
+  if (typeof desactivarEscritorio === "function") desactivarEscritorio();
   btnLogout.style.display = "none";
   headerSub.textContent = "Kardex inteligente";
   renderLogin();
