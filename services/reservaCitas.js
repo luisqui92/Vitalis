@@ -36,9 +36,18 @@ function comoTexto(texto) { return { tipo: "texto", texto }; }
 function comoBotones(texto, botones) { return { tipo: "botones", texto, botones }; }
 function comoLista(texto, textoBoton, filas) { return { tipo: "lista", texto, textoBoton, filas }; }
 
+// Si el paciente quedó a mitad de una conversación (se distrajo, cerró
+// WhatsApp, tocó algo raro) y no volvió a escribir en 2 minutos, el
+// próximo mensaje arranca de cero en vez de insistir con un paso viejo que
+// ya no tiene sentido — más simple para el paciente que quedar "trabado"
+// sin entender por qué el bot no le entiende.
+const SESION_MINUTOS_EXPIRA = 2;
 async function obtenerSesion(numero) {
   const doc = await SesionCitaWA.findOne({ numero }).lean();
-  return doc || { numero, paso: "inicio", datos: {} };
+  if (!doc) return { numero, paso: "inicio", datos: {} };
+  const minutosInactiva = (Date.now() - new Date(doc.updatedAt).getTime()) / 60000;
+  if (minutosInactiva > SESION_MINUTOS_EXPIRA) return { numero, paso: "inicio", datos: {} };
+  return doc;
 }
 async function guardarSesion(numero, paso, datos) {
   await SesionCitaWA.findOneAndUpdate({ numero }, { paso, datos }, { upsert: true });
