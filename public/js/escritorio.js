@@ -13,10 +13,15 @@ const ES_ESCRITORIO = window.matchMedia("(min-width: 1024px)").matches;
 let escrActivo = "inicio";
 
 const ESCR_NAV_ITEMS = [
-  { id: "inicio", label: "Inicio", icono: ICONOS.tendencia },
-  { id: "pacientes", label: "Pacientes", icono: ICONOS.persona },
-  { id: "agenda", label: "Agenda", icono: ICONOS.calendario },
-  { id: "configuracion", label: "Configuración", icono: ICONOS.escudo },
+  { id: "inicio", label: "Inicio", icono: ICONOS.tendencia, fn: "renderInicioEscritorio" },
+  { id: "pacientes", label: "Pacientes", icono: ICONOS.persona, fn: "renderDashboard" },
+  { id: "agenda", label: "Agenda", icono: ICONOS.calendario, fn: "renderAgenda" },
+  { id: "voz", label: "Vitalis Voice", icono: ICONOS.mic, fn: "renderVozEscritorio" },
+  { id: "indicaciones", label: "Indicaciones", icono: ICONOS.documento, fn: "renderIndicacionesEscritorio" },
+  { id: "estudios", label: "Estudios e imágenes", icono: ICONOS.frasco, fn: "renderEstudiosEscritorio" },
+  { id: "reportes", label: "Reportes", icono: ICONOS.tendencia, fn: "renderReportesEscritorio" },
+  { id: "finanzas", label: "Finanzas", icono: ICONOS.clipboard, fn: "renderFinanzasEscritorio" },
+  { id: "configuracion", label: "Configuración", icono: ICONOS.escudo, fn: "renderSeguridad" },
 ];
 
 function escritorioShellActivo() {
@@ -74,10 +79,7 @@ function pintarNavEscritorio() {
   nav.querySelectorAll(".escr-nav-item").forEach(btn => {
     btn.onclick = () => {
       const item = ESCR_NAV_ITEMS.find(i => i.id === btn.dataset.id);
-      if (item.id === "inicio") renderInicioEscritorio();
-      else if (item.id === "pacientes") renderDashboard();
-      else if (item.id === "agenda") renderAgenda();
-      else if (item.id === "configuracion") renderSeguridad();
+      window[item.fn]();
     };
   });
 }
@@ -222,7 +224,4 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
   });
 }
 
-envolverParaEscritorio("renderDashboard", "pacientes", "Pacientes");
-envolverParaEscritorio("renderAgenda", "agenda", "Agenda");
-envolverParaEscritorio("renderSeguridad", "configuracion", "Configuración");
-envolverParaEscritorio("renderInicioEscritorio", "inicio", "Inicio");
+ESCR_NAV_ITEMS.forEach(it => envolverParaEscritorio(it.fn, it.id, it.label));

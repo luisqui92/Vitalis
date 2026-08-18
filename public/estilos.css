@@ -407,6 +407,11 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .escr-lista-hora{font-size:12.5px;font-weight:700;color:var(--primary);min-width:44px;}
 .escr-lista-titulo{font-size:13.5px;font-weight:600;}
 .escr-lista-sub{font-size:11.5px;color:var(--text-muted);margin-top:1px;}
+.escr-barras{display:flex;align-items:flex-end;gap:14px;height:140px;padding-top:8px;}
+.escr-barra-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+.escr-barra{width:100%;max-width:34px;background:var(--gradient-vitalis);border-radius:5px 5px 0 0;min-height:4px;}
+.escr-barra-valor{font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;}
+.escr-barra-label{font-size:11px;color:var(--text-muted);margin-top:6px;text-transform:capitalize;}
 
 @media (max-width:1279px){
   .escr-grid-2{grid-template-columns:1fr;}
