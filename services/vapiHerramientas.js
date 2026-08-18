@@ -11,13 +11,65 @@ const { obtenerHorariosDisponibles } = require("./agenda");
 const { crearCitaConfirmada } = require("./crearCita");
 const { eliminarEvento } = require("./googleCalendar");
 const { formatearFechaCompleta } = require("./reservaCitas");
+const { CONFIG } = require("../config");
+
+// "Súper número" de voz: la misma idea que el súper número de WhatsApp
+// (mismo WHATSAPP_ESPECIALIDADES_MEDICOS), pero acá no hay una sesión
+// guardada — Vapi no la necesita, porque el LLM que conduce la llamada ya
+// recuerda por su cuenta qué especialidad eligió el que llama, así que
+// alcanza con que la vuelva a mandar como argumento en cada herramienta
+// (por eso el parámetro "especialidad" en las funciones de abajo).
+// medicoPhoneFijo viene de la URL del webhook (/vapi/webhook/:medicoPhone):
+// si es un teléfono real, ese consultorio es fijo (como siempre); si es
+// "super", se resuelve caso por caso según la especialidad que mande Vapi.
+const ETIQUETA_ESPECIALIDAD = {
+  medicina_general: "Medicina General",
+  odontologia: "Odontología",
+  estetica: "Estética",
+  oftalmologia: "Oftalmología",
+  veterinaria: "Veterinaria",
+  ginecologia: "Ginecología y Obstetricia",
+};
+
+async function resolverMedicoPhone(medicoPhoneFijo, especialidad) {
+  if (medicoPhoneFijo) return medicoPhoneFijo;
+  if (!especialidad) return null;
+  const telefonos = CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS;
+  const medico = await Medico.findOne({ phone: { $in: telefonos }, tipoEspecialidad: especialidad, activo: true }).select("phone").lean();
+  return medico?.phone || null;
+}
+
+// Para buscar (no para crear/modificar) alcanza con el teléfono del
+// paciente — si en modo súper número el asistente no repitió la
+// especialidad (puede pasar, es una llamada real, no todo sale perfecto),
+// mejor buscar en todos los consultorios configurados que fallar de una.
+async function resolverMedicoPhones(medicoPhoneFijo, especialidad) {
+  const medicoPhone = await resolverMedicoPhone(medicoPhoneFijo, especialidad);
+  if (medicoPhone) return [medicoPhone];
+  if (!medicoPhoneFijo) return CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS;
+  return [];
+}
+
+// Herramienta propia del modo "súper número": le dice al asistente qué
+// especialidades puede ofrecer, para que se las lea al que llama antes de
+// preguntar cuál busca.
+async function listarEspecialidades() {
+  const telefonos = CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS;
+  if (!telefonos.length) return "Este número no tiene varias especialidades configuradas.";
+  const medicos = await Medico.find({ phone: { $in: telefonos }, activo: true }).select("phone tipoEspecialidad").lean();
+  const ordenadas = telefonos.map(ph => medicos.find(m => m.phone === ph)?.tipoEspecialidad).filter(Boolean);
+  if (!ordenadas.length) return "Este número no tiene ninguna especialidad configurada todavía.";
+  return "Las especialidades disponibles son: " + ordenadas.map(t => ETIQUETA_ESPECIALIDAD[t] || t).join(", ") + ".";
+}
 
 // Hasta 8 horarios concretos — una lista más larga es difícil de seguir
 // por voz. Cada opción lleva su fecha en ISO entre paréntesis: es lo que
 // el asistente tiene que copiar tal cual al llamar a agendar_cita (lo que
 // dice en voz alta puede ser su propia versión más natural del texto, esto
 // es el dato que necesita para la próxima llamada, no un guion literal).
-async function consultarDisponibilidad(medicoPhone, { diasAdelante } = {}) {
+async function consultarDisponibilidad(medicoPhoneFijo, { diasAdelante, especialidad } = {}) {
+  const medicoPhone = await resolverMedicoPhone(medicoPhoneFijo, especialidad);
+  if (!medicoPhone) return "No pude identificar el consultorio — preguntale primero qué especialidad busca (usá listar_especialidades si hace falta).";
   const dias = await obtenerHorariosDisponibles(medicoPhone, diasAdelante || 14);
   const opciones = [];
   for (const dia of dias) {
@@ -35,7 +87,9 @@ async function consultarDisponibilidad(medicoPhone, { diasAdelante } = {}) {
     .join(". ");
 }
 
-async function agendarCita(medicoPhone, { fechaHora, pacienteNombre, pacienteTelefono, motivo } = {}) {
+async function agendarCita(medicoPhoneFijo, { fechaHora, pacienteNombre, pacienteTelefono, motivo, especialidad } = {}) {
+  const medicoPhone = await resolverMedicoPhone(medicoPhoneFijo, especialidad);
+  if (!medicoPhone) return "No pude identificar el consultorio — preguntale primero qué especialidad busca (usá listar_especialidades si hace falta).";
   const medico = await Medico.findOne({ phone: medicoPhone, activo: true });
   if (!medico) return "No se pudo agendar: el consultorio no está disponible en este momento.";
 
@@ -66,12 +120,14 @@ async function agendarCita(medicoPhone, { fechaHora, pacienteNombre, pacienteTel
   }
 }
 
-async function consultarMisCitas(medicoPhone, { pacienteTelefono } = {}) {
+async function consultarMisCitas(medicoPhoneFijo, { pacienteTelefono, especialidad } = {}) {
+  const medicoPhones = await resolverMedicoPhones(medicoPhoneFijo, especialidad);
+  if (!medicoPhones.length) return "No pude identificar el consultorio — preguntale primero qué especialidad busca (usá listar_especialidades si hace falta).";
   const telefono = String(pacienteTelefono || "").trim();
   if (!telefono) return "Necesito el número de teléfono del paciente para buscar sus citas.";
 
   const citas = await Cita.find({
-    medicoPhone, pacienteTelefono: telefono, estado: "confirmada", fecha: { $gte: new Date() },
+    medicoPhone: { $in: medicoPhones }, pacienteTelefono: telefono, estado: "confirmada", fecha: { $gte: new Date() },
   }).sort({ fecha: 1 }).lean();
 
   if (!citas.length) return "No encontré ninguna cita próxima confirmada con ese número de teléfono.";
@@ -80,20 +136,24 @@ async function consultarMisCitas(medicoPhone, { pacienteTelefono } = {}) {
     .join(" ");
 }
 
-async function cancelarCita(medicoPhone, { citaId, pacienteTelefono } = {}) {
+async function cancelarCita(medicoPhoneFijo, { citaId, pacienteTelefono, especialidad } = {}) {
   let cita = null;
   if (citaId) {
-    cita = await Cita.findOne({ _id: citaId, medicoPhone, estado: "confirmada" });
+    // Con citaId alcanza — ya identifica el consultorio por sí solo (viene
+    // de una consulta_mis_citas anterior en esta misma llamada).
+    cita = await Cita.findOne({ _id: citaId, estado: "confirmada" });
   } else if (pacienteTelefono) {
+    const medicoPhones = await resolverMedicoPhones(medicoPhoneFijo, especialidad);
+    if (!medicoPhones.length) return "No pude identificar el consultorio — preguntale qué especialidad busca, o pedile el citaId si ya lo consultaste antes.";
     cita = await Cita.findOne({
-      medicoPhone, pacienteTelefono: String(pacienteTelefono).trim(), estado: "confirmada", fecha: { $gte: new Date() },
+      medicoPhone: { $in: medicoPhones }, pacienteTelefono: String(pacienteTelefono).trim(), estado: "confirmada", fecha: { $gte: new Date() },
     }).sort({ fecha: 1 });
   }
   if (!cita) {
     return "No encontré ninguna cita próxima confirmada para cancelar. Verificá el número de teléfono, o pedile al paciente el citaId si lo consultaste antes.";
   }
 
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("googleCalendarId").lean();
+  const medico = await Medico.findOne({ phone: cita.medicoPhone }).select("googleCalendarId").lean();
   cita.estado = "cancelada";
   await cita.save();
   if (medico?.googleCalendarId && cita.googleEventId) {
@@ -102,4 +162,4 @@ async function cancelarCita(medicoPhone, { citaId, pacienteTelefono } = {}) {
   return `Listo, cancelé la cita del ${formatearFechaCompleta(cita.fecha)}.`;
 }
 
-module.exports = { consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita };
+module.exports = { listarEspecialidades, consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita };

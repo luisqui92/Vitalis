@@ -10,9 +10,10 @@
 //   sale:   { results: [{ toolCallId, result }] }
 const { CONFIG, log } = require("../config");
 const { Medico } = require("../db/models");
-const { consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita } = require("../services/vapiHerramientas");
+const { listarEspecialidades, consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita } = require("../services/vapiHerramientas");
 
 const HERRAMIENTAS = {
+  listar_especialidades: listarEspecialidades,
   consultar_disponibilidad: consultarDisponibilidad,
   agendar_cita: agendarCita,
   consultar_mis_citas: consultarMisCitas,
@@ -21,7 +22,12 @@ const HERRAMIENTAS = {
 
 module.exports = function (app) {
   // Cada médico/consultorio tiene su propio Assistant en Vapi, configurado
-  // con esta URL (con SU teléfono en la ruta) como Server URL.
+  // con esta URL (con SU teléfono en la ruta) como Server URL — salvo el
+  // "súper número" (/vapi/webhook/super), que atiende a TODOS los
+  // consultorios de WHATSAPP_ESPECIALIDADES_MEDICOS: ahí el asistente
+  // pregunta la especialidad primero y la manda como argumento en cada
+  // herramienta (ver services/vapiHerramientas.js), en vez de tener un
+  // médico fijo en la URL.
   app.post("/vapi/webhook/:medicoPhone", async (req, res) => {
     try {
       // Sin secreto configurado no hay forma segura de confirmar que esto
@@ -36,9 +42,16 @@ module.exports = function (app) {
         return res.status(401).json({ error: "No autorizado" });
       }
 
-      const medicoPhone = String(req.params.medicoPhone || "").trim();
-      const medico = await Medico.findOne({ phone: medicoPhone, activo: true }).select("_id").lean();
-      if (!medico) return res.status(404).json({ error: "Consultorio no encontrado" });
+      const paramMedicoPhone = String(req.params.medicoPhone || "").trim();
+      const esSuperNumero = paramMedicoPhone === "super";
+      let medicoPhone = null;
+      if (esSuperNumero) {
+        if (!CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length) return res.status(503).json({ error: "Súper número no configurado" });
+      } else {
+        const medico = await Medico.findOne({ phone: paramMedicoPhone, activo: true }).select("_id").lean();
+        if (!medico) return res.status(404).json({ error: "Consultorio no encontrado" });
+        medicoPhone = paramMedicoPhone;
+      }
 
       const msg = req.body?.message;
       if (msg?.type !== "tool-calls") {
