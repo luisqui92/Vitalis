@@ -4,7 +4,7 @@
 // prolijo). Sigue siendo una máquina de estados (no IA libre): para algo
 // tan estructurado como elegir un turno, es más confiable que dejar que el
 // paciente escriba libre y una IA interprete la fecha/hora.
-const { Medico, Cita, SesionCitaWA } = require("../db/models");
+const { Medico, Cita, SesionCitaWA, Paciente, ConsultaMedica, Vacuna, Medicamento } = require("../db/models");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
 const { eliminarEvento } = require("./googleCalendar");
 const { enrutarMensaje } = require("./asistenteWhatsapp");
@@ -47,6 +47,36 @@ async function limpiarSesion(numero) {
   await SesionCitaWA.deleteOne({ numero });
 }
 
+// Resumen liviano de la historia de un paciente/cliente ya conocido, para
+// que el asistente pueda saludarlo con calidez y continuidad (sin volverse
+// una interpretación clínica — eso lo prohíbe el propio prompt del
+// asistente). null si el número no corresponde a ningún paciente cargado
+// (primera vez que escribe).
+async function resumenHistorialPaciente(medicoPhone, numero) {
+  const paciente = await Paciente.findOne({ medicoPhone, telefono: numero }).lean();
+  if (!paciente) return null;
+
+  const [consultas, medicamentosActivos, vacunas] = await Promise.all([
+    ConsultaMedica.find({ pacienteId: paciente._id, medicoPhone, estado: "completado" })
+      .select("notaClinica createdAt").sort({ createdAt: -1 }).limit(2).lean(),
+    Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null }).select("nombre").lean(),
+    Vacuna.find({ pacienteId: paciente._id, medicoPhone }).select("nombre fecha").sort({ fecha: -1 }).limit(2).lean(),
+  ]);
+
+  const partes = [`Nombre: ${paciente.nombre}`];
+  if (paciente.especie) partes.push(`Especie/raza: ${paciente.especie}${paciente.raza ? " " + paciente.raza : ""}`);
+  if (consultas.length) {
+    partes.push("Últimas visitas: " + consultas.map(c => {
+      const motivo = c.notaClinica?.motivoConsulta || c.notaClinica?.diagnostico;
+      return `${new Date(c.createdAt).toLocaleDateString("es-BO")}${motivo ? " - " + motivo : ""}`;
+    }).join("; "));
+  }
+  if (medicamentosActivos.length) partes.push("Medicación activa: " + medicamentosActivos.map(m => m.nombre).join(", "));
+  if (vacunas.length) partes.push("Vacunas recientes: " + vacunas.map(v => `${v.nombre} (${new Date(v.fecha).toLocaleDateString("es-BO")})`).join(", "));
+
+  return partes.join("\n");
+}
+
 async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
   const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
   if (!medicoPhone) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
@@ -84,9 +114,10 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
 // (sin sacar al paciente del paso en el que estaba); si reconoce que
 // quiere cancelar, lo manda a ese flujo. Si no es ninguna de las dos,
 // seguimos con el "no entendí" de siempre.
-async function intentarDesvioLibre(texto, medico) {
+async function intentarDesvioLibre(medicoPhone, numero, texto, medico) {
   try {
-    const { intencion, respuesta } = await enrutarMensaje(texto, medico);
+    const historial = await resumenHistorialPaciente(medicoPhone, numero);
+    const { intencion, respuesta } = await enrutarMensaje(texto, medico, historial);
     if (intencion === "pregunta" && respuesta) return { tipo: "respuesta", texto: respuesta };
     if (intencion === "cancelar") return { tipo: "cancelar" };
   } catch (e) {
@@ -100,7 +131,8 @@ async function intentarDesvioLibre(texto, medico) {
 // quiere agendar — recién ahí arranca la lista de días.
 async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
   try {
-    const { intencion, respuesta } = await enrutarMensaje(texto, medico);
+    const historial = await resumenHistorialPaciente(medicoPhone, numero);
+    const { intencion, respuesta } = await enrutarMensaje(texto, medico, historial);
     if (intencion === "cancelar") return iniciarCancelacion(medicoPhone, numero);
     if (intencion === "pregunta" && respuesta) return comoTexto(respuesta);
   } catch (e) {
@@ -145,7 +177,7 @@ async function elegirDia(medicoPhone, numero, t, texto, datos, medico) {
   const idx = t.startsWith("dia_") ? parseInt(t.slice(4), 10) : NaN;
   const dia = Number.isInteger(idx) ? datos.dias?.[idx] : null;
   if (!dia) {
-    const desvio = await intentarDesvioLibre(texto, medico);
+    const desvio = await intentarDesvioLibre(medicoPhone, numero, texto, medico);
     if (desvio?.tipo === "respuesta") return comoTexto(`${desvio.texto}\n\nCuando quieras, elegí un día de la lista para seguir con tu cita.`);
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
     return comoTexto("Elegí uno de los días de la lista de arriba para seguir con tu cita (o escribí qué necesitás).");
@@ -158,7 +190,7 @@ async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
   const idx = t.startsWith("hora_") ? parseInt(t.slice(5), 10) : NaN;
   const slot = Number.isInteger(idx) ? datos.diaElegido?.slots?.[idx] : null;
   if (!slot) {
-    const desvio = await intentarDesvioLibre(texto, medico);
+    const desvio = await intentarDesvioLibre(medicoPhone, numero, texto, medico);
     if (desvio?.tipo === "respuesta") return comoTexto(`${desvio.texto}\n\nCuando quieras, elegí un horario de la lista para el ${formatearDiaCorto(datos.diaElegido?.fecha)}.`);
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
     return comoTexto("Elegí uno de los horarios de la lista de arriba (o escribí qué necesitás).");
@@ -227,7 +259,7 @@ async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico
   const esSi = t === "si_cancelar" || t === "si" || t === "sí";
   const esNo = t === "no_cancelar" || t === "no";
   if (!esSi && !esNo) {
-    const desvio = await intentarDesvioLibre(texto, medico);
+    const desvio = await intentarDesvioLibre(medicoPhone, numero, texto, medico);
     if (desvio?.tipo === "respuesta") return comoTexto(`${desvio.texto}\n\n¿Confirmás que querés cancelar tu cita?`);
   }
   if (!esSi) {
@@ -246,4 +278,4 @@ async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico
   return comoTexto("Listo, cancelé tu cita. Si querés agendar otra, escribí cualquier cosa.");
 }
 
-module.exports = { procesarMensajeEntrante, formatearFechaCompleta };
+module.exports = { procesarMensajeEntrante, formatearFechaCompleta, resumenHistorialPaciente };
