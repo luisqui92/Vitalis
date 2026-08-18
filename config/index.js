@@ -37,6 +37,14 @@ const CONFIG = {
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || "",
 
+  // "Súper número": un mismo WhatsApp que reparte entre varios consultorios
+  // propios (uno por especialidad) — el paciente primero elige cuál busca,
+  // y de ahí en más esa conversación queda atada a ESE médico. Lista de
+  // teléfonos de Medico, en el orden en que se muestran; vacío = se
+  // mantiene el comportamiento de siempre (un solo consultorio fijo, con
+  // SALUD_WHATSAPP_MEDICO_PHONE).
+  WHATSAPP_ESPECIALIDADES_MEDICOS: (process.env.WHATSAPP_ESPECIALIDADES_MEDICOS || "").split(",").map(s => s.trim()).filter(Boolean),
+
   // Recepcionista de voz (Vapi): secreto compartido para verificar que un
   // webhook de /vapi/webhook/:medicoPhone realmente viene de Vapi (se
   // configura igual en el dashboard de Vapi, como credencial del Server
@@ -69,7 +77,7 @@ function validateConfig() {
   // revienta en el primer login/request autenticado con un error críptico en
   // vez de fallar limpio al arrancar.
   const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
-  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_ESPECIALIDADES_MEDICOS"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 

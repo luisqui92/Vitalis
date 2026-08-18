@@ -77,14 +77,61 @@ async function resumenHistorialPaciente(medicoPhone, numero) {
   return partes.join("\n");
 }
 
-async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
-  const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
-  if (!medicoPhone) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
-  const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-  if (!medico) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
+// "Súper número": varios consultorios propios detrás del mismo WhatsApp.
+// El paciente elige primero cuál busca; esa elección queda guardada en
+// datos.medicoPhone de la sesión y viaja con ella en cada paso siguiente
+// (todos los guardarSesion de acá abajo hacen spread de "datos", así que
+// alcanza con sembrarla una sola vez al elegir).
+const ETIQUETA_ESPECIALIDAD = {
+  odontologia: "🦷 Odontología",
+  estetica: "✨ Estética (Vitalis Face)",
+  oftalmologia: "👁️ Oftalmología",
+  veterinaria: "🐾 Veterinaria",
+  ginecologia: "🤰 Ginecología y Obstetricia",
+  medicina_general: "🩺 Medicina General",
+};
 
+async function mostrarEspecialidades(numero) {
+  const telefonos = CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS;
+  const medicos = await Medico.find({ phone: { $in: telefonos } }).select("phone nombre tipoEspecialidad").lean();
+  const ordenados = telefonos.map(ph => medicos.find(m => m.phone === ph)).filter(Boolean);
+  if (ordenados.length === 0) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
+  await guardarSesion(numero, "elegir_especialidad", {
+    opciones: ordenados.map(m => ({ phone: m.phone, nombre: m.nombre, tipoEspecialidad: m.tipoEspecialidad })),
+  });
+  return comoLista(
+    "¡Hola! 👋 ¿Cuál de nuestros consultorios buscás?",
+    "Ver opciones",
+    ordenados.map((m, i) => ({
+      id: `esp_${i}`,
+      title: ETIQUETA_ESPECIALIDAD[m.tipoEspecialidad] || m.tipoEspecialidad,
+      description: m.nombre,
+    })),
+  );
+}
+
+async function elegirEspecialidad(numero, t, datos) {
+  const idx = t.startsWith("esp_") ? parseInt(t.slice(4), 10) : NaN;
+  const opcion = Number.isInteger(idx) ? datos.opciones?.[idx] : null;
+  if (!opcion) return comoTexto("Elegí una de las opciones de la lista de arriba para continuar.");
+  const medico = await Medico.findOne({ phone: opcion.phone }).lean();
+  if (!medico) return comoTexto("Ups, ese consultorio ya no está disponible. Escribí cualquier cosa para ver las opciones de nuevo.");
+  return iniciarReserva(opcion.phone, numero);
+}
+
+async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
+  const superNumero = CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length > 0;
   const sesion = await obtenerSesion(numero);
   const t = texto.trim().toLowerCase();
+
+  const medicoPhone = sesion.datos?.medicoPhone || (!superNumero ? CONFIG.SALUD_WHATSAPP_MEDICO_PHONE : null);
+  if (!medicoPhone) {
+    if (sesion.paso === "elegir_especialidad") return elegirEspecialidad(numero, t, sesion.datos);
+    return mostrarEspecialidades(numero);
+  }
+
+  const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+  if (!medico) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
 
   if (t === "cancelar" || t === "cancelar cita") {
     return iniciarCancelacion(medicoPhone, numero);
@@ -152,7 +199,7 @@ async function iniciarReserva(medicoPhone, numero) {
     return comoTexto("Por ahora no tengo horarios disponibles cargados. Comunicate directo con la clínica para coordinar tu cita.");
   }
   const diasMostrados = dias.slice(0, 10);
-  await guardarSesion(numero, "elegir_dia", { dias: diasMostrados });
+  await guardarSesion(numero, "elegir_dia", { medicoPhone, dias: diasMostrados });
   return comoLista(
     "¡Hola! 👋 Elegí el día que te sirva para tu cita:",
     "Ver días",
@@ -248,7 +295,7 @@ async function iniciarCancelacion(medicoPhone, numero) {
     await limpiarSesion(numero);
     return comoTexto("No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí cualquier cosa.");
   }
-  await guardarSesion(numero, "confirmar_cancelacion", { citaId: String(cita._id) });
+  await guardarSesion(numero, "confirmar_cancelacion", { medicoPhone, citaId: String(cita._id) });
   return comoBotones(
     `Tenés una cita para el ${formatearFechaCompleta(cita.fecha)}. ¿Confirmás que querés cancelarla?`,
     [{ id: "si_cancelar", title: "Sí, cancelar" }, { id: "no_cancelar", title: "No" }],
