@@ -22,12 +22,37 @@ const FILA_INFERIOR = [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38];
 // por 90°) da un valle ∪ (arco superior: los incisivos al centro, abajo,
 // cerca de la arcada inferior); invertido=true (t de 180° a 360°, pasando
 // por 270°) da un domo ∩ (arco inferior, mismo criterio pero al revés).
+// Las piezas se reparten a distancia PAREJA sobre el arco, no a ángulos
+// iguales. En una elipse tan achatada como esta (rx muy mayor que ry), pasos
+// de ángulo iguales avanzan muy poco cerca de los extremos: los molares del
+// fondo terminaban a 9px uno de otro, encimados (la ficha mide 24px), y los
+// incisivos del centro separados 36px. Recorrer el arco por longitud deja
+// todas las piezas a la misma distancia, como en una arcada real.
 function posicionesArco(n, cx, cy, rx, ry, invertido) {
-  const tFin = invertido ? 360 : 0;
+  const tIni = Math.PI;
+  const tFin = invertido ? 2 * Math.PI : 0;
+  const punto = (t) => ({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+
+  // Se camina el arco en pasos chicos guardando cuánto se lleva recorrido.
+  const PASOS = 2000;
+  const acumulado = [0];
+  let anterior = punto(tIni);
+  for (let i = 1; i <= PASOS; i++) {
+    const p = punto(tIni + (tFin - tIni) * (i / PASOS));
+    acumulado.push(acumulado[i - 1] + Math.hypot(p.x - anterior.x, p.y - anterior.y));
+    anterior = p;
+  }
+  const largoTotal = acumulado[PASOS];
+
   const pos = [];
+  let paso = 0;
   for (let i = 0; i < n; i++) {
-    const t = (180 + (tFin - 180) * (i / (n - 1))) * Math.PI / 180;
-    pos.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+    const objetivo = (largoTotal * i) / (n - 1);
+    while (paso < PASOS && acumulado[paso + 1] < objetivo) paso++;
+    // Interpolación dentro del tramo, para no quedar pegado a la grilla.
+    const tramo = acumulado[paso + 1] - acumulado[paso];
+    const frac = tramo > 0 ? (objetivo - acumulado[paso]) / tramo : 0;
+    pos.push(punto(tIni + (tFin - tIni) * ((paso + frac) / PASOS)));
   }
   return pos;
 }
@@ -55,11 +80,12 @@ async function renderTabOdontograma(pacienteId) {
 
 function piezaSvgHtml(pieza, pos) {
   const info = ESTADOS_PIEZA_INFO[pieza.estado] || ESTADOS_PIEZA_INFO.sano;
-  const w = 24, h = 28;
+  // Lo más grande que entra en el arco sin que dos piezas se toquen.
+  const w = 26, h = 30;
   return `
     <g class="pieza-dental" data-numero="${pieza.numero}" transform="translate(${pos.x - w/2},${pos.y - h/2})" style="cursor:pointer">
       <rect width="${w}" height="${h}" rx="7" fill="${info.color}" stroke="${info.borde || info.color}" stroke-width="1.5"></rect>
-      <text x="${w/2}" y="${h/2 + 4}" text-anchor="middle" font-size="9" font-weight="700" fill="${info.texto}">${pieza.numero}</text>
+      <text x="${w/2}" y="${h/2 + 5}" text-anchor="middle" font-size="13" font-weight="700" fill="${info.texto}">${pieza.numero}</text>
     </g>`;
 }
 
@@ -69,9 +95,15 @@ function pintarOdontograma(pacienteId, odontograma) {
   const porNumero = {};
   odontograma.piezas.forEach(p => { porNumero[p.numero] = p; });
 
-  const W = 400, H = 260;
-  const posSup = posicionesArco(16, W/2, 95, 175, 40, false);
-  const posInf = posicionesArco(16, W/2, 205, 175, 40, true);
+  // El arco viejo (175x40) era muy chico para 16 piezas: quedaban a 9px una
+  // de otra en los extremos y se encimaban. Ojo que ahí lo que aprieta no es
+  // el ancho de la ficha sino el alto — cerca de los molares las piezas se
+  // apilan casi en vertical.
+  // El SVG escala al contenedor, así que agrandar el arco en unidades
+  // internas no cambia cómo se ve: solo deja aire entre las fichas.
+  const W = 600, H = 400;
+  const posSup = posicionesArco(16, W/2, 60, 250, 100, false);
+  const posInf = posicionesArco(16, W/2, 340, 250, 100, true);
 
   const svgPiezas = [
     ...FILA_SUPERIOR.map((n, i) => piezaSvgHtml(porNumero[n], posSup[i])),
@@ -86,7 +118,7 @@ function pintarOdontograma(pacienteId, odontograma) {
         <button class="tab ${vistaOdontograma === "3d" ? "activo" : ""}" id="btnVista3D">Vista 3D</button>
       </div>
       <div id="odontograma2dBox" style="display:${vistaOdontograma === "2d" ? "block" : "none"}">
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:420px;height:auto">${svgPiezas}</svg>
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto">${svgPiezas}</svg>
       </div>
       <div id="odontograma3dBox" style="display:${vistaOdontograma === "3d" ? "block" : "none"};min-height:220px"></div>
       <div class="odonto-leyenda">
