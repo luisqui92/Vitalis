@@ -9,6 +9,29 @@ const TIPOS_RECORDATORIO = {
   otro: "🔔 Otro",
 };
 
+// Pantalla propia (antes era una tarjeta fija arriba del dashboard, que
+// ocupaba media pantalla del celular incluso sin recordatorios). Ahora se
+// entra desde el ícono de campana, que avisa con un contador si hay algo
+// pendiente.
+async function renderRecordatorios() {
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando recordatorios...</div>`;
+  try {
+    const [dataRecordatorios, dataPacientes] = await Promise.all([
+      api("/medico/recordatorios"),
+      api("/medico/pacientes"),
+    ]);
+    const pacientes = dataPacientes.pacientes || [];
+    app.innerHTML = `
+      <button class="back" id="btnBack">← Volver</button>
+      ${tabRecordatoriosHtml(dataRecordatorios.recordatorios || [], pacientes)}`;
+    document.getElementById("btnBack").onclick = renderDashboard;
+    wireRecordatorios(pacientes);
+  } catch (e) {
+    if (e.status === 401) return logout();
+    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando los recordatorios")}</div>`;
+  }
+}
+
 function tabRecordatoriosHtml(recordatorios, pacientes) {
   return `
     <div class="card">
@@ -68,7 +91,7 @@ function wireRecordatorios(pacientes) {
           method: "POST", headers: {"Content-Type":"application/json"},
           body: JSON.stringify({ tipo, titulo, fecha }),
         });
-        renderDashboard();
+        renderRecordatorios();
       } catch (e) {
         errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
       }
@@ -80,7 +103,7 @@ function wireRecordatorios(pacientes) {
       await api("/medico/recordatorios/" + btn.dataset.completarRecordatorio, {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ completado: true }),
       });
-      renderDashboard();
+      renderRecordatorios();
     };
   });
   document.querySelectorAll("[data-borrar-recordatorio]").forEach(btn => {
@@ -88,7 +111,7 @@ function wireRecordatorios(pacientes) {
       ev.stopPropagation();
       if (!confirm("¿Eliminar este recordatorio?")) return;
       await api("/medico/recordatorios/" + btn.dataset.borrarRecordatorio, { method: "DELETE" });
-      renderDashboard();
+      renderRecordatorios();
     };
   });
 }

@@ -31,11 +31,12 @@ async function renderDashboard() {
       api("/medico/recordatorios"),
     ]);
     const items = dataPacientes.pacientes || [];
+    const pendientes = (dataRecordatorios.recordatorios || []).length;
     app.innerHTML = `
-      ${tabRecordatoriosHtml(dataRecordatorios.recordatorios || [], items)}
-      <div class="tabs" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+      <div class="tabs" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
         <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>Nuevo<br>paciente</button>
         <button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>Agenda</button>
+        <button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>Recordatorios</button>
         <button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>Vincular<br>celular</button>
         <button class="tab" id="btnSeguridad"><span class="tab-icono">${ICONOS.escudo}</span>Seguridad</button>
       </div>
@@ -49,6 +50,7 @@ async function renderDashboard() {
     `;
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
     document.getElementById("btnAgenda").onclick = renderAgenda;
+    document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
     document.getElementById("btnVincular").onclick = renderVincular;
     document.getElementById("btnSeguridad").onclick = renderSeguridad;
     document.querySelectorAll(".item[data-id]").forEach(el => {
@@ -67,7 +69,6 @@ async function renderDashboard() {
         document.getElementById("buscarVacio").style.display = visibles === 0 ? "block" : "none";
       };
     }
-    wireRecordatorios(items);
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando pacientes")}</div>`;

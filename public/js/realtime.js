@@ -49,6 +49,7 @@ function refrescarPantallaActual() {
   else if (tipo === "agenda") renderAgenda();
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
   else if (tipo === "inicioEscritorio" && typeof renderInicioEscritorio === "function") renderInicioEscritorio();
+  else if (tipo === "recordatorios") renderRecordatorios();
 }
 
 function envolverParaTiempoReal(nombreFn, calcularPantalla) {
@@ -68,3 +69,4 @@ envolverParaTiempoReal("renderAgenda", () => ({ tipo: "agenda", params: {} }));
 // ESA alcanza para las dos, sin duplicar el seguimiento.
 envolverParaTiempoReal("pintarKardex", (p, _c, _m, _v, _med, _est, _rec, tabActiva) => ({ tipo: "pacienteDetalle", params: { pacienteId: p._id, tabActiva } }));
 envolverParaTiempoReal("renderInicioEscritorio", () => ({ tipo: "inicioEscritorio", params: {} }));
+envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", params: {} }));

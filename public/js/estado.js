@@ -97,6 +97,7 @@ const ICONOS = {
   escudo: svgIcono(`<path d="M12 3l7 3v6c0 4.8-3 8.3-7 9.5-4-1.2-7-4.7-7-9.5V6l7-3z"/><path d="M9 12l2 2 4-4"/>`),
   embarazo: svgIcono(`<circle cx="12" cy="6.3" r="2.6"/><path d="M8 21v-6.5C6.3 13 5.5 10.8 6.3 8.7 7 6.8 8.9 5.6 11 5.6h1c3 0 5.2 2.8 4.6 5.7-.4 2.1-2 3.8-4.1 4.3V21"/>`),
   corazon: svgIcono(`<path d="M12 20.2s-7.8-4.8-7.8-10.4c0-2.7 2.1-4.8 4.7-4.8 1.6 0 3 .8 3.1 2 .1-1.2 1.5-2 3.1-2 2.6 0 4.7 2.1 4.7 4.8 0 5.6-7.8 10.4-7.8 10.4z"/>`),
+  campana: svgIcono(`<path d="M12 3.2a5.6 5.6 0 0 0-5.6 5.6c0 4.2-1.7 5.5-1.7 5.5h14.6s-1.7-1.3-1.7-5.5A5.6 5.6 0 0 0 12 3.2z"/><path d="M10.3 17.5a2 2 0 0 0 3.4 0"/>`),
 };
 
 // Ícono + etiqueta corta de cada pestaña del Kardex (ver pintarKardex en
