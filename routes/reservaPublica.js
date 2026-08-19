@@ -26,6 +26,18 @@ function datosDesdeToken(token) {
 }
 
 module.exports = function (app) {
+  // Datos para la llamada de voz por navegador (sin número de teléfono) —
+  // ver public/js/reservarLlamada.js. La Public Key y el Assistant ID de
+  // Vapi están pensados para exponerse al navegador, no son secretos (el
+  // secreto real, VAPI_SERVER_SECRET, nunca sale del servidor).
+  app.get("/reserva-publica/config", (_req, res) => {
+    res.json({
+      vapiPublicKey: CONFIG.VAPI_PUBLIC_KEY,
+      vapiAssistantId: CONFIG.VAPI_ASSISTANT_ID,
+      configurado: Boolean(CONFIG.VAPI_PUBLIC_KEY && CONFIG.VAPI_ASSISTANT_ID),
+    });
+  });
+
   app.get("/reserva-publica/disponibilidad", limitReservaPublica, asyncRoute(async (req, res) => {
     const datos = datosDesdeToken(String(req.query.token || ""));
     if (!datos) throw new ErrorHttp(401, "Este link venció o no es válido. Escribile de nuevo al WhatsApp del consultorio para conseguir uno nuevo.");

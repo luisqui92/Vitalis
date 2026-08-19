@@ -48,7 +48,13 @@ app.use(helmet({
       // antes/después y el mapa anatómico de Vitalis Face las muestran
       // como <img> directo en la página, no en una pestaña aparte.
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com"],
+      // Las de Daily/Vapi son para la llamada de voz por navegador de la
+      // página pública de reserva (public/js/reservarLlamada.js) — Vapi
+      // usa la infraestructura de Daily para el audio en tiempo real, y
+      // reparte las salas entre varios subdominios que no se pueden listar
+      // uno por uno (por eso el wss: general, como recomienda la propia
+      // guía de CSP de Daily).
+      connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       // El decoder Draco (vista 3D del odontograma) corre en un Web Worker

@@ -51,6 +51,7 @@ function pintar() {
   app.innerHTML = `
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">👋 Dr(a). ${esc(ESTADO.medicoNombre)}</div>
+      <button class="secondary" id="btnLlamarAhora">📞 Hablar con el asistente</button>
       <div class="hint">Elegí el día:</div>
       <div class="reserva-dias">
         ${ESTADO.dias.map((d, i) => {

@@ -54,6 +54,15 @@ const CONFIG = {
   // URL) — sin esto, cualquiera que adivine la URL podría agendar/cancelar
   // citas a nombre de un paciente.
   VAPI_SERVER_SECRET: process.env.VAPI_SERVER_SECRET || "",
+
+  // Llamada de voz por navegador (sin número de teléfono): la página
+  // pública de reserva usa el SDK web de Vapi con estas dos — a
+  // diferencia de VAPI_SERVER_SECRET, estas SÍ se exponen al navegador
+  // (vía GET /reserva-publica/config), es justamente para lo que están
+  // pensadas — Vapi las llama "Public Key" y Assistant ID, no dan acceso
+  // a nada sensible por sí solas.
+  VAPI_PUBLIC_KEY: process.env.VAPI_PUBLIC_KEY || "",
+  VAPI_ASSISTANT_ID: process.env.VAPI_ASSISTANT_ID || "",
 };
 
 // ─── LOGGER ────────────────────────────────────────────────────────────────
@@ -80,7 +89,7 @@ function validateConfig() {
   // revienta en el primer login/request autenticado con un error críptico en
   // vez de fallar limpio al arrancar.
   const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
-  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_ESPECIALIDADES_MEDICOS"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_ESPECIALIDADES_MEDICOS", "VAPI_PUBLIC_KEY", "VAPI_ASSISTANT_ID"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 
