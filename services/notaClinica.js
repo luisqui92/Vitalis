@@ -28,6 +28,7 @@ RESPONDE SOLO JSON con esta estructura exacta:
   "reconsultaSugerida": {"fechaHora":"YYYY-MM-DDTHH:mm o null","textoOriginal":"string o null"},
   "tratamientosSugeridos": [{"itemMencionado":"string","piezaFdi":"number o null","catalogoNombreSugerido":"string o null"}],
   "examenOcularSugerido": [{"ojo":"OD u OI","estructura":"string exacto de la lista dada","hallazgo":"string","estado":"normal|leve|moderado|importante"}],
+  "odontogramaSugerido": [{"piezaFdi":"number 11-48","estado":"uno exacto de la lista dada","hallazgo":"string"}],
   "antecedentesPersonalesNuevos": ["string", ...],
   "antecedentesFamiliaresNuevos": [{"parentesco":"string","condicion":"string"}],
   "vacunasMencionadas": [{"nombre":"string","dosis":"string o null","fecha":"YYYY-MM-DD o null"}]
@@ -115,7 +116,32 @@ Reglas:
     (para no generar una alarma que el médico no dijo). Esto se aplica
     directo a la ficha del paciente sin que el médico lo confirme antes,
     así que ante cualquier duda real de a qué estructura/ojo se refiere,
-    mejor no reportar ese ítem.`;
+    mejor no reportar ese ítem.
+- "odontogramaSugerido": SOLO si más abajo te doy la lista de estados
+  válidos de pieza dental (si no te la doy, dejá esta lista vacía — es una
+  función solo para odontología). El odontólogo va mencionando el estado
+  de piezas puntuales mientras revisa la boca — reportá un ítem por cada
+  pieza con un número FDI claro (11-48) y un estado clínico concreto, ej:
+  "la 36 tiene caries", "la 18 hay que extraerla", "24 con endodoncia ya
+  hecha", "la 46 sana". Para cada uno:
+  · "piezaFdi": el número FDI tal cual (11-48). Si no queda claro de qué
+    pieza habla, no reportes ese ítem — nunca adivines el número.
+  · "estado": copiá EXACTO uno de los estados válidos que te paso más
+    abajo, el que mejor corresponda a lo que dijo (ej: "tiene caries" →
+    "caries"; "hay que sacarla"/"extracción" → "extraccion_indicada" si
+    todavía no se hizo, o "ausente" si ya no está; "está sana"/"bien" →
+    "sano"). Si lo que describe no corresponde con confianza a ninguno de
+    los estados de la lista, no reportes ese ítem.
+  · "hallazgo": lo que dijo, tal cual (para que quede en el registro).
+  Esto se aplica directo al odontograma del paciente sin que el médico lo
+  confirme antes (lo revisa/corrige después desde la pestaña Odontograma),
+  así que ante cualquier duda real de la pieza o el estado, mejor no
+  reportar ese ítem. Es un campo DISTINTO de "tratamientosSugeridos": este
+  es el estado clínico actual de la pieza (qué tiene), el otro es qué
+  tratamiento HAY QUE HACER a futuro — la misma pieza puede aparecer en
+  los dos a la vez (ej: "la 36 tiene caries, hay que hacer una
+  obturación" → una entrada acá con estado "caries", y otra en
+  tratamientosSugeridos con el ítem de obturación).`;
 
 function construirContexto(contexto) {
   const partes = [];
@@ -138,6 +164,9 @@ function construirContexto(contexto) {
   }
   if (contexto?.estructurasOculares?.length) {
     partes.push(`Estructuras oculares válidas (para "examenOcularSugerido"): ${contexto.estructurasOculares.join(", ")}`);
+  }
+  if (contexto?.estadosPiezaDental?.length) {
+    partes.push(`Estados de pieza dental válidos (para "odontogramaSugerido"): ${contexto.estadosPiezaDental.join(", ")}`);
   }
   return `\n\n(${partes.join(" ")})`;
 }
@@ -181,6 +210,14 @@ function sanearNota(nota) {
       if (t && t.piezaFdi !== null && t.piezaFdi !== undefined) {
         const n = Number(t.piezaFdi);
         t.piezaFdi = Number.isFinite(n) ? n : null;
+      }
+    }
+  }
+  if (Array.isArray(nota?.odontogramaSugerido)) {
+    for (const o of nota.odontogramaSugerido) {
+      if (o && o.piezaFdi !== null && o.piezaFdi !== undefined) {
+        const n = Number(o.piezaFdi);
+        o.piezaFdi = Number.isFinite(n) ? n : null;
       }
     }
   }

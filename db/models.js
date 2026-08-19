@@ -167,6 +167,19 @@ const consultaMedicaSchema = new mongoose.Schema({
       hallazgo: { type: String, default: "" },
       estado: { type: String, default: "" },
     }],
+    // Vitalis Odonto: igual que examenOcularSugerido, pero para el estado
+    // clínico de cada pieza del odontograma ("la 33 tiene caries", "hay que
+    // extraer la 18") — se aplica solo al odontograma apenas termina de
+    // generarse la nota, no hace falta que el odontólogo lo confirme (lo
+    // corrige después desde la pestaña Odontograma si hace falta). Es
+    // independiente de tratamientosSugeridos (que es para el PRESUPUESTO,
+    // se confirma a mano) — la misma consulta puede generar los dos para
+    // la misma pieza a la vez (el estado clínico, y el tratamiento a hacer).
+    odontogramaSugerido: [{
+      piezaFdi: { type: Number, default: null },
+      estado: { type: String, default: "" },
+      hallazgo: { type: String, default: "" },
+    }],
   },
   notaClinicaError: String,
 }, { timestamps: true });
@@ -229,6 +242,12 @@ const piezaDentalSchema = new mongoose.Schema({
       fecha: { type: Date, default: Date.now },
       estado: { type: String, enum: ESTADOS_PIEZA_DENTAL },
       notas: { type: String, default: "" },
+      // "voz" = lo aplicó solo la IA desde una consulta (ver
+      // odontogramaSugerido más arriba); "manual" = lo cargó el odontólogo
+      // a mano desde la pestaña Odontograma. Igual patrón que el historial
+      // de estructuras oculares de Vitalis Visión.
+      fuente: { type: String, enum: ["voz", "manual"], default: "manual" },
+      consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
     }],
     default: [],
   },

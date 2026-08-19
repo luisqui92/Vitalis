@@ -4,7 +4,7 @@
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
 const { CONFIG, log } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming } = require("../services/assemblyai");
@@ -83,6 +83,7 @@ module.exports = function (app) {
           // Solo para oftalmología (Vitalis Visión): la lista de estructuras
           // oculares válidas, para que la IA narre el examen por ojo.
           const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
+          const esOdontologia = medico?.tipoEspecialidad === "odontologia";
           const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
 
           consulta.notaClinica = await generarNotaClinica(transcripcionCompleta, {
@@ -91,6 +92,7 @@ module.exports = function (app) {
             medicamentosActivos: medicamentosActivos.map(m => m.nombre),
             catalogoTratamientos,
             estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
+            estadosPiezaDental: esOdontologia ? ESTADOS_PIEZA_DENTAL : [],
             veterinaria: esVeterinaria,
             especie: esVeterinaria ? paciente.especie : "",
             raza: esVeterinaria ? paciente.raza : "",
@@ -123,6 +125,31 @@ module.exports = function (app) {
               await examen.save();
             } catch (e) {
               log.error("[EXAMEN_OCULAR]", e.message);
+            }
+          }
+
+          // Vitalis Odonto: mismo patrón — el odontograma se actualiza solo
+          // apenas termina la nota, con fuente:"voz" en el historial de la
+          // pieza para que quede claro que vino de la consulta.
+          const hallazgosOdonto = consulta.notaClinica?.odontogramaSugerido;
+          if (esOdontologia && hallazgosOdonto?.length) {
+            try {
+              let odontograma = await Odontograma.findOne({ pacienteId: paciente._id, medicoPhone });
+              if (!odontograma) {
+                const piezas = PIEZAS_FDI_PERMANENTE.map(numero => ({ numero, estado: "sano", notas: "", historial: [] }));
+                odontograma = await Odontograma.create({ pacienteId: paciente._id, medicoPhone, piezas });
+              }
+              for (const h of hallazgosOdonto) {
+                if (!PIEZAS_FDI_PERMANENTE.includes(h.piezaFdi) || !ESTADOS_PIEZA_DENTAL.includes(h.estado)) continue;
+                const pieza = odontograma.piezas.find(p => p.numero === h.piezaFdi);
+                if (!pieza) continue;
+                pieza.estado = h.estado;
+                pieza.notas = h.hallazgo;
+                pieza.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
+              }
+              await odontograma.save();
+            } catch (e) {
+              log.error("[ODONTOGRAMA]", e.message);
             }
           }
         } catch (e) {
