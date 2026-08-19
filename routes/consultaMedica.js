@@ -7,7 +7,7 @@ const { CONFIG, log } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { transcribirConsultaMedica, crearTokenStreaming } = require("../services/assemblyai");
+const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara } = require("../services/assemblyai");
 const { generarNotaClinica } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
 const { enviarTexto } = require("../services/metaWhatsapp");
@@ -29,7 +29,11 @@ module.exports = function (app) {
   app.get("/medico/transcripcion-token", requireMedico, asyncRoute(async (req, res) => {
     try {
       const token = await crearTokenStreaming();
-      res.json({ token });
+      // El vocabulario viaja junto al token para que la vista previa en vivo
+      // reconozca exactamente los mismos términos que la transcripción final
+      // (una sola fuente de verdad, en services/assemblyai.js).
+      const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("tipoEspecialidad").lean();
+      res.json({ token, keyterms: keytermsPara(medico?.tipoEspecialidad) });
     } catch (e) {
       log.error("[TRANSCRIPCION_TOKEN]", e.response?.data || e.message);
       throw new ErrorHttp(502, "No se pudo generar el token de transcripción en vivo");
@@ -58,7 +62,10 @@ module.exports = function (app) {
 
     res.status(202).json({ ok: true, consulta });
 
-    transcribirConsultaMedica(audioBuffer)
+    // La especialidad afina el vocabulario que se le pasa a AssemblyAI.
+    const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+
+    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad)
       .then(async ({ transcripcionCompleta, segmentos, duracionSegundos }) => {
         consulta.estado = "completado";
         consulta.transcripcionCompleta = transcripcionCompleta;

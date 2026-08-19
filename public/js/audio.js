@@ -107,10 +107,26 @@ function crearTranscriptorEnVivo(onTexto) {
   async function iniciar(stream) {
     detenidoManualmente = false;
     try {
-      const { token } = await api("/medico/transcripcion-token");
-      const url = "wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&encoding=pcm_s16le"
-        + "&format_turns=true&speech_model=universal-streaming-multilingual&token=" + encodeURIComponent(token);
-      ws = new WebSocket(url);
+      const { token, keyterms } = await api("/medico/transcripcion-token");
+      // Mismo criterio que la transcripción final (services/assemblyai.js):
+      // Medical Mode + vocabulario de la especialidad, para que lo que se ve
+      // mientras se habla se parezca a lo que después queda guardado.
+      // Los parámetros de lista (language_codes, keyterms_prompt) van como
+      // array JSON codificado en la URL — probado contra la API: mandarlos
+      // como parámetros repetidos devuelve "Invalid JSON array".
+      const params = new URLSearchParams({
+        sample_rate: "16000",
+        encoding: "pcm_s16le",
+        speech_model: "universal-3-5-pro",
+        domain: "medical-v1",
+        mode: "balanced",
+        language_codes: JSON.stringify(["es"]),
+        token,
+      });
+      if (Array.isArray(keyterms) && keyterms.length) {
+        params.set("keyterms_prompt", JSON.stringify(keyterms));
+      }
+      ws = new WebSocket("wss://streaming.assemblyai.com/v3/ws?" + params.toString());
 
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const blobUrl = URL.createObjectURL(new Blob([CODIGO_WORKLET], { type: "application/javascript" }));
@@ -166,7 +182,15 @@ function crearTranscriptorEnVivo(onTexto) {
     if (workletNode) { try { workletNode.disconnect(); } catch {} }
     if (source) { try { source.disconnect(); } catch {} }
     if (audioCtx) { try { audioCtx.close(); } catch {} }
-    if (ws) { try { ws.close(); } catch {} }
+    // AssemblyAI factura la sesión hasta que se cierra: si solo se corta el
+    // socket sin avisar, la da por viva y cobra hasta el tope de 3 horas.
+    // Por eso primero se manda Terminate y recién después se cierra.
+    if (ws) {
+      try {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "Terminate" }));
+      } catch {}
+      try { ws.close(); } catch {}
+    }
     ws = null; audioCtx = null; workletNode = null; source = null;
   }
 

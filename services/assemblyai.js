@@ -14,6 +14,53 @@ const KEYTERMS_MEDICOS_ES = [
   "radiografía", "resonancia magnética", "tomografía", "biopsia",
 ];
 
+// Vocabulario propio de cada rama, que se suma al general. Sin esto, un
+// odontólogo dictando "pieza 36 con caries oclusal" pelea contra un modelo
+// afinado para medicina general — y justamente esos términos son los que
+// después alimentan el odontograma automático.
+const KEYTERMS_POR_ESPECIALIDAD = {
+  odontologia: [
+    "odontograma", "pieza dental", "caries", "caries oclusal", "caries interproximal",
+    "endodoncia", "obturación", "resina", "amalgama", "corona", "sellante",
+    "extracción", "exodoncia", "implante", "periodontitis", "gingivitis",
+    "sarro", "placa bacteriana", "profilaxis", "pulpitis", "absceso",
+    "maxilar", "mandíbula", "molar", "premolar", "canino", "incisivo",
+    "oclusión", "bruxismo", "ortodoncia", "brackets", "prótesis",
+  ],
+  oftalmologia: [
+    "agudeza visual", "miopía", "astigmatismo", "hipermetropía", "presbicia",
+    "catarata", "glaucoma", "retina", "córnea", "cristalino", "conjuntivitis",
+    "presión intraocular", "fondo de ojo", "mácula", "nervio óptico",
+    "queratitis", "uveítis", "estrabismo", "dioptrías",
+  ],
+  ginecologia: [
+    "embarazo", "gestación", "semanas de gestación", "ecografía obstétrica",
+    "papanicolau", "colposcopía", "menstruación", "amenorrea", "endometrio",
+    "ovario", "útero", "cesárea", "parto", "anticonceptivo", "menopausia",
+    "preeclampsia", "trimestre",
+  ],
+  veterinaria: [
+    "canino", "felino", "desparasitación", "vacuna antirrábica", "moquillo",
+    "parvovirus", "castración", "esterilización", "garrapata", "pulgas",
+    "dermatitis", "otitis", "peso corporal", "raza", "mestizo",
+  ],
+  estetica: [
+    "toxina botulínica", "bótox", "ácido hialurónico", "relleno dérmico",
+    "peeling", "mesoterapia", "lipopapada", "hilos tensores", "colágeno",
+    "arrugas", "surco nasogeniano", "flacidez", "melasma", "láser",
+  ],
+};
+
+// AssemblyAI acepta hasta 100 términos en streaming (más en batch, pero
+// mantenemos una sola lista para que la vista previa y la transcripción
+// final reconozcan exactamente el mismo vocabulario).
+const MAX_KEYTERMS = 100;
+
+function keytermsPara(tipoEspecialidad) {
+  const propios = KEYTERMS_POR_ESPECIALIDAD[tipoEspecialidad] || [];
+  return [...KEYTERMS_MEDICOS_ES, ...propios].slice(0, MAX_KEYTERMS);
+}
+
 async function subirAudio(audioBuffer) {
   const res = await axios.post("https://api.assemblyai.com/v2/upload", audioBuffer, {
     headers: { Authorization: CONFIG.ASSEMBLYAI_API_KEY, "Content-Type": "application/octet-stream" },
@@ -24,7 +71,7 @@ async function subirAudio(audioBuffer) {
   return res.data.upload_url;
 }
 
-async function pedirTranscripcion(audioUrl) {
+async function pedirTranscripcion(audioUrl, tipoEspecialidad) {
   const res = await axios.post(
     "https://api.assemblyai.com/v2/transcript",
     {
@@ -39,7 +86,7 @@ async function pedirTranscripcion(audioUrl) {
       // detectarla, este número es solo una ayuda, no un límite estricto.
       speakers_expected: 2,
       domain: "medical-v1",
-      keyterms_prompt: KEYTERMS_MEDICOS_ES,
+      keyterms_prompt: keytermsPara(tipoEspecialidad),
     },
     {
       headers: { Authorization: CONFIG.ASSEMBLYAI_API_KEY, "Content-Type": "application/json" },
@@ -63,13 +110,13 @@ async function esperarTranscripcion(id) {
   throw new Error("Tiempo de espera agotado transcribiendo el audio");
 }
 
-async function transcribirConsultaMedica(audioBuffer) {
+async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad) {
   if (!CONFIG.ASSEMBLYAI_API_KEY) {
     throw new Error("ASSEMBLYAI_API_KEY no configurado");
   }
 
   const audioUrl = await subirAudio(audioBuffer);
-  const id = await pedirTranscripcion(audioUrl);
+  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad);
   const data = await esperarTranscripcion(id);
 
   const segmentos = (data.utterances || []).map(u => ({
@@ -101,4 +148,4 @@ async function crearTokenStreaming() {
   return res.data.token;
 }
 
-module.exports = { transcribirConsultaMedica, crearTokenStreaming };
+module.exports = { transcribirConsultaMedica, crearTokenStreaming, keytermsPara };
