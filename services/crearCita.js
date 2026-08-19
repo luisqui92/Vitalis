@@ -6,6 +6,21 @@
 const { Paciente, Cita } = require("../db/models");
 const { crearEvento } = require("./googleCalendar");
 const { horarioSigueLibre } = require("./agenda");
+const { notificarMedico } = require("./push");
+const { log } = require("../config");
+
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// "jueves 21 de agosto, 15:30" — la fecha se guarda en UTC, así que se pasa
+// a hora de Bolivia (UTC-4) antes de leerla, o el aviso llega con la hora
+// corrida y el médico se presenta cuatro horas tarde.
+function cuandoEnBolivia(fecha) {
+  const b = new Date(new Date(fecha).getTime() - 4 * 3600000);
+  const hh = String(b.getUTCHours()).padStart(2, "0");
+  const mm = String(b.getUTCMinutes()).padStart(2, "0");
+  return `${DIAS[b.getUTCDay()]} ${b.getUTCDate()} de ${MESES[b.getUTCMonth()]}, ${hh}:${mm}`;
+}
 
 // Se usa un error con esta marca (en vez de un mensaje de texto suelto) para
 // que cada caller (WhatsApp conversacional, reserva pública por link) lo
@@ -52,6 +67,15 @@ async function crearCitaConfirmada({ medicoPhone, medico, pacienteTelefono, paci
     const eventId = await crearEvento(medico.googleCalendarId, cita);
     if (eventId) await Cita.updateOne({ _id: cita._id }, { googleEventId: eventId });
   }
+
+  // Aviso al navegador del médico. Va sin await y con su propio catch: la
+  // cita ya está guardada y confirmada, y que falle un servicio de push
+  // ajeno no puede hacer que el paciente vea un error de reserva.
+  notificarMedico(medicoPhone, {
+    titulo: "Nueva reserva",
+    cuerpo: `${pacienteNombre} — ${cuandoEnBolivia(fecha)}${motivo ? ` · ${motivo}` : ""}`,
+    url: "/",
+  }).catch(e => log.error("[CREAR_CITA] no se pudo notificar la reserva:", e.message));
 
   return cita;
 }

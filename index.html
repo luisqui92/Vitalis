@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vitalis · Kardex inteligente</title>
 <link rel="icon" href="/logo.png">
+<!-- Manifest + apple-touch-icon: en iPhone las notificaciones del navegador
+     solo funcionan si el médico agregó Vitalis a la pantalla de inicio, y
+     para eso hace falta esto. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/logo.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vitalis">
+<meta name="theme-color" content="#0f1720">
 <link rel="preload" href="/fonts/fraunces-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/estilos.css">
@@ -67,6 +75,7 @@
 <script src="/js/examenOcular.js"></script>
 <script src="/js/embarazo.js"></script>
 <script src="/js/tratamientos.js"></script>
+<script src="/js/notificaciones.js"></script>
 <script src="/js/seguridad.js"></script>
 <script src="/js/recordatorios.js"></script>
 <script src="/js/agenda.js"></script>

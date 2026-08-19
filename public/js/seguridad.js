@@ -32,6 +32,8 @@ function pintarSeguridad(dosFAActivo, eventos) {
   app.innerHTML = `
     <button class="back" id="btnBack">← Panel</button>
 
+    ${notificacionesHtml()}
+
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">🔐 Verificación en dos pasos (2FA)</div>
       ${dosFAActivo ? `
@@ -60,6 +62,7 @@ function pintarSeguridad(dosFAActivo, eventos) {
     </div>`;
 
   document.getElementById("btnBack").onclick = renderDashboard;
+  wireNotificaciones();
 
   const btnActivar = document.getElementById("btnActivar2FA");
   if (btnActivar) btnActivar.onclick = () => iniciarActivacion2FA();

@@ -520,6 +520,23 @@ const vinculacionSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Vinculacion = mongoose.model("Vinculacion", vinculacionSchema);
 
+// Navegadores suscritos a las notificaciones del médico (Web Push). Un
+// médico puede tener varias: el celular, la compu del consultorio, etc., y
+// el aviso va a todas. El "endpoint" es la URL que da el navegador para
+// llegarle a ESE dispositivo — es única, y si el navegador la da de baja
+// (desinstalación, permiso revocado) el servicio de push responde 404/410
+// y la borramos sola.
+const suscripcionPushSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  endpoint: { type: String, unique: true, required: true },
+  keys: {
+    p256dh: { type: String, required: true },
+    auth: { type: String, required: true },
+  },
+  navegador: { type: String, default: "" }, // user-agent, para que el médico reconozca cuál es cuál
+}, { timestamps: true });
+const SuscripcionPush = mongoose.model("SuscripcionPush", suscripcionPushSchema);
+
 // Registro de auditoría: quién accedió/hizo qué y cuándo — clave para el
 // secreto médico (poder responder "quién vio la historia de este paciente")
 // y para detectar accesos anómalos. Se escribe siempre, nunca se edita.
@@ -552,4 +569,4 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };

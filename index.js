@@ -98,6 +98,7 @@ require("./routes/vapi")(app);
 require("./routes/vinculacion")(app);
 require("./routes/dashboardEscritorio")(app);
 require("./routes/reservaPublica")(app);
+require("./routes/push")(app);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));

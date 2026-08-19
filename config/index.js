@@ -63,6 +63,18 @@ const CONFIG = {
   // a nada sensible por sí solas.
   VAPI_PUBLIC_KEY: process.env.VAPI_PUBLIC_KEY || "",
   VAPI_ASSISTANT_ID: process.env.VAPI_ASSISTANT_ID || "",
+
+  // Notificaciones del navegador (Web Push). La pública se le entrega al
+  // navegador para suscribirse; la privada firma cada envío y no sale de
+  // acá. Se generan una sola vez con:
+  //   node -e "console.log(require('web-push').generateVAPIDKeys())"
+  // Si se cambian, todas las suscripciones existentes dejan de servir y
+  // cada médico tiene que volver a activar las notificaciones.
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || "",
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || "",
+  // A quién contactar si desde este servidor se manda push mal formado.
+  // Solo se acepta mailto: o https:.
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT || "mailto:soporte@chatgo.ia.bo",
 };
 
 // ─── LOGGER ────────────────────────────────────────────────────────────────
@@ -89,7 +101,7 @@ function validateConfig() {
   // revienta en el primer login/request autenticado con un error críptico en
   // vez de fallar limpio al arrancar.
   const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
-  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_ESPECIALIDADES_MEDICOS", "VAPI_PUBLIC_KEY", "VAPI_ASSISTANT_ID"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_ESPECIALIDADES_MEDICOS", "VAPI_PUBLIC_KEY", "VAPI_ASSISTANT_ID", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 
