@@ -5,6 +5,7 @@ btnLogout.onclick = logout;
 aplicarTemaSegunEspecialidad();
 aplicarLandingVeterinariaSiCorresponde();
 if (TOKEN) {
+  conectarTiempoReal();
   if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
   else renderDashboard();
 } else {

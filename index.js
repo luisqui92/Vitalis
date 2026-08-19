@@ -2,6 +2,7 @@
 // Vitalis — SmartKardex (antes vivía dentro de ChatGo, ahora es su propia app)
 // ═══════════════════════════════════════════════════════════════════════════
 const path = require("path");
+const http = require("http");
 const express = require("express");
 const helmet = require("helmet");
 const app = express();
@@ -61,6 +62,15 @@ app.use(helmet({
 
 app.use(express.json({ limit: "10mb" }));
 
+// ─── TIEMPO REAL ──────────────────────────────────────────────────────────
+// Avisa a las otras sesiones abiertas del mismo médico (celular + compu a
+// la vez, por ejemplo) cuando algo cambió, para que se actualicen solas.
+// Va ANTES de las rutas para que "res.on('finish')" quede enganchado en
+// todas ellas — lee req.adminUser recién cuando la respuesta ya terminó,
+// así que no importa que las rutas de abajo sean las que lo setean.
+const { iniciarServidorTiempoReal, middlewareAvisarCambios } = require("./services/realtime");
+app.use(middlewareAvisarCambios);
+
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
 require("./routes/consultaMedica")(app);
@@ -94,5 +104,10 @@ app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
 app.get(["/", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
+// http.createServer (en vez del app.listen de siempre) porque el
+// WebSocket del tiempo real necesita colgarse del mismo servidor, no de
+// uno aparte — comparten el mismo puerto/dominio.
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => log.info(`🚀 Vitalis corriendo en puerto ${PORT}`));
+const server = http.createServer(app);
+iniciarServidorTiempoReal(server);
+server.listen(PORT, () => log.info(`🚀 Vitalis corriendo en puerto ${PORT}`));

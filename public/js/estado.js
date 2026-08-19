@@ -208,6 +208,7 @@ function logout() {
   localStorage.removeItem("salud_tipo_especialidad");
   aplicarTemaSegunEspecialidad();
   if (typeof desactivarEscritorio === "function") desactivarEscritorio();
+  if (typeof desconectarTiempoReal === "function") desconectarTiempoReal();
   btnLogout.style.display = "none";
   headerSub.textContent = "Kardex inteligente";
   renderLogin();

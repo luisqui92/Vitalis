@@ -36,6 +36,7 @@ function completarLogin(data) {
   localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
   localStorage.setItem("salud_tipo_especialidad", MEDICO_TIPO_ESPECIALIDAD);
   aplicarTemaSegunEspecialidad();
+  if (typeof conectarTiempoReal === "function") conectarTiempoReal();
   if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
   else renderDashboard();
 }
