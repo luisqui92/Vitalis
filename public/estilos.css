@@ -227,6 +227,23 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .nota-titulo{font-family:var(--font-marca);font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;}
 .nota-campo{font-size:13px;line-height:1.6;margin-bottom:8px;}
 .nota-campo b{color:var(--text);font-weight:600;}
+/* Filas de "qué aplicar al confirmar": cada una es una casilla marcada por
+   defecto, que el médico desmarca si la IA entendió mal. */
+.conf-fila{padding:10px 0;border-bottom:1px solid var(--border);}
+.conf-fila:last-of-type{border-bottom:none;}
+/* Estas etiquetas son frases completas, no títulos de campo: se sacan el
+   mayúsculas/tracking que trae el label global, pensado para rótulos cortos. */
+.conf-check{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;line-height:1.5;cursor:pointer;margin:0;
+  text-transform:none;letter-spacing:normal;font-weight:400;color:var(--text);}
+.conf-check input[type=checkbox]{width:17px;height:17px;margin:1px 0 0 0;flex-shrink:0;accent-color:var(--primary);cursor:pointer;}
+.conf-check b{font-weight:600;}
+.conf-fila .hint{margin:6px 0 4px 26px;}
+.conf-fila input:not([type=checkbox]),.conf-fila label:not(.conf-check){margin-left:26px;width:calc(100% - 26px);}
+/* Medicamentos de la nota: en pantalla angosta la dosis y la frecuencia no
+   entran al lado del nombre, así que bajan a una segunda línea. */
+.med-row{flex-wrap:wrap;}
+.med-row .nf-med-nombre{min-width:100%;}
+@media(min-width:520px){.med-row .nf-med-nombre{min-width:0;}}
 .paciente-info{font-size:13px;color:var(--text-muted);margin-top:4px;line-height:1.5;}
 .avatar-card{text-align:center;}
 .avatar{width:58px;height:58px;border-radius:50%;background:var(--gradient-vitalis);color:#fff;font-family:var(--font-marca);font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 3px 10px rgba(var(--primary-rgb),.25);flex:0 0 auto;}

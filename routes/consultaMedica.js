@@ -4,7 +4,7 @@
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
 const { CONFIG, log } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara } = require("../services/assemblyai");
@@ -234,6 +234,216 @@ module.exports = function (app) {
     }
 
     res.json({ consulta: consultaObj });
+  }));
+
+  // ─── CONFIRMAR LA CONSULTA (un solo paso) ──────────────────────────────
+  // El médico revisa la nota que escribió la IA, corrige lo que haga falta
+  // y marca qué aplicar. Todo eso llega junto acá: se guarda la nota
+  // editada y se aplica lo marcado de una sola vez.
+  //
+  // Nada de esto es "todo o nada": si algo puntual falla (típico: el
+  // WhatsApp de la reconsulta cuando el paciente no tiene teléfono), el
+  // resto igual se aplica y se devuelve la lista de lo que no salió, para
+  // que el médico lo vea y decida. Fallar entero por un WhatsApp sería
+  // peor: le borraría también las correcciones que acaba de escribir.
+  app.post("/medico/consultas/:id/confirmar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    if (consulta.confirmadaEn) throw new ErrorHttp(409, "Esta consulta ya fue confirmada");
+    if (!consulta.notaClinica) throw new ErrorHttp(400, "Esta consulta todavía no tiene nota clínica");
+
+    const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
+    const aplicar = req.body?.aplicar || {};
+    const aplicado = [];
+    const fallado = [];
+
+    // ── 1. Guardar la nota con las correcciones del médico ──
+    const notaEditada = req.body?.nota;
+    if (notaEditada && typeof notaEditada === "object") {
+      const n = consulta.notaClinica;
+      const textos = ["motivoConsulta", "antecedentesRelevantes", "diagnostico", "plan", "proximoControl"];
+      const listas = ["sintomas", "diagnosticosDiferenciales", "examenesSolicitados"];
+      let huboCambios = false;
+
+      for (const campo of textos) {
+        if (notaEditada[campo] === undefined) continue;
+        const valor = String(notaEditada[campo]).trim();
+        if (valor !== (n[campo] || "")) {
+          // Lo que la IA propuso vs. lo que quedó: alimenta el panel de
+          // correcciones, que es como medimos si la IA está mejorando.
+          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: n[campo], valorFinal: valor });
+          n[campo] = valor;
+          huboCambios = true;
+        }
+      }
+      for (const campo of listas) {
+        if (!Array.isArray(notaEditada[campo])) continue;
+        const valor = notaEditada[campo].map(x => String(x).trim()).filter(Boolean);
+        if (valor.join("|") !== (n[campo] || []).join("|")) {
+          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: (n[campo] || []).join(", "), valorFinal: valor.join(", ") });
+          n[campo] = valor;
+          huboCambios = true;
+        }
+      }
+      if (Array.isArray(notaEditada.medicamentosRecetados)) {
+        const valor = notaEditada.medicamentosRecetados
+          .map(m => ({ nombre: String(m?.nombre || "").trim(), dosis: String(m?.dosis || "").trim(), frecuencia: String(m?.frecuencia || "").trim() }))
+          .filter(m => m.nombre);
+        const antes = (n.medicamentosRecetados || []).map(m => `${m.nombre}|${m.dosis}|${m.frecuencia}`).join("¬");
+        const despues = valor.map(m => `${m.nombre}|${m.dosis}|${m.frecuencia}`).join("¬");
+        if (antes !== despues) {
+          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo: "medicamentosRecetados", valorSugerido: antes, valorFinal: despues });
+          n.medicamentosRecetados = valor;
+          huboCambios = true;
+        }
+      }
+      if (huboCambios) {
+        consulta.notaEditadaPorMedico = true;
+        aplicado.push("Nota clínica corregida");
+      }
+    }
+
+    const nota = consulta.notaClinica;
+
+    // ── 2. Reconsulta: agendar y avisar por WhatsApp ──
+    const pedidoReconsulta = aplicar.reconsulta;
+    const sugerida = nota.reconsultaSugerida;
+    if (sugerida?.fechaHora && sugerida.estado === "pendiente") {
+      if (pedidoReconsulta?.activo) {
+        try {
+          if (pedidoReconsulta.fechaHora) {
+            const f = new Date(pedidoReconsulta.fechaHora);
+            if (isNaN(f.getTime())) throw new Error("La fecha de la reconsulta no es válida");
+            registrarCorreccion({
+              medicoPhone, tipo: "reconsulta", consultaId: consulta._id, campo: "fechaHora",
+              valorSugerido: sugerida.fechaHora?.toISOString(), valorFinal: f.toISOString(),
+            });
+            sugerida.fechaHora = f;
+          }
+          if (!paciente.telefono) throw new Error("El paciente no tiene teléfono cargado");
+
+          const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+          const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
+          const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
+          const primerNombre = String(paciente.nombre || "").split(" ")[0];
+          const texto = `Hola ${primerNombre} 👋 ${medico?.nombre || "Tu médico"} te sugiere tu próxima consulta para el ${formatearFechaCompleta(sugerida.fechaHora)}.\n\nElegí el horario que te quede mejor acá (vas a ver la disponibilidad real):\n${link}\n\n(el link es válido por 45 minutos)`;
+          await enviarTexto(paciente.telefono, texto);
+
+          sugerida.estado = "confirmada";
+          aplicado.push("Reconsulta avisada por WhatsApp");
+          registrar({ req, medicoPhone, accion: "reconsulta_confirmada", recurso: `ConsultaMedica:${consulta._id}` });
+        } catch (e) {
+          log.error("[CONFIRMAR/reconsulta]", e.message);
+          fallado.push("No se pudo avisar la reconsulta por WhatsApp: " + e.message);
+        }
+      } else {
+        sugerida.estado = "descartada";
+      }
+    }
+
+    // ── 3. Tratamientos sugeridos → presupuesto ──
+    const tratamientosPedidos = Array.isArray(aplicar.tratamientos) ? aplicar.tratamientos : [];
+    for (const item of (nota.tratamientosSugeridos || [])) {
+      if (item.estado !== "pendiente") continue;
+      const pedido = tratamientosPedidos.find(t => String(t?.itemId) === String(item._id));
+      if (!pedido) { item.estado = "descartado"; continue; }
+      try {
+        const nombre = String(pedido.nombre || item.catalogoNombreSugerido || item.itemMencionado || "").trim();
+        if (!nombre) throw new Error("falta el nombre");
+        const precio = Number(pedido.precio);
+        if (!Number.isFinite(precio) || precio < 0) throw new Error("precio inválido");
+        let piezaFdi = pedido.piezaFdi !== undefined && pedido.piezaFdi !== "" ? Number(pedido.piezaFdi) : item.piezaFdi;
+        if (piezaFdi !== null && piezaFdi !== undefined && !Number.isFinite(piezaFdi)) throw new Error("pieza inválida");
+
+        registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "nombre", valorSugerido: item.catalogoNombreSugerido, valorFinal: nombre });
+        registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "piezaFdi", valorSugerido: item.piezaFdi, valorFinal: piezaFdi });
+
+        await TratamientoPlan.create({
+          pacienteId: consulta.pacienteId, medicoPhone, nombre, precio,
+          piezaFdi: piezaFdi ?? null, estado: "pendiente",
+        });
+        item.estado = "agregado";
+        aplicado.push(`Tratamiento al presupuesto: ${nombre}`);
+      } catch (e) {
+        fallado.push(`No se pudo agregar el tratamiento "${item.itemMencionado}": ${e.message}`);
+      }
+    }
+
+    // ── 4. Medicación al Kardex ──
+    const medsPedidos = Array.isArray(aplicar.medicamentos) ? aplicar.medicamentos : [];
+    for (const i of medsPedidos) {
+      const m = (nota.medicamentosRecetados || [])[Number(i)];
+      if (!m?.nombre) continue;
+      try {
+        await Medicamento.create({
+          pacienteId: consulta.pacienteId, medicoPhone,
+          nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "",
+        });
+        aplicado.push(`Medicación: ${m.nombre}`);
+      } catch (e) {
+        fallado.push(`No se pudo cargar el medicamento "${m.nombre}": ${e.message}`);
+      }
+    }
+
+    // ── 5. Antecedentes y vacunas ──
+    for (const i of (Array.isArray(aplicar.antecedentesPersonales) ? aplicar.antecedentesPersonales : [])) {
+      const texto = (nota.antecedentesPersonalesNuevos || [])[Number(i)];
+      if (!texto) continue;
+      if (!paciente.antecedentesPersonales?.includes(texto)) {
+        paciente.antecedentesPersonales = [...(paciente.antecedentesPersonales || []), texto];
+        aplicado.push(`Antecedente: ${texto}`);
+      }
+    }
+    for (const i of (Array.isArray(aplicar.antecedentesFamiliares) ? aplicar.antecedentesFamiliares : [])) {
+      const a = (nota.antecedentesFamiliaresNuevos || [])[Number(i)];
+      if (!a?.condicion) continue;
+      paciente.antecedentesFamiliares = [...(paciente.antecedentesFamiliares || []), { parentesco: a.parentesco || "", condicion: a.condicion }];
+      aplicado.push(`Antecedente familiar: ${a.parentesco} — ${a.condicion}`);
+    }
+    await paciente.save();
+
+    for (const i of (Array.isArray(aplicar.vacunas) ? aplicar.vacunas : [])) {
+      const v = (nota.vacunasMencionadas || [])[Number(i)];
+      if (!v?.nombre) continue;
+      try {
+        // La fecha se guarda como YYYY-MM-DD en hora local: usar toISOString()
+        // directo adelantaría un día las consultas cargadas de noche en
+        // Bolivia (UTC-4).
+        const base = new Date(consulta.createdAt);
+        const fecha = v.fecha || new Date(base.getTime() - base.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        await Vacuna.create({
+          pacienteId: consulta.pacienteId, medicoPhone,
+          nombre: v.nombre, dosis: v.dosis || "", fecha,
+        });
+        aplicado.push(`Vacuna: ${v.nombre}`);
+      } catch (e) {
+        fallado.push(`No se pudo cargar la vacuna "${v.nombre}": ${e.message}`);
+      }
+    }
+
+    // ── 6. Receta con los medicamentos (ya corregidos arriba) ──
+    let recetaId = null;
+    if (aplicar.receta && (nota.medicamentosRecetados || []).length) {
+      try {
+        const receta = await Receta.create({
+          pacienteId: consulta.pacienteId, medicoPhone, consultaId: consulta._id,
+          fecha: new Date(),
+          medicamentos: nota.medicamentosRecetados.map(m => ({
+            nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "", duracion: "",
+          })),
+        });
+        recetaId = receta._id;
+        aplicado.push("Receta generada");
+      } catch (e) {
+        fallado.push("No se pudo generar la receta: " + e.message);
+      }
+    }
+
+    consulta.confirmadaEn = new Date();
+    await consulta.save();
+    registrar({ req, medicoPhone, accion: "consulta_confirmada", recurso: `ConsultaMedica:${consulta._id}` });
+
+    res.json({ ok: true, aplicado, fallado, recetaId });
   }));
 
   // ─── RECONSULTA POR VOZ: confirmar o descartar lo que detectó la IA ─────

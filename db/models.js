@@ -118,6 +118,12 @@ const consultaMedicaSchema = new mongoose.Schema({
   // Nota clínica estructurada, generada por IA a partir de la transcripción
   // una vez que esta termina. Es un segundo paso, independiente del de arriba.
   notaClinicaEstado: { type: String, enum: ["pendiente", "completado", "error"], default: "pendiente" },
+  // El médico revisa la nota, corrige lo que la IA escribió mal y confirma
+  // una sola vez: ahí se aplica todo lo que dejó marcado (reconsulta,
+  // tratamientos, receta, medicación, antecedentes, vacunas). Queda la
+  // fecha para no volver a aplicar lo mismo si entra de nuevo a la pantalla.
+  confirmadaEn: { type: Date, default: null },
+  notaEditadaPorMedico: { type: Boolean, default: false },
   notaClinica: {
     motivoConsulta: String,
     sintomas: [String],
@@ -532,7 +538,7 @@ const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 // bloquea ni retrasa el flujo real si falla al guardar.
 const correccionIASchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
-  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular"], required: true },
+  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular", "nota"], required: true },
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
   campo: { type: String, default: "" }, // ej: "fechaHora", "nombre", "OD:cristalino"
   valorSugerido: { type: String, default: "" }, // lo que propuso la IA

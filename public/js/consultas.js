@@ -206,20 +206,29 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     const data = await api("/medico/consultas/" + id);
     const c = data.consulta;
 
+    const yaConfirmada = !!c.confirmadaEn;
+    const n = c.notaClinica;
+    const hayNota = c.estado === "completado" && c.notaClinicaEstado === "completado" && n;
+
+    // ── NOTA CLÍNICA ──
+    // Antes de confirmar es un formulario: la IA se equivoca (nombres de
+    // medicamentos, una pieza mal escuchada) y el médico tiene que poder
+    // corregirlo antes de que eso quede en el Kardex. Después de confirmar
+    // se muestra como texto, ya sin editar.
     let notaHtml = "";
     if (c.estado === "completado") {
       if (c.notaClinicaEstado === "pendiente") {
         notaHtml = `<div class="card"><div class="hint">🧠 Generando nota clínica...</div></div>`;
       } else if (c.notaClinicaEstado === "error") {
         notaHtml = `<div class="card"><div class="error">⚠️ No se pudo generar la nota clínica automática. La transcripción completa queda más abajo.</div></div>`;
-      } else if (c.notaClinica) {
-        const n = c.notaClinica;
+      } else if (n && yaConfirmada) {
         const meds = (n.medicamentosRecetados || []).map(m =>
           esc(m.nombre + (m.dosis ? " " + m.dosis : "") + (m.frecuencia ? " — " + m.frecuencia : ""))
         ).join("; ");
         notaHtml = `
           <div class="card">
-            <div class="nota-titulo">🧠 Nota clínica generada por IA (revisar antes de usar)</div>
+            <div class="nota-titulo">🧠 Nota clínica${c.notaEditadaPorMedico ? " (corregida por vos)" : ""}</div>
+            <div class="hint" style="color:var(--success);margin-bottom:10px">✅ Consulta confirmada el ${new Date(c.confirmadaEn).toLocaleString("es-BO")}</div>
             ${n.motivoConsulta ? `<div class="nota-campo"><b>Motivo:</b> ${esc(n.motivoConsulta)}</div>` : ""}
             ${(n.sintomas||[]).length ? `<div class="nota-campo"><b>Síntomas:</b> ${esc(n.sintomas.join(", "))}</div>` : ""}
             ${n.antecedentesRelevantes ? `<div class="nota-campo"><b>Antecedentes:</b> ${esc(n.antecedentesRelevantes)}</div>` : ""}
@@ -229,98 +238,122 @@ async function renderDetalle(id, esRefrescoAutomatico) {
             ${meds ? `<div class="nota-campo"><b>Medicamentos:</b> ${meds}</div>` : ""}
             ${(n.examenesSolicitados||[]).length ? `<div class="nota-campo"><b>Exámenes:</b> ${esc(n.examenesSolicitados.join(", "))}</div>` : ""}
             ${n.proximoControl ? `<div class="nota-campo"><b>Próximo control:</b> ${esc(n.proximoControl)}</div>` : ""}
-            ${(n.medicamentosRecetados||[]).length ? `<button class="secondary" id="btnGenerarReceta" style="margin-top:14px">📝 Generar receta con estos medicamentos</button>` : ""}
           </div>`;
-      }
-    }
-
-    let sugerenciasHtml = "";
-    if (c.estado === "completado" && c.notaClinicaEstado === "completado" && c.notaClinica) {
-      const n = c.notaClinica;
-      const items = [];
-      (n.medicamentosRecetados || []).forEach((m, i) => items.push({
-        tipo: "medicamento", i,
-        texto: esc(m.nombre + (m.dosis ? " " + m.dosis : "") + (m.frecuencia ? " — " + m.frecuencia : "")),
-      }));
-      (n.antecedentesPersonalesNuevos || []).forEach((a, i) => items.push({ tipo: "antp", i, texto: esc(a) }));
-      (n.antecedentesFamiliaresNuevos || []).forEach((a, i) => items.push({
-        tipo: "antf", i, texto: esc(`${a.parentesco}: ${a.condicion}`),
-      }));
-      (n.vacunasMencionadas || []).forEach((v, i) => items.push({
-        tipo: "vacuna", i,
-        texto: esc(v.nombre + (v.dosis ? " — " + v.dosis : "") + (v.fecha ? " (" + v.fecha + ")" : "")),
-      }));
-      if (items.length) {
-        sugerenciasHtml = `
+      } else if (n) {
+        notaHtml = `
           <div class="card">
-            <div class="nota-titulo">➕ Sugerencias para el Kardex</div>
-            <div class="hint" style="margin-bottom:10px">Detectado en esta consulta. Revisá y agregá lo que corresponda — no se carga nada solo.</div>
-            ${items.map(it => `
-              <div class="dato-row" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-                <span>${it.texto}</span>
-                <button class="link" data-sugerencia="${it.tipo}:${it.i}" style="margin:0;width:auto;white-space:nowrap">➕ Agregar</button>
-              </div>`).join("")}
+            <div class="nota-titulo">🧠 Nota clínica generada por IA</div>
+            <div class="hint" style="margin-bottom:12px">Revisá y corregí lo que haga falta. Se guarda cuando confirmás.</div>
+            <label>Motivo de consulta</label>
+            <input id="nfMotivo" type="text" value="${esc(n.motivoConsulta || "")}">
+            <label>Síntomas <span class="hint">(separados por coma)</span></label>
+            <input id="nfSintomas" type="text" value="${esc((n.sintomas || []).join(", "))}">
+            <label>Antecedentes relevantes</label>
+            <textarea id="nfAntecedentes" rows="2">${esc(n.antecedentesRelevantes || "")}</textarea>
+            <label>Diagnóstico</label>
+            <input id="nfDiagnostico" type="text" value="${esc(n.diagnostico || "")}">
+            <label>Diagnósticos diferenciales <span class="hint">(separados por coma)</span></label>
+            <input id="nfDiferenciales" type="text" value="${esc((n.diagnosticosDiferenciales || []).join(", "))}">
+            <label>Plan</label>
+            <textarea id="nfPlan" rows="3">${esc(n.plan || "")}</textarea>
+            <label>Medicamentos</label>
+            <div id="nfMeds">
+              ${(n.medicamentosRecetados || []).map((m, i) => `
+                <div class="med-row" data-i="${i}" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+                  <input class="nf-med-nombre" type="text" placeholder="Medicamento" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
+                  <input class="nf-med-dosis" type="text" placeholder="Dosis" value="${esc(m.dosis || "")}" style="flex:1;margin:0">
+                  <input class="nf-med-frec" type="text" placeholder="Frecuencia" value="${esc(m.frecuencia || "")}" style="flex:1;margin:0">
+                  <button class="link nf-med-quitar" title="Quitar" style="margin:0;width:auto">✕</button>
+                </div>`).join("")}
+            </div>
+            <button class="link" id="nfMedAgregar" style="margin:0 0 10px 0;width:auto">➕ Agregar medicamento</button>
+            <label>Exámenes solicitados <span class="hint">(separados por coma)</span></label>
+            <input id="nfExamenes" type="text" value="${esc((n.examenesSolicitados || []).join(", "))}">
+            <label>Próximo control</label>
+            <input id="nfProximoControl" type="text" value="${esc(n.proximoControl || "")}">
           </div>`;
       }
     }
 
-    let reconsultaHtml = "";
-    const reconsulta = c.notaClinica?.reconsultaSugerida;
-    if (reconsulta?.fechaHora) {
-      if (reconsulta.estado === "pendiente") {
+    // ── QUÉ APLICAR AL CONFIRMAR ──
+    // Todo junto y marcado por defecto: el médico desmarca lo que la IA
+    // haya entendido mal y confirma una sola vez.
+    let confirmarHtml = "";
+    if (hayNota && !yaConfirmada) {
+      const filas = [];
+
+      const reconsulta = n.reconsultaSugerida;
+      if (reconsulta?.fechaHora && reconsulta.estado === "pendiente") {
         // datetime-local necesita "YYYY-MM-DDTHH:mm" en hora local, no UTC.
         const f = new Date(reconsulta.fechaHora);
         const valorInput = new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        reconsultaHtml = `
-          <div class="card">
-            <div class="nota-titulo">🗓️ Reconsulta sugerida</div>
-            ${reconsulta.textoOriginal ? `<div class="hint" style="margin-bottom:10px">Detecté esto en la consulta: "${esc(reconsulta.textoOriginal)}"</div>` : ""}
-            <label>Fecha y hora (revisá antes de avisarle al paciente)</label>
-            <input id="reconsultaFecha" type="datetime-local" value="${valorInput}">
-            <div id="reconsultaErr"></div>
-            <button class="primary" id="btnConfirmarReconsulta">Confirmar y avisar por WhatsApp</button>
-            <button class="link" id="btnDescartarReconsulta">Descartar</button>
-          </div>`;
-      } else if (reconsulta.estado === "confirmada") {
-        reconsultaHtml = `<div class="card"><div class="hint" style="color:var(--success)">✅ Reconsulta confirmada — se le avisó al paciente por WhatsApp.</div></div>`;
+        filas.push(`
+          <div class="conf-fila">
+            <label class="conf-check"><input type="checkbox" id="cfReconsulta" checked>
+              <span><b>Agendar reconsulta</b> y avisarle al paciente por WhatsApp</span></label>
+            ${reconsulta.textoOriginal ? `<div class="hint">Dijiste: "${esc(reconsulta.textoOriginal)}"</div>` : ""}
+            <input id="cfReconsultaFecha" type="datetime-local" value="${valorInput}">
+          </div>`);
       }
-    }
 
-    let tratamientosHtml = "";
-    const tratSugeridos = c.notaClinica?.tratamientosSugeridos;
-    if (tratSugeridos && tratSugeridos.length) {
-      const pendientes = tratSugeridos.filter(t => t.estado === "pendiente");
-      const resueltos = tratSugeridos.filter(t => t.estado !== "pendiente");
-      if (pendientes.length || resueltos.length) {
-        tratamientosHtml = `
-          <div class="card">
-            <div class="nota-titulo">🦷 Tratamientos mencionados</div>
-            <div class="hint" style="margin-bottom:10px">Detecté esto en la consulta. Revisá el nombre, la pieza y el precio antes de agregarlo al presupuesto — no se carga nada solo.</div>
-            ${pendientes.map(t => `
-              <div class="dato-row" data-tratsug="${t._id}" style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
-                <div class="hint" style="margin-bottom:8px">Detecté esto en la consulta: "${esc(t.itemMencionado)}"</div>
-                <label>Tratamiento</label>
-                <input class="ts-nombre" type="text" value="${esc(t.catalogoNombreSugerido || t.itemMencionado || "")}">
-                <div style="display:flex;gap:10px">
-                  <div style="flex:1">
-                    <label>Pieza (FDI, opcional)</label>
-                    <input class="ts-pieza" type="number" min="11" max="48" value="${t.piezaFdi ?? ""}">
-                  </div>
-                  <div style="flex:1">
-                    <label>Precio (Bs.)</label>
-                    <input class="ts-precio" type="number" min="0" step="0.01" value="${t.precioCatalogo ?? ""}">
-                  </div>
-                </div>
-                <div class="ts-err"></div>
-                <button class="primary ts-btn-agregar" style="margin-top:8px">Agregar al presupuesto</button>
-                <button class="link ts-btn-descartar">Descartar</button>
-              </div>`).join("")}
-            ${resueltos.map(t => `
-              <div class="hint" style="margin-top:8px;color:${t.estado === "agregado" ? "var(--success)" : "inherit"}">
-                ${t.estado === "agregado" ? "✅ Agregado al presupuesto" : "— Descartado"}: "${esc(t.itemMencionado)}"
-              </div>`).join("")}
-          </div>`;
+      (n.tratamientosSugeridos || []).filter(t => t.estado === "pendiente").forEach(t => {
+        filas.push(`
+          <div class="conf-fila" data-tratsug="${t._id}">
+            <label class="conf-check"><input type="checkbox" class="cf-trat" checked>
+              <span><b>Agregar al presupuesto</b></span></label>
+            <div class="hint">Dijiste: "${esc(t.itemMencionado)}"</div>
+            <input class="ts-nombre" type="text" value="${esc(t.catalogoNombreSugerido || t.itemMencionado || "")}">
+            <div style="display:flex;gap:10px">
+              <div style="flex:1"><label>Pieza (FDI)</label>
+                <input class="ts-pieza" type="number" min="11" max="48" value="${t.piezaFdi ?? ""}"></div>
+              <div style="flex:1"><label>Precio (Bs.)</label>
+                <input class="ts-precio" type="number" min="0" step="0.01" value="${t.precioCatalogo ?? ""}"></div>
+            </div>
+          </div>`);
+      });
+
+      if ((n.medicamentosRecetados || []).length) {
+        filas.push(`
+          <div class="conf-fila">
+            <label class="conf-check"><input type="checkbox" id="cfReceta" checked>
+              <span><b>Generar receta</b> con los medicamentos de la nota</span></label>
+          </div>`);
       }
+
+      (n.medicamentosRecetados || []).forEach((m, i) => filas.push(`
+        <div class="conf-fila">
+          <label class="conf-check"><input type="checkbox" class="cf-med" data-i="${i}" checked>
+            <span>Cargar a <b>Medicación</b>: ${esc(m.nombre + (m.dosis ? " " + m.dosis : ""))}</span></label>
+        </div>`));
+
+      (n.antecedentesPersonalesNuevos || []).forEach((a, i) => filas.push(`
+        <div class="conf-fila">
+          <label class="conf-check"><input type="checkbox" class="cf-antp" data-i="${i}" checked>
+            <span>Agregar <b>antecedente</b>: ${esc(a)}</span></label>
+        </div>`));
+
+      (n.antecedentesFamiliaresNuevos || []).forEach((a, i) => filas.push(`
+        <div class="conf-fila">
+          <label class="conf-check"><input type="checkbox" class="cf-antf" data-i="${i}" checked>
+            <span>Agregar <b>antecedente familiar</b>: ${esc(a.parentesco + ": " + a.condicion)}</span></label>
+        </div>`));
+
+      (n.vacunasMencionadas || []).forEach((v, i) => filas.push(`
+        <div class="conf-fila">
+          <label class="conf-check"><input type="checkbox" class="cf-vac" data-i="${i}" checked>
+            <span>Agregar <b>vacuna</b>: ${esc(v.nombre + (v.dosis ? " — " + v.dosis : ""))}</span></label>
+        </div>`));
+
+      confirmarHtml = `
+        <div class="card">
+          ${filas.length ? `
+            <div class="nota-titulo">✅ Qué aplicar al confirmar</div>
+            <div class="hint" style="margin-bottom:10px">Desmarcá lo que no corresponda. Nada se carga hasta que confirmes.</div>
+            ${filas.join("")}` : `
+            <div class="hint">No detecté nada para cargar al Kardex en esta consulta.</div>`}
+          <div id="confirmarErr"></div>
+          <button class="primary" id="btnConfirmarConsulta" style="margin-top:14px">Confirmar consulta</button>
+        </div>`;
     }
 
     let body = "";
@@ -345,135 +378,100 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         <div class="fecha">${new Date(c.createdAt).toLocaleString("es-BO")}${c.duracionSegundos ? " · " + Math.round(c.duracionSegundos/60) + " min" : ""}</div>
       </div>
       ${notaHtml}
-      ${reconsultaHtml}
-      ${tratamientosHtml}
-      ${sugerenciasHtml}
+      ${confirmarHtml}
       <div style="margin-top:14px">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
 
-    const btnConfirmarReconsulta = document.getElementById("btnConfirmarReconsulta");
-    if (btnConfirmarReconsulta) {
-      btnConfirmarReconsulta.onclick = async () => {
-        const errBox = document.getElementById("reconsultaErr");
+    // ── medicamentos: quitar / agregar filas en la nota editable ──
+    const medsBox = document.getElementById("nfMeds");
+    if (medsBox) {
+      medsBox.onclick = (e) => {
+        const quitar = e.target.closest(".nf-med-quitar");
+        if (!quitar) return;
+        e.preventDefault();
+        quitar.closest(".med-row").remove();
+      };
+      document.getElementById("nfMedAgregar").onclick = (e) => {
+        e.preventDefault();
+        const fila = document.createElement("div");
+        fila.className = "med-row";
+        fila.style.cssText = "display:flex;gap:6px;margin-bottom:6px;align-items:center";
+        fila.innerHTML = `
+          <input class="nf-med-nombre" type="text" placeholder="Medicamento" style="flex:2;margin:0">
+          <input class="nf-med-dosis" type="text" placeholder="Dosis" style="flex:1;margin:0">
+          <input class="nf-med-frec" type="text" placeholder="Frecuencia" style="flex:1;margin:0">
+          <button class="link nf-med-quitar" title="Quitar" style="margin:0;width:auto">✕</button>`;
+        medsBox.appendChild(fila);
+      };
+    }
+
+    // ── un solo botón: guarda la nota corregida y aplica lo marcado ──
+    const btnConfirmar = document.getElementById("btnConfirmarConsulta");
+    if (btnConfirmar) {
+      btnConfirmar.onclick = async () => {
+        const errBox = document.getElementById("confirmarErr");
         errBox.innerHTML = "";
-        btnConfirmarReconsulta.disabled = true;
-        btnConfirmarReconsulta.textContent = "Enviando...";
+        const val = (id) => (document.getElementById(id)?.value || "").trim();
+        const lista = (id) => val(id).split(",").map(x => x.trim()).filter(Boolean);
+        const marcado = (id) => !!document.getElementById(id)?.checked;
+
+        const nota = {
+          motivoConsulta: val("nfMotivo"),
+          sintomas: lista("nfSintomas"),
+          antecedentesRelevantes: val("nfAntecedentes"),
+          diagnostico: val("nfDiagnostico"),
+          diagnosticosDiferenciales: lista("nfDiferenciales"),
+          plan: val("nfPlan"),
+          examenesSolicitados: lista("nfExamenes"),
+          proximoControl: val("nfProximoControl"),
+          medicamentosRecetados: [...document.querySelectorAll("#nfMeds .med-row")].map(r => ({
+            nombre: r.querySelector(".nf-med-nombre").value.trim(),
+            dosis: r.querySelector(".nf-med-dosis").value.trim(),
+            frecuencia: r.querySelector(".nf-med-frec").value.trim(),
+          })).filter(m => m.nombre),
+        };
+
+        const aplicar = {
+          reconsulta: document.getElementById("cfReconsulta")
+            ? { activo: marcado("cfReconsulta"), fechaHora: val("cfReconsultaFecha") }
+            : null,
+          receta: marcado("cfReceta"),
+          tratamientos: [...document.querySelectorAll("[data-tratsug]")]
+            .filter(r => r.querySelector(".cf-trat").checked)
+            .map(r => ({
+              itemId: r.dataset.tratsug,
+              nombre: r.querySelector(".ts-nombre").value.trim(),
+              piezaFdi: r.querySelector(".ts-pieza").value,
+              precio: r.querySelector(".ts-precio").value,
+            })),
+          medicamentos: [...document.querySelectorAll(".cf-med:checked")].map(x => Number(x.dataset.i)),
+          antecedentesPersonales: [...document.querySelectorAll(".cf-antp:checked")].map(x => Number(x.dataset.i)),
+          antecedentesFamiliares: [...document.querySelectorAll(".cf-antf:checked")].map(x => Number(x.dataset.i)),
+          vacunas: [...document.querySelectorAll(".cf-vac:checked")].map(x => Number(x.dataset.i)),
+        };
+
+        btnConfirmar.disabled = true;
+        btnConfirmar.textContent = "Confirmando...";
         try {
-          const fechaHora = document.getElementById("reconsultaFecha").value;
-          await api(`/medico/consultas/${c._id}/reconsulta/confirmar`, {
-            method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ fechaHora }),
+          const r = await api(`/medico/consultas/${c._id}/confirmar`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nota, aplicar }),
           });
+          // Si algo puntual falló (típico: el WhatsApp de la reconsulta), el
+          // resto igual se aplicó — se avisa sin perder lo que ya se guardó.
+          if (r.fallado?.length) {
+            alert("Se confirmó la consulta, pero esto no se pudo aplicar:\n\n• " + r.fallado.join("\n• "));
+          }
+          if (r.recetaId) return renderReceta(r.recetaId);
           renderDetalle(id);
         } catch (e) {
           errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo confirmar")}</div>`;
-          btnConfirmarReconsulta.disabled = false;
-          btnConfirmarReconsulta.textContent = "Confirmar y avisar por WhatsApp";
+          btnConfirmar.disabled = false;
+          btnConfirmar.textContent = "Confirmar consulta";
         }
       };
     }
-    const btnDescartarReconsulta = document.getElementById("btnDescartarReconsulta");
-    if (btnDescartarReconsulta) {
-      btnDescartarReconsulta.onclick = async () => {
-        await api(`/medico/consultas/${c._id}/reconsulta/descartar`, { method: "POST" });
-        renderDetalle(id);
-      };
-    }
-
-    document.querySelectorAll("[data-tratsug]").forEach(row => {
-      const itemId = row.dataset.tratsug;
-      const errBox = row.querySelector(".ts-err");
-      const btnAgregar = row.querySelector(".ts-btn-agregar");
-      const btnDescartar = row.querySelector(".ts-btn-descartar");
-
-      btnAgregar.onclick = async () => {
-        errBox.innerHTML = "";
-        const nombre = row.querySelector(".ts-nombre").value.trim();
-        const piezaFdi = row.querySelector(".ts-pieza").value;
-        const precio = row.querySelector(".ts-precio").value;
-        btnAgregar.disabled = true;
-        btnAgregar.textContent = "Agregando...";
-        try {
-          await api(`/medico/consultas/${c._id}/tratamientos-sugeridos/${itemId}/agregar`, {
-            method: "POST", headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({ nombre, precio, piezaFdi }),
-          });
-          renderDetalle(id);
-        } catch (e) {
-          errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo agregar")}</div>`;
-          btnAgregar.disabled = false;
-          btnAgregar.textContent = "Agregar al presupuesto";
-        }
-      };
-      btnDescartar.onclick = async () => {
-        await api(`/medico/consultas/${c._id}/tratamientos-sugeridos/${itemId}/descartar`, { method: "POST" });
-        renderDetalle(id);
-      };
-    });
-
-    const btnGenerarReceta = document.getElementById("btnGenerarReceta");
-    if (btnGenerarReceta) {
-      btnGenerarReceta.onclick = async () => {
-        btnGenerarReceta.disabled = true;
-        btnGenerarReceta.textContent = "Generando...";
-        try {
-          const data = await api("/medico/pacientes/" + c.pacienteId + "/recetas", {
-            method: "POST", headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({ medicamentos: c.notaClinica.medicamentosRecetados, consultaId: c._id }),
-          });
-          renderReceta(data.receta._id);
-        } catch (e) {
-          btnGenerarReceta.disabled = false;
-          btnGenerarReceta.textContent = "📝 Generar receta con estos medicamentos";
-        }
-      };
-    }
-
-    document.querySelectorAll("[data-sugerencia]").forEach(btn => {
-      btn.onclick = async () => {
-        const [tipo, iStr] = btn.dataset.sugerencia.split(":");
-        const i = Number(iStr);
-        const n = c.notaClinica;
-        btn.disabled = true;
-        try {
-          if (tipo === "medicamento") {
-            const m = n.medicamentosRecetados[i];
-            await api("/medico/pacientes/" + c.pacienteId + "/medicamentos", {
-              method: "POST", headers: {"Content-Type":"application/json"},
-              body: JSON.stringify({ nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "" }),
-            });
-          } else if (tipo === "antp") {
-            await api("/medico/pacientes/" + c.pacienteId + "/antecedentes-personales", {
-              method: "POST", headers: {"Content-Type":"application/json"},
-              body: JSON.stringify({ texto: n.antecedentesPersonalesNuevos[i] }),
-            });
-          } else if (tipo === "antf") {
-            const a = n.antecedentesFamiliaresNuevos[i];
-            await api("/medico/pacientes/" + c.pacienteId + "/antecedentes-familiares", {
-              method: "POST", headers: {"Content-Type":"application/json"},
-              body: JSON.stringify({ parentesco: a.parentesco, condicion: a.condicion }),
-            });
-          } else if (tipo === "vacuna") {
-            const v = n.vacunasMencionadas[i];
-            // toISOString() es siempre UTC — una consulta cargada de noche
-            // en Bolivia (UTC-4) ya cae en el día siguiente en UTC, y la
-            // vacuna quedaba anotada un día adelantada. Mismo truco que la
-            // línea de arriba (reconsulta): restar el offset local antes
-            // de cortar a solo la fecha.
-            const fCreada = new Date(c.createdAt);
-            const fecha = v.fecha || new Date(fCreada.getTime() - fCreada.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-            await api("/medico/pacientes/" + c.pacienteId + "/vacunas", {
-              method: "POST", headers: {"Content-Type":"application/json"},
-              body: JSON.stringify({ nombre: v.nombre, dosis: v.dosis || "", fecha }),
-            });
-          }
-          btn.textContent = "✅ Agregado";
-        } catch (e) {
-          btn.disabled = false;
-          btn.textContent = "⚠️ Reintentar";
-        }
-      };
-    });
 
     if (c.estado === "procesando" || (c.estado === "completado" && c.notaClinicaEstado === "pendiente")) {
       pollTimeout = setTimeout(() => renderDetalle(id, true), 8000);
