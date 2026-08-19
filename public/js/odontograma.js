@@ -2,17 +2,26 @@
 // conversación) con panel de detalle tipo timeline por pieza. (Dentición
 // temporal queda para una próxima vuelta.)
 
+// Dos familias de estado: lo que la pieza TIENE hoy, y lo que está
+// INDICADO pero todavía no se hizo. Las indicadas van con el mismo tono
+// que su tratamiento, en versión clara y con el borde punteado, para que
+// se distinga de un vistazo lo planificado de lo hecho.
 const ESTADOS_PIEZA_INFO = {
   sano:                 { label: "Sano",                icono: "✅", color: "#ffffff", texto: "#0f2733", borde: "#c7d3da" },
   caries:                { label: "Caries",               icono: "🦠", color: "#b91c1c", texto: "#fff" },
+  fractura:              { label: "Fractura",              icono: "💥", color: "#7c2d12", texto: "#fff" },
   obturado:              { label: "Obturado",             icono: "🩹", color: "#2563eb", texto: "#fff" },
   corona:                { label: "Corona",                icono: "👑", color: "#ca8a04", texto: "#fff" },
   endodoncia:            { label: "Endodoncia",           icono: "💉", color: "#7c3aed", texto: "#fff" },
-  extraccion_indicada:   { label: "Extracción indicada",  icono: "⚠️", color: "#b45309", texto: "#fff" },
-  ausente:               { label: "Ausente",              icono: "❌", color: "#5b7480", texto: "#fff" },
-  fractura:              { label: "Fractura",              icono: "💥", color: "#7c2d12", texto: "#fff" },
   implante:              { label: "Implante",             icono: "🔩", color: "#15803d", texto: "#fff" },
   sellante:              { label: "Sellante",             icono: "🛡️", color: "#06b6d4", texto: "#fff" },
+  ausente:               { label: "Ausente",              icono: "❌", color: "#5b7480", texto: "#fff" },
+
+  obturacion_indicada:   { label: "Obturación indicada",  icono: "🩹", color: "#93c5fd", texto: "#0b2559", borde: "#2563eb", punteado: true },
+  corona_indicada:       { label: "Corona indicada",      icono: "👑", color: "#fcd34d", texto: "#3d2900", borde: "#ca8a04", punteado: true },
+  endodoncia_indicada:   { label: "Endodoncia indicada",  icono: "💉", color: "#c4b5fd", texto: "#2a1065", borde: "#7c3aed", punteado: true },
+  implante_indicado:     { label: "Implante indicado",    icono: "🔩", color: "#86efac", texto: "#052e16", borde: "#15803d", punteado: true },
+  extraccion_indicada:   { label: "Extracción indicada",  icono: "⚠️", color: "#fdba74", texto: "#431407", borde: "#b45309", punteado: true },
 };
 
 const FILA_SUPERIOR = [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28];
@@ -84,7 +93,7 @@ function piezaSvgHtml(pieza, pos) {
   const w = 26, h = 30;
   return `
     <g class="pieza-dental" data-numero="${pieza.numero}" transform="translate(${pos.x - w/2},${pos.y - h/2})" style="cursor:pointer">
-      <rect width="${w}" height="${h}" rx="7" fill="${info.color}" stroke="${info.borde || info.color}" stroke-width="1.5"></rect>
+      <rect width="${w}" height="${h}" rx="7" fill="${info.color}" stroke="${info.borde || info.color}" stroke-width="${info.punteado ? 2 : 1.5}"${info.punteado ? ' stroke-dasharray="4 2.5"' : ""}></rect>
       <text x="${w/2}" y="${h/2 + 5}" text-anchor="middle" font-size="13" font-weight="700" fill="${info.texto}">${pieza.numero}</text>
     </g>`;
 }
@@ -123,7 +132,7 @@ function pintarOdontograma(pacienteId, odontograma) {
       <div id="odontograma3dBox" style="display:${vistaOdontograma === "3d" ? "block" : "none"};min-height:220px"></div>
       <div class="odonto-leyenda">
         ${Object.entries(ESTADOS_PIEZA_INFO).map(([k, v]) => `
-          <span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.borde || v.color}"></i>${v.label}</span>`).join("")}
+          <span class="odonto-leyenda-item"><i style="background:${v.color};border:${v.punteado ? "1.5px dashed" : "1px solid"} ${v.borde || v.color}"></i>${v.label}</span>`).join("")}
       </div>
     </div>
     <div id="piezaDetalleBox"></div>`;

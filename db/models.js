@@ -230,9 +230,14 @@ const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 // dentición temporal (dientes de leche, 51-55/61-65/71-75/81-85) queda
 // para una siguiente vuelta — mezclar ambas con el recambio dental real
 // es justo la parte más delicada, no vale la pena apurarla.
+// Lo que la pieza tiene hoy, más los tratamientos indicados pero todavía
+// no hechos (el odontólogo los dicta como plan: "hay que hacer una
+// endodoncia en la 11"). Separarlos evita anotar como hecho algo que
+// recién está planificado.
 const ESTADOS_PIEZA_DENTAL = [
   "sano", "caries", "obturado", "corona", "endodoncia",
   "extraccion_indicada", "ausente", "fractura", "implante", "sellante",
+  "obturacion_indicada", "corona_indicada", "endodoncia_indicada", "implante_indicado",
 ];
 const PIEZAS_FDI_PERMANENTE = [
   11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28,

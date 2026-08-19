@@ -127,21 +127,42 @@ Reglas:
   · "piezaFdi": el número FDI tal cual (11-48). Si no queda claro de qué
     pieza habla, no reportes ese ítem — nunca adivines el número.
   · "estado": copiá EXACTO uno de los estados válidos que te paso más
-    abajo, el que mejor corresponda a lo que dijo (ej: "tiene caries" →
-    "caries"; "hay que sacarla"/"extracción" → "extraccion_indicada" si
-    todavía no se hizo, o "ausente" si ya no está; "está sana"/"bien" →
-    "sano"). Si lo que describe no corresponde con confianza a ninguno de
-    los estados de la lista, no reportes ese ítem.
+    abajo, el que mejor corresponda a lo que dijo. Si lo que describe no
+    corresponde con confianza a ninguno de los estados de la lista, no
+    reportes ese ítem.
+    La lista tiene dos familias, y elegir bien entre ellas es lo más
+    importante de este campo:
+    — Lo que la pieza YA TIENE: "tiene caries" → "caries"; "está
+      fracturada" → "fractura"; "ya tiene endodoncia hecha" →
+      "endodoncia"; "tiene una corona" → "corona"; "está obturada" →
+      "obturado"; "no está"/"ya se extrajo" → "ausente"; "está sana"/
+      "bien" → "sano".
+    — Lo que HAY QUE HACERLE y todavía no se hizo (terminan en
+      "_indicada"/"_indicado"): "hay que hacer una endodoncia" →
+      "endodoncia_indicada"; "va a necesitar corona" → "corona_indicada";
+      "hay que obturarla"/"hay que taparla" → "obturacion_indicada";
+      "hay que ponerle un implante" → "implante_indicado"; "hay que
+      sacarla"/"hay que extraerla" → "extraccion_indicada".
+    Nunca uses el estado hecho para algo que recién se planifica: si el
+    odontólogo dice que HAY QUE hacer una endodoncia, es
+    "endodoncia_indicada", no "endodoncia" — marcarla como hecha sería
+    anotar en la ficha un tratamiento que no se hizo.
   · "hallazgo": lo que dijo, tal cual (para que quede en el registro).
+  UNA SOLA entrada por pieza — cada diente guarda un único estado, así que
+  dos entradas del mismo número se pisan. Si de una misma pieza dice el
+  hallazgo Y el tratamiento, gana el hallazgo, que es lo que la pieza
+  tiene: "la 36 tiene caries, hay que obturarla" → una sola entrada, con
+  "caries" (marcarla "obturacion_indicada" escondería la caries). Usá los
+  estados "_indicada" cuando el tratamiento es lo único que dijo de esa
+  pieza: "hay que hacer una endodoncia en la 11" → "endodoncia_indicada".
   Esto se aplica directo al odontograma del paciente sin que el médico lo
   confirme antes (lo revisa/corrige después desde la pestaña Odontograma),
   así que ante cualquier duda real de la pieza o el estado, mejor no
-  reportar ese ítem. Es un campo DISTINTO de "tratamientosSugeridos": este
-  es el estado clínico actual de la pieza (qué tiene), el otro es qué
-  tratamiento HAY QUE HACER a futuro — la misma pieza puede aparecer en
-  los dos a la vez (ej: "la 36 tiene caries, hay que hacer una
-  obturación" → una entrada acá con estado "caries", y otra en
-  tratamientosSugeridos con el ítem de obturación).`;
+  reportar ese ítem. Es un campo DISTINTO de "tratamientosSugeridos": acá
+  va cómo queda la pieza en la ficha, allá va el ítem que se le va a
+  cobrar al paciente — el mismo tratamiento dictado suele ir a los dos
+  lados (ej: "hay que obturar la 36" → acá "obturacion_indicada" si no
+  dijo qué tiene, y allá el ítem de obturación con su precio).`;
 
 function construirContexto(contexto) {
   const partes = [];
