@@ -24,6 +24,7 @@ async function renderDashboard() {
   detenerPolling();
   headerSub.textContent = "Hola, " + (MEDICO_NOMBRE || "");
   btnLogout.style.display = "inline-block";
+  btnAsistente.style.display = "inline-flex";
   app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando tus pacientes...</div>`;
   try {
     const [dataPacientes, dataRecordatorios] = await Promise.all([

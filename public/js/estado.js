@@ -11,6 +11,7 @@ let MEDICO_TIPO_ESPECIALIDAD = localStorage.getItem("salud_tipo_especialidad") |
 let app = document.getElementById("app");
 const headerSub = document.getElementById("headerSub");
 const btnLogout = document.getElementById("btnLogout");
+const btnAsistente = document.getElementById("btnAsistente");
 
 // Odontología, estética, oftalmología y veterinaria tienen su propia
 // identidad visual (temas oscuros "Vitalis Dental" / "Vitalis Face" /
@@ -214,6 +215,8 @@ function logout() {
   if (typeof desactivarEscritorio === "function") desactivarEscritorio();
   if (typeof desconectarTiempoReal === "function") desconectarTiempoReal();
   btnLogout.style.display = "none";
+  btnAsistente.style.display = "none";
+  if (typeof cerrarAsistente === "function") cerrarAsistente();
   headerSub.textContent = "Kardex inteligente";
   renderLogin();
 }
