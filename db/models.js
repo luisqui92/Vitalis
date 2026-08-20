@@ -186,6 +186,14 @@ const consultaMedicaSchema = new mongoose.Schema({
       estado: { type: String, default: "" },
       hallazgo: { type: String, default: "" },
     }],
+    // Vitalis Gineco: hallazgos por órgano detectados en la consulta
+    // ("ovario izquierdo con quiste simple"). Igual que el mapa ocular y el
+    // odontograma, se aplican solos al mapa apenas se genera la nota.
+    ginecoSugerido: [{
+      organo: { type: String, default: "" },
+      hallazgo: { type: String, default: "" },
+      detalle: { type: String, default: "" },
+    }],
   },
   notaClinicaError: String,
 }, { timestamps: true });
@@ -309,6 +317,46 @@ const examenOcularSchema = new mongoose.Schema({
   estructuras: { type: [estructuraOcularSchema], default: [] },
 }, { timestamps: true });
 const ExamenOcular = mongoose.model("ExamenOcular", examenOcularSchema);
+
+// Vitalis Gineco — mapa del aparato reproductor: mismo patrón que el
+// odontograma y el mapa ocular, pero por órgano. La ginecóloga marca qué
+// encontró en cada uno y queda el historial de cómo fue cambiando.
+const ORGANOS_GINECO = [
+  "utero", "endometrio", "cuello_uterino",
+  "ovario_derecho", "ovario_izquierdo",
+  "trompa_derecha", "trompa_izquierda",
+  "mama_derecha", "mama_izquierda",
+];
+// Hallazgos concretos y no una escala de gravedad (como sí usa el mapa
+// ocular): en ginecología lo que se registra es QUÉ se encontró — un mioma
+// y un quiste piden conductas distintas aunque ambos sean "moderados".
+const HALLAZGOS_GINECO = [
+  "normal", "mioma", "quiste", "polipo", "endometriosis",
+  "inflamacion", "engrosamiento", "nodulo", "lesion", "ausente",
+];
+
+const organoGinecoSchema = new mongoose.Schema({
+  organo: { type: String, enum: ORGANOS_GINECO, required: true },
+  hallazgo: { type: String, enum: HALLAZGOS_GINECO, default: "normal" },
+  notas: { type: String, default: "" },
+  historial: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      hallazgo: { type: String, enum: HALLAZGOS_GINECO },
+      notas: { type: String, default: "" },
+      fuente: { type: String, enum: ["voz", "manual"], default: "manual" },
+      consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+    }],
+    default: [],
+  },
+}, { _id: false });
+
+const examenGinecologicoSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, unique: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  organos: { type: [organoGinecoSchema], default: [] },
+}, { timestamps: true });
+const ExamenGinecologico = mongoose.model("ExamenGinecologico", examenGinecologicoSchema);
 
 // Receta óptica: esfera/cilindro/eje/adición por ojo — completamente
 // distinta a una receta de medicamentos, por eso es un modelo aparte.
@@ -560,7 +608,7 @@ const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 // bloquea ni retrasa el flujo real si falla al guardar.
 const correccionIASchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
-  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular", "nota"], required: true },
+  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular", "examen_ginecologico", "nota"], required: true },
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
   campo: { type: String, default: "" }, // ej: "fechaHora", "nombre", "OD:cristalino"
   valorSugerido: { type: String, default: "" }, // lo que propuso la IA
@@ -569,4 +617,5 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };
+module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+  ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };

@@ -85,6 +85,7 @@ require("./routes/medicamentos")(app);
 require("./routes/vacunas")(app);
 require("./routes/odontograma")(app);
 require("./routes/examenOcular")(app);
+require("./routes/examenGinecologico")(app);
 require("./routes/embarazo")(app);
 require("./routes/tratamientos")(app);
 require("./routes/mediciones")(app);

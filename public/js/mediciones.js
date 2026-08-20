@@ -87,6 +87,82 @@ function dibujarGraficoEvolucion(canvas, puntos, doble) {
   }
   linea("#0e7490", p => p.valor);
   if (doble) linea("#b45309", p => p.valorSecundario);
+
+  // Se devuelven las posiciones en pantalla de cada punto para poder saber
+  // cuál se tocó y mostrar su valor (ver wireGraficoInteractivo).
+  return puntos.map((p, i) => ({ punto: p, x: x(i) }));
+}
+
+// Al tocar el gráfico se resalta la medición más cercana y se muestra su
+// valor y su fecha. En un celular no hay "hover", así que el mismo gesto
+// (tocar) tiene que servir para leer el dato.
+function wireGraficoInteractivo(canvas, posiciones, tipo) {
+  const salida = document.getElementById("medicionTocada");
+  if (!canvas || !salida || !posiciones?.length) return;
+
+  function mostrarDesde(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    let mejor = posiciones[0], mejorDist = Infinity;
+    for (const pos of posiciones) {
+      const d = Math.abs(pos.x - x);
+      if (d < mejorDist) { mejorDist = d; mejor = pos; }
+    }
+    const p = mejor.punto;
+    const valor = p.valorSecundario != null ? `${p.valor}/${p.valorSecundario}` : p.valor;
+    salida.innerHTML = `<b>${valor}${tipo.unidad ? " " + esc(tipo.unidad) : ""}</b> · ${new Date(p.fecha).toLocaleDateString("es-BO")}`;
+  }
+
+  canvas.onmousemove = (e) => mostrarDesde(e.clientX);
+  canvas.ontouchstart = canvas.ontouchmove = (e) => {
+    if (e.touches[0]) mostrarDesde(e.touches[0].clientX);
+  };
+  canvas.onmouseleave = () => { salida.innerHTML = ""; };
+}
+
+// "Antes pesaba X, ahora pesa Y": el dato que el médico busca de un vistazo
+// y que hasta ahora había que sacar comparando dos filas de la lista.
+function comparativaHtml(puntos, tipo) {
+  if (puntos.length < 2) return "";
+  const primero = puntos[0];
+  const ultimo = puntos[puntos.length - 1];
+  const fmt = (p) => (p.valorSecundario != null ? `${p.valor}/${p.valorSecundario}` : `${p.valor}`);
+
+  const delta = ultimo.valor - primero.valor;
+  const deltaSec = ultimo.valorSecundario != null && primero.valorSecundario != null
+    ? ultimo.valorSecundario - primero.valorSecundario : null;
+  const signo = (n) => (n > 0 ? "+" : "") + Math.round(n * 10) / 10;
+  // El color solo dice la DIRECCIÓN del cambio, no si es bueno o malo:
+  // bajar de peso puede ser lo buscado o una alarma según el caso, y eso
+  // lo juzga el médico, no la app.
+  const color = delta === 0 ? "var(--text-muted)" : delta > 0 ? "#b45309" : "#0e7490";
+  const flecha = delta === 0 ? "→" : delta > 0 ? "↑" : "↓";
+
+  const meses = Math.max(1, Math.round((new Date(ultimo.fecha) - new Date(primero.fecha)) / (30 * 24 * 3600 * 1000)));
+
+  return `
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">Cómo viene cambiando</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="text-align:center;flex:1">
+          <div class="hint">${new Date(primero.fecha).toLocaleDateString("es-BO")}</div>
+          <div style="font-size:22px;font-weight:700">${fmt(primero)}</div>
+          <div class="hint">antes</div>
+        </div>
+        <div style="text-align:center;color:${color};font-weight:700;white-space:nowrap">
+          <div style="font-size:20px">${flecha}</div>
+          <div style="font-size:13px">${signo(delta)}${deltaSec != null ? "/" + signo(deltaSec) : ""}</div>
+        </div>
+        <div style="text-align:center;flex:1">
+          <div class="hint">${new Date(ultimo.fecha).toLocaleDateString("es-BO")}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--primary)">${fmt(ultimo)}</div>
+          <div class="hint">ahora</div>
+        </div>
+      </div>
+      <div class="hint" style="text-align:center;margin-top:8px">
+        ${puntos.length} mediciones en ${meses} ${meses === 1 ? "mes" : "meses"}${tipo.unidad ? " · " + esc(tipo.unidad) : ""}
+      </div>
+    </div>`;
 }
 
 // Alerta simple de tendencia — no reemplaza el criterio del especialista,
@@ -139,11 +215,15 @@ function tabEvolucionHtml(mediciones) {
         <div class="hint" style="margin-top:4px">${esc(alerta)} Revisar según criterio del especialista.</div>
       </div>` : ""}
 
+    ${comparativaHtml(puntos, tipo)}
+
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${esc(tipo.label)}</div>
       ${puntos.length === 0
         ? `<div class="hint">Sin mediciones registradas todavía.</div>`
-        : `<canvas id="evolucionCanvas" style="width:100%;height:150px;display:block"></canvas>
+        : `<canvas id="evolucionCanvas" style="width:100%;height:150px;display:block;touch-action:none"></canvas>
+           <div id="medicionTocada" class="hint" style="text-align:center;min-height:18px;margin-top:4px"></div>
+           <div class="hint" style="text-align:center;font-size:11px">Tocá el gráfico para ver cada medición</div>
            ${tipo.doble ? `<div class="chart-legend"><span><i style="background:#0e7490"></i>Sistólica</span><span><i style="background:#b45309"></i>Diastólica</span></div>` : ""}`}
     </div>
 
@@ -181,7 +261,9 @@ function wireTabEvolucion(p, mediciones) {
 
   const canvas = document.getElementById("evolucionCanvas");
   if (canvas) {
-    dibujarGraficoEvolucion(canvas, puntosDe(mediciones, evolucionTipoActivo), TIPOS_MEDICION[evolucionTipoActivo].doble);
+    const tipoActual = TIPOS_MEDICION[evolucionTipoActivo];
+    const posiciones = dibujarGraficoEvolucion(canvas, puntosDe(mediciones, evolucionTipoActivo), tipoActual.doble);
+    wireGraficoInteractivo(canvas, posiciones, tipoActual);
   }
 
   document.getElementById("btnAgregarMedicion").onclick = async () => {

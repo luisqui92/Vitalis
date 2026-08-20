@@ -98,6 +98,8 @@ const ICONOS = {
   embarazo: svgIcono(`<circle cx="12" cy="6.3" r="2.6"/><path d="M8 21v-6.5C6.3 13 5.5 10.8 6.3 8.7 7 6.8 8.9 5.6 11 5.6h1c3 0 5.2 2.8 4.6 5.7-.4 2.1-2 3.8-4.1 4.3V21"/>`),
   corazon: svgIcono(`<path d="M12 20.2s-7.8-4.8-7.8-10.4c0-2.7 2.1-4.8 4.7-4.8 1.6 0 3 .8 3.1 2 .1-1.2 1.5-2 3.1-2 2.6 0 4.7 2.1 4.7 4.8 0 5.6-7.8 10.4-7.8 10.4z"/>`),
   campana: svgIcono(`<path d="M12 3.2a5.6 5.6 0 0 0-5.6 5.6c0 4.2-1.7 5.5-1.7 5.5h14.6s-1.7-1.3-1.7-5.5A5.6 5.6 0 0 0 12 3.2z"/><path d="M10.3 17.5a2 2 0 0 0 3.4 0"/>`),
+  // Útero esquemático (cuerpo + trompas + ovarios): el mapa ginecológico.
+  utero: svgIcono(`<path d="M8.5 8.4c-1 2.7-.4 6.6 3.5 7.6 3.9-1 4.5-4.9 3.5-7.6-1.3.8-5.7.8-7 0z"/><path d="M8.5 8.4C7.2 6.6 5.6 6.3 4.4 7.4"/><path d="M15.5 8.4c1.3-1.8 2.9-2.1 4.1-1"/><circle cx="3.4" cy="8.6" r="1.5"/><circle cx="20.6" cy="8.6" r="1.5"/><path d="M10.6 16v3.6h2.8V16"/>`),
 };
 
 // Ícono + etiqueta corta de cada pestaña del Kardex (ver pintarKardex en
@@ -177,6 +179,7 @@ const TABS_KARDEX_GINECOLOGIA = {
   paciente: { icono: ICONOS.persona, label: "Paciente" },
   consultas: { icono: ICONOS.mic, label: "Consultas" },
   embarazo: { icono: ICONOS.embarazo, label: "Embarazo" },
+  mapaGineco: { icono: ICONOS.utero, label: "Mapa" },
   evolucion: { icono: ICONOS.corazon, label: "Controles" },
   estudios: { icono: ICONOS.frasco, label: "Ecografías" },
   medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },

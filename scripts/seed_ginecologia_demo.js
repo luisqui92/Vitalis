@@ -16,7 +16,7 @@ const path = require("path");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento, Medicion, Estudio, Embarazo } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, Medicion, Estudio, Embarazo, ExamenGinecologico, ORGANOS_GINECO } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 
 function hace(meses) {
@@ -159,6 +159,7 @@ const PACIENTES_DEMO = [
   },
   {
     nombre: "Rosa María Colque Aduviri", fechaNacimiento: "1978-06-09", sexo: "Femenino", telefono: "70501105",
+    gineco: [{ organo: "utero", hallazgo: "mioma", notas: "Mioma intramural en cara posterior de 42 mm", mesesAtras: 3 }],
     antecedentesPersonales: ["Miomatosis uterina", "Dos partos vaginales previos"],
     antecedentesFamiliares: [{ parentesco: "Hermana", condicion: "Cáncer de mama" }],
     consultas: [
@@ -180,6 +181,10 @@ const PACIENTES_DEMO = [
   },
   {
     nombre: "Andrea Paola Mendoza Sillerico", fechaNacimiento: "1999-09-21", sexo: "Femenino", telefono: "70501106",
+    gineco: [
+      { organo: "ovario_derecho", hallazgo: "quiste", notas: "12 folículos periféricos, patrón poliquístico", mesesAtras: 3 },
+      { organo: "ovario_izquierdo", hallazgo: "quiste", notas: "14 folículos periféricos, patrón poliquístico", mesesAtras: 3 },
+    ],
     antecedentesPersonales: ["Síndrome de ovario poliquístico"],
     antecedentesFamiliares: [{ parentesco: "Madre", condicion: "Diabetes tipo 2" }],
     consultas: [
@@ -200,6 +205,7 @@ const PACIENTES_DEMO = [
   },
   {
     nombre: "Lucía Beatriz Flores Aramayo", fechaNacimiento: "1985-12-05", sexo: "Femenino", telefono: "70501107",
+    gineco: [{ organo: "cuello_uterino", hallazgo: "normal", notas: "Colposcopía sin lesión intraepitelial, test de Schiller negativo", mesesAtras: 4 }],
     antecedentesPersonales: ["Papanicolau con ASCUS hace 1 año"],
     antecedentesFamiliares: [],
     consultas: [
@@ -216,6 +222,10 @@ const PACIENTES_DEMO = [
   },
   {
     nombre: "Mariana Isabel Choque Zeballos", fechaNacimiento: "1972-03-17", sexo: "Femenino", telefono: "70501108",
+    gineco: [
+      { organo: "endometrio", hallazgo: "engrosamiento", notas: "Endometrio de 11 mm, se controla evolución", mesesAtras: 2 },
+      { organo: "mama_derecha", hallazgo: "nodulo", notas: "Nódulo palpable de 1 cm, cuadrante superoexterno", mesesAtras: 2 },
+    ],
     antecedentesPersonales: ["Perimenopausia"],
     antecedentesFamiliares: [{ parentesco: "Madre", condicion: "Osteoporosis" }],
     consultas: [
@@ -330,6 +340,24 @@ async function main() {
       });
     }
 
+    // Mapa ginecológico: solo se crea si esta paciente tiene hallazgos, con
+    // los demás órganos en normal.
+    if (base.gineco?.length) {
+      const organos = ORGANOS_GINECO.map(organo => {
+        const h = base.gineco.find(x => x.organo === organo);
+        if (!h) return { organo, hallazgo: "normal", notas: "", historial: [] };
+        return {
+          organo, hallazgo: h.hallazgo, notas: h.notas,
+          historial: [{ fecha: hace(h.mesesAtras), hallazgo: h.hallazgo, notas: h.notas, fuente: "voz" }],
+        };
+      });
+      await ExamenGinecologico.findOneAndUpdate(
+        { pacienteId: paciente._id },
+        { pacienteId: paciente._id, medicoPhone: phone, organos },
+        { upsert: true }
+      );
+    }
+
     // Embarazo en curso: la FUM se calcula hacia atrás desde las semanas que
     // tiene que mostrar HOY, para que la demo siempre dé números coherentes.
     if (base.embarazo) {
@@ -377,6 +405,7 @@ async function main() {
       `${base.mediciones.length} control(es)`,
       base.embarazo ? `embarazo de ${base.embarazo.semanasHoy} semanas` : null,
       base.embarazoCerrado ? `embarazo cerrado (${base.embarazoCerrado.desenlace.replace("_", " ")})` : null,
+      base.gineco?.length ? `${base.gineco.length} hallazgo(s) en el mapa` : null,
     ].filter(Boolean).join(" · ");
     console.log(`✅ ${base.nombre} — ${detalle}`);
     creadas++;

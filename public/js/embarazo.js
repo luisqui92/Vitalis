@@ -12,6 +12,82 @@ const DESENLACES_EMBARAZO_INFO = {
   otro: "Otro",
 };
 
+// Tamaño del bebé comparado con algo cotidiano: es la forma en que las
+// pacientes realmente entienden "estás de 20 semanas", y la que usan las
+// guías de control prenatal para explicarlo en consulta.
+const REFERENCIAS_FETALES = [
+  { hasta: 6,  emoji: "🫘", fruta: "una lenteja",       medida: "4 mm" },
+  { hasta: 8,  emoji: "🫐", fruta: "un arándano",       medida: "1,5 cm" },
+  { hasta: 10, emoji: "🍓", fruta: "una frutilla",      medida: "3 cm" },
+  { hasta: 12, emoji: "🍋", fruta: "un limón",          medida: "5 cm" },
+  { hasta: 16, emoji: "🥑", fruta: "una palta",         medida: "11 cm · 100 g" },
+  { hasta: 20, emoji: "🍌", fruta: "un plátano",        medida: "25 cm · 300 g" },
+  { hasta: 24, emoji: "🌽", fruta: "un choclo",         medida: "30 cm · 600 g" },
+  { hasta: 28, emoji: "🍆", fruta: "una berenjena",     medida: "37 cm · 1 kg" },
+  { hasta: 32, emoji: "🥥", fruta: "un coco",           medida: "42 cm · 1,7 kg" },
+  { hasta: 36, emoji: "🍈", fruta: "un melón",          medida: "47 cm · 2,6 kg" },
+  { hasta: 99, emoji: "🎃", fruta: "una sandía chica",  medida: "50 cm · 3,3 kg" },
+];
+function referenciaFetal(semanas) {
+  return REFERENCIAS_FETALES.find(r => semanas <= r.hasta) || REFERENCIAS_FETALES[REFERENCIAS_FETALES.length - 1];
+}
+
+// Silueta de perfil cuya panza crece con las semanas. No es una ecografía
+// ni pretende serlo: es la referencia visual de en qué momento del embarazo
+// está la paciente, que se lee de un vistazo mejor que un número.
+function siluetaEmbarazoSvg(semanas) {
+  // Hasta la semana 8 casi no se nota; de ahí crece hasta el término. La
+  // panza se dibuja como un círculo propio que crece sobre un torso fijo:
+  // es mucho más predecible que deformar el contorno del cuerpo, y se lee
+  // igual de bien en 12 semanas que en 40.
+  const avance = Math.min(1, Math.max(0, (semanas - 8) / 32));
+  const rPanza = 16 + avance * 22;
+  // El borde de atrás queda fijo contra la espalda y la panza crece SOLO
+  // hacia adelante — si se centra sobre el torso, a término se ve como una
+  // pelota alrededor del cuerpo en vez de un vientre.
+  const cxPanza = 74 + rPanza;
+  const cyPanza = 116;
+  const rBebe = 4 + avance * 11;
+
+  return `
+    <svg viewBox="0 0 190 220" style="width:100%;max-width:170px;height:auto;margin:8px auto 0;display:block" aria-label="Silueta del embarazo a las ${semanas} semanas">
+      <g fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-opacity="0.5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+        <!-- cabeza y cuello, pegados al torso -->
+        <circle cx="86" cy="26" r="15"/>
+        <path d="M 80 40 L 80 50 L 92 50 L 92 40 Z" stroke="none" fill-opacity="0.18"/>
+        <!-- torso de perfil, mirando a la derecha -->
+        <path d="M 86 46
+                 C 72 50, 66 64, 68 82
+                 C 70 108, 66 150, 64 196
+                 L 86 196
+                 C 88 158, 90 130, 92 108
+                 C 96 88, 98 62, 92 46 Z"/>
+        <!-- brazo, apoyado sobre la panza -->
+        <path d="M 92 62 C 108 70, ${cxPanza + rPanza * 0.6} ${cyPanza - rPanza * 0.7}, ${cxPanza + rPanza * 0.2} ${cyPanza + rPanza * 0.55}"
+              fill="none" stroke-opacity="0.4"/>
+      </g>
+      <!-- la panza: crece con las semanas -->
+      <circle cx="${cxPanza}" cy="${cyPanza}" r="${rPanza}"
+              fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-opacity="0.55" stroke-width="2"/>
+      <!-- el bebé adentro -->
+      <circle cx="${cxPanza + 2}" cy="${cyPanza}" r="${rBebe}" fill="var(--primary)" fill-opacity="0.9"/>
+    </svg>`;
+}
+
+// Barra de las 40 semanas con los tres trimestres marcados.
+function barraProgresoEmbarazo(semanas) {
+  const pct = Math.min(100, (semanas / 40) * 100);
+  return `
+    <div style="margin:12px 0 6px">
+      <div style="position:relative;height:9px;border-radius:5px;background:var(--border);overflow:hidden">
+        <div style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:var(--primary);border-radius:5px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-muted);margin-top:4px">
+        <span>0s</span><span>13s</span><span>27s</span><span>40s</span>
+      </div>
+    </div>`;
+}
+
 function trimestreDe(semanas) {
   if (semanas < 14) return "1er trimestre";
   if (semanas < 28) return "2do trimestre";
@@ -81,11 +157,19 @@ function pintarEmbarazo(pacienteId, activo, historial) {
 
   const semanas = activo.semanasGestacion?.semanas ?? 0;
   const dias = activo.semanasGestacion?.dias ?? 0;
+  const faltan = Math.max(0, Math.ceil((new Date(activo.fpp).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000)));
+  const ref = referenciaFetal(semanas);
   box.innerHTML = `
     <div class="card" style="text-align:center">
       <div class="hint" style="text-align:left">${trimestreDe(semanas)}</div>
       <div style="font-size:38px;font-weight:700;margin:6px 0">${semanas}<span style="font-size:18px;font-weight:600">s ${dias}d</span></div>
       <div class="hint">semanas de gestación</div>
+      ${siluetaEmbarazoSvg(semanas)}
+      <div class="hint" style="margin-top:6px">
+        ${ref.emoji} Del tamaño de ${ref.fruta} · ~${ref.medida}
+      </div>
+      ${barraProgresoEmbarazo(semanas)}
+      <div class="hint">${faltan > 0 ? `Faltan unas ${faltan} semana${faltan === 1 ? "" : "s"} para la fecha probable de parto` : "Ya llegó a la fecha probable de parto"}</div>
       <div style="display:flex;justify-content:space-around;margin-top:16px;text-align:left">
         <div><div class="hint">FUM</div><div style="font-weight:600">${new Date(activo.fum).toLocaleDateString("es-BO")}</div></div>
         <div><div class="hint">FPP</div><div style="font-weight:600">${new Date(activo.fpp).toLocaleDateString("es-BO")}</div></div>

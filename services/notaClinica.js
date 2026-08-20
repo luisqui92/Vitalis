@@ -29,6 +29,7 @@ RESPONDE SOLO JSON con esta estructura exacta:
   "tratamientosSugeridos": [{"itemMencionado":"string","piezaFdi":"number o null","catalogoNombreSugerido":"string o null"}],
   "examenOcularSugerido": [{"ojo":"OD u OI","estructura":"string exacto de la lista dada","hallazgo":"string","estado":"normal|leve|moderado|importante"}],
   "odontogramaSugerido": [{"piezaFdi":"number 11-48","estado":"uno exacto de la lista dada","hallazgo":"string"}],
+  "ginecoSugerido": [{"organo":"string exacto de la lista dada","hallazgo":"uno exacto de la lista dada","detalle":"string"}],
   "antecedentesPersonalesNuevos": ["string", ...],
   "antecedentesFamiliaresNuevos": [{"parentesco":"string","condicion":"string"}],
   "vacunasMencionadas": [{"nombre":"string","dosis":"string o null","fecha":"YYYY-MM-DD o null"}]
@@ -162,7 +163,35 @@ Reglas:
   va cómo queda la pieza en la ficha, allá va el ítem que se le va a
   cobrar al paciente — el mismo tratamiento dictado suele ir a los dos
   lados (ej: "hay que obturar la 36" → acá "obturacion_indicada" si no
-  dijo qué tiene, y allá el ítem de obturación con su precio).`;
+  dijo qué tiene, y allá el ítem de obturación con su precio).
+- "ginecoSugerido": SOLO si más abajo te doy la lista de órganos
+  ginecológicos (si no te la doy, dejá esta lista vacía — es una función
+  solo para ginecología). La ginecóloga va narrando lo que encuentra al
+  examinar o al leer una ecografía — reportá un ítem por cada hallazgo
+  CONCRETO sobre un órgano puntual, ej: "útero con un mioma de cuatro
+  centímetros", "ovario izquierdo con quiste simple", "endometrio
+  engrosado", "mama derecha con un nódulo palpable", "cuello sin lesiones".
+  Para cada uno:
+  · "organo": copiá EXACTO uno de los valores de la lista que te paso más
+    abajo (son identificadores sin tildes, ej. "cuello_uterino",
+    "ovario_izquierdo" — usalos tal cual, no los traduzcas ni les pongas
+    tildes). Cuidado con el lado: si dice "ovario izquierdo" es
+    "ovario_izquierdo". Si habla de un órgano par (ovario, trompa, mama)
+    sin aclarar de qué lado, y no se puede inferir del contexto inmediato,
+    NO reportes ese ítem.
+  · "hallazgo": copiá EXACTO uno de los hallazgos válidos que te paso más
+    abajo, el que mejor corresponda (ej: "tiene un mioma" → "mioma";
+    "quiste simple" → "quiste"; "endometrio engrosado" → "engrosamiento";
+    "se le extirpó" / "no se visualiza" → "ausente"; "sin alteraciones" /
+    "normal" → "normal"). Si lo que describe no corresponde con confianza a
+    ninguno, no reportes ese ítem.
+  · "detalle": lo que dijo tal cual, con las medidas si las mencionó (para
+    que quede en el registro).
+  UNA SOLA entrada por órgano — cada uno guarda un único hallazgo, así que
+  dos entradas del mismo órgano se pisan. Esto se aplica directo a la ficha
+  sin que la médica lo confirme antes (lo corrige después desde el Mapa),
+  así que ante cualquier duda real del órgano, del lado o del hallazgo,
+  mejor no reportar ese ítem.`;
 
 function construirContexto(contexto) {
   const partes = [];
@@ -188,6 +217,10 @@ function construirContexto(contexto) {
   }
   if (contexto?.estadosPiezaDental?.length) {
     partes.push(`Estados de pieza dental válidos (para "odontogramaSugerido"): ${contexto.estadosPiezaDental.join(", ")}`);
+  }
+  if (contexto?.organosGineco?.length) {
+    partes.push(`Órganos ginecológicos válidos (para "ginecoSugerido"): ${contexto.organosGineco.join(", ")}`);
+    partes.push(`Hallazgos ginecológicos válidos: ${contexto.hallazgosGineco.join(", ")}`);
   }
   return `\n\n(${partes.join(" ")})`;
 }

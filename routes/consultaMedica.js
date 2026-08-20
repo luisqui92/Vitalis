@@ -4,7 +4,7 @@
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
 const { CONFIG, log } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara } = require("../services/assemblyai");
@@ -92,6 +92,7 @@ module.exports = function (app) {
           const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
           const esOdontologia = medico?.tipoEspecialidad === "odontologia";
           const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
+          const esGinecologia = medico?.tipoEspecialidad === "ginecologia";
 
           consulta.notaClinica = await generarNotaClinica(transcripcionCompleta, {
             antecedentesPersonales: paciente.antecedentesPersonales || [],
@@ -100,6 +101,8 @@ module.exports = function (app) {
             catalogoTratamientos,
             estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
             estadosPiezaDental: esOdontologia ? ESTADOS_PIEZA_DENTAL : [],
+            organosGineco: esGinecologia ? ORGANOS_GINECO : [],
+            hallazgosGineco: esGinecologia ? HALLAZGOS_GINECO : [],
             veterinaria: esVeterinaria,
             especie: esVeterinaria ? paciente.especie : "",
             raza: esVeterinaria ? paciente.raza : "",
@@ -157,6 +160,29 @@ module.exports = function (app) {
               await odontograma.save();
             } catch (e) {
               log.error("[ODONTOGRAMA]", e.message);
+            }
+          }
+
+          // Vitalis Gineco: mismo patrón, por órgano.
+          const hallazgosGineco = consulta.notaClinica?.ginecoSugerido;
+          if (esGinecologia && hallazgosGineco?.length) {
+            try {
+              let mapa = await ExamenGinecologico.findOne({ pacienteId: paciente._id, medicoPhone });
+              if (!mapa) {
+                const organos = ORGANOS_GINECO.map(organo => ({ organo, hallazgo: "normal", notas: "", historial: [] }));
+                mapa = await ExamenGinecologico.create({ pacienteId: paciente._id, medicoPhone, organos });
+              }
+              for (const h of hallazgosGineco) {
+                if (!ORGANOS_GINECO.includes(h.organo) || !HALLAZGOS_GINECO.includes(h.hallazgo)) continue;
+                const item = mapa.organos.find(o => o.organo === h.organo);
+                if (!item) continue;
+                item.hallazgo = h.hallazgo;
+                item.notas = h.detalle;
+                item.historial.push({ fecha: new Date(), hallazgo: h.hallazgo, notas: h.detalle, fuente: "voz", consultaId: consulta._id });
+              }
+              await mapa.save();
+            } catch (e) {
+              log.error("[MAPA_GINECO]", e.message);
             }
           }
         } catch (e) {
