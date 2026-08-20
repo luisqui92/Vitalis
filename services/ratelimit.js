@@ -1,7 +1,16 @@
 // Vitalis — Rate Limiting en memoria (sin dependencias externas)
 const { log } = require("../config");
 
-const stores = { medico: new Map(), auth: new Map(), reservaPublica: new Map(), authCuenta: new Map() };
+// Los "store" se crean solos la primera vez que alguien pide un limitador
+// con ese nombre (ver almacen()). Antes había que acordarse de agregarlo
+// acá a mano, y olvidarse no fallaba al arrancar: fallaba con un 500 recién
+// cuando alguien pegaba a esa ruta.
+const stores = {};
+
+function almacen(nombre) {
+  if (!stores[nombre]) stores[nombre] = new Map();
+  return stores[nombre];
+}
 
 // Limpieza periódica para no acumular IPs
 setInterval(() => {
@@ -23,7 +32,7 @@ function getIP(req) {
 function rateLimit(storeName, max, windowMs, message) {
   return (req, res, next) => {
     const ip = getIP(req);
-    const store = stores[storeName];
+    const store = almacen(storeName);
     const now = Date.now();
     const data = store.get(ip);
 
@@ -69,7 +78,7 @@ function rateLimitPorClave(storeName, max, windowMs, message, keyFn) {
   return (req, res, next) => {
     const clave = keyFn(req);
     if (!clave) return next();
-    const store = stores[storeName];
+    const store = almacen(storeName);
     const now = Date.now();
     const data = store.get(clave);
 

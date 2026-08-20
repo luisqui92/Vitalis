@@ -50,6 +50,9 @@ function refrescarPantallaActual() {
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
   else if (tipo === "inicioEscritorio" && typeof renderInicioEscritorio === "function") renderInicioEscritorio();
   else if (tipo === "recordatorios") renderRecordatorios();
+  // preservarToken: este repintado no lo pidió el médico, así que no puede
+  // hacerle desaparecer el token que está copiando en ese momento.
+  else if (tipo === "equiposRayos" && typeof renderEquiposRayos === "function") renderEquiposRayos(params.pacienteVuelta, { preservarToken: true });
 }
 
 function envolverParaTiempoReal(nombreFn, calcularPantalla) {
@@ -70,3 +73,7 @@ envolverParaTiempoReal("renderAgenda", () => ({ tipo: "agenda", params: {} }));
 envolverParaTiempoReal("pintarKardex", (p, _c, _m, _v, _med, _est, _rec, tabActiva) => ({ tipo: "pacienteDetalle", params: { pacienteId: p._id, tabActiva } }));
 envolverParaTiempoReal("renderInicioEscritorio", () => ({ tipo: "inicioEscritorio", params: {} }));
 envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", params: {} }));
+// Sin esto, dar de alta un equipo de rayos (un POST) hacía que el aviso de
+// cambio repintara la pantalla ANTERIOR y saltara fuera de la de equipos,
+// justo en el único momento en que el token está a la vista.
+envolverParaTiempoReal("renderEquiposRayos", (pacienteVuelta) => ({ tipo: "equiposRayos", params: { pacienteVuelta } }));

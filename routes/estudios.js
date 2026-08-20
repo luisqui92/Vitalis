@@ -4,37 +4,17 @@
 // sirven al médico dueño del paciente, igual que cualquier otro dato clínico.
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 const express = require("express");
 const { Paciente, Estudio } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { DIR_ESTUDIOS, TIPOS_ARCHIVO_PERMITIDOS, guardarArchivoEstudio } = require("../services/archivosEstudio");
 
 const requireMedico = requireAuth(["medico"]);
 
-const DIR_ESTUDIOS = path.join(__dirname, "..", "uploads", "estudios");
-fs.mkdirSync(DIR_ESTUDIOS, { recursive: true });
-
-const EXT_POR_MIME = {
-  "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif",
-  "application/pdf": ".pdf",
-};
-function extensionParaMime(mime) {
-  if (EXT_POR_MIME[mime]) return EXT_POR_MIME[mime];
-  const sub = String(mime || "").split("/")[1];
-  return sub ? "." + sub.replace(/[^a-z0-9]/gi, "").slice(0, 10) : ".bin";
-}
-
 // Acepta el archivo como body crudo, igual que el audio de las consultas.
-// Lista blanca explícita (no "image/*"): un SVG también matchea ese glob,
-// y como el archivo se sirve después con el mismo Content-Type que se
-// subió y el navegador lo abre en una pestaña propia (mismo origen), un
-// SVG con <script> adentro correría con acceso al localStorage del
-// médico — ahí vive el token de sesión. Nadie sube estudios/fotos
-// clínicas en SVG, así que sacarlo de la lista no le saca nada a nadie.
-const TIPOS_ARCHIVO_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 const archivoRaw = express.raw({ type: TIPOS_ARCHIVO_PERMITIDOS, limit: "20mb" });
 
 module.exports = function (app) {
@@ -53,8 +33,7 @@ module.exports = function (app) {
     const tipo = String(req.query.tipo || "otro").trim();
 
     const mime = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim();
-    const archivoNombre = crypto.randomUUID() + extensionParaMime(mime);
-    fs.writeFileSync(path.join(DIR_ESTUDIOS, archivoNombre), archivo);
+    const archivoNombre = guardarArchivoEstudio(archivo, mime);
 
     const estudio = await Estudio.create({
       pacienteId: paciente._id, medicoPhone, tipo, nombre,

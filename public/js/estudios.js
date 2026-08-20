@@ -50,6 +50,7 @@ function angulosFotoActivos() { return MEDICO_TIPO_ESPECIALIDAD === "estetica" ?
 function tabEstudiosHtml(estudios) {
   const hayFotos = estudios.some(e => e.tipo === "foto" && e.anguloFoto);
   return `
+    ${bloqueCapturaHtml()}
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">Subir estudio</div>
       <select id="estTipo">
@@ -100,6 +101,11 @@ function tabEstudiosHtml(estudios) {
 }
 
 function wireTabEstudios(p, estudios) {
+  // Vitalis Rayos: se completa aparte y sin await porque necesita dos
+  // consultas propias al servidor — que la pestaña no se quede esperando
+  // por algo que la mayoría de las especialidades ni usa.
+  pintarBloqueCaptura(p);
+
   let archivoSeleccionado = null;
   let anguloElegido = null;
   let ladoOjoElegido = null;

@@ -518,6 +518,49 @@ const estudioSchema = new mongoose.Schema({
 estudioSchema.index({ pacienteId: 1, fecha: -1 });
 const Estudio = mongoose.model("Estudio", estudioSchema);
 
+// ─── VITALIS RAYOS ────────────────────────────────────────────────────────
+// El equipo de rayos (o el ecógrafo, o cualquier aparato de imagen) no habla
+// con Vitalis: habla con el software del fabricante que corre en una PC del
+// consultorio y deja las imágenes en una carpeta. El "puente" (agente-rayos/)
+// corre en esa PC, vigila la carpeta y sube lo nuevo acá.
+//
+// Cada PC es un EquipoRayos con su propio token. Se guarda solo el hash del
+// token, igual que una contraseña: si alguien se lleva la base, no se lleva
+// credenciales usables. El token en claro se muestra UNA sola vez, al crearlo.
+const equipoRayosSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  nombre: { type: String, default: "Equipo de rayos" },
+  tokenHash: { type: String, required: true, index: true },
+  activo: { type: Boolean, default: true },
+  // Para que el médico vea en pantalla si la PC del consultorio está
+  // prendida y conectada, sin tener que ir hasta ella.
+  ultimoContacto: { type: Date, default: null },
+  ultimaSubida: { type: Date, default: null },
+  subidas: { type: Number, default: 0 },
+}, { timestamps: true });
+const EquipoRayos = mongoose.model("EquipoRayos", equipoRayosSchema);
+
+// Ventana de captura: el odontólogo abre la ficha del paciente y toca
+// "Capturar radiografía". Durante los minutos siguientes, TODA imagen que
+// llegue del equipo se guarda en ESE paciente — nadie tipea nada, ni hay
+// que hacer coincidir nombres entre dos sistemas.
+//
+// unique por medicoPhone: abrir una ventana nueva pisa la anterior (no
+// tiene sentido tener dos pacientes "esperando radiografía" a la vez con
+// un solo aparato). El índice TTL sobre expiraEn las borra solas.
+const capturaPendienteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true, unique: true },
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true },
+  pacienteNombre: { type: String, default: "" }, // copiado para mostrarlo en el agente sin otra consulta
+  tipo: { type: String, default: "radiografia" },
+  nombre: { type: String, default: "Radiografía" },
+  notas: { type: String, default: "" },
+  expiraEn: { type: Date, required: true },
+  recibidas: { type: Number, default: 0 },
+}, { timestamps: true });
+capturaPendienteSchema.index({ expiraEn: 1 }, { expireAfterSeconds: 0 });
+const CapturaPendiente = mongoose.model("CapturaPendiente", capturaPendienteSchema);
+
 // Receta Digital: se arma a partir de lo recetado en una consulta (o a
 // mano) y queda lista para imprimir/guardar como PDF desde el navegador.
 // Crearla ES el acto de aprobación del médico — no hay estado de borrador,
@@ -664,4 +707,5 @@ const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
 module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
-  MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };
+  MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
+  EquipoRayos, CapturaPendiente };
