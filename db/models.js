@@ -358,6 +358,51 @@ const examenGinecologicoSchema = new mongoose.Schema({
 }, { timestamps: true });
 const ExamenGinecologico = mongoose.model("ExamenGinecologico", examenGinecologicoSchema);
 
+// Vitalis Vet — mapa corporal: lesiones marcadas sobre la silueta del
+// animal. A diferencia del odontograma (donde un diente es una unidad
+// discreta), una lesión está en un PUNTO: se marca donde caiga y se
+// autoetiqueta con la región anatómica, para que además de verse tenga un
+// nombre clínico con el que buscar y dictar.
+const REGIONES_CORPORALES = [
+  "hocico", "cabeza", "cuello", "dorso", "torax", "abdomen",
+  "grupa", "cola", "miembro_anterior", "miembro_posterior", "otra",
+];
+const ESTADOS_LESION = ["activa", "en_tratamiento", "resuelta"];
+const LADOS_CUERPO = ["izquierdo", "derecho"];
+
+const lesionCorporalSchema = new mongoose.Schema({
+  // Posición en porcentaje del lienzo (0-100), no en píxeles: si algún día
+  // se redibuja la silueta con otro tamaño, las lesiones ya cargadas
+  // siguen cayendo donde corresponde.
+  x: { type: Number, required: true },
+  y: { type: Number, required: true },
+  lado: { type: String, enum: LADOS_CUERPO, default: "izquierdo" },
+  region: { type: String, enum: REGIONES_CORPORALES, default: "otra" },
+  titulo: { type: String, default: "" },
+  estado: { type: String, enum: ESTADOS_LESION, default: "activa" },
+  historial: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      descripcion: { type: String, default: "" },
+      tamanoCm: { type: Number, default: null },
+      estado: { type: String, enum: ESTADOS_LESION, default: "activa" },
+      // Foto clínica de ese control: se reusa el Centro de Estudios en vez
+      // de guardar archivos por un camino aparte.
+      estudioId: { type: mongoose.Schema.Types.ObjectId, ref: "Estudio", default: null },
+      fuente: { type: String, enum: ["voz", "manual"], default: "manual" },
+      consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+    }],
+    default: [],
+  },
+}, { timestamps: true });
+
+const mapaCorporalSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, unique: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  lesiones: { type: [lesionCorporalSchema], default: [] },
+}, { timestamps: true });
+const MapaCorporal = mongoose.model("MapaCorporal", mapaCorporalSchema);
+
 // Receta óptica: esfera/cilindro/eje/adición por ojo — completamente
 // distinta a una receta de medicamentos, por eso es un modelo aparte.
 const recetaOpticaSchema = new mongoose.Schema({
@@ -618,4 +663,5 @@ correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
 module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
-  ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };
+  ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
+  MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO };

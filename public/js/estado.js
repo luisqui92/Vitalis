@@ -166,6 +166,7 @@ const TABS_KARDEX_VETERINARIA = {
   consultas: { icono: ICONOS.mic, label: "Consultas" },
   medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  mapaCorporal: { icono: ICONOS.pata, label: "Lesiones" },
   vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
   evolucion: { icono: ICONOS.tendencia, label: "Peso" },
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
