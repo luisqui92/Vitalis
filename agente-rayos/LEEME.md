@@ -24,44 +24,41 @@ forma infalible:
 
 Anotá esa ruta completa.
 
-## 2. Sacar el token en Vitalis
+## 2. Instalar (todo desde el navegador de esa misma PC)
 
-En Vitalis (desde cualquier navegador, con la cuenta del médico):
-**Ajustes → Equipo de rayos → Agregar equipo**.
+Lo más cómodo es hacer esto **sentado en la PC del consultorio**, no en
+otra máquina: los dos archivos se descargan ahí mismo.
 
-Te muestra un token una sola vez. Copialo ahora — después no se puede
-volver a ver, solo generar uno nuevo.
-
-## 3. Instalar
-
-1. Copiá esta carpeta `agente-rayos` a la PC, por ejemplo en
-   `C:\VitalisRayos`.
-2. Si esa PC no tiene Node.js, instalalo desde https://nodejs.org
+1. Si esa PC no tiene Node.js, instalalo desde https://nodejs.org
    (la versión LTS, siguiente-siguiente-siguiente, sin cambiar nada).
-3. Copiá `config.ejemplo.json` y renombralo a `config.json`.
-4. Abrí `config.json` con el Bloc de notas y completá:
+2. Creá una carpeta nueva, por ejemplo `C:\VitalisRayos`.
+3. Entrá a Vitalis con la cuenta del médico, abrí la ficha de cualquier
+   paciente → pestaña **Estudios** → **Conectalo y las placas entran
+   solas** (o **Administrar**, si ya hay un equipo).
+4. Poné un nombre para la PC y tocá **Conectar una PC**.
+5. Pegá la ruta del paso 1 en el campo de la carpeta y bajá los dos
+   archivos: **config.json** y **agente.js**. Guardalos en
+   `C:\VitalisRayos`.
+6. Abrí una ventana de comandos en esa carpeta (clic derecho dentro de
+   ella → *Abrir en Terminal*) y escribí:
 
-```json
-{
-  "servidor": "https://salud.chatgo.ia.bo",
-  "token": "vrx_...................",
-  "carpeta": "C:\\Ai-Dental\\Images",
-  "incluirSubcarpetas": true
-}
+```
+node agente.js
 ```
 
-> Ojo con las barras: en Windows van **dobles** (`C:\\Ai-Dental\\Images`),
-> no simples.
+Tiene que decir `✓ conectado a Vitalis`. Dejá esa ventana abierta:
+mientras esté abierta, las radiografías suben solas.
 
-5. Doble clic en `iniciar.bat`.
+> El `config.json` que baja Vitalis ya trae el token y la ruta bien
+> escritos. No hace falta editarlo a mano, y conviene no hacerlo: las
+> barras de Windows se escriben distinto adentro de un archivo JSON y es
+> el error más común.
 
-Tiene que aparecer una ventana negra que diga `✓ conectado a Vitalis`.
-Dejala abierta: mientras esté abierta, las radiografías suben solas.
+## 3. Que arranque solo cuando se prende la PC
 
-## 4. Que arranque solo cuando se prende la PC
-
-Apretá `Windows + R`, escribí `shell:startup` y Enter. Se abre una
-carpeta: arrastrá ahí un acceso directo a `iniciar.bat`.
+Copiá también el `iniciar.bat` de esta carpeta a `C:\VitalisRayos`.
+Después apretá `Windows + R`, escribí `shell:startup` y Enter: se abre
+una carpeta, arrastrá ahí un acceso directo a `iniciar.bat`.
 
 ---
 
@@ -82,10 +79,10 @@ minutos después.
 
 | Lo que dice la ventana | Qué pasa | Qué hacer |
 |---|---|---|
-| `token inválido` | El token se regeneró o está mal copiado | Generá uno nuevo en Vitalis y pegalo en `config.json` |
+| `token inválido` | El token se regeneró o está dado de baja | Generá uno nuevo en Vitalis y bajá otra vez el `config.json` |
 | `sin conexión con Vitalis` | La PC se quedó sin internet | Revisá la red; se reconecta solo |
 | `en espera` | Nadie tocó "Capturar radiografía" | Abrí la ficha del paciente y tocá el botón |
-| No aparece nada al tomar una placa | La carpeta de `config.json` no es la correcta | Repetí el paso 1 |
+| No aparece nada al tomar una placa | La carpeta de `config.json` no es la correcta | Repetí el paso 1 y bajá otra vez el `config.json` |
 
 **La primera vez que arranca** marca todo lo que ya había en la carpeta
 como historial viejo y **no lo sube** — si no, mandaría años de

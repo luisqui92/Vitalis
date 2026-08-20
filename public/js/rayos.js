@@ -294,16 +294,28 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
       <div id="rxTokenTexto" style="font-family:monospace;font-size:13px;word-break:break-all;background:var(--bg);padding:10px;border-radius:8px;user-select:all">${esc(token)}</div>
       <button class="secondary" id="btnCopiarToken" style="margin-top:10px">📋 Copiar</button>
 
-      <div class="seccion-titulo">Qué hacer con esto</div>
-      <div class="hint">
-        En la PC del consultorio (la que tiene el software del sensor):
-        <ol style="margin:8px 0 0 18px;padding:0">
-          <li>Copiá ahí la carpeta <b>agente-rayos</b>.</li>
-          <li>Renombrá <b>config.ejemplo.json</b> a <b>config.json</b> y pegá este token adentro.</li>
-          <li>Poné en <b>carpeta</b> la ruta donde el software guarda las imágenes.</li>
-          <li>Doble clic en <b>iniciar.bat</b>.</li>
-        </ol>
-        Está todo explicado paso a paso en el archivo <b>LEEME.md</b> de esa carpeta.
+      <div class="seccion-titulo">Instalación en la PC del consultorio</div>
+      <div class="hint" style="margin-bottom:10px">
+        Hacé esto <b>desde esa misma PC</b> — la que tiene el software del sensor.
+        Pegá abajo la carpeta donde ese software guarda las imágenes y Vitalis te
+        arma el archivo de configuración ya listo, con el token adentro.
+      </div>
+      <label>Carpeta donde el software guarda las imágenes</label>
+      <input id="rxCarpeta" type="text" placeholder="C:\\Ai-Dental\\Images" spellcheck="false">
+      <div class="hint" style="margin:6px 0 0">
+        Copiala de la barra de direcciones del Explorador y pegala tal cual —
+        de las barras nos ocupamos nosotros.
+      </div>
+      <div id="rxCarpetaErr"></div>
+      <button class="secondary" id="btnBajarConfig" style="margin-top:10px">⬇️ 1. Descargar config.json</button>
+      <a class="secondary" id="btnBajarAgente" href="/rayos/agente.js" download="agente.js"
+         style="display:block;text-align:center;text-decoration:none;margin-top:8px">⬇️ 2. Descargar agente.js</a>
+      <div class="hint" style="margin-top:10px">
+        Poné los dos archivos <b>en una misma carpeta nueva</b> (por ejemplo
+        <b>C:\\VitalisRayos</b>). Después abrí ahí una ventana de comandos y escribí:
+        <div style="font-family:monospace;font-size:13px;background:var(--bg);padding:8px;border-radius:8px;margin-top:6px;user-select:all">node agente.js</div>
+        Si dice <b>conectado a Vitalis</b>, ya está andando. Si dice que
+        <i>node</i> no se reconoce, instalá Node.js desde nodejs.org y volvé a intentar.
       </div>
     </div>`;
   if (desplazar) caja.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -324,4 +336,41 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
       btn.textContent = "Seleccionado — copialo con Ctrl+C";
     }
   };
+
+  // El config.json se arma acá, en el navegador, y no en el servidor: el
+  // token en claro no existe del lado de Vitalis (guardamos solo su hash),
+  // así que este es el único lugar del mundo donde se lo puede meter en el
+  // archivo. JSON.stringify escapa solo las barras de Windows, que es
+  // justo lo que se escribe mal cuando se hace a mano.
+  document.getElementById("btnBajarConfig").onclick = () => {
+    const err = document.getElementById("rxCarpetaErr");
+    const carpeta = document.getElementById("rxCarpeta").value.trim().replace(/["']/g, "");
+    if (!carpeta) {
+      err.innerHTML = `<div class="error">Falta la carpeta — sin eso el agente no sabe dónde mirar.</div>`;
+      return;
+    }
+    err.innerHTML = "";
+    const config = {
+      servidor: location.origin,
+      token,
+      carpeta,
+      incluirSubcarpetas: true,
+      segundosRevision: 3,
+      minutosReintento: 20,
+    };
+    descargarTexto("config.json", JSON.stringify(config, null, 2));
+  };
+}
+
+// Descarga un archivo generado en el navegador, sin pasar por el servidor.
+function descargarTexto(nombre, contenido) {
+  const url = URL.createObjectURL(new Blob([contenido], { type: "application/octet-stream" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Sin esto el blob queda ocupando memoria hasta que se recargue la página.
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }

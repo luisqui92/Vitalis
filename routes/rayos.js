@@ -20,6 +20,7 @@
 // imagen y reintenta un rato.
 const express = require("express");
 const crypto = require("crypto");
+const path = require("path");
 const { Paciente, Estudio, EquipoRayos, CapturaPendiente } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico, rateLimit } = require("../services/ratelimit");
@@ -78,6 +79,18 @@ function capturaVigente(captura) {
 }
 
 module.exports = function (app) {
+  // ─── DESCARGA DEL AGENTE ─────────────────────────────────────────────────
+  // Sin sesión a propósito: se baja desde la PC del consultorio, donde el
+  // odontólogo no tiene por qué estar logueado. No expone nada — es el
+  // mismo programa que está en el repositorio, sin ninguna credencial
+  // adentro (esas van en config.json, que se arma en el navegador del
+  // médico y nunca pasa por acá).
+  app.get("/rayos/agente.js", (_req, res) => {
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="agente.js"');
+    res.sendFile(path.join(__dirname, "..", "agente-rayos", "agente.js"));
+  });
+
   // ═══ LADO MÉDICO (desde el navegador, con la sesión de siempre) ═════════
 
   // ─── ESTADO COMPLETO (equipos + ventana abierta) ─────────────────────────
