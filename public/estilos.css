@@ -161,6 +161,33 @@ body.tema-ginecologia{
 }
 body.tema-ginecologia input,body.tema-ginecologia select,body.tema-ginecologia textarea{background:#271e1a;}
 body.tema-ginecologia button.secondary{background:rgba(189,107,79,.16);color:var(--accent-2);}
+
+/* Vitalis Pediatría — verde azulado suave con acento durazno: la única
+   rama donde el que mira la pantalla muchas veces es la madre, no el
+   médico, así que se busca cercanía antes que aire clínico. */
+body.tema-pediatria{
+  --primary:#3f9aa8;
+  --primary-dark:#2c6f7a;
+  --primary-rgb:63,154,168;
+  --accent:#e79f6d;
+  --accent-2:#f2bf96;
+  --accent-rgb:231,159,109;
+  --bg:#101718;
+  --card:#182325;
+  --border:#27383a;
+  --text:#e8f1f2;
+  --text-muted:#93a7a9;
+  --success:#5aa87e; --success-bg:rgba(90,168,126,.14);
+  --warning:#d9a05c; --warning-bg:rgba(217,160,92,.14);
+  --danger:#c96a6a; --danger-bg:rgba(201,106,106,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
+}
+body.tema-pediatria input,body.tema-pediatria select,body.tema-pediatria textarea{background:#1c292b;}
+body.tema-pediatria button.secondary{background:rgba(63,154,168,.16);color:var(--accent-2);}
+body.tema-pediatria .segmento.h0{background:#1c292b;}
+body.tema-pediatria .segmento.h1{background:rgba(231,159,109,.14);}
+body.tema-pediatria .brief-card{background:linear-gradient(135deg,#162224,#121b1c);}
+
 body.tema-ginecologia .segmento.h0{background:#271e1a;}
 body.tema-ginecologia .segmento.h1{background:rgba(201,160,95,.14);}
 body.tema-ginecologia .brief-card{background:linear-gradient(135deg,#241c18,#1c1512);}

@@ -27,7 +27,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -75,6 +75,16 @@ const pacienteSchema = new mongoose.Schema({
   especie: { type: String, default: "" },
   raza: { type: String, default: "" },
   duenoNombre: { type: String, default: "" },
+  // Solo Vitalis Pediatría. La edad corregida es la diferencia entre lo que
+  // el chico tiene y lo que tendría si hubiera nacido a término: a un
+  // prematuro de 32 semanas hay que restarle 8 semanas hasta los 2 años,
+  // porque si no su curva de crecimiento se lee como un retraso que no
+  // existe — y eso asusta a una madre por nada. Vacío = nació a término.
+  semanasGestacionAlNacer: { type: Number, default: null },
+  // A quién se le habla: en pediatría el paciente no es quien contesta el
+  // teléfono. "telefono" sigue siendo el de contacto, igual que en veterinaria.
+  tutorNombre: { type: String, default: "" },
+  tutorParentesco: { type: String, default: "" },
   antecedentesPersonales: { type: [String], default: [] }, // ej: "Hipertensión desde 2019", "Alergia a penicilina"
   antecedentesFamiliares: { type: [{ parentesco: String, condicion: String }], default: [] },
   // Brief Clínico Inteligente: resumen ejecutivo generado por IA a partir del

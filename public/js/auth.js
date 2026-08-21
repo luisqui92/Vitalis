@@ -79,6 +79,7 @@ function renderRegistro() {
         <option value="estetica">💉 Estética / Plástica / Dermatología</option>
         <option value="oftalmologia">👁️ Oftalmología</option>
         <option value="ginecologia">🤰 Ginecología y Obstetricia</option>
+        <option value="pediatria">🧸 Pediatría</option>
         <option value="veterinaria">🐾 Veterinaria</option>
       </select>`;
   app.innerHTML = `

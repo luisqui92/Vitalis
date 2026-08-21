@@ -203,6 +203,29 @@ GINECOLOGÍA Y OBSTETRICIA (Vitalis Gineco)
   izquierdo con quiste simple", "endometrio engrosado").
 - Los estudios se muestran como "Ecografías" en la ficha.`,
 
+  pediatria: `
+PEDIATRÍA (Vitalis Pediatría)
+- Curvas de crecimiento con los patrones oficiales de la OMS: peso para la
+  edad (hasta los 10 años), talla para la edad (hasta los 19), perímetro
+  cefálico (hasta los 5) e IMC para la edad (hasta los 19). Cada control se
+  dibuja sobre las bandas de la OMS y se muestra el percentil y el z-score.
+  Fuera de esos rangos Vitalis no calcula percentil: lo dice, no lo inventa.
+- El IMC no se carga a mano: se calcula solo cuando se cargan peso y talla
+  en el mismo control.
+- Compara cada control con el anterior y avisa cuando el chico se movió de
+  carril hacia abajo (media desviación estándar o más). Es un aviso para
+  mirar, no un diagnóstico: Vitalis nunca dice "desnutrido".
+- Edad corregida para prematuros: si se cargan las semanas de gestación al
+  nacer, hasta los 2 años los percentiles se calculan descontando lo que le
+  faltó para llegar a término. Sin eso, un prematuro se lee como un retraso
+  de crecimiento que no existe.
+- La edad se muestra en días, meses o años según corresponda, no siempre en
+  años: "18 días", "7 meses", "3 a 4 m".
+- Para calcular percentiles hacen falta la fecha de nacimiento y el sexo del
+  paciente. Si falta alguno, la pantalla lo dice y no muestra ningún número.
+- En la ficha del paciente se puede cargar la madre, el padre o el tutor y
+  su parentesco — el teléfono de contacto es el de esa persona.`,
+
   estetica: `
 ESTÉTICA (Vitalis Face)
 - Las pestañas propias son "Procedimientos" (el plan de tratamiento) y

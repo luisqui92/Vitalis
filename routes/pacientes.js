@@ -23,8 +23,14 @@ module.exports = function (app) {
     const especie = String(req.body?.especie || "").trim();
     const raza = String(req.body?.raza || "").trim();
     const duenoNombre = String(req.body?.duenoNombre || "").trim();
+    const tutorNombre = String(req.body?.tutorNombre || "").trim();
+    const tutorParentesco = String(req.body?.tutorParentesco || "").trim();
+    // 20 a 44 semanas es el rango biológicamente posible; fuera de ahí es un
+    // error de tipeo, y guardarlo haría que la edad corregida mienta.
+    const semanas = Number(req.body?.semanasGestacionAlNacer);
+    const semanasGestacionAlNacer = Number.isFinite(semanas) && semanas >= 20 && semanas <= 44 ? semanas : null;
 
-    const paciente = await Paciente.create({ medicoPhone, nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre });
+    const paciente = await Paciente.create({ medicoPhone, nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer });
     res.status(201).json({ ok: true, paciente });
   }));
 
@@ -63,7 +69,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.id, medicoPhone }, "Paciente no encontrado");
 
-    const campos = ["nombre", "sexo", "telefono", "notas", "especie", "raza", "duenoNombre"];
+    const campos = ["nombre", "sexo", "telefono", "notas", "especie", "raza", "duenoNombre", "tutorNombre", "tutorParentesco"];
     for (const campo of campos) {
       if (req.body?.[campo] !== undefined) paciente[campo] = String(req.body[campo]).trim();
     }

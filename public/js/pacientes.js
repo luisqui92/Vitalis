@@ -6,8 +6,12 @@ function pacienteItemHtml(p) {
   const info = esVet
     ? [p.especie, p.raza].filter(Boolean).join(" · ")
     : (() => {
-        const edad = edadDesde(p.fechaNacimiento);
-        return `${edad != null ? edad + " años" : ""}${edad != null && p.sexo ? " · " : ""}${p.sexo || ""}`;
+        // En pediatría "2 años" de un bebé de 26 meses tira justo el dato
+        // que importa; se muestra en días/meses hasta que deja de importar.
+        const edad = MEDICO_TIPO_ESPECIALIDAD === "pediatria"
+          ? edadPediatricaTexto(p.fechaNacimiento)
+          : (edadDesde(p.fechaNacimiento) != null ? edadDesde(p.fechaNacimiento) + " años" : "");
+        return `${edad}${edad && p.sexo ? " · " : ""}${p.sexo || ""}`;
       })();
   return `
     <div class="item item-paciente" data-id="${p._id}" data-nombre="${esc(p.nombre.toLowerCase())}">
@@ -80,6 +84,7 @@ async function renderDashboard() {
 function renderNuevoPaciente() {
   detenerPolling();
   const esVet = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
+  const esPed = MEDICO_TIPO_ESPECIALIDAD === "pediatria";
   app.innerHTML = `
     <button class="back" id="btnBack">← Volver</button>
     <div class="card">
@@ -90,9 +95,10 @@ function renderNuevoPaciente() {
       <input id="pEspecie" type="text" placeholder="Ej: Perro, Gato...">
       <label>Raza (opcional)</label>
       <input id="pRaza" type="text" placeholder="Ej: Labrador">` : ""}
-      <label>Fecha de nacimiento (opcional)</label>
+      <label>Fecha de nacimiento${esPed ? "" : " (opcional)"}</label>
       <input id="pFecha" type="date">
-      <label>Sexo (opcional)</label>
+      ${esPed ? `<div class="hint" style="margin:-4px 0 8px">Sin fecha de nacimiento y sexo no se pueden calcular los percentiles de crecimiento.</div>` : ""}
+      <label>Sexo${esPed ? "" : " (opcional)"}</label>
       <select id="pSexo">
         <option value="">— Sin especificar —</option>
         ${esVet ? `
@@ -105,7 +111,15 @@ function renderNuevoPaciente() {
       ${esVet ? `
       <label>Nombre del dueño (opcional)</label>
       <input id="pDuenoNombre" type="text" placeholder="Ej: María Pérez">` : ""}
-      <label>Teléfono${esVet ? " del dueño" : ""} (opcional)</label>
+      ${esPed ? `
+      <label>Semanas de gestación al nacer (opcional)</label>
+      <input id="pSemanasGesta" type="number" min="20" max="44" step="1" inputmode="numeric" placeholder="Ej: 32 — dejalo vacío si nació a término">
+      <div class="hint" style="margin:-4px 0 8px">Si nació prematuro, Vitalis usa la edad corregida en las curvas hasta los 2 años.</div>
+      <label>Madre, padre o tutor (opcional)</label>
+      <input id="pTutorNombre" type="text" placeholder="Ej: María Pérez">
+      <label>Parentesco (opcional)</label>
+      <input id="pTutorParentesco" type="text" placeholder="Ej: Madre">` : ""}
+      <label>Teléfono${esVet ? " del dueño" : esPed ? " del tutor" : ""} (opcional)</label>
       <input id="pTelefono" type="tel" placeholder="591XXXXXXXX">
       <label>Notas (opcional)</label>
       <input id="pNotas" type="text" placeholder="Alergias, observaciones generales...">
@@ -122,13 +136,16 @@ function renderNuevoPaciente() {
     const especie = esVet ? document.getElementById("pEspecie").value.trim() : "";
     const raza = esVet ? document.getElementById("pRaza").value.trim() : "";
     const duenoNombre = esVet ? document.getElementById("pDuenoNombre").value.trim() : "";
+    const tutorNombre = esPed ? document.getElementById("pTutorNombre").value.trim() : "";
+    const tutorParentesco = esPed ? document.getElementById("pTutorParentesco").value.trim() : "";
+    const semanasGestacionAlNacer = esPed ? (document.getElementById("pSemanasGesta").value.trim() || null) : null;
     const errBox = document.getElementById("pErr");
     errBox.innerHTML = "";
     if (!nombre) { errBox.innerHTML = `<div class="error">${esVet ? "El nombre de la mascota es obligatorio" : "El nombre es obligatorio"}</div>`; return; }
     try {
       const data = await api("/medico/pacientes", {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre }),
+        body: JSON.stringify({ nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer }),
       });
       renderPacienteDetalle(data.paciente._id);
     } catch (e) {
@@ -310,7 +327,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
-  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
+  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
     <button class="back" id="btnBack">← Pacientes</button>
@@ -351,6 +368,10 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   if (tabActiva === "embarazo") {
     renderTabEmbarazo(p._id);
+  }
+
+  if (tabActiva === "crecimiento") {
+    wireTabCrecimiento(p, mediciones);
   }
 
   if (tabActiva === "consultas") {

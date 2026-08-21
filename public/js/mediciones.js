@@ -16,6 +16,11 @@ const TIPOS_MEDICION = {
   // clínico para sospecha de glaucoma.
   presionIntraocularOD: { label: "Presión intraocular OD", unidad: "mmHg", alertaUmbral: 21 },
   presionIntraocularOI: { label: "Presión intraocular OI", unidad: "mmHg", alertaUmbral: 21 },
+  // Vitalis Pediatría: van al gráfico normal de evolución como cualquier
+  // otra medición, pero además son la materia prima de las curvas de
+  // crecimiento (ver crecimiento.js), donde se leen contra la OMS.
+  talla:               { label: "Talla",             unidad: "cm" },
+  perimetroCefalico:   { label: "Perímetro cefálico", unidad: "cm" },
   // Vitalis Obstetricia: controles prenatales, control a control.
   pesoMaterno:         { label: "Peso materno",       unidad: "kg" },
   alturaUterina:       { label: "Altura uterina",      unidad: "cm" },

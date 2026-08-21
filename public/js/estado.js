@@ -23,13 +23,15 @@ function aplicarTemaSegunEspecialidad() {
   const esOftalmologia = MEDICO_TIPO_ESPECIALIDAD === "oftalmologia";
   const esVeterinaria = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
   const esGinecologia = MEDICO_TIPO_ESPECIALIDAD === "ginecologia";
+  const esPediatria = MEDICO_TIPO_ESPECIALIDAD === "pediatria";
   document.body.classList.toggle("tema-dental", esDental);
   document.body.classList.toggle("tema-estetica", esEstetica);
   document.body.classList.toggle("tema-oftalmologia", esOftalmologia);
   document.body.classList.toggle("tema-veterinaria", esVeterinaria);
   document.body.classList.toggle("tema-ginecologia", esGinecologia);
+  document.body.classList.toggle("tema-pediatria", esPediatria);
   const marcaH1 = document.querySelector(".brand h1");
-  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : esOftalmologia ? "Vitalis Visión" : esVeterinaria ? "Vitalis Veterinaria" : esGinecologia ? "Vitalis Obstetricia" : "Vitalis";
+  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : esOftalmologia ? "Vitalis Visión" : esVeterinaria ? "Vitalis Veterinaria" : esGinecologia ? "Vitalis Obstetricia" : esPediatria ? "Vitalis Pediatría" : "Vitalis";
 }
 
 // /veterinaria es la "landing" de Vitalis Veterinaria: mismo frontend, pero
@@ -188,7 +190,24 @@ const TABS_KARDEX_GINECOLOGIA = {
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
+// Vitalis Pediatría: "crecimiento" son las curvas de la OMS (peso, talla,
+// perímetro cefálico e IMC para la edad) y es la pestaña que define la rama
+// — un pediatra la abre antes que ninguna otra. "evolucion" queda para los
+// signos vitales de siempre (temperatura, saturación), que en un chico con
+// fiebre siguen haciendo falta.
+const TABS_KARDEX_PEDIATRIA = {
+  paciente: { icono: ICONOS.persona, label: "Paciente" },
+  consultas: { icono: ICONOS.mic, label: "Consultas" },
+  crecimiento: { icono: ICONOS.tendencia, label: "Crecimiento" },
+  vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  evolucion: { icono: ICONOS.corazon, label: "Signos" },
+  estudios: { icono: ICONOS.frasco, label: "Estudios" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
+};
 function tabsKardexPara(tipoEspecialidad) {
+  if (tipoEspecialidad === "pediatria") return TABS_KARDEX_PEDIATRIA;
   if (tipoEspecialidad === "odontologia") return TABS_KARDEX_ODONTOLOGIA;
   if (tipoEspecialidad === "estetica") return TABS_KARDEX_ESTETICA;
   if (tipoEspecialidad === "oftalmologia") return TABS_KARDEX_OFTALMOLOGIA;

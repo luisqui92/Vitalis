@@ -39,6 +39,15 @@ const KEYTERMS_POR_ESPECIALIDAD = {
     "ovario", "útero", "cesárea", "parto", "anticonceptivo", "menopausia",
     "preeclampsia", "trimestre",
   ],
+  pediatria: [
+    "percentil", "curva de crecimiento", "perímetro cefálico", "edad corregida",
+    "prematuro", "recién nacido", "lactante", "pretérmino", "a término",
+    "lactancia materna", "ablactación", "fontanela", "reflejo de Moro",
+    "desarrollo psicomotor", "control de niño sano", "pentavalente",
+    "bronquiolitis", "otitis media", "faringoamigdalitis", "exantema",
+    "convulsión febril", "deshidratación", "diarrea aguda", "peso al nacer",
+    "talla", "milígramos por kilo", "gotas", "jarabe", "suspensión",
+  ],
   veterinaria: [
     "canino", "felino", "desparasitación", "vacuna antirrábica", "moquillo",
     "parvovirus", "castración", "esterilización", "garrapata", "pulgas",
