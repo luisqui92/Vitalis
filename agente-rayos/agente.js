@@ -51,6 +51,26 @@ const MIME_POR_EXT = {
 };
 const EXTENSIONES = Object.keys(MIME_POR_EXT);
 
+// El software del sensor guarda VARIOS archivos por cada placa: la imagen
+// de verdad, una miniatura y una versión ampliada. El Ai-Dental usa
+// "algo.png", "algo-small.png" y "algo-zoom.png". Sin filtrarlas, cada
+// radiografía entraría a la ficha del paciente como tres estudios, dos de
+// ellos basura — y el odontólogo tendría que borrarlos a mano cada vez.
+//
+// El control de duplicados por hash no las ataja: son imágenes distintas,
+// con contenido distinto.
+//
+// Se puede ajustar desde config.json con "ignorarSufijos" si aparece otro
+// software que use otros nombres.
+const SUFIJOS_IGNORADOS = Array.isArray(cfg.ignorarSufijos)
+  ? cfg.ignorarSufijos.map(s => String(s).toLowerCase())
+  : ["-small", "-zoom", "-thumb", "_small", "_zoom", "_thumb", "-preview", "_preview"];
+
+function esVarianteDescartable(archivo) {
+  const base = path.basename(archivo, path.extname(archivo)).toLowerCase();
+  return SUFIJOS_IGNORADOS.some(suf => base.endsWith(suf));
+}
+
 // ─── MEMORIA ENTRE ARRANQUES ──────────────────────────────────────────────
 // Guarda qué archivos ya vio, para no volver a subir todo el historial cada
 // vez que alguien reinicia la PC. Se guarda por hash del contenido y no por
@@ -137,7 +157,7 @@ function listarImagenes(dir, profundidad = 0) {
     if (e.isDirectory()) {
       if (cfg.incluirSubcarpetas === false) continue;
       salida.push(...listarImagenes(completo, profundidad + 1));
-    } else if (EXTENSIONES.includes(path.extname(e.name).toLowerCase())) {
+    } else if (EXTENSIONES.includes(path.extname(e.name).toLowerCase()) && !esVarianteDescartable(e.name)) {
       salida.push(completo);
     }
   }
@@ -179,7 +199,7 @@ function estaCompleto(archivo) {
 // saber por qué. Es el primer lugar donde alguien va a perder una mañana.
 function revisarFormatosDeLaCarpeta() {
   const otros = new Map(); // extensión → cuántos
-  let soportados = 0;
+  let soportados = 0, variantes = 0;
   (function recorrer(dir, prof) {
     if (prof > 6) return;
     let entradas;
@@ -191,10 +211,15 @@ function revisarFormatosDeLaCarpeta() {
       }
       const ext = path.extname(e.name).toLowerCase();
       if (!ext) continue;
-      if (EXTENSIONES.includes(ext)) soportados++;
-      else otros.set(ext, (otros.get(ext) || 0) + 1);
+      if (!EXTENSIONES.includes(ext)) { otros.set(ext, (otros.get(ext) || 0) + 1); continue; }
+      if (esVarianteDescartable(e.name)) variantes++;
+      else soportados++;
     }
   })(cfg.carpeta, 0);
+
+  if (variantes > 0) {
+    log("→", `${variantes} miniaturas/ampliaciones del propio software se ignoran (sube una sola imagen por placa)`);
+  }
 
   if (soportados === 0 && otros.size === 0) {
     log("!", "la carpeta está vacía — ¿es la correcta? Tomá una radiografía y fijate dónde cae el archivo");
