@@ -172,6 +172,46 @@ function estaCompleto(archivo) {
   return Date.now() - previo.desde >= MS_ESTABLE;
 }
 
+// ─── DIAGNÓSTICO DE LA CARPETA ────────────────────────────────────────────
+// Muchos sensores dentales guardan en .bmp o .tif, que Vitalis no acepta.
+// Sin este aviso, una carpeta llena de .bmp se ve EXACTAMENTE igual que una
+// carpeta vacía: el agente dice "conectado", no sube nada, y no hay forma de
+// saber por qué. Es el primer lugar donde alguien va a perder una mañana.
+function revisarFormatosDeLaCarpeta() {
+  const otros = new Map(); // extensión → cuántos
+  let soportados = 0;
+  (function recorrer(dir, prof) {
+    if (prof > 6) return;
+    let entradas;
+    try { entradas = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entradas) {
+      if (e.isDirectory()) {
+        if (cfg.incluirSubcarpetas !== false) recorrer(path.join(dir, e.name), prof + 1);
+        continue;
+      }
+      const ext = path.extname(e.name).toLowerCase();
+      if (!ext) continue;
+      if (EXTENSIONES.includes(ext)) soportados++;
+      else otros.set(ext, (otros.get(ext) || 0) + 1);
+    }
+  })(cfg.carpeta, 0);
+
+  if (soportados === 0 && otros.size === 0) {
+    log("!", "la carpeta está vacía — ¿es la correcta? Tomá una radiografía y fijate dónde cae el archivo");
+    return;
+  }
+  if (soportados === 0 && otros.size > 0) {
+    const lista = [...otros].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([e, n]) => `${n} ${e}`).join(", ");
+    log("✗", `en esa carpeta hay ${lista}, y Vitalis solo acepta ${EXTENSIONES.join(" ")}`);
+    log("→", "configurá el software del sensor para que exporte JPG o PNG, o avisanos y lo resolvemos del lado de Vitalis");
+    return;
+  }
+  if (otros.size > 0) {
+    const lista = [...otros].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([e, n]) => `${n} ${e}`).join(", ");
+    log("!", `aviso: además hay ${lista} que no se van a subir (solo ${EXTENSIONES.join(" ")})`);
+  }
+}
+
 // ─── COLA DE ESPERA ───────────────────────────────────────────────────────
 // Imágenes que llegaron pero todavía no tienen paciente esperando.
 const enEspera = new Map(); // hash → { archivo, buffer, mime, desde, proximoIntento }
@@ -375,6 +415,7 @@ console.log("");
 console.log("  Dejá esta ventana abierta. Para apagarlo: cerrala o Ctrl+C.");
 console.log("");
 
+revisarFormatosDeLaCarpeta();
 if (estado.primeraVez) marcarHistorialInicial();
 
 revisar();
