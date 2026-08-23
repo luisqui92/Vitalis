@@ -188,6 +188,34 @@ body.tema-pediatria .segmento.h0{background:#1c292b;}
 body.tema-pediatria .segmento.h1{background:rgba(231,159,109,.14);}
 body.tema-pediatria .brief-card{background:linear-gradient(135deg,#162224,#121b1c);}
 
+/* Vitalis Neurodesarrollo — violeta suave. Es la rama donde más veces mira
+   la pantalla una madre y no un médico, y donde el mapa sensorial usa color
+   para significar cosas: por eso la base es tranquila y de bajo contraste,
+   para que los estados del mapa se lean solos. */
+body.tema-neuro{
+  --primary:#7c6bc4;
+  --primary-dark:#584a94;
+  --primary-rgb:124,107,196;
+  --accent:#d99a6c;
+  --accent-2:#ecc0a0;
+  --accent-rgb:217,154,108;
+  --bg:#131218;
+  --card:#1e1c26;
+  --border:#302d3d;
+  --text:#eeecf4;
+  --text-muted:#9c97ac;
+  --success:#5fa47e; --success-bg:rgba(95,164,126,.14);
+  --warning:#d4a05e; --warning-bg:rgba(212,160,94,.14);
+  --danger:#c96f7e; --danger-bg:rgba(201,111,126,.14);
+  --gradient-vitalis:linear-gradient(135deg,var(--primary-dark),var(--primary));
+}
+body.tema-neuro input,body.tema-neuro select,body.tema-neuro textarea{background:#242231;}
+body.tema-neuro button.secondary{background:rgba(124,107,196,.16);color:var(--accent-2);}
+body.tema-neuro .segmento.h0{background:#242231;}
+body.tema-neuro .segmento.h1{background:rgba(217,154,108,.14);}
+body.tema-neuro .brief-card{background:linear-gradient(135deg,#1d1b26,#17161e);}
+
+
 body.tema-ginecologia .segmento.h0{background:#271e1a;}
 body.tema-ginecologia .segmento.h1{background:rgba(201,160,95,.14);}
 body.tema-ginecologia .brief-card{background:linear-gradient(135deg,#241c18,#1c1512);}

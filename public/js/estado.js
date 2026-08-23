@@ -24,14 +24,16 @@ function aplicarTemaSegunEspecialidad() {
   const esVeterinaria = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
   const esGinecologia = MEDICO_TIPO_ESPECIALIDAD === "ginecologia";
   const esPediatria = MEDICO_TIPO_ESPECIALIDAD === "pediatria";
+  const esNeuro = MEDICO_TIPO_ESPECIALIDAD === "neurodesarrollo";
   document.body.classList.toggle("tema-dental", esDental);
   document.body.classList.toggle("tema-estetica", esEstetica);
   document.body.classList.toggle("tema-oftalmologia", esOftalmologia);
   document.body.classList.toggle("tema-veterinaria", esVeterinaria);
   document.body.classList.toggle("tema-ginecologia", esGinecologia);
   document.body.classList.toggle("tema-pediatria", esPediatria);
+  document.body.classList.toggle("tema-neuro", esNeuro);
   const marcaH1 = document.querySelector(".brand h1");
-  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : esOftalmologia ? "Vitalis Visión" : esVeterinaria ? "Vitalis Veterinaria" : esGinecologia ? "Vitalis Obstetricia" : esPediatria ? "Vitalis Pediatría" : "Vitalis";
+  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : esOftalmologia ? "Vitalis Visión" : esVeterinaria ? "Vitalis Veterinaria" : esGinecologia ? "Vitalis Obstetricia" : esPediatria ? "Vitalis Pediatría" : esNeuro ? "Vitalis Neurodesarrollo" : "Vitalis";
 }
 
 // /veterinaria es la "landing" de Vitalis Veterinaria: mismo frontend, pero
@@ -206,7 +208,25 @@ const TABS_KARDEX_PEDIATRIA = {
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
 };
+// Vitalis Neurodesarrollo (autismo, síndrome de Down y otras condiciones):
+// "perfilNeuro" es quién es la persona, qué apoyos necesita y su mapa
+// sensorial; "objetivos" son las metas medibles con su progreso; "salud" es
+// el calendario de controles que hay que ir a buscar. No hay pestaña de
+// diagnóstico a propósito — ver el comentario en db/models.js.
+const TABS_KARDEX_NEURO = {
+  paciente: { icono: ICONOS.persona, label: "Paciente" },
+  perfilNeuro: { icono: ICONOS.persona, label: "Perfil" },
+  consultas: { icono: ICONOS.mic, label: "Sesiones" },
+  objetivos: { icono: ICONOS.tendencia, label: "Objetivos" },
+  salud: { icono: ICONOS.jeringa, label: "Salud" },
+  crecimiento: { icono: ICONOS.tendencia, label: "Crecimiento" },
+  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
+  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
+  estudios: { icono: ICONOS.frasco, label: "Estudios" },
+  recetas: { icono: ICONOS.documento, label: "Recetas" },
+};
 function tabsKardexPara(tipoEspecialidad) {
+  if (tipoEspecialidad === "neurodesarrollo") return TABS_KARDEX_NEURO;
   if (tipoEspecialidad === "pediatria") return TABS_KARDEX_PEDIATRIA;
   if (tipoEspecialidad === "odontologia") return TABS_KARDEX_ODONTOLOGIA;
   if (tipoEspecialidad === "estetica") return TABS_KARDEX_ESTETICA;

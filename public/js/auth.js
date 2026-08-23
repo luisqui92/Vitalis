@@ -80,6 +80,7 @@ function renderRegistro() {
         <option value="oftalmologia">👁️ Oftalmología</option>
         <option value="ginecologia">🤰 Ginecología y Obstetricia</option>
         <option value="pediatria">🧸 Pediatría</option>
+        <option value="neurodesarrollo">🧩 Neurodesarrollo (autismo, síndrome de Down)</option>
         <option value="veterinaria">🐾 Veterinaria</option>
       </select>`;
   app.innerHTML = `

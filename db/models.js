@@ -27,7 +27,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"], default: "medicina_general" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -571,6 +571,146 @@ const capturaPendienteSchema = new mongoose.Schema({
 capturaPendienteSchema.index({ expiraEn: 1 }, { expireAfterSeconds: 0 });
 const CapturaPendiente = mongoose.model("CapturaPendiente", capturaPendienteSchema);
 
+
+// ═══ VITALIS NEURODESARROLLO ══════════════════════════════════════════════
+// Autismo, síndrome de Down y otras condiciones del neurodesarrollo no
+// entran en una historia clínica común, y por una razón de fondo: no hay
+// una enfermedad que curar. El expediente no es un registro de lo que
+// falló, es el MAPA DE UNA PERSONA — su perfil, sus apoyos, sus objetivos y
+// quién trabaja con ella.
+//
+// Por eso acá no hay "diagnóstico" como una etiqueta única. El DSM-5 mismo
+// no dice "tiene autismo" y listo: define NIVELES DE APOYO en dos ejes
+// independientes, y alguien puede necesitar nivel 1 en uno y nivel 3 en el
+// otro. La ficha tiene que mostrar eso.
+const CONDICIONES_NEURO = ["tea", "sindrome_down", "tdah", "discapacidad_intelectual", "trastorno_lenguaje", "otra"];
+
+// Nivel de apoyo del DSM-5: 1 = necesita apoyo, 2 = apoyo sustancial,
+// 3 = apoyo muy sustancial. Se registran los dos ejes por separado porque
+// es como está definido, no como una nota promedio.
+const EJES_APOYO = ["comunicacionSocial", "conductasRestringidas"];
+
+const FORMAS_COMUNICACION = ["verbal_fluida", "frases", "palabras_sueltas", "no_verbal", "aumentativa", "mixta"];
+
+// Las modalidades del perfil sensorial. En autismo esto es lo que más le
+// sirve a la familia y a la escuela todos los días: "no tolera el ruido del
+// secador de manos" vale más que cualquier código diagnóstico, y hoy no
+// queda escrito en ningún lado.
+const MODALIDADES_SENSORIALES = ["auditivo", "tactil", "visual", "vestibular", "propioceptivo", "oral", "olfativo", "interoceptivo"];
+const RESPUESTAS_SENSORIALES = ["sin_datos", "tipico", "hiper", "hipo", "busca", "mixto"];
+
+const modalidadSensorialSchema = new mongoose.Schema({
+  modalidad: { type: String, enum: MODALIDADES_SENSORIALES, required: true },
+  respuesta: { type: String, enum: RESPUESTAS_SENSORIALES, default: "sin_datos" },
+  // Lo concreto y accionable: qué lo desregula y qué lo calma. Es lo que se
+  // copia al informe para la escuela.
+  desencadenantes: { type: [String], default: [] },
+  estrategias: { type: [String], default: [] },
+  historial: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      respuesta: { type: String, enum: RESPUESTAS_SENSORIALES },
+      notas: { type: String, default: "" },
+      // Mismo criterio que el odontograma y el mapa ocular: queda registrado
+      // si lo aplicó la IA desde lo dictado o lo cargó el profesional.
+      fuente: { type: String, enum: ["voz", "manual"], default: "manual" },
+      consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+    }],
+    default: [],
+  },
+}, { _id: false });
+
+const perfilNeuroSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, unique: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  condiciones: { type: [{ type: String, enum: CONDICIONES_NEURO }], default: [] },
+  detalleCondicion: { type: String, default: "" },
+  apoyoComunicacionSocial: { type: Number, min: 1, max: 3, default: null },
+  apoyoConductasRestringidas: { type: Number, min: 1, max: 3, default: null },
+  comunicacion: { type: String, enum: FORMAS_COMUNICACION, default: null },
+  sistemaAumentativo: { type: String, default: "" },
+  // Se pregunta primero por las fortalezas y no por los déficits, a
+  // propósito: es lo que la familia nunca ve escrito en un informe y lo que
+  // el equipo necesita para apoyarse en algo.
+  fortalezas: { type: [String], default: [] },
+  intereses: { type: [String], default: [] },
+  perfilSensorial: { type: [modalidadSensorialSchema], default: [] },
+  perfilSugerido: { type: Boolean, default: false }, // la IA propuso cambios sin confirmar
+}, { timestamps: true });
+const PerfilNeuro = mongoose.model("PerfilNeuro", perfilNeuroSchema);
+
+// Objetivos individualizados. Esto es lo que se pelea con la escuela y con
+// el seguro, y hoy vive en cuadernos: "pedir agua señalando, sin ayuda
+// física, 8 de 10 veces". Cada profesional del equipo carga el avance y
+// sale una curva.
+const AREAS_OBJETIVO = ["comunicacion", "social", "autonomia", "motor", "cognitivo", "conducta", "sensorial", "academico", "familiar"];
+
+const objetivoNeuroSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  titulo: { type: String, required: true },
+  area: { type: String, enum: AREAS_OBJETIVO, default: "comunicacion" },
+  // El criterio de logro escrito como corresponde: observable y contable.
+  criterio: { type: String, default: "" },
+  fechaInicio: { type: Date, default: Date.now },
+  fechaCierre: { type: Date, default: null },
+  estado: { type: String, enum: ["activo", "logrado", "suspendido"], default: "activo" },
+  // Cada registro es una sesión: cuántas veces salió sobre cuántas se
+  // intentó. Guardar los dos números y no un porcentaje deja ver si el
+  // 50% fue 1 de 2 o 15 de 30, que no es lo mismo.
+  progreso: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      logros: { type: Number, default: 0 },
+      intentos: { type: Number, default: 0 },
+      // Nivel de ayuda que necesitó: el objetivo real casi siempre es bajar
+      // esto, no subir el porcentaje.
+      ayuda: { type: String, enum: ["independiente", "verbal", "gestual", "fisica_parcial", "fisica_total"], default: "independiente" },
+      notas: { type: String, default: "" },
+      profesional: { type: String, default: "" },
+    }],
+    default: [],
+  },
+}, { timestamps: true });
+objetivoNeuroSchema.index({ pacienteId: 1, estado: 1 });
+const ObjetivoNeuro = mongoose.model("ObjetivoNeuro", objetivoNeuroSchema);
+
+// Calendario de vigilancia de salud. El síndrome de Down trae asociadas
+// condiciones que hay que ir BUSCANDO en momentos determinados — no
+// aparecen solas, hay que pedirlas. Si nadie lleva el calendario, se pasan
+// de largo años enteros, y eso es exactamente lo que pasa hoy.
+//
+// Es el mismo patrón que la pestaña de Vacunas: qué corresponde a esta
+// edad, qué está hecho y qué está atrasado.
+//
+// IMPORTANTE: la plantilla que trae Vitalis (ver services/vigilancia.js) es
+// un punto de partida basado en guías publicadas, NO un protocolo. Cada
+// ítem es editable y borrable, porque el protocolo que manda es el del
+// médico tratante y el de su país.
+const vigilanciaSaludSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  nombre: { type: String, required: true },
+  categoria: { type: String, default: "" }, // cardio, tiroides, audición, visión, digestivo, sueño...
+  // Ventana de edad en meses en la que corresponde hacerlo. desde=0 es "al
+  // nacer"; hasta=null es "de ahí en adelante".
+  desdeMeses: { type: Number, default: 0 },
+  hastaMeses: { type: Number, default: null },
+  // Cada cuánto se repite (null = una sola vez en la vida).
+  cadaMeses: { type: Number, default: null },
+  nota: { type: String, default: "" },
+  realizados: {
+    type: [{
+      fecha: { type: Date, required: true },
+      resultado: { type: String, default: "" },
+      estudioId: { type: mongoose.Schema.Types.ObjectId, ref: "Estudio", default: null },
+    }],
+    default: [],
+  },
+}, { timestamps: true });
+vigilanciaSaludSchema.index({ pacienteId: 1, desdeMeses: 1 });
+const VigilanciaSalud = mongoose.model("VigilanciaSalud", vigilanciaSaludSchema);
+
 // Receta Digital: se arma a partir de lo recetado en una consulta (o a
 // mano) y queda lista para imprimir/guardar como PDF desde el navegador.
 // Crearla ES el acto de aprobación del médico — no hay estado de borrador,
@@ -718,4 +858,6 @@ const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
-  EquipoRayos, CapturaPendiente };
+  EquipoRayos, CapturaPendiente,
+  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud,
+  CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO };

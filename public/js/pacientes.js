@@ -327,7 +327,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
-  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
+  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: `<div id="objetivosNeuroBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
     <button class="back" id="btnBack">← Pacientes</button>
@@ -372,6 +372,18 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   if (tabActiva === "crecimiento") {
     wireTabCrecimiento(p, mediciones);
+  }
+
+  if (tabActiva === "perfilNeuro") {
+    renderTabPerfilNeuro(p._id);
+  }
+
+  if (tabActiva === "objetivos") {
+    renderTabObjetivosNeuro(p._id);
+  }
+
+  if (tabActiva === "salud") {
+    renderTabVigilancia(p._id);
   }
 
   if (tabActiva === "consultas") {

@@ -92,6 +92,7 @@ require("./routes/tratamientos")(app);
 require("./routes/mediciones")(app);
 require("./routes/estudios")(app);
 require("./routes/rayos")(app);
+require("./routes/neurodesarrollo")(app);
 require("./routes/memoriaClinica")(app);
 require("./routes/recetas")(app);
 require("./routes/recordatorios")(app);

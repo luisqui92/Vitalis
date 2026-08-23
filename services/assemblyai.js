@@ -39,6 +39,16 @@ const KEYTERMS_POR_ESPECIALIDAD = {
     "ovario", "útero", "cesárea", "parto", "anticonceptivo", "menopausia",
     "preeclampsia", "trimestre",
   ],
+  neurodesarrollo: [
+    "autismo", "trastorno del espectro autista", "TEA", "síndrome de Down",
+    "trisomía 21", "neurodesarrollo", "perfil sensorial", "hiperreactividad",
+    "hiporreactividad", "estereotipias", "ecolalia", "desregulación",
+    "comunicación aumentativa", "PECS", "integración sensorial",
+    "terapia ocupacional", "fonoaudiología", "psicomotricidad",
+    "nivel de apoyo", "conductas restringidas", "interés restringido",
+    "anticipación", "agenda visual", "TDAH", "hipotonía", "atlantoaxial",
+    "hipotiroidismo", "estimulación temprana", "inclusión escolar",
+  ],
   pediatria: [
     "percentil", "curva de crecimiento", "perímetro cefálico", "edad corregida",
     "prematuro", "recién nacido", "lactante", "pretérmino", "a término",

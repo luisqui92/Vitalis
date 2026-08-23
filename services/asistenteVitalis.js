@@ -203,6 +203,34 @@ GINECOLOGÍA Y OBSTETRICIA (Vitalis Gineco)
   izquierdo con quiste simple", "endometrio engrosado").
 - Los estudios se muestran como "Ecografías" en la ficha.`,
 
+  neurodesarrollo: `
+NEURODESARROLLO (Vitalis Neurodesarrollo) — autismo, síndrome de Down y otras
+- Acá la ficha NO es un historial de enfermedad: es el mapa de una persona.
+  Por eso no hay un campo "diagnóstico" con una etiqueta única.
+- Perfil: se marcan una o varias condiciones (autismo, síndrome de Down,
+  TDAH, discapacidad intelectual, trastorno del lenguaje), la forma de
+  comunicación y el sistema aumentativo si usa (PECS, tablero, app).
+- Niveles de apoyo del DSM-5 en DOS ejes independientes: comunicación social
+  y conductas restringidas. Alguien puede necesitar nivel 3 en uno y nivel 1
+  en el otro, y así se guarda — no hay un nivel único ni un promedio.
+- Fortalezas e intereses se cargan antes que nada. Es información clínica
+  real: es donde se apoya el trabajo del equipo.
+- Perfil sensorial: los ocho sentidos (auditivo, táctil, visual, vestibular,
+  propioceptivo, oral, olfativo e interoceptivo). En cada uno se marca si la
+  respuesta es típica, hiperreactiva, hiporreactiva, buscadora o mixta, y se
+  anota qué lo desregula y qué lo calma. Cada sentido guarda su historial.
+- Objetivos individualizados y medibles. Se registra por sesión cuántas
+  veces salió sobre cuántas se intentó, y con cuánta ayuda (sin ayuda,
+  verbal, gestual, física parcial, física total). El gráfico muestra las dos
+  cosas: la altura es el porcentaje y el color es cuánta ayuda necesitó,
+  porque bajar la ayuda es tan importante como subir el porcentaje.
+- Salud: calendario de controles que hay que ir a buscar, por edad. Trae
+  plantillas para síndrome de Down y para autismo, y dice qué está atrasado,
+  qué toca ahora y qué está al día. Las plantillas son un punto de partida
+  basado en guías publicadas, NO un protocolo: todo se puede editar y borrar,
+  el criterio que manda es el del profesional.
+- Vitalis no diagnostica ni puntúa riesgo en esta rama. Registra y muestra.`,
+
   pediatria: `
 PEDIATRÍA (Vitalis Pediatría)
 - Curvas de crecimiento con los patrones oficiales de la OMS: peso para la
