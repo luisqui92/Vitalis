@@ -93,6 +93,7 @@ require("./routes/mediciones")(app);
 require("./routes/estudios")(app);
 require("./routes/rayos")(app);
 require("./routes/neurodesarrollo")(app);
+require("./routes/informes")(app);
 require("./routes/memoriaClinica")(app);
 require("./routes/recetas")(app);
 require("./routes/recordatorios")(app);
@@ -114,7 +115,11 @@ app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
 // Vitalis Veterinaria vive en /veterinaria como landing propia (mismo
 // frontend/SPA de siempre — el JS detecta la ruta y ajusta marca/tema/
 // registro antes incluso de loguearse; ver public/js/auth.js y estado.js).
+// /informe/<token> es la página que abre el PACIENTE desde el enlace de
+// WhatsApp: mismo frontend, pero el JS detecta la ruta y muestra el informe
+// con membrete en vez de la pantalla de login (ver public/js/informePublico.js).
 app.get(["/", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
 // http.createServer (en vez del app.listen de siempre) porque el

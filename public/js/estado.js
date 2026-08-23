@@ -56,6 +56,17 @@ function aplicarLandingVeterinariaSiCorresponde() {
 let pollTimeout = null;
 function detenerPolling() { if (pollTimeout) { clearTimeout(pollTimeout); pollTimeout = null; } }
 
+// ─── NÚMERO DE PANTALLA ───────────────────────────────────────────────────
+// Cada pantalla pide sus datos al servidor y recién después pinta. Si en ese
+// rato el médico se fue a otra (abrió un informe, por ejemplo), el pintado
+// viejo llega tarde y le tapa lo que está haciendo — y eso pasa solo, porque
+// el aviso de tiempo real dispara repintados que nadie pidió.
+// Cada pantalla toma un número al entrar y no pinta si mientras tanto salió
+// otro: llegó tarde, ya no es la pantalla que el médico está mirando.
+let SERIE_PANTALLA = 0;
+function nuevaSeriePantalla() { return ++SERIE_PANTALLA; }
+function seriePantallaVigente(n) { return n === SERIE_PANTALLA; }
+
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function edadDesde(fechaNacimiento) {
@@ -121,6 +132,7 @@ const TABS_KARDEX_MEDICINA_GENERAL = {
   evolucion: { icono: ICONOS.tendencia, label: "Evolución" },
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 const TABS_KARDEX_ODONTOLOGIA = {
   paciente: { icono: ICONOS.persona, label: "Paciente" },
@@ -131,6 +143,7 @@ const TABS_KARDEX_ODONTOLOGIA = {
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 // Vitalis Face (estética/plástica/dermatología): sin odontograma ni
 // vacunas/evolución — en cambio, Estudios se usa para las fotos clínicas
@@ -144,6 +157,7 @@ const TABS_KARDEX_ESTETICA = {
   medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 // Vitalis Visión (oftalmología): "ojos" es el mapa ocular por estructura,
 // "evolucion" acá se usa para presión intraocular/agudeza visual (con
@@ -159,6 +173,7 @@ const TABS_KARDEX_OFTALMOLOGIA = {
   medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 // Vitalis Veterinaria: mismas fichas que medicina general (consultas,
 // medicación, antecedentes, vacunas, evolución de peso, estudios, recetas)
@@ -175,6 +190,7 @@ const TABS_KARDEX_VETERINARIA = {
   evolucion: { icono: ICONOS.tendencia, label: "Peso" },
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 // Vitalis Obstetricia (ginecología y obstetricia): "embarazo" es la FUM/FPP
 // y semanas de gestación del embarazo activo (o para abrir uno nuevo);
@@ -191,6 +207,7 @@ const TABS_KARDEX_GINECOLOGIA = {
   medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 // Vitalis Pediatría: "crecimiento" son las curvas de la OMS (peso, talla,
 // perímetro cefálico e IMC para la edad) y es la pestaña que define la rama
@@ -207,6 +224,7 @@ const TABS_KARDEX_PEDIATRIA = {
   evolucion: { icono: ICONOS.corazon, label: "Signos" },
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 // Vitalis Neurodesarrollo (autismo, síndrome de Down y otras condiciones):
 // "perfilNeuro" es quién es la persona, qué apoyos necesita y su mapa
@@ -224,6 +242,7 @@ const TABS_KARDEX_NEURO = {
   antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
   estudios: { icono: ICONOS.frasco, label: "Estudios" },
   recetas: { icono: ICONOS.documento, label: "Recetas" },
+  informes: { icono: ICONOS.documento, label: "Informes" },
 };
 function tabsKardexPara(tipoEspecialidad) {
   if (tipoEspecialidad === "neurodesarrollo") return TABS_KARDEX_NEURO;

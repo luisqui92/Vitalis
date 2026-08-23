@@ -536,3 +536,51 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .asistente-pie{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border);}
 .asistente-pie input{margin:0;flex:1;}
 .asistente-pie button{margin:0;width:auto;padding:11px 16px;white-space:nowrap;}
+
+/* ═══ HOJA MEMBRETADA DE INFORMES ═══════════════════════════════════════
+   La hoja se dibuja siempre en claro, aunque Vitalis esté en tema oscuro:
+   es un documento que se imprime en papel y que el paciente va a mirar
+   fuera de la app. Un informe médico en fondo negro no lo lee nadie. */
+.inf-barra{display:flex;gap:8px;padding:10px;background:#15151a;justify-content:flex-end;z-index:2}
+.inf-hoja{
+  background:#fff;color:#1a1a1a;max-width:820px;margin:16px auto 40px;padding:34px 38px;
+  border-radius:4px;box-shadow:0 6px 28px rgba(0,0,0,.35);
+  font-family:Georgia,"Times New Roman",serif;font-size:14px;line-height:1.55;
+}
+.inf-cabecera{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1a1a1a;padding-bottom:14px}
+.inf-logo{max-height:64px;max-width:150px;object-fit:contain}
+.inf-nombre-centro{font-size:20px;font-weight:700;letter-spacing:.3px}
+.inf-datos-centro{font-size:12px;color:#555;margin-top:2px}
+.inf-titulo{text-align:center;font-size:17px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:20px 0 14px}
+.inf-datos{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px}
+.inf-datos td{border:1px solid #d4d4d4;padding:7px 10px;width:50%;vertical-align:top}
+.inf-datos b{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#666;font-weight:700}
+.inf-bloque{margin-bottom:16px}
+.inf-bloque h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#444;
+  border-bottom:1px solid #ddd;padding-bottom:3px;margin:0 0 7px}
+.inf-bloque p{margin:0;text-align:justify}
+.inf-imagenes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.inf-imagenes figure{margin:0;text-align:center}
+.inf-imagenes img{width:100%;background:#000;border:1px solid #ccc;border-radius:3px;
+  max-height:270px;object-fit:contain}
+.inf-imagenes figcaption{font-size:11px;color:#666;margin-top:3px}
+.inf-firma{margin-top:38px;text-align:center;page-break-inside:avoid}
+.inf-firma img{max-height:58px;display:block;margin:0 auto -6px}
+.inf-linea{width:230px;border-top:1px solid #1a1a1a;margin:0 auto 5px}
+.inf-profesional{font-size:12.5px;line-height:1.4}
+.inf-pie-firma{font-size:10px;color:#777;margin-top:6px}
+.inf-pie{margin-top:26px;border-top:1px solid #ddd;padding-top:9px;font-size:10.5px;color:#666;text-align:center}
+.inf-verificacion{margin-top:4px;font-size:9.5px;color:#888}
+
+@media print{
+  .inf-hoja{box-shadow:none;margin:0;padding:0;max-width:none;border-radius:0}
+  #hojaInforme{position:static !important;background:#fff !important;overflow:visible !important}
+  .inf-bloque,.inf-imagenes figure{page-break-inside:avoid}
+  @page{margin:14mm}
+}
+@media(max-width:640px){
+  .inf-hoja{padding:20px 16px;margin:8px;font-size:13px}
+  .inf-cabecera{flex-direction:column;text-align:center;gap:8px}
+  .inf-datos td{display:block;width:auto;border-bottom:none}
+  .inf-datos tr:last-child td:last-child{border-bottom:1px solid #d4d4d4}
+}

@@ -42,9 +42,18 @@ function desconectarTiempoReal() {
   }
 }
 
+// Hay pantallas que son un formulario abierto, con texto a medio escribir:
+// el editor de informes (el médico está dictando el diagnóstico) y el
+// membrete. Repintarlas por un aviso de cambio le borraría lo escrito — y
+// el aviso muchas veces lo dispara el guardado del propio médico, así que
+// se borraría solo. Se registran igual, para que el aviso no caiga sobre la
+// pantalla anterior y lo saque de acá; refrescarlas es no hacer nada.
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete"]);
+
 function refrescarPantallaActual() {
   if (!PANTALLA_ACTUAL) return;
   const { tipo, params } = PANTALLA_ACTUAL;
+  if (PANTALLAS_SIN_REFRESCO.has(tipo)) return;
   if (tipo === "dashboard") renderDashboard();
   else if (tipo === "agenda") renderAgenda();
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
@@ -77,3 +86,8 @@ envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", pa
 // cambio repintara la pantalla ANTERIOR y saltara fuera de la de equipos,
 // justo en el único momento en que el token está a la vista.
 envolverParaTiempoReal("renderEquiposRayos", (pacienteVuelta) => ({ tipo: "equiposRayos", params: { pacienteVuelta } }));
+// Estas dos van a PANTALLAS_SIN_REFRESCO: se registran para que el aviso de
+// cambio sepa que el médico ya no está en la ficha del paciente, y ahí se
+// queda quieto en vez de repintarla encima del informe a medio escribir.
+envolverParaTiempoReal("renderEditorInforme", (pacienteId, informeId) => ({ tipo: "editorInforme", params: { pacienteId, informeId } }));
+envolverParaTiempoReal("renderMembrete", () => ({ tipo: "membrete", params: {} }));

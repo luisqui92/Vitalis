@@ -85,6 +85,11 @@ const pacienteSchema = new mongoose.Schema({
   // teléfono. "telefono" sigue siendo el de contacto, igual que en veterinaria.
   tutorNombre: { type: String, default: "" },
   tutorParentesco: { type: String, default: "" },
+  // Código corto y único por consultorio. Es lo que se dicta por teléfono
+  // ("soy el paciente P-0147"), lo que va impreso en el informe y lo que
+  // permite encontrar a alguien cuando el nombre está mal escrito — que en
+  // un centro de imagen con mostrador pasa todo el tiempo.
+  codigo: { type: String, default: "", index: true },
   antecedentesPersonales: { type: [String], default: [] }, // ej: "Hipertensión desde 2019", "Alergia a penicilina"
   antecedentesFamiliares: { type: [{ parentesco: String, condicion: String }], default: [] },
   // Brief Clínico Inteligente: resumen ejecutivo generado por IA a partir del
@@ -754,6 +759,75 @@ const vigilanciaSaludSchema = new mongoose.Schema({
 vigilanciaSaludSchema.index({ pacienteId: 1, desdeMeses: 1 });
 const VigilanciaSalud = mongoose.model("VigilanciaSalud", vigilanciaSaludSchema);
 
+
+// ═══ INFORMES CON MEMBRETE ════════════════════════════════════════════════
+// El informe ES el producto que vende un centro de imagen: el paciente no
+// paga por la placa, paga por la lectura del médico. Por eso esto no es un
+// campo de texto más en la consulta, es una entidad propia con su código,
+// su estado y su firma.
+//
+// Membrete: el encabezado del centro médico. Va en una colección aparte y
+// no dentro de Medico porque incluye el logo y la firma en base64, y ese
+// documento se lee en cada autenticación — cargar 200 KB de imágenes en
+// cada login sería pagar caro por algo que se usa solo al imprimir.
+const membreteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, unique: true, index: true, required: true },
+  nombreCentro: { type: String, default: "" },
+  direccion: { type: String, default: "" },
+  telefono: { type: String, default: "" },
+  ciudad: { type: String, default: "" },
+  // Lo que va debajo de la firma: "Dra. X · Médico radiólogo · Reg. 12345"
+  profesionalNombre: { type: String, default: "" },
+  profesionalTitulo: { type: String, default: "" },
+  profesionalRegistro: { type: String, default: "" },
+  piePagina: { type: String, default: "" },
+  // Imágenes como data URI. Son chicas (un logo y una firma) y así viajan
+  // en el respaldo de la base sin plomería aparte de archivos.
+  logo: { type: String, default: "" },
+  firma: { type: String, default: "" },
+}, { timestamps: true });
+const Membrete = mongoose.model("Membrete", membreteSchema);
+
+const informeSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  // Correlativo por consultorio, el que se dicta por teléfono cuando alguien
+  // llama a preguntar por su informe.
+  codigo: { type: String, required: true, index: true },
+  titulo: { type: String, default: "" },        // "Radiografía periapical - molar 36"
+  tipoEstudio: { type: String, default: "" },
+  fechaEstudio: { type: Date, default: Date.now },
+
+  // Cuáles de las imágenes del paciente se incluyen. Se GUARDA la selección
+  // en vez de borrar las descartadas: al paciente ya se le dio la dosis y
+  // esa placa es parte del registro, aunque no vaya en el informe.
+  estudiosIncluidos: [{ type: mongoose.Schema.Types.ObjectId, ref: "Estudio" }],
+
+  tecnica: { type: String, default: "" },
+  hallazgos: { type: String, default: "" },
+  conclusion: { type: String, default: "" },
+  recomendaciones: { type: String, default: "" },
+
+  // Un informe firmado no se edita más. Si hay que corregirlo se hace uno
+  // nuevo que referencia al anterior — igual que en cualquier servicio de
+  // imagenología serio, porque el informe original ya salió del consultorio
+  // y puede estar en manos de otro médico.
+  estado: { type: String, enum: ["borrador", "firmado"], default: "borrador", index: true },
+  firmadoEn: { type: Date, default: null },
+  corrigeA: { type: mongoose.Schema.Types.ObjectId, ref: "Informe", default: null },
+
+  // Enlace para el paciente: sin cuenta, sin contraseña, vence solo. Un
+  // paciente que recibe un informe una vez no va a crear un usuario, y una
+  // cuenta más es superficie de ataque más.
+  tokenPublico: { type: String, default: null, index: true },
+  tokenExpira: { type: Date, default: null },
+  compartidoEn: { type: Date, default: null },
+  vistoEn: { type: Date, default: null },
+  vistas: { type: Number, default: 0 },
+}, { timestamps: true });
+informeSchema.index({ medicoPhone: 1, codigo: 1 }, { unique: true });
+const Informe = mongoose.model("Informe", informeSchema);
+
 // Receta Digital: se arma a partir de lo recetado en una consulta (o a
 // mano) y queda lista para imprimir/guardar como PDF desde el navegador.
 // Crearla ES el acto de aprobación del médico — no hay estado de borrador,
@@ -902,5 +976,5 @@ module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medici
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente,
-  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud,
+  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, Membrete, Informe,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO };

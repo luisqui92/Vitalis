@@ -159,13 +159,18 @@ function renderNuevoPaciente() {
 // para no estar yendo y viniendo cada vez que querés ver otra cosa.
 async function renderPacienteDetalle(pacienteId, tabInicial) {
   detenerPolling();
+  const serie = nuevaSeriePantalla();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
   try {
     const data = await api("/medico/pacientes/" + pacienteId);
+    // Si el médico ya se fue a otra pantalla mientras esto viajaba, este
+    // pintado llega tarde y le taparía lo que está haciendo.
+    if (!seriePantallaVigente(serie)) return;
     const tabPorDefecto = MEDICO_TIPO_ESPECIALIDAD === "odontologia" ? "odontograma" : MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? "ojos" : MEDICO_TIPO_ESPECIALIDAD === "ginecologia" ? "embarazo" : "consultas";
     pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabInicial || tabPorDefecto);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (!seriePantallaVigente(serie)) return;
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando el paciente")}</div>`;
   }
 }
@@ -327,7 +332,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
-  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: `<div id="objetivosNeuroBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
+  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: `<div id="objetivosNeuroBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, informes: `<div id="informesBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
     <button class="back" id="btnBack">← Pacientes</button>
@@ -384,6 +389,10 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   if (tabActiva === "salud") {
     renderTabVigilancia(p._id);
+  }
+
+  if (tabActiva === "informes") {
+    renderTabInformes(p._id);
   }
 
   if (tabActiva === "consultas") {
