@@ -2,3 +2,8 @@ node_modules
 /uploads
 .env
 .env.*
+
+# Copias de seguridad y archivos de estudios: son datos de pacientes,
+# nunca van al repositorio.
+backups/
+uploads/

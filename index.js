@@ -104,6 +104,7 @@ require("./routes/dashboardEscritorio")(app);
 require("./routes/reservaPublica")(app);
 require("./routes/push")(app);
 require("./routes/asistenteVitalis")(app);
+require("./routes/backup")(app);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
@@ -123,3 +124,7 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 iniciarServidorTiempoReal(server);
 server.listen(PORT, () => log.info(`🚀 Vitalis corriendo en puerto ${PORT}`));
+
+// Copias de seguridad automáticas. Va acá, después de levantar el servidor,
+// para que un problema con los respaldos nunca impida que Vitalis atienda.
+require("./services/backup").programar();

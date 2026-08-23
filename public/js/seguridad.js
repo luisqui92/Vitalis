@@ -22,6 +22,9 @@ async function renderSeguridad() {
       api("/medico/auditoria"),
     ]);
     pintarSeguridad(estado2fa.activo, dataAuditoria.eventos || []);
+    // Aparte y sin await: si los respaldos tardan o fallan, la pantalla de
+    // seguridad tiene que aparecer igual.
+    pintarEstadoBackups();
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando seguridad")}</div>`;
@@ -33,6 +36,8 @@ function pintarSeguridad(dosFAActivo, eventos) {
     <button class="back" id="btnBack">← Panel</button>
 
     ${notificacionesHtml()}
+
+    <div id="backupsBox"></div>
 
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">🔐 Verificación en dos pasos (2FA)</div>
@@ -108,4 +113,89 @@ async function iniciarActivacion2FA() {
   } catch (e) {
     box.innerHTML = `<div class="error">${esc(e.error || "No se pudo generar el código")}</div>`;
   }
+}
+
+
+// ─── COPIAS DE SEGURIDAD ──────────────────────────────────────────────────
+// Un respaldo que anda pero que nadie mira es medio respaldo. Esto está en
+// la pantalla donde el médico ya entra, y se pone rojo solo cuando hay algo
+// de qué preocuparse — el resto del tiempo es una línea tranquila.
+const PROBLEMAS_BACKUP = {
+  nunca_se_hizo: "Todavía no se hizo ninguna copia de seguridad.",
+  ultimo_fallo: "La última copia no pasó la verificación. Revisá los logs del servidor.",
+  desactualizado: "Hace más de 48 horas que no se hace una copia.",
+};
+
+function hace(horas) {
+  if (horas == null) return "";
+  if (horas < 1) return "hace " + Math.max(1, Math.round(horas * 60)) + " min";
+  if (horas < 48) return "hace " + Math.round(horas) + " h";
+  return "hace " + Math.round(horas / 24) + " días";
+}
+
+function pesoLegible(bytes) {
+  if (bytes > 1024 * 1024) return (bytes / 1048576).toFixed(1) + " MB";
+  if (bytes > 1024) return Math.round(bytes / 1024) + " KB";
+  return bytes + " B";
+}
+
+async function pintarEstadoBackups() {
+  const caja = document.getElementById("backupsBox");
+  if (!caja) return;
+  let e;
+  try {
+    e = await api("/medico/backups");
+  } catch { return; }
+
+  const u = e.ultimo;
+  const problema = e.problema ? PROBLEMAS_BACKUP[e.problema] : null;
+
+  caja.innerHTML = `
+    <div class="card"${problema ? ' style="border-color:var(--danger)"' : ""}>
+      <div class="seccion-titulo" style="margin-top:0">💾 Copias de seguridad</div>
+
+      ${problema ? `<div class="error" style="margin-bottom:10px">${esc(problema)}</div>` : ""}
+
+      ${u ? `
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <div style="font-weight:600">${u.verificado === true ? "✅ Verificada" : u.verificado === false ? "❌ Falló la verificación" : "Sin verificar"}</div>
+          <div class="hint" style="margin:0">${esc(hace(e.horasDesdeUltimo))}</div>
+        </div>
+        <div class="hint" style="margin-top:4px">
+          ${u.documentos.toLocaleString("es-BO")} registros · ${u.archivos} archivos · ${esc(pesoLegible(u.bytes))} · tardó ${u.segundos}s
+        </div>
+        <div class="hint" style="margin-top:2px">
+          ${e.cuantos} ${e.cuantos === 1 ? "copia guardada" : "copias guardadas"} ·
+          ${u.cifrado ? "cifradas" : '<span style="color:var(--warning)">sin cifrar</span>'} ·
+          ${e.afuera ? "se envían fuera del servidor" : '<span style="color:var(--warning)">solo en este servidor</span>'}
+        </div>
+      ` : `<div class="hint">Todavía no hay ninguna copia.</div>`}
+
+      ${!e.afuera ? `
+        <div class="hint" style="margin-top:10px;color:var(--warning)">
+          Ojo: una copia en el mismo disco protege de un borrado por error, no de que el
+          disco se muera. Falta configurar el envío a otro lado.
+        </div>` : ""}
+
+      <div id="backupErr"></div>
+      <button class="secondary" id="btnBackupAhora" style="margin-top:10px">Hacer una copia ahora</button>
+    </div>`;
+
+  document.getElementById("btnBackupAhora").onclick = async () => {
+    const btn = document.getElementById("btnBackupAhora");
+    btn.disabled = true;
+    btn.textContent = "Copiando y verificando...";
+    try {
+      const r = await api("/medico/backups", { method: "POST" });
+      alert(r.verificado === true
+        ? `Listo: ${r.documentos} registros y ${r.archivos} archivos.\n\nSe restauró en una base de prueba para comprobar que sirve, y salió bien.`
+        : `La copia se hizo pero NO pasó la verificación. Avisale a soporte antes de confiar en ella.`);
+      pintarEstadoBackups();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Hacer una copia ahora";
+      const caja2 = document.getElementById("backupErr");
+      if (caja2) caja2.innerHTML = `<div class="error">${esc(err.error || "No se pudo hacer la copia")}</div>`;
+    }
+  };
 }
