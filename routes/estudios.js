@@ -105,12 +105,28 @@ module.exports = function (app) {
     if (req.body?.calibracion !== undefined) {
       const c = req.body.calibracion;
       const mm = Number(c?.mmPorPixel);
+      const mmY = Number(c?.mmPorPixelY);
+      const valida = (n) => Number.isFinite(n) && n > 0 && n < 100;
       // Una calibración absurda (cero, negativa, o un píxel de un metro)
       // convierte todas las mediciones en números sin sentido pero con
       // pinta de clínicos, que es lo peligroso.
-      estudio.calibracion = c && Number.isFinite(mm) && mm > 0 && mm < 100
-        ? { mmPorPixel: mm, referencia: String(c.referencia || "").slice(0, 120), fecha: new Date() }
-        : { mmPorPixel: null, referencia: "", fecha: null };
+      //
+      // El origen viene del cliente pero NO se le cree: "dicom" solo se
+      // acepta si el estudio de verdad entró por un DICOM. Si no, cualquiera
+      // podría hacer pasar una calibración a ojo por una medida del equipo,
+      // que es justo la distinción que el informe muestra.
+      const origenPedido = String(c?.origen || "");
+      const puedeSerDicom = Boolean(estudio.dicom?.sopInstanceUID);
+      estudio.calibracion = c && valida(mm)
+        ? {
+            mmPorPixel: mm,
+            mmPorPixelY: valida(mmY) ? mmY : null,
+            referencia: String(c.referencia || "").slice(0, 160),
+            fecha: new Date(),
+            origen: origenPedido === "dicom" && puedeSerDicom ? "dicom" : (origenPedido ? "manual" : ""),
+            planoDetector: Boolean(c.planoDetector) && puedeSerDicom,
+          }
+        : { mmPorPixel: null, mmPorPixelY: null, referencia: "", fecha: null, origen: "", planoDetector: false };
     }
 
     await estudio.save();

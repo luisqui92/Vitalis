@@ -59,6 +59,9 @@ function refrescarPantallaActual() {
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
   else if (tipo === "inicioEscritorio" && typeof renderInicioEscritorio === "function") renderInicioEscritorio();
   else if (tipo === "recordatorios") renderRecordatorios();
+  // La bandeja SÍ se refresca sola: es una pantalla de espera, y lo que se
+  // espera es justamente que aparezca algo nuevo.
+  else if (tipo === "bandejaDicom" && typeof renderBandejaDicom === "function") renderBandejaDicom();
   // preservarToken: este repintado no lo pidió el médico, así que no puede
   // hacerle desaparecer el token que está copiando en ese momento.
   else if (tipo === "equiposRayos" && typeof renderEquiposRayos === "function") renderEquiposRayos(params.pacienteVuelta, { preservarToken: true });
@@ -86,6 +89,7 @@ envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", pa
 // cambio repintara la pantalla ANTERIOR y saltara fuera de la de equipos,
 // justo en el único momento en que el token está a la vista.
 envolverParaTiempoReal("renderEquiposRayos", (pacienteVuelta) => ({ tipo: "equiposRayos", params: { pacienteVuelta } }));
+envolverParaTiempoReal("renderBandejaDicom", () => ({ tipo: "bandejaDicom", params: {} }));
 // Estas dos van a PANTALLAS_SIN_REFRESCO: se registran para que el aviso de
 // cambio sepa que el médico ya no está en la ficha del paciente, y ahí se
 // queda quieto en vez de repintarla encima del informe a medio escribir.

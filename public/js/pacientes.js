@@ -26,18 +26,45 @@ function pacienteItemHtml(p) {
 // ─── DASHBOARD = LISTA DE PACIENTES ─────────────────────────────────────
 async function renderDashboard() {
   detenerPolling();
+  const serie = nuevaSeriePantalla();
   headerSub.textContent = "Hola, " + (MEDICO_NOMBRE || "");
   btnLogout.style.display = "inline-block";
   btnAsistente.style.display = "inline-flex";
   app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando tus pacientes...</div>`;
   try {
-    const [dataPacientes, dataRecordatorios] = await Promise.all([
+    // Las tres en paralelo: la bandeja es una consulta más y el panel es lo
+    // primero que ve el médico al entrar. En serie, cada una le suma su
+    // demora a la pantalla de arranque.
+    const [dataPacientes, dataRecordatorios, dataBandeja] = await Promise.all([
       api("/medico/pacientes"),
       api("/medico/recordatorios"),
+      // Si la bandeja falla, el panel tiene que abrirse igual.
+      api("/medico/dicom/bandeja").catch(() => ({ entrantes: [] })),
     ]);
+    // Si mientras esto viajaba el médico ya abrió otra pantalla, este pintado
+    // llega tarde y le taparía lo que está haciendo.
+    if (!seriePantallaVigente(serie)) return;
     const items = dataPacientes.pacientes || [];
     const pendientes = (dataRecordatorios.recordatorios || []).length;
+
+    // Estudios que llegaron de la caja y todavía no tienen dueño. La fila
+    // solo aparece si hay alguno: para un médico sin caja DICOM, esto no
+    // existe y no le ocupa pantalla. Y si el técnico pone el código del
+    // paciente en el equipo, tampoco aparece nunca — el estudio se archiva
+    // solo. Que esté vacía es el caso bueno.
+    const sinAsignar = (dataBandeja.entrantes || []).length;
+
     app.innerHTML = `
+      ${sinAsignar ? `
+        <div class="card no-imprimir" style="border-color:var(--warning);cursor:pointer" id="avisoBandeja">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <div>
+              <div style="font-weight:600">📥 ${sinAsignar} estudio${sinAsignar > 1 ? "s" : ""} sin asignar</div>
+              <div class="hint" style="margin:2px 0 0">Llegaron de la caja y falta decir de quién son.</div>
+            </div>
+            <span style="color:var(--primary);font-weight:600">Ver →</span>
+          </div>
+        </div>` : ""}
       <div class="tabs" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
         <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>Nuevo<br>paciente</button>
         <button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>Agenda</button>
@@ -53,6 +80,8 @@ async function renderDashboard() {
         <div class="empty" id="buscarVacio" style="display:none">Ningún paciente coincide con la búsqueda.</div>
       `}
     `;
+    const avisoBandeja = document.getElementById("avisoBandeja");
+    if (avisoBandeja) avisoBandeja.onclick = () => renderBandejaDicom();
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
     document.getElementById("btnAgenda").onclick = renderAgenda;
     document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
@@ -76,6 +105,7 @@ async function renderDashboard() {
     }
   } catch (e) {
     if (e.status === 401) return logout();
+    if (!seriePantallaVigente(serie)) return;
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando pacientes")}</div>`;
   }
 }

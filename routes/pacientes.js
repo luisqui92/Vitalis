@@ -6,6 +6,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { registrar } = require("../services/auditoria");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { siguienteCodigo } = require("../services/codigos");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -30,7 +31,12 @@ module.exports = function (app) {
     const semanas = Number(req.body?.semanasGestacionAlNacer);
     const semanasGestacionAlNacer = Number.isFinite(semanas) && semanas >= 20 && semanas <= 44 ? semanas : null;
 
-    const paciente = await Paciente.create({ medicoPhone, nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer });
+    // El código sale de una, no cuando haga falta: es lo que el técnico
+    // tipea en el equipo de imagen para que el estudio se archive solo al
+    // llegar (ver routes/cajaDicom.js), y lo que el paciente dicta por
+    // teléfono. Un paciente sin código no puede usar ninguna de las dos.
+    const codigo = await siguienteCodigo(Paciente, medicoPhone, "P");
+    const paciente = await Paciente.create({ medicoPhone, codigo, nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer });
     res.status(201).json({ ok: true, paciente });
   }));
 

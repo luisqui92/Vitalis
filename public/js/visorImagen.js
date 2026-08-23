@@ -75,6 +75,15 @@ async function abrirVisorImagen(estudioId, estudio) {
     rotacion: guardados.rotacion ?? 0,
     espejo: guardados.espejo ?? false,
     mmPorPixel: estudio?.calibracion?.mmPorPixel ?? null,
+    // El DICOM trae los dos ejes por separado, y en ecografía y en algunas
+    // panorámicas NO son iguales. Vacío = píxel cuadrado.
+    mmPorPixelY: estudio?.calibracion?.mmPorPixelY ?? null,
+    // De dónde salió la escala ("dicom" = la trajo el archivo) y si es la del
+    // detector. Las dos cosas se muestran en pantalla: no es lo mismo un
+    // milímetro leído del equipo que uno calibrado a ojo, ni una medida sobre
+    // una reconstrucción que sobre una sombra proyectada.
+    origenEscala: estudio?.calibracion?.origen || "",
+    planoDetector: Boolean(estudio?.calibracion?.planoDetector),
     mediciones: (estudio?.mediciones || []).map(m => ({ ...m })),
     modo: "mover",       // mover | distancia | angulo | calibrar
     puntosEnCurso: [],
@@ -312,6 +321,18 @@ function distanciaPx(a, b) {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+// La distancia en milímetros NO es la distancia en píxeles por un número:
+// cada eje puede tener su propia escala. Si el píxel no es cuadrado —pasa en
+// ecografía y en algunas panorámicas— convertir primero cada eje y recién
+// después medir es la diferencia entre una diagonal correcta y una que
+// miente sin avisar. Con píxel cuadrado da exactamente lo mismo de antes.
+function distanciaMm(a, b) {
+  const v = visorEstado;
+  const ex = v.mmPorPixel;
+  const ey = v.mmPorPixelY || v.mmPorPixel;
+  return Math.hypot((b.x - a.x) * ex, (b.y - a.y) * ey);
+}
+
 function anguloEntre(a, vertice, b) {
   const u = { x: a.x - vertice.x, y: a.y - vertice.y };
   const w = { x: b.x - vertice.x, y: b.y - vertice.y };
@@ -329,7 +350,7 @@ function textoMedicion(m) {
   const px = distanciaPx(m.puntos[0], m.puntos[1]);
   // Acá está la regla: sin calibración, píxeles. Nunca milímetros inventados.
   return v.mmPorPixel
-    ? (px * v.mmPorPixel).toFixed(2).replace(".", ",") + " mm"
+    ? distanciaMm(m.puntos[0], m.puntos[1]).toFixed(2).replace(".", ",") + " mm"
     : Math.round(px) + " px";
 }
 
@@ -338,11 +359,27 @@ function pintarListaMediciones() {
   const caja = v.capa.querySelector("#visorMediciones");
   if (!caja) return;
 
-  const aviso = !v.mmPorPixel && v.mediciones.some(m => m.tipo === "distancia")
-    ? `<div style="color:#ffb84d;margin-bottom:6px">
+  const hayDistancias = v.mediciones.some(m => m.tipo === "distancia");
+  let aviso = "";
+  if (!v.mmPorPixel && hayDistancias) {
+    aviso = `<div style="color:#ffb84d;margin-bottom:6px">
          Las distancias están en píxeles. Una imagen JPEG o PNG no trae el tamaño real
          del píxel, así que para tener milímetros hay que calibrar con 🎯.
-       </div>` : "";
+       </div>`;
+  } else if (hayDistancias && v.origenEscala === "dicom") {
+    // Cuando la escala la trajo el archivo, decirlo vale: es la diferencia
+    // entre un número medido y uno calibrado a ojo. Y si además es una
+    // proyección, el milímetro es el de la SOMBRA — el objeto está delante
+    // del detector y sale agrandado. Callarlo sería dejar que alguien decida
+    // sobre un número que parece más exacto de lo que es.
+    aviso = `<div style="color:#8fd6a8;margin-bottom:6px">
+         Escala del equipo (DICOM) — no hace falta calibrar.
+         ${v.planoDetector ? `<span style="color:#ffb84d;display:block;margin-top:3px">
+           Es la medida en el detector: en radiografía el objeto sale algo agrandado.
+           Para el milímetro real, poné una referencia conocida en el mismo plano.
+         </span>` : ""}
+       </div>`;
+  }
 
   caja.innerHTML = aviso + (v.mediciones.length
     ? v.mediciones.map((m, i) => `
@@ -466,8 +503,7 @@ function marcarPunto(px, py) {
     m.valor = anguloEntre(puntos[0], puntos[1], puntos[2]);
     m.unidad = "grados";
   } else {
-    const px = distanciaPx(puntos[0], puntos[1]);
-    m.valor = v.mmPorPixel ? px * v.mmPorPixel : px;
+    m.valor = v.mmPorPixel ? distanciaMm(puntos[0], puntos[1]) : distanciaPx(puntos[0], puntos[1]);
     m.unidad = v.mmPorPixel ? "mm" : "px";
   }
   v.mediciones.push(m);
@@ -483,6 +519,19 @@ function marcarPunto(px, py) {
 function pedirCalibracion(puntos) {
   const v = visorEstado;
   const px = distanciaPx(puntos[0], puntos[1]);
+
+  // Pisar la escala que trajo el DICOM con una marcada a mano casi siempre
+  // es un retroceso: el equipo sabe el tamaño de su píxel mejor que nadie
+  // marcando dos puntos con el dedo. Tiene sentido en un caso —calibrar
+  // contra una referencia que esté en el mismo plano del objeto, para
+  // corregir la magnificación— así que no se prohíbe, se pregunta.
+  if (v.origenEscala === "dicom" &&
+      !confirm("Esta imagen ya trae la escala del equipo (DICOM), que es más exacta que marcarla a mano.\n\n" +
+               "Recalibrar solo conviene si estás usando una referencia de tamaño conocido apoyada en el mismo plano que lo que vas a medir.\n\n¿Seguir igual?")) {
+    v.modo = "mover";
+    dibujarVisor();
+    return;
+  }
 
   const respuesta = prompt(
     "¿Cuántos milímetros mide en la realidad la distancia que acabás de marcar?\n\n" +
@@ -501,6 +550,12 @@ function pedirCalibracion(puntos) {
   }
 
   v.mmPorPixel = mm / px;
+  // Una calibración a mano se marca sobre la pantalla, así que vale igual
+  // para los dos ejes: se borra el eje Y del DICOM en vez de dejar mezclada
+  // una escala X nueva con una Y vieja, que daría diagonales absurdas.
+  v.mmPorPixelY = null;
+  v.origenEscala = "manual";
+  v.planoDetector = false;
   v.referenciaCalibracion = `${mm} mm sobre ${Math.round(px)} px`;
   v.sucio = true;
   v.modo = "mover";
@@ -557,7 +612,17 @@ async function guardarVisor() {
       body: JSON.stringify({
         ajustesVisor: { brillo: v.brillo, contraste: v.contraste, invertido: v.invertido, rotacion: v.rotacion, espejo: v.espejo },
         mediciones: v.mediciones,
-        calibracion: v.mmPorPixel ? { mmPorPixel: v.mmPorPixel, referencia: v.referenciaCalibracion || v.estudio?.calibracion?.referencia || "" } : null,
+        // Va la calibración COMPLETA, no solo el mmPorPixel: el servidor
+        // reemplaza el objeto entero, así que mandar de menos le borraría al
+        // estudio el eje Y y el origen de la escala nada más que por haber
+        // tocado el brillo.
+        calibracion: v.mmPorPixel ? {
+          mmPorPixel: v.mmPorPixel,
+          mmPorPixelY: v.mmPorPixelY,
+          origen: v.origenEscala || "manual",
+          planoDetector: v.planoDetector,
+          referencia: v.referenciaCalibracion || v.estudio?.calibracion?.referencia || "",
+        } : null,
       }),
     });
     v.sucio = false;

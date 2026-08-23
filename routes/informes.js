@@ -28,6 +28,7 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { registrar } = require("../services/auditoria");
 const { DIR_ESTUDIOS } = require("../services/archivosEstudio");
 const { enviarTexto } = require("../services/metaWhatsapp");
+const { siguienteCodigo } = require("../services/codigos");
 const { CONFIG, log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -38,27 +39,9 @@ const limitPublico = rateLimit("informePublico", 40, 60 * 1000, "Demasiadas peti
 
 const DIAS_VALIDEZ_ENLACE = 90;
 
-// ─── CÓDIGOS ──────────────────────────────────────────────────────────────
-// Correlativo por consultorio, corto y dictable por teléfono. Se cuenta lo
-// que ya hay en vez de guardar un contador aparte: con los volúmenes de un
-// consultorio esto es instantáneo y no hay un número que se pueda
-// desincronizar de la realidad.
-//
-// Se cuentan los que YA TIENEN código, no todos los documentos. Con los
-// informes da lo mismo (todos nacen con código), pero al paciente el código
-// se le pone cuando ya está guardado en la base, así que contarlo a él
-// también hacía que el primero fuera P-0002.
-async function siguienteCodigo(Modelo, medicoPhone, prefijo) {
-  const cuantos = await Modelo.countDocuments({ medicoPhone, codigo: { $nin: [null, ""] } });
-  for (let intento = 0; intento < 50; intento++) {
-    const codigo = `${prefijo}-${String(cuantos + 1 + intento).padStart(4, "0")}`;
-    const existe = await Modelo.findOne({ medicoPhone, codigo }).lean();
-    if (!existe) return codigo;
-  }
-  // Si después de 50 intentos sigue chocando, algo raro pasa: mejor un
-  // código feo pero único que un error en la cara del médico.
-  return `${prefijo}-${Date.now().toString().slice(-6)}`;
-}
+// Los códigos correlativos (P-0001, INF-0001) viven en services/codigos.js:
+// los comparte con el alta de pacientes, que ahora le pone el código de una
+// para que se pueda tipear en el equipo de imagen desde el primer día.
 
 async function membreteDe(medicoPhone) {
   let m = await Membrete.findOne({ medicoPhone });

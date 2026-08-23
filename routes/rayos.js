@@ -28,6 +28,7 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { registrar } = require("../services/auditoria");
 const { TIPOS_ARCHIVO_PERMITIDOS, guardarArchivoEstudio } = require("../services/archivosEstudio");
 const { avisarCambio } = require("../services/realtime");
+const { generarToken, hashToken, equipoDesdeRequest, capturaVigente } = require("../services/equipoAuth");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -47,36 +48,9 @@ const archivoRaw = express.raw({ type: TIPOS_ARCHIVO_PERMITIDOS, limit: "20mb" }
 const MINUTOS_VENTANA = 10;
 const MINUTOS_VENTANA_MAX = 60;
 
-// ─── TOKENS DEL EQUIPO ────────────────────────────────────────────────────
-// Mismo criterio que una contraseña: se guarda el hash, el token en claro
-// se muestra una sola vez y no se puede volver a ver. Si se pierde, se
-// genera otro (es un botón, no un drama).
-function generarToken() {
-  return "vrx_" + crypto.randomBytes(24).toString("hex");
-}
-function hashToken(token) {
-  return crypto.createHash("sha256").update(String(token)).digest("hex");
-}
-
-// Autentica al agente por el header X-Equipo-Token. Devuelve el equipo o
-// null (y en ese caso ya respondió el error).
-async function equipoDesdeRequest(req, res) {
-  const token = String(req.headers["x-equipo-token"] || "").trim();
-  if (!token) {
-    res.status(401).json({ error: "Falta el token del equipo (header X-Equipo-Token)" });
-    return null;
-  }
-  const equipo = await EquipoRayos.findOne({ tokenHash: hashToken(token), activo: true });
-  if (!equipo) {
-    res.status(401).json({ error: "Token de equipo inválido o dado de baja" });
-    return null;
-  }
-  return equipo;
-}
-
-function capturaVigente(captura) {
-  return Boolean(captura && new Date(captura.expiraEn).getTime() > Date.now());
-}
+// Los tokens del equipo y la autenticación viven en services/equipoAuth.js:
+// los comparte con la Caja Vitalis (routes/cajaDicom.js), que se autentica
+// igual porque para Vitalis también es un equipo que sube imágenes solo.
 
 module.exports = function (app) {
   // ─── DESCARGA DEL AGENTE ─────────────────────────────────────────────────

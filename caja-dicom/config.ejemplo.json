@@ -1,0 +1,17 @@
+{
+  "_": "Copiá este archivo como config.json y completá los dos primeros campos.",
+
+  "vitalisUrl": "https://tu-dominio-de-vitalis.com",
+  "token": "vrx_pegá_acá_el_token_que_te_dio_vitalis",
+
+  "_orthanc": "Dónde escucha Orthanc en esta misma máquina. Si no le cambiaste el puerto, dejalo así.",
+  "orthanc": "http://127.0.0.1:8042",
+  "orthancUsuario": "",
+  "orthancClave": "",
+
+  "_segundos": "Cada cuánto revisa si llegó algo nuevo.",
+  "segundos": 10,
+
+  "_anchoMaxPreview": "Ancho máximo de la vista previa que se sube. El DICOM original NUNCA se sube: se queda en esta máquina. Subir esto mejora un poco el detalle en pantalla y engorda mucho lo que viaja.",
+  "anchoMaxPreview": 1600
+}

@@ -7,3 +7,8 @@ node_modules
 # nunca van al repositorio.
 backups/
 uploads/
+
+# Estado local del agente de la caja DICOM (qué ya subió) y su configuración
+# con el token — nunca al repositorio.
+caja-dicom/subidos.json
+caja-dicom/config.json

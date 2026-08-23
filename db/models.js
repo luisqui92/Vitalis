@@ -512,6 +512,37 @@ const Medicion = mongoose.model("Medicion", medicionSchema);
 // Centro de Estudios: laboratorios, radiografías, ecografías, tomografías,
 // resonancias, ECG, fotos clínicas... El archivo en sí vive en disco (fuera
 // de /public — ver routes/estudios.js), acá solo queda la referencia.
+// Lo que se guarda de un estudio que llegó por DICOM. Va como constante
+// porque lo comparten el Estudio ya asignado a un paciente y el que todavía
+// está en la bandeja esperando que alguien le diga de quién es.
+const DICOM_ORIGEN = {
+  equipoId: { type: mongoose.Schema.Types.ObjectId, ref: "EquipoRayos", default: null },
+  // Identificador único en el mundo de ESTA imagen. Es lo que vuelve
+  // imposible duplicarla: si la misma placa llega dos veces, la segunda se
+  // descarta sola, sin comparar hashes ni nombres de archivo.
+  sopInstanceUID: { type: String, default: null },
+  seriesInstanceUID: { type: String, default: "" },
+  studyInstanceUID: { type: String, default: "" },
+  modalidad: { type: String, default: "" }, // DX, CR, CT, MR, US, PX, MG...
+  // Tamaño del ORIGINAL, que vive en la caja. La vista previa puede ser más
+  // chica: escalaPreview dice cuánto, y es lo que permite convertir una
+  // medición hecha sobre la previa a milímetros reales sin que mienta.
+  filas: { type: Number, default: null },
+  columnas: { type: Number, default: null },
+  escalaPreview: { type: Number, default: 1 },
+  bitsAlmacenados: { type: Number, default: null },
+  ventanaCentro: { type: Number, default: null },
+  ventanaAncho: { type: Number, default: null },
+  fabricante: { type: String, default: "" },
+  modelo: { type: String, default: "" },
+  // Lo que el técnico tipeó en el equipo, tal cual vino. Se guarda sin
+  // tocarlo para poder auditar después a quién se le asignó y por qué.
+  pacienteNombreDicom: { type: String, default: "" },
+  pacienteIdDicom: { type: String, default: "" },
+  descripcionEstudio: { type: String, default: "" },
+  descripcionSerie: { type: String, default: "" },
+};
+
 const estudioSchema = new mongoose.Schema({
   pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
   medicoPhone: { type: String, index: true, required: true },
@@ -542,9 +573,23 @@ const estudioSchema = new mongoose.Schema({
   calibracion: {
     // Cuántos milímetros mide un píxel de la imagen. null = sin calibrar.
     mmPorPixel: { type: Number, default: null },
+    // El DICOM trae los dos ejes por separado, y en ecografía y en algunas
+    // panorámicas NO son iguales. Con un solo número, una medición diagonal
+    // sale mal. Vacío = cuadrado (usa mmPorPixel para los dos).
+    mmPorPixelY: { type: Number, default: null },
     // Con qué se calibró, para poder revisarlo o rehacerlo.
     referencia: { type: String, default: "" },
     fecha: { type: Date, default: null },
+    // De dónde salió la escala. Importa: "4,2 mm" leído del DICOM y "4,2 mm"
+    // calibrado a ojo sobre un JPEG no valen lo mismo, y el que lee el
+    // informe tiene derecho a saber cuál de los dos está mirando.
+    origen: { type: String, enum: ["dicom", "manual", ""], default: "" },
+    // En radiografía y panorámica la escala es la del DETECTOR: es el tamaño
+    // de la sombra proyectada, no el del hueso, porque el objeto está delante
+    // de la placa y sale agrandado. En tomografía y resonancia no pasa, porque
+    // hay reconstrucción y no proyección. El visor lo avisa en vez de que se
+    // olvide.
+    planoDetector: { type: Boolean, default: false },
   },
   mediciones: {
     type: [{
@@ -572,8 +617,22 @@ const estudioSchema = new mongoose.Schema({
     rotacion: { type: Number, default: 0 },
     espejo: { type: Boolean, default: false },
   },
+  // ─── Origen DICOM (Caja Vitalis) ─────────────────────────────────────
+  // Cuando el estudio entró por la caja de la clínica, acá queda de dónde
+  // salió. Vitalis guarda la VISTA PREVIA; el .dcm original de 16 bits se
+  // queda en el disco de la caja y no sale de ahí nunca — por eso se anota
+  // en qué equipo vive y con qué identificador volver a pedirlo.
+  dicom: DICOM_ORIGEN,
 }, { timestamps: true });
 estudioSchema.index({ pacienteId: 1, fecha: -1 });
+// Un mismo estudio no puede entrar dos veces. El SOPInstanceUID es único en
+// el mundo, así que esto lo hace imposible por construcción en vez de por
+// comparar hashes o nombres de archivo. Parcial porque la mayoría de los
+// estudios (los que sube el médico a mano) no vienen de un DICOM.
+estudioSchema.index(
+  { medicoPhone: 1, "dicom.sopInstanceUID": 1 },
+  { unique: true, partialFilterExpression: { "dicom.sopInstanceUID": { $type: "string" } } }
+);
 const Estudio = mongoose.model("Estudio", estudioSchema);
 
 // ─── VITALIS RAYOS ────────────────────────────────────────────────────────
@@ -618,6 +677,49 @@ const capturaPendienteSchema = new mongoose.Schema({
 }, { timestamps: true });
 capturaPendienteSchema.index({ expiraEn: 1 }, { expireAfterSeconds: 0 });
 const CapturaPendiente = mongoose.model("CapturaPendiente", capturaPendienteSchema);
+
+// ─── BANDEJA DE ENTRADA (Caja Vitalis DICOM) ──────────────────────────────
+// La ventana de captura funciona en un consultorio con un sillón: el
+// odontólogo abre la ficha, dispara, y la placa cae en ese paciente.
+//
+// En un centro de imagen no: los estudios llegan todo el día desde varios
+// equipos y nadie está apretando "capturar" por cada uno. Ahí el estudio
+// entra a esta bandeja con el nombre que el técnico tipeó en el aparato, y
+// el médico lo asigna. Si el técnico puso el código de paciente de Vitalis,
+// se asigna solo y la bandeja ni se entera.
+//
+// Es un modelo aparte y NO un Estudio con pacienteId vacío, a propósito: un
+// estudio sin paciente no es parte de ninguna historia clínica. Si viviera
+// en la misma colección, cada consulta del sistema tendría que acordarse de
+// excluirlo para siempre — y una sola que se olvide le muestra a un paciente
+// la radiografía de otro.
+const estudioEntranteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  // La vista previa ya guardada en disco. El original sigue en la caja.
+  archivoNombre: { type: String, required: true },
+  archivoMime: { type: String, required: true },
+  archivoTamano: { type: Number, required: true },
+  fecha: { type: Date, required: true },
+  tipo: { type: String, default: "radiografia" },
+  nombre: { type: String, default: "" },
+  calibracion: {
+    mmPorPixel: { type: Number, default: null },
+    mmPorPixelY: { type: Number, default: null },
+    referencia: { type: String, default: "" },
+    origen: { type: String, enum: ["dicom", "manual", ""], default: "" },
+    planoDetector: { type: Boolean, default: false },
+  },
+  dicom: DICOM_ORIGEN,
+}, { timestamps: true });
+estudioEntranteSchema.index({ medicoPhone: 1, createdAt: -1 });
+// Mismo motivo que en Estudio: si la misma imagen llega dos veces, la
+// segunda no entra. Y se comprueba contra las DOS colecciones al recibir,
+// porque un estudio ya asignado tampoco tiene que volver a la bandeja.
+estudioEntranteSchema.index(
+  { medicoPhone: 1, "dicom.sopInstanceUID": 1 },
+  { unique: true, partialFilterExpression: { "dicom.sopInstanceUID": { $type: "string" } } }
+);
+const EstudioEntrante = mongoose.model("EstudioEntrante", estudioEntranteSchema);
 
 
 // ═══ VITALIS NEURODESARROLLO ══════════════════════════════════════════════
@@ -975,6 +1077,6 @@ const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
-  EquipoRayos, CapturaPendiente,
+  EquipoRayos, CapturaPendiente, EstudioEntrante,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, Membrete, Informe,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO };
