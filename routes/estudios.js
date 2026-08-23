@@ -58,6 +58,66 @@ module.exports = function (app) {
     res.sendFile(ruta);
   }));
 
+  // ─── AJUSTES Y MEDICIONES DEL VISOR ──────────────────────────────────────
+  // El archivo original NUNCA se modifica: acá solo se guarda cómo mirarlo y
+  // qué se midió encima. Una radiografía es un documento clínico y legal —
+  // si un ajuste de contraste pisara el archivo, se perdería la prueba de lo
+  // que de verdad capturó el equipo.
+  app.patch("/medico/estudios/:id/visor", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const estudio = await obtenerOFallar(Estudio, { _id: req.params.id, medicoPhone }, "Estudio no encontrado");
+
+    const a = req.body?.ajustesVisor;
+    if (a && typeof a === "object") {
+      const entre = (v, min, max, def) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+      };
+      estudio.ajustesVisor = {
+        brillo: entre(a.brillo, 20, 250, 100),
+        contraste: entre(a.contraste, 20, 350, 100),
+        invertido: Boolean(a.invertido),
+        // Solo los cuatro giros rectos: un giro libre desalinea las
+        // mediciones ya tomadas sin que se note.
+        rotacion: [0, 90, 180, 270].includes(Number(a.rotacion)) ? Number(a.rotacion) : 0,
+        espejo: Boolean(a.espejo),
+      };
+    }
+
+    if (Array.isArray(req.body?.mediciones)) {
+      const punto = (p) => ({ x: Number(p?.x), y: Number(p?.y) });
+      estudio.mediciones = req.body.mediciones
+        .filter(m => ["distancia", "angulo"].includes(m?.tipo) && Array.isArray(m.puntos))
+        .map(m => ({
+          tipo: m.tipo,
+          // Una distancia son 2 puntos y un ángulo 3. Guardar una medición
+          // incompleta deja una línea suelta que después no se puede borrar.
+          puntos: m.puntos.slice(0, m.tipo === "angulo" ? 3 : 2).map(punto),
+          etiqueta: String(m.etiqueta || "").trim().slice(0, 80),
+          valor: Number.isFinite(Number(m.valor)) ? Number(m.valor) : null,
+          unidad: ["mm", "px", "grados"].includes(m.unidad) ? m.unidad : "",
+          fecha: m.fecha ? new Date(m.fecha) : new Date(),
+        }))
+        .filter(m => m.puntos.length === (m.tipo === "angulo" ? 3 : 2) && m.puntos.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)))
+        .slice(0, 50);
+    }
+
+    if (req.body?.calibracion !== undefined) {
+      const c = req.body.calibracion;
+      const mm = Number(c?.mmPorPixel);
+      // Una calibración absurda (cero, negativa, o un píxel de un metro)
+      // convierte todas las mediciones en números sin sentido pero con
+      // pinta de clínicos, que es lo peligroso.
+      estudio.calibracion = c && Number.isFinite(mm) && mm > 0 && mm < 100
+        ? { mmPorPixel: mm, referencia: String(c.referencia || "").slice(0, 120), fecha: new Date() }
+        : { mmPorPixel: null, referencia: "", fecha: null };
+    }
+
+    await estudio.save();
+    registrar({ req, medicoPhone, accion: "editar_visor_estudio", recurso: `Estudio:${estudio._id}` });
+    res.json({ ok: true, estudio });
+  }));
+
   // ─── ELIMINAR ────────────────────────────────────────────────────────────
   app.delete("/medico/estudios/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;

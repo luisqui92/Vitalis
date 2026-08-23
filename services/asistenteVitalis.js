@@ -150,6 +150,23 @@ SEGURIDAD
 Verificación en dos pasos con app autenticadora (Google Authenticator,
 Authy). Registro de actividad de la cuenta: se ve quién entró y qué se hizo,
 con fecha e IP.
+
+VISOR DE IMÁGENES
+- Cualquier imagen del Centro de Estudios (radiografías, ecografías, fotos)
+  se abre dentro de Vitalis con zoom, giro, espejo, negativo, brillo y
+  contraste. Los PDF se abren aparte, como siempre.
+- Se puede medir distancias y ángulos encima de la imagen. Las mediciones se
+  guardan en la ficha del paciente y vuelven a aparecer al reabrir el
+  estudio, incluso desde otro dispositivo.
+- IMPORTANTE sobre las distancias: una imagen JPEG o PNG no trae el tamaño
+  real del píxel (eso solo viene en DICOM), así que Vitalis las muestra en
+  PÍXELES hasta que se calibre. Para calibrar se marca una distancia
+  conocida (por ejemplo el largo del sensor intraoral) y se escribe cuánto
+  mide en milímetros; de ahí en adelante todas las mediciones de esa imagen
+  salen en milímetros. Vitalis nunca muestra milímetros sin calibrar.
+- Los ángulos sí se muestran siempre en grados: no dependen de la escala.
+- El archivo original NUNCA se modifica. El brillo, el contraste y el giro
+  son solo formas de mirarlo, y se guardan aparte.
 `;
 
 const MANUAL_POR_ESPECIALIDAD = {

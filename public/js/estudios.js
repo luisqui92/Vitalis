@@ -325,7 +325,13 @@ function wireTabEstudios(p, estudios) {
   }
 
   document.querySelectorAll("[data-ver-estudio]").forEach(el => {
-    el.onclick = () => abrirArchivoEstudio(el.dataset.verEstudio);
+    el.onclick = () => {
+      const e = estudios.find(x => x._id === el.dataset.verEstudio);
+      // Las imágenes se abren en el visor de Vitalis (zoom, contraste,
+      // mediciones); los PDF y todo lo demás, como siempre.
+      if (e && String(e.archivoMime || "").startsWith("image/")) abrirVisorImagen(e._id, e);
+      else abrirArchivoEstudio(el.dataset.verEstudio);
+    };
   });
   document.querySelectorAll("[data-mapa-facial]").forEach(btn => {
     btn.onclick = async (ev) => {

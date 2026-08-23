@@ -22,6 +22,9 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     registrar({ req, medicoPhone, accion: "backup_manual", recurso: "Backup" });
     const manifiesto = await backup.hacerBackup();
+    if (manifiesto.salteado) {
+      return res.status(503).json({ error: "La base de datos no está disponible en este momento. Probá de nuevo en un minuto." });
+    }
     res.json({
       ok: manifiesto.verificado !== false,
       documentos: manifiesto.documentos,

@@ -38,7 +38,12 @@ const DIAS_DIARIOS = Number(process.env.BACKUP_DIAS) || 7;
 const SEMANAS = Number(process.env.BACKUP_SEMANAS) || 8;
 
 // Cada cuánto corre solo. Por defecto una vez al día.
-const HORAS_INTERVALO = Number(process.env.BACKUP_HORAS) || 24;
+//
+// El tope de una semana no es una preferencia: setInterval de Node guarda la
+// espera en 32 bits, así que cualquier valor mayor a ~24 días DESBORDA y el
+// temporizador pasa a dispararse cada milisegundo. Un "respaldo mensual" mal
+// puesto tumbaría el servidor haciendo respaldos sin parar, en silencio.
+const HORAS_INTERVALO = Math.min(168, Math.max(1, Number(process.env.BACKUP_HORAS) || 24));
 
 // A partir de cuántas horas sin respaldo Vitalis lo muestra como problema.
 const HORAS_ALERTA = 48;
@@ -146,6 +151,15 @@ function nombreDeAhora() {
 }
 
 async function hacerBackup({ verificar = true } = {}) {
+  // Si Mongo está caído o reconectando, no hay nada que respaldar. Sin este
+  // chequeo el respaldo automático deja un [ERROR] en el log cada vez que la
+  // base tose, y un log lleno de errores rojos que no significan nada es la
+  // forma más rápida de que nadie mire el log cuando importe.
+  if (mongoose.connection.readyState !== 1) {
+    log.warn("[BACKUP] se saltea este respaldo: MongoDB no está conectado ahora mismo");
+    return { salteado: true, motivo: "sin_conexion" };
+  }
+
   const arrancó = Date.now();
   await fsp.mkdir(DIR_BACKUPS, { recursive: true });
   const marca = nombreDeAhora();

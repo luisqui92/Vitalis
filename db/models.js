@@ -524,6 +524,49 @@ const estudioSchema = new mongoose.Schema({
   // Vitalis Visión: a qué ojo corresponde un estudio (OCT, fondo de ojo,
   // campimetría...) — "OD", "OI" o "ambos". Vacío si no aplica.
   ladoOjo: { type: String, default: "" },
+  // ─── Visor de imágenes ───────────────────────────────────────────────
+  // Lo que el médico midió o marcó sobre la imagen. Se guarda en
+  // coordenadas de la IMAGEN (píxeles del archivo original), nunca de la
+  // pantalla: así una medición hecha en el celular se ve en el mismo lugar
+  // en la compu, con otro zoom y otro tamaño de pantalla.
+  //
+  // La calibración es lo que convierte píxeles en milímetros. Sin ella NO
+  // se muestran milímetros: una radiografía JPEG o PNG no trae el tamaño
+  // real del píxel (eso solo viene en DICOM), así que decir "4,2 mm" sin
+  // haber calibrado sería inventar un número con apariencia clínica.
+  calibracion: {
+    // Cuántos milímetros mide un píxel de la imagen. null = sin calibrar.
+    mmPorPixel: { type: Number, default: null },
+    // Con qué se calibró, para poder revisarlo o rehacerlo.
+    referencia: { type: String, default: "" },
+    fecha: { type: Date, default: null },
+  },
+  mediciones: {
+    type: [{
+      tipo: { type: String, enum: ["distancia", "angulo"], required: true },
+      // distancia: [{x,y},{x,y}] · ángulo: [{x,y},{x,y},{x,y}] con el
+      // vértice en el medio.
+      puntos: [{ x: Number, y: Number, _id: false }],
+      etiqueta: { type: String, default: "" },
+      // El valor se recalcula al dibujar, pero se guarda el del momento en
+      // que se midió: si mañana se recalibra la imagen, queda registro de
+      // con qué números tomó su decisión el médico ese día.
+      valor: { type: Number, default: null },
+      unidad: { type: String, default: "" },
+      fecha: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
+  // Ajustes de visualización (brillo, contraste, giro, negativo). No
+  // modifican el archivo original —la imagen guardada nunca se toca— pero
+  // se recuerdan para que el estudio se abra como el médico lo dejó.
+  ajustesVisor: {
+    brillo: { type: Number, default: 100 },
+    contraste: { type: Number, default: 100 },
+    invertido: { type: Boolean, default: false },
+    rotacion: { type: Number, default: 0 },
+    espejo: { type: Boolean, default: false },
+  },
 }, { timestamps: true });
 estudioSchema.index({ pacienteId: 1, fecha: -1 });
 const Estudio = mongoose.model("Estudio", estudioSchema);

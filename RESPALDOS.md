@@ -150,7 +150,7 @@ Todos opcionales, en el `.env`:
 |---|---|---|
 | `BACKUP_CLAVE` | *(vacío)* | Clave de cifrado. Sin ella no se cifra ni se sube afuera. |
 | `BACKUP_COMANDO_SUBIDA` | *(vacío)* | Comando para mandar la copia afuera. |
-| `BACKUP_HORAS` | `24` | Cada cuántas horas se hace una. |
+| `BACKUP_HORAS` | `24` | Cada cuántas horas se hace una. Entre 1 y 168 (una semana). |
 | `BACKUP_DIAS` | `7` | Se conservan todas las de los últimos N días. |
 | `BACKUP_SEMANAS` | `8` | Y una por semana hacia atrás, N semanas. |
 | `BACKUP_DIR` | `./backups` | Dónde se guardan. |
