@@ -183,6 +183,20 @@ function s25RectoComun(vistas, ref) {
     x0 = Math.max(x0, dx);       y0 = Math.max(y0, dy);
     x1 = Math.min(x1, s + dx);   y1 = Math.min(y1, s + dy);
   }
+
+  // Y además se recorta EN VERTICAL a la cara. El recorte común sale angosto
+  // a lo ancho pero conserva casi todo el alto de la foto —cielo arriba,
+  // pecho abajo—, y esa tira larguísima, limitada por la altura de la
+  // pantalla, terminaba mostrando la cara diminuta. Acotando arriba y abajo,
+  // el mismo espacio en pantalla lo ocupa la cara y no el fondo.
+  //
+  // Las distancias van en múltiplos del alto nariz-mentón: así el encuadre
+  // es el mismo en una foto de cerca que en una de lejos.
+  if (ref && ref.alto > 0) {
+    y0 = Math.max(y0, ref.punta.y - ref.alto * 1.75);
+    y1 = Math.min(y1, ref.menton.y + ref.alto * 0.55);
+  }
+
   if (x1 - x0 < 0.15 || y1 - y0 < 0.15) return { x0: 0, y0: 0, x1: 1, y1: 1 };
   return { x0, y0, x1, y1 };
 }

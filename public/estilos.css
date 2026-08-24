@@ -725,11 +725,11 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
   color:var(--vf-texto);border-radius:8px;padding:7px 9px}
 
 /* ─── Avisos ──────────────────────────────────────────────────────────── */
-.vf-avisos{position:fixed;top:14px;right:14px;z-index:9900;display:flex;
-  flex-direction:column;gap:7px;pointer-events:none}
+.vf-avisos{position:fixed;bottom:14px;right:14px;z-index:9900;display:flex;
+  flex-direction:column-reverse;gap:7px;pointer-events:none}
 .vf-aviso{font-size:12px;padding:9px 13px;border-radius:10px;background:#11141b;
   border:1px solid var(--vf-verde);color:#9df0e2;box-shadow:0 8px 24px rgba(0,0,0,.5);
-  opacity:0;transform:translateY(-6px);transition:opacity .25s,transform .25s;max-width:320px}
+  opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s;max-width:320px}
 .vf-aviso-visible{opacity:1;transform:none}
 .vf-aviso-ambar{border-color:#8a6d2f;color:#e6d5a4}
 .vf-control{margin:10px 0}

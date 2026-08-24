@@ -489,7 +489,8 @@ function vfPintar() {
               <button class="vf-chip" id="vfBtnLandmarks">◦ Puntos</button>
               <button class="vf-chip" id="vfBtnSimular">✨ Simular</button>
               <button class="vf-chip" id="vfBtnComparar">👁 Ver original</button>
-              <button class="vf-chip" id="vfBtnMedir">📏 Medir</button>
+              <button class="vf-chip" id="vfBtnMedir">📏 Medir recto</button>
+              <button class="vf-chip" id="vfBtnContorno">〰️ Medir por el borde</button>
               <button class="vf-chip" id="vfBtnAnotar">✎ Anotar</button>
               <button class="vf-chip" id="vfBtnLimpiar">↺ Limpiar</button>
             </div>
@@ -584,7 +585,7 @@ function vfPintar() {
             ${vf.medidas.map((m, i) => `
               <div class="vf-medida">
                 <div class="vf-medida-fila">
-                  <span class="vf-medida-label">${esc(m.vista)} · medida ${i + 1}</span>
+                  <span class="vf-medida-label">${esc(m.vista)} · ${m.porContorno ? "por el borde" : "recta"}</span>
                   <span class="vf-medida-valor">${esc(m.texto)}</span>
                 </div>
               </div>`).join("")}
@@ -723,11 +724,32 @@ function vfMontarVisor() {
   lienzo.width = Math.max(16, Math.round(refImg.naturalWidth * (r.x1 - r.x0)));
   lienzo.height = Math.max(16, Math.round(refImg.naturalHeight * (r.y1 - r.y0)));
 
+  // La capa de anotaciones se dimensiona por lo que se VE, no por la
+  // resolución de la foto. Antes copiaba el tamaño interno del lienzo (520 px
+  // de ancho en un recorte típico) mientras la foto se mostraba al 40%: una
+  // etiqueta de 13 px de lienzo salía de 5 px en pantalla, ilegible.
   const dibujo = capa.querySelector("#vfCapaDibujo");
-  dibujo.width = lienzo.width;
-  dibujo.height = lienzo.height;
+  vfAjustarCapaDibujo();
+  if (vf.observador) vf.observador.disconnect();
+  vf.observador = new ResizeObserver(() => { vfAjustarCapaDibujo(); vfDibujarCapa(); });
+  vf.observador.observe(lienzo);
 
   vfRender();
+}
+
+// Tamaño de la capa de dibujo = tamaño en pantalla del lienzo, por la
+// densidad del display para que no salga borrosa.
+function vfAjustarCapaDibujo() {
+  const lienzo = vf.capa.querySelector("#vfLienzo");
+  const dibujo = vf.capa.querySelector("#vfCapaDibujo");
+  if (!lienzo || !dibujo) return;
+  const r = lienzo.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  dibujo.width = Math.round(r.width * dpr);
+  dibujo.height = Math.round(r.height * dpr);
+  dibujo.style.width = r.width + "px";
+  dibujo.style.height = r.height + "px";
 }
 
 function vfRender() {
@@ -755,6 +777,19 @@ function vfActualizarPie() {
   }
   const sello = vf.capa.querySelector(".vf-sello");
   if (sello) sello.style.display = vf.simulando && !vf.verOriginal ? "" : "none";
+
+  // Medir por el borde solo existe donde hay borde: al girar a una vista sin
+  // marcar, el botón se apaga en vez de dejar hacer clics que no miden nada.
+  const btnCont = vf.capa.querySelector("#vfBtnContorno");
+  if (btnCont) {
+    const hay = Boolean(v && vfContornoDe(v));
+    btnCont.disabled = !hay;
+    btnCont.title = hay ? "" : "Hace falta un perfil marcado en esta vista";
+    if (!hay && vf.herramienta === "contorno") {
+      vf.herramienta = null;
+      btnCont.classList.remove("vf-chip-activo");
+    }
+  }
 }
 
 // Del lienzo a las coordenadas propias de la foto que se está viendo, que es
@@ -776,77 +811,126 @@ function vfDeLaVistaAlLienzo(p, vista) {
   };
 }
 
+// El contorno denso del perfil marcado: los mismos puntos que deforma la
+// malla, densificados con la spline. Es lo que permite medir SIGUIENDO la
+// silueta en vez de en línea recta.
+function vfContornoDe(vista) {
+  if (vista.modo !== "perfil" || !vista.marcados) return null;
+  if (!vista.__contorno) vista.__contorno = sfSuavizar(vista.marcados, 14);
+  return vista.__contorno;
+}
+
+// Índice del punto del contorno más cercano a p.
+function vfIndiceEnContorno(contorno, p, w, h) {
+  let mejor = 0, d2 = Infinity;
+  for (let i = 0; i < contorno.length; i++) {
+    const dx = (contorno[i].x - p.x) * w, dy = (contorno[i].y - p.y) * h;
+    const d = dx * dx + dy * dy;
+    if (d < d2) { d2 = d; mejor = i; }
+  }
+  return mejor;
+}
+
+// Largo del contorno entre dos índices, sumando tramo a tramo. Es la
+// diferencia con la línea recta: en una nariz con giba, el dorso mide más de
+// lo que mide la cuerda entre sus extremos, y es el dorso lo que se opera.
+function vfLargoContorno(contorno, i, j, w, h) {
+  const [a, b] = i <= j ? [i, j] : [j, i];
+  let largo = 0;
+  for (let k = a; k < b; k++) {
+    largo += Math.hypot((contorno[k + 1].x - contorno[k].x) * w,
+                        (contorno[k + 1].y - contorno[k].y) * h);
+  }
+  return largo;
+}
+
 function vfDibujarCapa() {
   const c = vf.capa.querySelector("#vfCapaDibujo");
-  if (!c) return;
+  if (!c || c.width < 2) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
   const ctx = c.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, c.width, c.height);
+  // A partir de acá se dibuja en píxeles de PANTALLA: un texto de 14 mide 14.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = c.width / dpr, H = c.height / dpr;
+
   const vista = vf.vistaActual;
   if (!vista) return;
-  const aLienzo = (p) => {
+  const aPantalla = (p) => {
     const q = vfDeLaVistaAlLienzo(p, vista);
-    return { x: q.u * c.width, y: q.v * c.height };
+    return { x: q.u * W, y: q.v * H };
   };
 
   if (vf.landmarks) {
     ctx.fillStyle = "rgba(45,212,191,.9)";
     const puntos = vista.modo === "auto" ? vista.landmarks
       : vista.modo === "perfil" ? vista.marcados : [];
-    const radio = Math.max(1.2, c.width * 0.0022);
+    const radio = Math.max(1, W * 0.005);
     for (const p of puntos) {
-      const q = aLienzo(p);
+      const q = aPantalla(p);
       ctx.beginPath(); ctx.arc(q.x, q.y, radio, 0, Math.PI * 2); ctx.fill();
     }
-    // En un perfil marcado, la línea del contorno explica más que los puntos.
-    if (vista.modo === "perfil" && vista.marcados) {
+    const contorno = vfContornoDe(vista);
+    if (contorno) {
       ctx.beginPath();
-      vista.marcados.forEach((p, i) => {
-        const q = aLienzo(p);
+      contorno.forEach((p, i) => {
+        const q = aPantalla(p);
         i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y);
       });
       ctx.strokeStyle = "rgba(45,212,191,.75)";
-      ctx.lineWidth = Math.max(1.5, c.width * 0.003);
+      ctx.lineWidth = Math.max(1.5, W * 0.006);
       ctx.stroke();
     }
   }
 
-  const gruesa = Math.max(2, c.width * 0.004);
-  for (const m of vf.medidas.filter(m => m.angulo === vista.grados)) {
-    const a = aLienzo(m.a), b = aLienzo(m.b);
-    ctx.strokeStyle = "#2dd4bf"; ctx.lineWidth = gruesa;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-    ctx.fillStyle = "#2dd4bf";
-    for (const q of [a, b]) { ctx.beginPath(); ctx.arc(q.x, q.y, gruesa * 1.4, 0, Math.PI * 2); ctx.fill(); }
-    const tam = Math.max(11, Math.round(c.width * 0.026));
+  const grosor = Math.max(2, W * 0.008);
+  const tam = Math.max(13, Math.round(W * 0.05));
+  const etiqueta = (texto, x, y, color) => {
     ctx.font = `600 ${tam}px system-ui, sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - tam * 0.4;
-    const ancho = ctx.measureText(m.texto).width;
-    ctx.fillStyle = "rgba(0,0,0,.65)";
-    ctx.fillRect(mx - ancho / 2 - 5, my - tam, ancho + 10, tam * 1.3);
-    ctx.fillStyle = "#7ff3dd";
-    ctx.fillText(m.texto, mx, my + tam * 0.22);
-  }
-  for (const p of vf.puntosMedida) {
-    const q = aLienzo(p);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const ancho = ctx.measureText(texto).width;
+    ctx.fillStyle = "rgba(0,0,0,.72)";
+    ctx.fillRect(x - ancho / 2 - 6, y - tam * 0.72, ancho + 12, tam * 1.44);
+    ctx.fillStyle = color;
+    ctx.fillText(texto, x, y);
+  };
+
+  for (const m of vf.medidas.filter(m => m.angulo === vista.grados)) {
+    ctx.strokeStyle = "#2dd4bf"; ctx.lineWidth = grosor;
+    ctx.beginPath();
+    if (m.camino && m.camino.length > 1) {
+      m.camino.forEach((p, i) => {
+        const q = aPantalla(p);
+        i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y);
+      });
+    } else {
+      const a = aPantalla(m.a), b = aPantalla(m.b);
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
     ctx.fillStyle = "#2dd4bf";
-    ctx.beginPath(); ctx.arc(q.x, q.y, gruesa * 1.4, 0, Math.PI * 2); ctx.fill();
+    for (const p of [m.a, m.b]) {
+      const q = aPantalla(p);
+      ctx.beginPath(); ctx.arc(q.x, q.y, grosor * 1.3, 0, Math.PI * 2); ctx.fill();
+    }
+    const medio = m.camino && m.camino.length > 1
+      ? aPantalla(m.camino[Math.floor(m.camino.length / 2)])
+      : { x: (aPantalla(m.a).x + aPantalla(m.b).x) / 2, y: (aPantalla(m.a).y + aPantalla(m.b).y) / 2 };
+    etiqueta(m.texto, medio.x, medio.y - tam, "#7ff3dd");
+  }
+
+  for (const p of vf.puntosMedida) {
+    const q = aPantalla(p);
+    ctx.fillStyle = "#2dd4bf";
+    ctx.beginPath(); ctx.arc(q.x, q.y, grosor * 1.3, 0, Math.PI * 2); ctx.fill();
   }
 
   for (const a of vf.anotaciones.filter(a => a.angulo === vista.grados)) {
-    const q = aLienzo(a);
-    ctx.strokeStyle = "#c084fc"; ctx.lineWidth = gruesa;
-    ctx.beginPath(); ctx.arc(q.x, q.y, gruesa * 4, 0, Math.PI * 2); ctx.stroke();
-    if (a.texto) {
-      const tam = Math.max(11, Math.round(c.width * 0.024));
-      ctx.font = `600 ${tam}px system-ui, sans-serif`;
-      ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      const ancho = ctx.measureText(a.texto).width;
-      ctx.fillStyle = "rgba(0,0,0,.65)";
-      ctx.fillRect(q.x + gruesa * 5, q.y - tam * 0.75, ancho + 10, tam * 1.5);
-      ctx.fillStyle = "#e9d5ff";
-      ctx.fillText(a.texto, q.x + gruesa * 5 + 5, q.y);
-    }
+    const q = aPantalla(a);
+    ctx.strokeStyle = "#c084fc"; ctx.lineWidth = grosor;
+    ctx.beginPath(); ctx.arc(q.x, q.y, grosor * 3.5, 0, Math.PI * 2); ctx.stroke();
+    if (a.texto) etiqueta(a.texto, q.x, q.y - grosor * 6, "#e9d5ff");
   }
 }
 
@@ -937,14 +1021,23 @@ function vfEnganchar() {
     b.onclick = () => {
       vf.herramienta = vf.herramienta === nombre ? null : nombre;
       vf.puntosMedida = [];
-      capa.querySelectorAll("#vfBtnMedir,#vfBtnAnotar").forEach(x => x.classList.remove("vf-chip-activo"));
+        capa.querySelectorAll("#vfBtnMedir,#vfBtnContorno,#vfBtnAnotar")
+        .forEach(x => x.classList.remove("vf-chip-activo"));
       if (vf.herramienta === nombre) { b.classList.add("vf-chip-activo"); vfAviso(aviso); }
       visor.style.cursor = vf.herramienta ? "crosshair" : "grab";
       vfDibujarCapa();
     };
   };
-  herramienta("#vfBtnMedir", "medir", "Marcá dos puntos sobre la foto.");
+  herramienta("#vfBtnMedir", "medir", "Marcá dos puntos: la medida va en línea recta.");
+  herramienta("#vfBtnContorno", "contorno",
+    "Marcá dos puntos del perfil: la medida sigue la silueta, no la cuerda.");
   herramienta("#vfBtnAnotar", "anotar", "Tocá donde quieras dejar una marca.");
+
+  // Medir por el borde solo tiene sentido donde hay un borde marcado.
+  const btnCont = capa.querySelector("#vfBtnContorno");
+  const hayContorno = vf.vistaActual && vfContornoDe(vf.vistaActual);
+  btnCont.disabled = !hayContorno;
+  btnCont.title = hayContorno ? "" : "Hace falta un perfil marcado en esta vista";
 
   capa.querySelector("#vfBtnLimpiar").onclick = () => {
     const g = vf.vistaActual ? vf.vistaActual.grados : null;
@@ -990,15 +1083,35 @@ function vfClicHerramienta(ev) {
     return;
   }
 
-  vf.puntosMedida.push(p);
+  const porContorno = vf.herramienta === "contorno";
+  const contorno = porContorno ? vfContornoDe(vista) : null;
+  if (porContorno && !contorno) {
+    vfAviso("Esta vista no tiene el perfil marcado: no hay borde que seguir.", "ambar");
+    return;
+  }
+
+  vf.puntosMedida.push(porContorno
+    // Al medir por el borde, el punto se pega al contorno: si no, el largo
+    // arrancaría a un centímetro de la piel y el número saldría corto.
+    ? { ...contorno[vfIndiceEnContorno(contorno, p, vista.img.naturalWidth, vista.img.naturalHeight)] }
+    : p);
   if (vf.puntosMedida.length < 2) { vfDibujarCapa(); return; }
 
   const [a, b] = vf.puntosMedida;
   vf.puntosMedida = [];
   const W = vista.img.naturalWidth, H = vista.img.naturalHeight;
-  const px = vfDist(a, b, W, H);
-  const cal = vista.estudio && vista.estudio.calibracion;
 
+  let px, camino = null;
+  if (porContorno) {
+    const i = vfIndiceEnContorno(contorno, a, W, H);
+    const j = vfIndiceEnContorno(contorno, b, W, H);
+    px = vfLargoContorno(contorno, i, j, W, H);
+    camino = contorno.slice(Math.min(i, j), Math.max(i, j) + 1);
+  } else {
+    px = vfDist(a, b, W, H);
+  }
+
+  const cal = vista.estudio && vista.estudio.calibracion;
   // Con calibración, milímetros. Sin ella, porcentaje de la altura
   // nariz-mentón de ESTA vista, que es una referencia que la foto sí trae.
   // Lo que no va a pasar nunca es que salga un número en mm sin escala.
@@ -1011,7 +1124,8 @@ function vfClicHerramienta(ev) {
   } else {
     texto = Math.round(px) + " px";
   }
-  vf.medidas.push({ a, b, angulo: vista.grados, vista: vista.label, texto });
+  vf.medidas.push({ a, b, camino, angulo: vista.grados, vista: vista.label,
+                    texto, porContorno });
   vfPintar();
   if (!(cal && cal.mmPorPixel)) {
     vfAviso("Sin calibrar: la medida va en % de la altura nariz–mentón, no en mm.", "ambar");
