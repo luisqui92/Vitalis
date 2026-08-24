@@ -584,3 +584,152 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
   .inf-datos td{display:block;width:auto;border-bottom:none}
   .inf-datos tr:last-child td:last-child{border-bottom:1px solid #d4d4d4}
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   VITALIS FACE — consola de análisis facial
+   ──────────────────────────────────────────────────────────────────────────
+   Tema oscuro propio: es la única pantalla del sistema donde lo que importa
+   es la foto, y un fondo claro alrededor de una cara cambia cómo se percibe
+   la piel. Todo con tokens propios (--vf-*) para no tocar el resto de la app.
+   ══════════════════════════════════════════════════════════════════════════ */
+.vf-capa{
+  --vf-fondo:#0b0d12; --vf-panel:#11141b; --vf-borde:#1e2430;
+  --vf-texto:#e8ebf0; --vf-suave:#93a1b5; --vf-acento:#38bdf8; --vf-verde:#2dd4bf;
+  position:fixed; inset:0; z-index:9500; overflow-y:auto;
+  background:var(--vf-fondo); color:var(--vf-texto);
+  font-size:14px; line-height:1.5;
+}
+.vf-cargando{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;min-height:70vh;color:var(--vf-suave);font-size:13.5px}
+
+.vf-shell{display:grid;grid-template-columns:250px minmax(0,1fr) 330px;
+  gap:14px;padding:14px;max-width:1700px;margin:0 auto;align-items:start}
+@media (max-width:1200px){ .vf-shell{grid-template-columns:1fr} }
+
+/* ─── Lateral ─────────────────────────────────────────────────────────── */
+.vf-lateral{background:var(--vf-panel);border:1px solid var(--vf-borde);border-radius:14px;
+  padding:14px;display:flex;flex-direction:column;gap:16px;position:sticky;top:14px}
+@media (max-width:1200px){ .vf-lateral{position:static} }
+.vf-marca{display:flex;align-items:center;gap:10px}
+.vf-marca-icono{width:36px;height:36px;border-radius:10px;flex:0 0 36px;
+  background:linear-gradient(135deg,var(--vf-acento),var(--vf-verde));
+  color:#04121b;font-weight:800;font-size:19px;display:flex;align-items:center;justify-content:center}
+.vf-marca-nombre{font-weight:700;letter-spacing:.06em;font-size:13.5px}
+.vf-marca-sub{font-size:11px;color:var(--vf-acento);letter-spacing:.03em}
+.vf-paciente{background:#0d1017;border:1px solid var(--vf-borde);border-radius:10px;padding:10px 12px}
+.vf-paciente-tit{font-size:10px;text-transform:uppercase;letter-spacing:.13em;color:var(--vf-suave);opacity:.75}
+.vf-paciente-nombre{font-weight:600;margin-top:3px}
+.vf-paciente-datos{font-size:11.5px;color:var(--vf-suave)}
+.vf-lateral-tit{font-size:10px;text-transform:uppercase;letter-spacing:.13em;
+  color:var(--vf-suave);opacity:.75;margin-bottom:8px}
+.vf-tira{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:7px}
+.vf-tira-item{all:unset;cursor:pointer;text-align:center;font-size:9.5px;
+  color:var(--vf-suave);position:relative;display:block}
+.vf-tira-foto{aspect-ratio:3/4;border-radius:7px;overflow:hidden;background:#000;
+  border:2px solid transparent;margin-bottom:3px}
+.vf-tira-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.vf-tira-activa .vf-tira-foto{border-color:var(--vf-acento)}
+.vf-tira-activa{color:var(--vf-texto)}
+.vf-tira-punto{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;
+  background:#e0a95c;box-shadow:0 0 0 2px rgba(0,0,0,.5)}
+.vf-proc-lista{display:flex;flex-direction:column;gap:7px}
+.vf-proc{background:#0d1017;border:1px solid var(--vf-borde);border-radius:8px;padding:7px 9px}
+.vf-proc-nombre{font-size:12px}
+.vf-proc-meta{font-size:10.5px;color:var(--vf-suave);margin-top:1px}
+
+/* ─── Centro ──────────────────────────────────────────────────────────── */
+.vf-principal{display:flex;flex-direction:column;gap:12px;min-width:0}
+.vf-cabecera{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.vf-cabecera h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em}
+.vf-cabecera p{margin:2px 0 0;font-size:12.5px;color:var(--vf-suave)}
+.vf-cabecera-acciones{display:flex;gap:8px;flex-wrap:wrap}
+.vf-visor-caja{background:var(--vf-panel);border:1px solid var(--vf-borde);
+  border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.vf-barra{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.vf-barra-grupo{display:flex;gap:6px;flex-wrap:wrap}
+.vf-vista-nombre{font-size:12px;color:var(--vf-suave)}
+.vf-visor{position:relative;background:#05070b;border-radius:10px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;
+  min-height:300px;max-height:72vh}
+.vf-visor:active{cursor:grabbing}
+.vf-visor canvas{display:block;max-width:100%;max-height:72vh;width:auto;height:auto}
+.vf-visor #vfCapaDibujo{position:absolute;inset:0;margin:auto;pointer-events:none}
+.vf-etiqueta{position:absolute;left:10px;top:10px;font-size:11px;background:rgba(0,0,0,.6);
+  padding:3px 9px;border-radius:20px;pointer-events:none;letter-spacing:.06em}
+.vf-sello{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11px;
+  letter-spacing:.13em;text-shadow:0 1px 4px #000;pointer-events:none;opacity:.9}
+.vf-aviso-marcar{font-size:11.5px;background:#221d10;border:1px solid #4a3f1c;
+  color:#e6d5a4;padding:8px 11px;border-radius:9px;line-height:1.55}
+.vf-aviso-marcar a{color:#ffd76e}
+.vf-giro{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--vf-borde);padding-top:10px}
+.vf-giro-presets{display:flex;justify-content:space-between;gap:4px;flex-wrap:wrap}
+.vf-giro-presets button{all:unset;cursor:pointer;font-size:10.5px;color:var(--vf-acento);
+  padding:3px 6px;border-radius:6px;letter-spacing:.02em}
+.vf-giro-presets button:hover{background:#182231}
+.vf-giro-presets .vf-preset-activo{color:var(--vf-texto);font-weight:700;background:#182231}
+.vf-giro-barra{display:flex;align-items:center;gap:10px}
+.vf-giro-barra input[type=range]{flex:1;accent-color:var(--vf-acento)}
+.vf-giro-pie{display:flex;justify-content:space-between;font-size:11px;color:var(--vf-suave)}
+.vf-giro-pie span:first-child{font-variant-numeric:tabular-nums;color:var(--vf-acento);font-weight:700}
+
+/* ─── Métricas ────────────────────────────────────────────────────────── */
+.vf-metricas{display:flex;flex-direction:column;gap:12px;min-width:0}
+.vf-zonas{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.vf-zona{all:unset;cursor:pointer;text-align:center;font-size:11px;padding:7px 4px;
+  border-radius:9px;background:var(--vf-panel);border:1px solid var(--vf-borde);color:var(--vf-suave)}
+.vf-zona span{display:block;font-size:15px;margin-bottom:1px}
+.vf-zona-activa{border-color:var(--vf-verde);color:var(--vf-texto);background:#0f1d1e}
+.vf-panel{background:var(--vf-panel);border:1px solid var(--vf-borde);border-radius:14px;padding:13px}
+.vf-panel-tit{font-size:10px;text-transform:uppercase;letter-spacing:.13em;
+  color:var(--vf-suave);opacity:.8;margin-bottom:9px;font-weight:600}
+.vf-subtit{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--vf-suave);
+  opacity:.7;margin:14px 0 6px}
+.vf-medida{padding:7px 0;border-bottom:1px solid var(--vf-borde)}
+.vf-medida:last-child{border-bottom:none}
+.vf-medida-fila{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.vf-medida-label{font-size:12.5px}
+.vf-medida-valor{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vf-medida-fuera .vf-medida-valor{color:#e0a95c}
+.vf-mm{color:#7fd1a8}
+.vf-medida-rango{font-size:10px;color:var(--vf-suave);opacity:.65;text-align:right}
+.vf-medida-ayuda{font-size:10.5px;color:var(--vf-suave);opacity:.6;line-height:1.45;margin-top:2px}
+.vf-sim-numero{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.vf-sim-numero span{font-size:13px;opacity:.45;font-weight:400}
+.vf-nota{font-size:11px;color:var(--vf-suave);line-height:1.55;margin:8px 0 0}
+.vf-nota-borde{border-top:1px solid var(--vf-borde);padding-top:9px;margin-top:12px}
+.vf-callout{font-size:11px;background:#221d10;border:1px solid #4a3f1c;color:#e6d5a4;
+  padding:8px 10px;border-radius:9px;line-height:1.55;margin-top:10px}
+.vf-callout a{color:#ffd76e}
+
+/* ─── Controles ───────────────────────────────────────────────────────── */
+.vf-btn{all:unset;cursor:pointer;box-sizing:border-box;display:inline-flex;align-items:center;
+  justify-content:center;gap:6px;font-size:12.5px;padding:8px 13px;border-radius:9px;
+  background:#182231;border:1px solid var(--vf-borde);color:var(--vf-texto)}
+.vf-btn:hover{background:#1e2937}
+.vf-btn[disabled]{opacity:.5;cursor:default}
+.vf-btn-primario{background:var(--vf-acento);border-color:var(--vf-acento);color:#04121b;font-weight:600}
+.vf-btn-primario:hover{background:#5bc9fa}
+.vf-btn-borde{background:transparent;width:100%;margin-top:8px}
+.vf-btn-redondo{all:unset;cursor:pointer;width:32px;height:32px;border-radius:9px;
+  background:#182231;border:1px solid var(--vf-borde);color:var(--vf-texto);
+  display:flex;align-items:center;justify-content:center;font-size:11px}
+.vf-chip{all:unset;cursor:pointer;font-size:11.5px;padding:5px 10px;border-radius:8px;
+  background:#182231;border:1px solid var(--vf-borde);color:var(--vf-suave)}
+.vf-chip:hover{color:var(--vf-texto)}
+.vf-chip-activo{background:#0f2b31;border-color:var(--vf-verde);color:#9df0e2}
+.vf-capa input[type=number]{background:#0d1017;border:1px solid var(--vf-borde);
+  color:var(--vf-texto);border-radius:8px;padding:7px 9px}
+
+/* ─── Avisos ──────────────────────────────────────────────────────────── */
+.vf-avisos{position:fixed;top:14px;right:14px;z-index:9900;display:flex;
+  flex-direction:column;gap:7px;pointer-events:none}
+.vf-aviso{font-size:12px;padding:9px 13px;border-radius:10px;background:#11141b;
+  border:1px solid var(--vf-verde);color:#9df0e2;box-shadow:0 8px 24px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(-6px);transition:opacity .25s,transform .25s;max-width:320px}
+.vf-aviso-visible{opacity:1;transform:none}
+.vf-aviso-ambar{border-color:#8a6d2f;color:#e6d5a4}
+.vf-control{margin:10px 0}
+.vf-control-fila{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px}
+.vf-control-fila span:last-child{color:var(--vf-suave);font-variant-numeric:tabular-nums}
+.vf-control input[type=range]{width:100%;accent-color:var(--vf-acento)}
+.vf-chip[disabled]{opacity:.4;cursor:default}

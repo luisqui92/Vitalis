@@ -115,22 +115,64 @@ function vfProporciones(lm, base, marco, grupos, w, h) {
   // muchas veces no muestra y el detector nunca da: no se inventa.
   const tercioInferior = vfDist(baseAlar, menton, w, h);
 
+  // Boca y mandíbula, para los paneles de labios y mentón.
+  const bocaIzq = extremo(base.labios, "x", -1), bocaDer = extremo(base.labios, "x", 1);
+  const anchuraBucal = vfDist(lm[bocaIzq], lm[bocaDer], w, h);
+  // Anchura mandibular: lo más ancho del óvalo POR DEBAJO de la boca. Sin ese
+  // corte, "el óvalo más ancho" es el pómulo y la mandíbula sale igual que la
+  // cara en toda persona.
+  const vBoca = Math.max(...base.labios.map(i => lm[i].y));
+  const mandi = base.ovalo.filter(i => lm[i].y > vBoca);
+  const anchuraMandibular = mandi.length > 1
+    ? vfDist(lm[extremo(mandi, "x", -1)], lm[extremo(mandi, "x", 1)], w, h) : null;
+
+  const M = (id, zona, label, valor, opciones) => ({ id, zona, label, valor, ...opciones });
+
   return {
     puntos: { nasion, menton, baseAlar, pupIzq, pupDer, alaIzq: lm[alaIzq], alaDer: lm[alaDer], sienIzq: lm[izq], sienDer: lm[der] },
-    px: { anchuraFacial, alturaFacial, anchuraNasal, alturaNasal, interpupilar, tercioMedio: alturaNasal, tercioInferior },
-    indices: [
-      { id: "facial", label: "Índice facial", valor: alturaFacial / anchuraFacial * 100, unidad: "",
-        normal: [85, 95], ayuda: "Alto de la cara sobre su ancho. Menos de 85: cara ancha (euriprosopo); más de 95: cara alargada (leptoprosopo).",
-        categoria: (v) => v < 85 ? "Euriprosopo (cara ancha)" : v > 95 ? "Leptoprosopo (cara alargada)" : "Mesoprosopo (proporción media)" },
-      { id: "nasal", label: "Índice nasal", valor: anchuraNasal / alturaNasal * 100, unidad: "",
-        normal: [70, 85], ayuda: "Ancho de la nariz sobre su alto. Es la medida que más cambia una rinoplastia de base.",
-        categoria: (v) => v < 70 ? "Leptorrino (nariz angosta)" : v > 85 ? "Platirrino (nariz ancha)" : "Mesorrino (proporción media)" },
-      { id: "quintos", label: "Regla de los quintos", valor: anchuraFacial / (ojoProm || 1), unidad: " ojos",
-        normal: [4.6, 5.4], ayuda: "Cuántos ojos entran en el ancho de la cara. El canon clásico dice cinco." },
-      { id: "interpupilar", label: "Interpupilar / ancho facial", valor: interpupilar / anchuraFacial, unidad: "",
-        normal: [0.42, 0.50], ayuda: "Separación de los ojos respecto del ancho de la cara." },
-      { id: "tercios", label: "Tercio medio / tercio inferior", valor: alturaNasal / (tercioInferior || 1), unidad: "",
-        normal: [0.90, 1.10], ayuda: "Nasion a base de la nariz, contra base de la nariz a mentón. El canon los quiere iguales. El tercio superior necesita el nacimiento del pelo y no se estima." },
+    px: { anchuraFacial, alturaFacial, anchuraNasal, alturaNasal, interpupilar,
+          tercioMedio: alturaNasal, tercioInferior, anchuraBucal, anchuraMandibular },
+    medidas: [
+      M("facial", "cara", "Índice facial", alturaFacial / anchuraFacial * 100, {
+        normal: [85, 95],
+        ayuda: "Alto de la cara sobre su ancho. Menos de 85: cara ancha (euriprosopo); más de 95: cara alargada (leptoprosopo)." }),
+      M("tercios", "cara", "Tercio medio / tercio inferior", alturaNasal / (tercioInferior || 1), {
+        normal: [0.90, 1.10], decimales: 2,
+        ayuda: "Nasion a base de la nariz, contra base de la nariz a mentón. El canon los quiere iguales. El tercio superior necesita el nacimiento del pelo y no se estima." }),
+      M("quintos", "cara", "Regla de los quintos", anchuraFacial / (ojoProm || 1), {
+        normal: [4.6, 5.4], decimales: 2, sufijo: " ojos",
+        ayuda: "Cuántos ojos entran en el ancho de la cara. El canon clásico dice cinco." }),
+
+      M("nasal", "nariz", "Índice nasal", anchuraNasal / alturaNasal * 100, {
+        normal: [70, 85],
+        ayuda: "Ancho de la nariz sobre su alto. Es la medida que más cambia una rinoplastia de base." }),
+      M("narizCara", "nariz", "Ancho nasal / ancho facial", anchuraNasal / anchuraFacial, {
+        normal: [0.25, 0.32], decimales: 3,
+        ayuda: "La base de la nariz respecto de la cara entera. El canon la quiere del ancho de un ojo." }),
+
+      M("interpupilar", "ojos", "Interpupilar / ancho facial", interpupilar / anchuraFacial, {
+        normal: [0.42, 0.50], decimales: 3,
+        ayuda: "Separación de los ojos respecto del ancho de la cara." }),
+      M("ojoCara", "ojos", "Ancho del ojo / ancho facial", ojoProm / anchuraFacial, {
+        normal: [0.18, 0.22], decimales: 3,
+        ayuda: "El otro lado de la regla de los quintos, mirado desde el ojo." }),
+
+      M("bocaCara", "labios", "Ancho de boca / ancho facial", anchuraBucal / anchuraFacial, {
+        normal: [0.36, 0.45], decimales: 3,
+        ayuda: "El canon pone las comisuras a la vertical de las pupilas." }),
+      M("bocaNariz", "labios", "Ancho de boca / ancho nasal", anchuraBucal / (anchuraNasal || 1), {
+        normal: [1.4, 1.7], decimales: 2,
+        ayuda: "Relación boca-nariz, que es lo que se mira cuando se discute agrandar labios." }),
+
+      ...(anchuraMandibular ? [
+        M("mandibulaCara", "menton", "Ancho mandibular / bicigomático", anchuraMandibular / anchuraFacial, {
+          normal: [0.70, 0.85], decimales: 3,
+          ayuda: "Mandíbula contra pómulos. Baja: cara en triángulo; alta: cara cuadrada." }),
+      ] : []),
+
+      M("pomuloAltura", "pomulos", "Bicigomático / altura facial", anchuraFacial / (alturaFacial || 1), {
+        normal: [1.05, 1.18], decimales: 3,
+        ayuda: "Cuánto manda el ancho de los pómulos sobre el alto de la cara." }),
     ],
   };
 }
@@ -201,14 +243,38 @@ function vfAngulosPerfil(p, w, h) {
   ].filter(a => Number.isFinite(a.valor));
 }
 
+// ═══ ZONAS ANATÓMICAS ══════════════════════════════════════════════════════
+// Cada zona filtra qué medidas se muestran. Se discute una zona por vez con
+// el paciente —"hablemos de la nariz"— y mostrar las diez a la vez es ruido.
+const VF_ZONAS = [
+  { id: "cara",    label: "Cara entera", icono: "🙂" },
+  { id: "nariz",   label: "Nariz",       icono: "👃" },
+  { id: "ojos",    label: "Ojos",        icono: "👁" },
+  { id: "labios",  label: "Labios",      icono: "👄" },
+  { id: "menton",  label: "Mentón",      icono: "🧏" },
+  { id: "pomulos", label: "Pómulos",     icono: "✨" },
+];
+
+// Qué controles del simulador toca cada zona. Elegir "Nariz" muestra las
+// proporciones de la nariz Y los controles de la nariz: es la misma
+// conversación, y tenerla partida en dos pantallas era el problema.
+const VF_CONTROLES_ZONA = {
+  nariz:   ["dorso", "proyeccionPunta", "rotacionPunta", "anchoAlas"],
+  menton:  ["mentonProyeccion", "mentonAltura", "mandibula"],
+  pomulos: ["pomulos"],
+  labios:  ["labios"],
+  ojos:    ["parpadoSuperior"],
+  cara:    [],
+};
+
 // ═══ LA CONSOLA ════════════════════════════════════════════════════════════
 async function vfAbrirConsola(pacienteId) {
   const capa = document.createElement("div");
   capa.id = "vitalisFace";
-  capa.style.cssText = "position:fixed;inset:0;background:#0b0d12;z-index:9500;overflow-y:auto;color:#e8ebf0";
-  capa.innerHTML = `<div style="max-width:520px;margin:90px auto;text-align:center">
-    <div class="spinner" style="margin:0 auto 14px"></div>
-    <div id="vfPaso" style="opacity:.7;font-size:13.5px">Cargando la ficha...</div>
+  capa.className = "vf-capa";
+  capa.innerHTML = `<div class="vf-cargando">
+    <div class="spinner"></div>
+    <div id="vfPaso">Cargando la ficha...</div>
   </div>`;
   document.body.appendChild(capa);
   document.body.style.overflow = "hidden";
@@ -226,13 +292,8 @@ async function vfAbrirConsola(pacienteId) {
   }
 
   const estudios = (datos.estudios || []).filter(e => e.tipo === "foto");
-  const porAngulo = new Map();
-  for (const e of estudios) {
-    if (!S25_VISTAS.some(v => v.angulo === e.anguloFoto)) continue;
-    const previo = porAngulo.get(e.anguloFoto);
-    if (!previo || new Date(e.fecha) > new Date(previo.fecha)) porAngulo.set(e.anguloFoto, e);
-  }
-  const vistas = S25_VISTAS.filter(v => porAngulo.has(v.angulo)).map(v => ({ ...v, estudio: porAngulo.get(v.angulo) }));
+  paso("Cargando las fotos...");
+  const { vistas, ref } = await s25CargarVistas(estudios, paso);
 
   if (!vistas.length) {
     capa.innerHTML = vfErrorHtml(
@@ -242,394 +303,831 @@ async function vfAbrirConsola(pacienteId) {
     return;
   }
 
-  paso("Cargando las fotos...");
-  for (const v of vistas) {
-    const blob = await traerBlobEstudio(v.estudio._id);
-    if (!blob) continue;
-    v.img = new Image();
-    v.url = URL.createObjectURL(blob);
-    await new Promise(ok => { v.img.onload = ok; v.img.onerror = ok; v.img.src = v.url; });
-  }
-
-  // El análisis frontal manda: es la única vista donde el detector da los 468
-  // puntos con sentido. Si no hay frontal, se usa la más cercana al frente.
-  paso("Analizando la vista frontal...");
-  const candidatas = vistas.filter(v => v.img).sort((a, b) => Math.abs(a.grados) - Math.abs(b.grados));
+  // El análisis de proporciones sale de la vista detectada más frontal: es la
+  // única donde los 468 puntos tienen sentido.
+  paso("Midiendo proporciones...");
+  const auto = vistas.filter(v => v.modo === "auto").sort((a, b) => Math.abs(a.grados) - Math.abs(b.grados))[0];
   let analisis = null;
-  for (const v of candidatas) {
-    let d = null;
-    try { d = await detectarEnImagen(v.img); } catch { d = null; }
-    if (!d) continue;
-    const base = regionesBase(d.FaceLandmarker);
-    const marco = sfMarcoDeLaCara(d.landmarks, base);
-    const grupos = sfGruposAnatomicos(d.landmarks, base, marco);
-    const w = v.img.naturalWidth, h = v.img.naturalHeight;
+  if (auto) {
+    const w = auto.img.naturalWidth, h = auto.img.naturalHeight;
     analisis = {
-      vista: v, deteccion: d, base, marco, grupos, w, h,
-      prop: vfProporciones(d.landmarks, base, marco, grupos, w, h),
-      sim: vfSimetria(d.landmarks, base, marco, w, h),
+      vista: auto, w, h,
+      prop: vfProporciones(auto.landmarks, auto.base, auto.marco, auto.grupos, w, h),
+      sim: vfSimetria(auto.landmarks, auto.base, auto.marco, w, h),
     };
-    break;
   }
-
-  const perfiles = vistas.filter(v => Math.abs(v.grados) === 90);
-  const completos = SF_PUNTOS_PERFIL.length;
-  const conPerfil = perfiles.find(v => Array.isArray(v.estudio.perfilMarcado) && v.estudio.perfilMarcado.length === completos);
-  const angulos = conPerfil
-    ? vfAngulosPerfil(conPerfil.estudio.perfilMarcado, conPerfil.img.naturalWidth, conPerfil.img.naturalHeight)
-    : null;
 
   vf = {
-    capa, pacienteId, paciente: datos.paciente || {}, estudios, vistas, tratamientos,
-    analisis, angulos, perfilAngulos: conPerfil || null,
-    seleccion: (candidatas[0] || vistas[0]).angulo,
-    calibracion: analisis ? (analisis.vista.estudio.calibracion || null) : null,
+    capa, pacienteId, paciente: datos.paciente || {}, estudios, vistas, ref, tratamientos,
+    analisis,
+    zona: "cara",
+    grados: vistas.some(v => v.grados === 0) ? 0 : vistas[0].grados,
+    valores: Object.fromEntries(SF_CONTROLES.map(c => [c.id, 0])),
+    verOriginal: false,
+    simulando: false,
+    landmarks: false,
+    herramienta: null,      // null | "medir" | "anotar"
+    puntosMedida: [],
+    medidas: [],            // las que tomó el médico, de esta sesión
+    anotaciones: [],
+    vistaActual: null,
+    motor: null,
   };
+  vfRecalcularAngulos();
   vfPintar();
 }
 
+// Los ángulos del perfil salen de la vista de perfil que esté marcada.
+function vfRecalcularAngulos() {
+  const perfil = vf.vistas.find(v => Math.abs(v.grados) === 90 && v.modo === "perfil" && v.marcados);
+  vf.perfilAngulos = perfil || null;
+  vf.angulos = perfil
+    ? vfAngulosPerfil(perfil.marcados, perfil.img.naturalWidth, perfil.img.naturalHeight)
+    : null;
+}
+
 function vfErrorHtml(msg) {
-  return `<div style="max-width:520px;margin:90px auto;padding:0 20px;text-align:center;color:#e8ebf0">
+  return `<div class="vf-cargando" style="max-width:520px;text-align:center">
     <div style="font-size:38px;margin-bottom:12px">🙂</div>
     <div style="line-height:1.6;margin-bottom:20px">${msg}</div>
-    <button class="visor-btn" data-cerrar-vf>Cerrar</button>
+    <button class="vf-btn" data-cerrar-vf>Cerrar</button>
   </div>`;
 }
 function vfEngancharCerrar(capa) {
   capa.querySelectorAll("[data-cerrar-vf]").forEach(b => b.onclick = vfCerrarConsola);
 }
 function vfCerrarConsola() {
-  if (vf) for (const v of vf.vistas) if (v.url) URL.revokeObjectURL(v.url);
+  if (vf) s25LiberarVistas(vf.vistas);
   const c = document.getElementById("vitalisFace");
   if (c) c.remove();
   document.body.style.overflow = "";
   vf = null;
 }
 
-// Un número con su rango de referencia al lado.
-//
+// ═══ AVISOS ════════════════════════════════════════════════════════════════
+function vfAviso(mensaje, tipo = "info") {
+  let cont = document.getElementById("vfAvisos");
+  if (!cont) {
+    cont = document.createElement("div");
+    cont.id = "vfAvisos";
+    cont.className = "vf-avisos";
+    (vf ? vf.capa : document.body).appendChild(cont);
+  }
+  const el = document.createElement("div");
+  el.className = "vf-aviso vf-aviso-" + tipo;
+  el.textContent = mensaje;
+  cont.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("vf-aviso-visible"));
+  setTimeout(() => {
+    el.classList.remove("vf-aviso-visible");
+    setTimeout(() => el.remove(), 300);
+  }, 3400);
+}
+
+// ═══ FORMATO DE UNA MEDIDA ═════════════════════════════════════════════════
 // Fuera de rango se marca en ámbar y nada más. La primera versión escribía
 // "fuera del canon" al lado de cada uno, y sobre la cara de una persona
 // concreta eso se lee como una lista de defectos: seis de nueve renglones
 // acusando a alguien de no ser el promedio. Los rangos son de antropometría
 // descriptiva —de dónde cae la mayoría—, no de dónde habría que estar.
-function vfFilaMedidaHtml(m, mm) {
+function vfFilaMedidaHtml(m) {
   const v = m.valor;
   const fuera = m.normal && (v < m.normal[0] || v > m.normal[1]);
-  const texto = m.unidad === " ojos" ? v.toFixed(2) + m.unidad
-    : m.normal && m.normal[1] > 10 ? v.toFixed(1) + "°"
-    : v.toFixed(2);
+  const esAngulo = m.grados;
+  const dec = m.decimales !== undefined ? m.decimales : (esAngulo ? 1 : 1);
+  const texto = (esAngulo ? v.toFixed(1) + "°" : v.toFixed(dec) + (m.sufijo || ""));
+  const rango = m.normal
+    ? `${m.normal[0]}–${m.normal[1]}${esAngulo ? "°" : ""}`
+    : "";
   return `
-    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;padding:7px 0;border-bottom:1px solid #1b1f29">
-      <div>
-        <div style="font-size:13px">${esc(m.label)}</div>
-        <div style="font-size:11px;opacity:.45;line-height:1.45;margin-top:1px">${esc(m.ayuda || "")}</div>
+    <div class="vf-medida${fuera ? " vf-medida-fuera" : ""}">
+      <div class="vf-medida-fila">
+        <span class="vf-medida-label">${esc(m.label)}</span>
+        <span class="vf-medida-valor">${texto}</span>
       </div>
-      <div style="text-align:right;white-space:nowrap">
-        <div style="font-variant-numeric:tabular-nums;font-size:14px${fuera ? ";color:#e0a95c" : ""}">${texto}</div>
-        ${m.normal ? `<div style="font-size:10.5px;opacity:.4">referencia ${m.normal[0]}–${m.normal[1]}${m.normal[1] > 10 && m.unidad !== " ojos" ? "°" : ""}</div>` : ""}
-
-        ${mm ? `<div style="font-size:11px;color:#7fd1a8;font-variant-numeric:tabular-nums">${mm}</div>` : ""}
-      </div>
+      ${rango ? `<div class="vf-medida-rango">referencia ${rango}</div>` : ""}
+      ${m.ayuda ? `<div class="vf-medida-ayuda">${esc(m.ayuda)}</div>` : ""}
     </div>`;
 }
 
+// ═══ LA PANTALLA ═══════════════════════════════════════════════════════════
 function vfPintar() {
-  const { capa, paciente, vistas, analisis, angulos, tratamientos } = vf;
-  const sel = vistas.find(v => v.angulo === vf.seleccion) || vistas[0];
-  const cal = vf.calibracion && vf.calibracion.mmPorPixel ? vf.calibracion : null;
-  const enMm = (px) => cal ? (px * cal.mmPorPixel).toFixed(1) + " mm" : null;
-
-  const panel = (titulo, cuerpo, extra = "") => `
-    <section style="background:#11141b;border:1px solid #1b1f29;border-radius:12px;padding:14px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px">
-        <h2 style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.55;margin:0;font-weight:600">${titulo}</h2>
-        ${extra}
-      </div>
-      ${cuerpo}
-    </section>`;
+  const { capa, paciente, vistas, analisis } = vf;
+  const minG = Math.min(...vistas.map(v => v.grados));
+  const maxG = Math.max(...vistas.map(v => v.grados));
 
   capa.innerHTML = `
-    <div style="padding:14px 14px 40px;max-width:1500px;margin:0 auto">
-      <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:19px;font-weight:700;letter-spacing:.02em">
-            VITALIS FACE <span style="font-weight:400;opacity:.5;font-size:13px;letter-spacing:.08em">ANÁLISIS FACIAL 2.5D</span>
+    <div class="vf-shell">
+
+      <aside class="vf-lateral">
+        <div class="vf-marca">
+          <div class="vf-marca-icono">V</div>
+          <div>
+            <div class="vf-marca-nombre">VITALIS FACE</div>
+            <div class="vf-marca-sub">Análisis facial 2.5D</div>
           </div>
-          <div style="font-size:13px;opacity:.65;margin-top:2px">${esc(paciente.nombre || "Paciente")}${paciente.codigo ? " · " + esc(paciente.codigo) : ""}</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="visor-btn" id="vfGirar" style="background:var(--primary);color:#fff">🔄 Girar y simular</button>
-          <button class="visor-btn" data-cerrar-vf>✕ Cerrar</button>
+
+        <div class="vf-paciente">
+          <div class="vf-paciente-tit">Paciente</div>
+          <div class="vf-paciente-nombre">${esc(paciente.nombre || "Paciente")}</div>
+          <div class="vf-paciente-datos">
+            ${paciente.codigo ? esc(paciente.codigo) : ""}${paciente.codigo && paciente.fechaNacimiento ? " · " : ""}${paciente.fechaNacimiento ? vfEdad(paciente.fechaNacimiento) : ""}
+          </div>
         </div>
-      </header>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;align-items:start">
-
-        ${panel("Las vistas del protocolo", `
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px">
+        <div class="vf-lateral-seccion">
+          <div class="vf-lateral-tit">Vistas cargadas</div>
+          <div class="vf-tira">
             ${vistas.map(v => `
-              <button data-vista="${v.angulo}" style="all:unset;cursor:pointer;text-align:center">
-                <div style="border-radius:8px;overflow:hidden;border:2px solid ${v.angulo === sel.angulo ? "var(--primary)" : "transparent"};aspect-ratio:3/4;background:#000">
-                  ${v.url ? `<img src="${v.url}" style="width:100%;height:100%;object-fit:cover;display:block">` : ""}
-                </div>
-                <div style="font-size:10.5px;opacity:.6;margin-top:4px">${esc(v.label)}</div>
+              <button class="vf-tira-item${v.grados === vf.grados ? " vf-tira-activa" : ""}" data-ir="${v.grados}">
+                <div class="vf-tira-foto">${v.url ? `<img src="${v.url}" alt="">` : ""}</div>
+                <span>${esc(v.label)}</span>
+                ${v.modo === "sinMarcar" ? `<i class="vf-tira-punto" title="sin marcar"></i>` : ""}
               </button>`).join("")}
           </div>
-          <div style="font-size:11px;opacity:.45;margin-top:10px;line-height:1.5">
-            ${vistas.length} de 5 vistas cargadas. El giro recorre estas fotos: no hay un modelo
-            tridimensional atrás, y por eso lo que se ve en cada ángulo es la cara del paciente
-            y no una aproximación.
-          </div>`)}
+          <p class="vf-nota">
+            ${vistas.length} de 5. El giro recorre estas fotos: no hay un modelo tridimensional
+            atrás, y por eso cada ángulo es la cara del paciente y no una aproximación.
+          </p>
+        </div>
 
-        ${panel("Vista seleccionada", `
-          <div style="background:#000;border-radius:10px;overflow:hidden;aspect-ratio:3/4">
-            ${sel.url ? `<img src="${sel.url}" style="width:100%;height:100%;object-fit:contain;display:block">` : ""}
+        <div class="vf-lateral-seccion">
+          <div class="vf-lateral-tit">Procedimientos</div>
+          ${vf.tratamientos.length ? `
+            <div class="vf-proc-lista">
+              ${vf.tratamientos.slice(0, 8).map(t => `
+                <div class="vf-proc">
+                  <div class="vf-proc-nombre">${esc(t.nombre)}</div>
+                  <div class="vf-proc-meta">
+                    ${new Date(t.createdAt).toLocaleDateString("es-BO")}${t.regionFacial ? " · " + esc(t.regionFacial) : ""}
+                    · ${esc({ pendiente: "pendiente", en_proceso: "en proceso", realizado: "realizado" }[t.estado] || t.estado)}
+                  </div>
+                </div>`).join("")}
+            </div>`
+            : `<p class="vf-nota">Todavía no hay procedimientos cargados.</p>`}
+        </div>
+
+        <button class="vf-btn vf-btn-borde" data-cerrar-vf>← Volver a la ficha</button>
+      </aside>
+
+      <main class="vf-principal">
+        <header class="vf-cabecera">
+          <div>
+            <h1>Vitalis Face 2.5D</h1>
+            <p>Cada ángulo es una fotografía real del paciente</p>
           </div>
-          <div style="font-size:12px;opacity:.6;margin-top:8px">${esc(sel.label)} · ${esc(sel.estudio.nombre || "")}</div>`,
-          `<span style="font-size:11px;opacity:.4">${sel.img ? sel.img.naturalWidth + "×" + sel.img.naturalHeight : ""}</span>`)}
+          <div class="vf-cabecera-acciones">
+            <button class="vf-btn" id="vfSimulador">✨ Abrir simulador</button>
+            <button class="vf-btn vf-btn-primario" id="vfGuardar">Guardar esta vista</button>
+          </div>
+        </header>
 
-        ${panel("Mapa anatómico", analisis
-          ? `<canvas id="vfMapa" style="width:100%;border-radius:10px;display:block"></canvas>
-             <div id="vfLeyenda" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:10.5px"></div>`
-          : `<div style="font-size:12.5px;opacity:.6;line-height:1.6">
-               No se detectó una cara en ninguna vista. El mapa necesita una frontal
-               con los dos ojos visibles, sin lentes ni gorra.
-             </div>`)}
-
-        ${panel("Proporciones y ángulos", analisis ? `
-          ${analisis.prop.indices.map(m => vfFilaMedidaHtml(m, null)).join("")}
-          ${angulos && angulos.length ? `
-            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.45;margin:14px 0 4px">Ángulos del perfil</div>
-            ${angulos.map(m => vfFilaMedidaHtml(m, null)).join("")}
-          ` : `
-            <div style="margin-top:14px;font-size:11.5px;background:#1a1710;border:1px solid #3d3418;color:#e0cf9c;padding:9px 11px;border-radius:8px;line-height:1.55">
-              Los ángulos del perfil —nasofrontal, nasolabial, nasofacial— son los que de
-              verdad se miran en una rinoplastia, y no necesitan ninguna calibración.
-              Para calcularlos hace falta marcar el perfil una vez.
-              <a href="#" id="vfMarcarPerfil" style="color:#ffd76e">Marcar ${esc(vfPerfilAMarcar() ? vfPerfilAMarcar().label.toLowerCase() : "el perfil")} ahora</a>${vf.vistas.filter(v => Math.abs(v.grados) === 90).length > 1 ? " (elegí el otro en la tira de arriba para marcar ese)" : ""}
-            </div>`}
-          <div style="margin-top:14px;font-size:11.5px;opacity:.55;line-height:1.6;border-top:1px solid #1b1f29;padding-top:10px">
-            Todo lo de arriba son razones y ángulos: no dependen de a qué distancia se sacó
-            la foto, así que son correctos sin calibrar.
-            <div style="margin-top:6px">
-              Los rangos de referencia dicen dónde cae la mayoría de las caras medidas, no
-              dónde habría que estar. Casi toda cara queda fuera de alguno, y en ámbar no
-              significa que haya nada que corregir: significa que ahí es donde esta cara se
-              distingue del promedio.
+        <section class="vf-visor-caja">
+          <div class="vf-barra">
+            <div class="vf-barra-grupo">
+              <button class="vf-chip" id="vfBtnLandmarks">◦ Puntos</button>
+              <button class="vf-chip" id="vfBtnSimular">✨ Simular</button>
+              <button class="vf-chip" id="vfBtnComparar">👁 Ver original</button>
+              <button class="vf-chip" id="vfBtnMedir">📏 Medir</button>
+              <button class="vf-chip" id="vfBtnAnotar">✎ Anotar</button>
+              <button class="vf-chip" id="vfBtnLimpiar">↺ Limpiar</button>
             </div>
-          </div>` : `<div style="font-size:12.5px;opacity:.6">Hace falta una vista frontal detectable.</div>`)}
-
-        ${panel("Medidas en milímetros", analisis ? (cal ? `
-          ${[
-            { label: "Anchura facial (bicigomática)", px: analisis.prop.px.anchuraFacial },
-            { label: "Altura facial (nasion–mentón)", px: analisis.prop.px.alturaFacial },
-            { label: "Anchura nasal", px: analisis.prop.px.anchuraNasal },
-            { label: "Altura nasal", px: analisis.prop.px.alturaNasal },
-            { label: "Distancia interpupilar", px: analisis.prop.px.interpupilar },
-          ].map(m => `
-            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;padding:7px 0;border-bottom:1px solid #1b1f29;font-size:13px">
-              <span>${esc(m.label)}</span>
-              <span style="font-variant-numeric:tabular-nums;color:#7fd1a8">${enMm(m.px)}</span>
-            </div>`).join("")}
-          <div style="margin-top:12px;font-size:11.5px;opacity:.55;line-height:1.6">
-            Calibrado con: ${esc(cal.referencia || "referencia manual")}.
-            <a href="#" id="vfRecalibrar" style="color:var(--primary)">Volver a calibrar</a>
+            <span class="vf-vista-nombre" id="vfNombreVista"></span>
           </div>
-          <div style="margin-top:8px;font-size:11px;background:#1a1710;border:1px solid #3d3418;color:#e0cf9c;padding:8px 10px;border-radius:8px;line-height:1.55">
-            Válido solo para lo que esté en el mismo plano que la referencia. Una cara es
-            curva: lo que está más cerca de la cámara sale más grande.
-          </div>` : `
-          <div style="font-size:12.5px;opacity:.7;line-height:1.65">
-            Todavía no hay milímetros, y no los va a haber inventados.
-            Una foto no trae escala: la misma nariz, de cerca y de lejos, ocupa distinta
-            cantidad de píxeles. Para dar milímetros hace falta algo de tamaño conocido
-            en la foto.
+
+          <div class="vf-visor" id="vfVisor">
+            <canvas id="vfLienzo"></canvas>
+            <canvas id="vfCapaDibujo"></canvas>
+            <div class="vf-etiqueta" id="vfEtiqueta"></div>
+            <div class="vf-sello">SIMULACIÓN — NO ES UNA PROMESA DE RESULTADO</div>
           </div>
-          <button class="visor-btn" id="vfCalibrar" style="margin-top:12px">📏 Calibrar con una referencia</button>
-          <div style="font-size:11px;opacity:.45;margin-top:8px;line-height:1.55">
-            Sirve una regla, una tarjeta apoyada en la mejilla, o cualquier objeto cuyo
-            tamaño real conozcas, siempre que esté a la misma distancia de la cámara que
-            la cara.
-          </div>`) : `<div style="font-size:12.5px;opacity:.6">Hace falta una vista frontal detectable.</div>`)}
 
-        ${panel("Simetría", analisis ? `
-          <canvas id="vfSimetria" style="width:100%;border-radius:10px;display:block"></canvas>
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px">
-            <span style="font-size:12.5px;opacity:.7">Índice de simetría</span>
-            <span style="font-size:20px;font-variant-numeric:tabular-nums">${analisis.sim.indice.toFixed(1)}<span style="font-size:12px;opacity:.5">/100</span></span>
+          <div class="vf-aviso-marcar" id="vfAvisoMarcar" style="display:none">
+            La vista <b></b> no está marcada: se ve la foto original, sin la simulación encima.
+            <a href="#" id="vfMarcarActual">Marcarla ahora</a>
           </div>
-          <div style="font-size:11.5px;opacity:.55;line-height:1.6;margin-top:8px">
-            Diferencia media entre cada punto y su espejo: ${analisis.sim.difMediaPorcentaje.toFixed(2)}% del ancho de la cara.
-            La mayor: ${analisis.sim.difPeorPorcentaje.toFixed(2)}%, con el lado
-            ${analisis.sim.ladoIzquierdoMayor ? "izquierdo" : "derecho"} más prominente.
-            Se expresa en porcentaje y no en milímetros a propósito: en porcentaje vale igual
-            de cerca que de lejos.
+
+          <div class="vf-giro">
+            <div class="vf-giro-presets">
+              ${vistas.map(v => `<button data-ir="${v.grados}" class="${v.grados === vf.grados ? "vf-preset-activo" : ""}">${esc(v.label)}</button>`).join("")}
+            </div>
+            <div class="vf-giro-barra">
+              <button class="vf-btn-redondo" id="vfMenos">◀</button>
+              <input type="range" id="vfGiro" min="${minG}" max="${maxG}" step="1" value="${vf.grados}">
+              <button class="vf-btn-redondo" id="vfMas">▶</button>
+            </div>
+            <div class="vf-giro-pie">
+              <span id="vfGiroVal">${vf.grados}°</span>
+              <span>Arrastrá sobre la foto para girar</span>
+            </div>
           </div>
-          <div style="font-size:11px;opacity:.4;margin-top:6px;line-height:1.5">
-            Ninguna cara es simétrica. El número sirve para comparar la misma cara antes y
-            después, no para compararla con otra persona.
-          </div>` : `<div style="font-size:12.5px;opacity:.6">Hace falta una vista frontal detectable.</div>`)}
+        </section>
+      </main>
 
-        ${panel("Evolución en el tiempo", vfEvolucionHtml())}
+      <aside class="vf-metricas">
+        <div class="vf-zonas">
+          ${VF_ZONAS.map(z => `
+            <button class="vf-zona${z.id === vf.zona ? " vf-zona-activa" : ""}" data-zona="${z.id}">
+              <span>${z.icono}</span>${esc(z.label)}
+            </button>`).join("")}
+        </div>
 
-        ${panel("Antes y después", vfAntesDespuesHtml())}
+        ${analisis ? `
+          <div class="vf-panel">
+            <div class="vf-panel-tit">${esc(VF_ZONAS.find(z => z.id === vf.zona).label)}</div>
+            ${vfMedidasDeZona().map(m => vfFilaMedidaHtml(m)).join("") ||
+              `<p class="vf-nota">No hay proporciones propias de esta zona en una vista frontal.</p>`}
+            ${vf.zona === "nariz" || vf.zona === "menton" ? vfBloqueAngulosHtml() : ""}
+            ${vfBloqueControlesHtml()}
+            <p class="vf-nota vf-nota-borde">
+              Razones y ángulos: no dependen de a qué distancia se sacó la foto, así que son
+              correctos sin calibrar. Los rangos de referencia dicen dónde cae la mayoría de
+              las caras medidas, no dónde habría que estar.
+            </p>
+          </div>
 
-        ${panel("Procedimientos", tratamientos.length ? `
-          <div style="font-size:12.5px">
-            ${tratamientos.slice(0, 12).map(t => `
-              <div style="display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:7px 0;border-bottom:1px solid #1b1f29;align-items:baseline">
-                <span style="opacity:.5;font-size:11px;white-space:nowrap">${new Date(t.createdAt).toLocaleDateString("es-BO")}</span>
-                <span>${esc(t.nombre)}${t.regionFacial ? `<span style="opacity:.5"> · ${esc(t.regionFacial)}</span>` : ""}</span>
-                <span style="font-size:11px;opacity:.6;white-space:nowrap">${esc({ pendiente: "pendiente", en_proceso: "en proceso", realizado: "realizado" }[t.estado] || t.estado)}</span>
+          <div class="vf-panel">
+            <div class="vf-panel-tit">Milímetros</div>
+            ${vfBloqueMilimetrosHtml()}
+          </div>
+
+          <div class="vf-panel">
+            <div class="vf-panel-tit">Simetría</div>
+            <div class="vf-sim-numero">
+              ${analisis.sim.indice.toFixed(1)}<span>/100</span>
+            </div>
+            <p class="vf-nota">
+              Diferencia media entre cada punto y su espejo: ${analisis.sim.difMediaPorcentaje.toFixed(2)}%
+              del ancho de la cara; la mayor, ${analisis.sim.difPeorPorcentaje.toFixed(2)}%, con el lado
+              ${analisis.sim.ladoIzquierdoMayor ? "izquierdo" : "derecho"} más prominente.
+              Va en porcentaje y no en milímetros a propósito: en porcentaje vale igual de cerca
+              que de lejos.
+            </p>
+            <p class="vf-nota">
+              Ninguna cara es simétrica. El número sirve para comparar esta cara consigo misma
+              antes y después, no con otra persona.
+            </p>
+            <button class="vf-btn vf-btn-borde" id="vfVerSimetria">Ver mapa de simetría</button>
+          </div>
+        ` : `
+          <div class="vf-panel">
+            <p class="vf-nota">
+              No se detectó una cara en ninguna vista, así que no hay proporciones.
+              El detector necesita una frontal con los dos ojos visibles, sin lentes ni gorra.
+            </p>
+          </div>`}
+
+        ${vf.medidas.length ? `
+          <div class="vf-panel">
+            <div class="vf-panel-tit">Medido a mano</div>
+            ${vf.medidas.map((m, i) => `
+              <div class="vf-medida">
+                <div class="vf-medida-fila">
+                  <span class="vf-medida-label">${esc(m.vista)} · medida ${i + 1}</span>
+                  <span class="vf-medida-valor">${esc(m.texto)}</span>
+                </div>
               </div>`).join("")}
-          </div>
-          ${tratamientos.length > 12 ? `<div style="font-size:11px;opacity:.45;margin-top:8px">y ${tratamientos.length - 12} más en la pestaña de tratamientos</div>` : ""}`
-          : `<div style="font-size:12.5px;opacity:.6;line-height:1.6">
-               Todavía no hay procedimientos cargados. Se cargan en la pestaña de
-               tratamientos y aparecen acá con su región facial.
-             </div>`)}
-      </div>
-    </div>`;
+            <p class="vf-nota">De esta sesión: no quedan guardadas en la ficha.</p>
+          </div>` : ""}
+      </aside>
+    </div>
+    <div class="vf-avisos" id="vfAvisos"></div>`;
 
   vfEngancharCerrar(capa);
+  vfMontarVisor();
   vfEnganchar();
 }
 
-function vfEvolucionHtml() {
-  const fotos = vf.estudios
-    .filter(e => e.anguloFoto === "frontal")
-    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-  if (fotos.length < 2) {
-    return `<div style="font-size:12.5px;opacity:.6;line-height:1.6">
-      Con una sola frontal no hay evolución que mostrar. A medida que se carguen
-      controles frontales en distintas fechas, aparecen acá en orden.
-    </div>`;
+function vfEdad(fecha) {
+  const n = new Date(fecha);
+  if (isNaN(n)) return "";
+  const hoy = new Date();
+  let a = hoy.getFullYear() - n.getFullYear();
+  const m = hoy.getMonth() - n.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < n.getDate())) a--;
+  return a + " años";
+}
+
+function vfMedidasDeZona() {
+  if (!vf.analisis) return [];
+  return vf.analisis.prop.medidas.filter(m => m.zona === vf.zona);
+}
+
+function vfBloqueAngulosHtml() {
+  const zona = vf.zona;
+  const deZona = { nariz: ["nasofrontal", "nasolabial", "nasofacial"], menton: ["mentolabial"] }[zona] || [];
+  if (vf.angulos) {
+    const filas = vf.angulos.filter(a => deZona.includes(a.id));
+    if (!filas.length) return "";
+    return `<div class="vf-subtit">Ángulos del perfil</div>`
+      + filas.map(a => vfFilaMedidaHtml({ ...a, grados: true })).join("");
   }
+  const perfil = vfPerfilAMarcar();
   return `
-    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
-      ${fotos.map((e, i) => `
-        <div style="flex:0 0 84px;text-align:center">
-          <div style="aspect-ratio:3/4;border-radius:8px;background:#000;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.5;border:1px solid #1b1f29">
-            ${i === 0 ? "inicial" : "control " + i}
-          </div>
-          <div style="font-size:10.5px;opacity:.55;margin-top:4px">${new Date(e.fecha).toLocaleDateString("es-BO")}</div>
-        </div>`).join("")}
-    </div>
-    <div style="font-size:11px;opacity:.45;margin-top:10px;line-height:1.5">
-      ${fotos.length} controles frontales. Para comparar dos, usá el panel de al lado.
+    <div class="vf-callout">
+      Los ángulos del perfil —nasofrontal, nasolabial, nasofacial— son los que de verdad
+      se miran en una rinoplastia, y no necesitan calibración.
+      Para calcularlos hay que marcar el perfil una vez.
+      <a href="#" id="vfMarcarPerfil">Marcar ${esc(perfil ? perfil.label.toLowerCase() : "el perfil")} ahora</a>
     </div>`;
 }
 
-function vfAntesDespuesHtml() {
-  const fotos = vf.estudios
-    .filter(e => e.anguloFoto)
-    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-  if (fotos.length < 2) {
-    return `<div style="font-size:12.5px;opacity:.6;line-height:1.6">
-      Hace falta más de una foto para comparar.
-    </div>`;
+// Los controles del simulador de la zona que se está mirando. Aparecen solo
+// con la simulación encendida: mientras se están leyendo proporciones, unos
+// deslizadores al lado invitan a confundir lo medido con lo imaginado.
+function vfBloqueControlesHtml() {
+  const ids = VF_CONTROLES_ZONA[vf.zona] || [];
+  if (!ids.length) {
+    return vf.simulando
+      ? `<p class="vf-nota vf-nota-borde">Elegí una zona —nariz, mentón, pómulos, labios u ojos— para ver sus controles.</p>`
+      : "";
   }
-  const opciones = (sel) => fotos.map(e =>
-    `<option value="${e._id}" ${e._id === sel ? "selected" : ""}>${esc(e.nombre || e.anguloFoto)} · ${new Date(e.fecha).toLocaleDateString("es-BO")}</option>`).join("");
+  if (!vf.simulando) {
+    return `<button class="vf-btn vf-btn-borde" id="vfActivarSim">✨ Simular sobre esta zona</button>`;
+  }
+  const ctrls = SF_CONTROLES.filter(c => ids.includes(c.id));
   return `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <select id="vfAntes" style="font-size:12px">${opciones(fotos[0]._id)}</select>
-      <select id="vfDespues" style="font-size:12px">${opciones(fotos[fotos.length - 1]._id)}</select>
-      <div style="background:#000;border-radius:8px;aspect-ratio:3/4;overflow:hidden"><img id="vfImgAntes" style="width:100%;height:100%;object-fit:contain;display:block"></div>
-      <div style="background:#000;border-radius:8px;aspect-ratio:3/4;overflow:hidden"><img id="vfImgDespues" style="width:100%;height:100%;object-fit:contain;display:block"></div>
-    </div>
-    <div style="font-size:11px;opacity:.45;margin-top:8px;line-height:1.5">
-      Comparar sirve si las dos fotos están sacadas parecido. Distinta luz o distinta
-      distancia cambian la cara más que muchos tratamientos.
+    <div class="vf-subtit">Simulación</div>
+    ${ctrls.map(c => `
+      <div class="vf-control">
+        <div class="vf-control-fila">
+          <span>${esc(c.label)}</span>
+          <span id="vfval-${c.id}">${vf.valores[c.id]}</span>
+        </div>
+        <input type="range" data-ctrl-vf="${c.id}" min="-100" max="100" step="1" value="${vf.valores[c.id]}">
+        <div class="vf-medida-ayuda">${esc(c.ayuda || "")}</div>
+      </div>`).join("")}
+    <div class="vf-callout">
+      Los rangos están acotados a lo quirúrgicamente plausible. Una simulación es una
+      herramienta para entenderse con el paciente, no un resultado garantizado.
     </div>`;
 }
 
+function vfBloqueMilimetrosHtml() {
+  const a = vf.analisis;
+  const cal = a.vista.estudio.calibracion;
+  if (!cal || !cal.mmPorPixel) {
+    return `
+      <p class="vf-nota">
+        Todavía no hay milímetros, y no los va a haber inventados. Una foto no trae escala:
+        la misma nariz, de cerca y de lejos, ocupa distinta cantidad de píxeles.
+      </p>
+      <button class="vf-btn vf-btn-borde" id="vfCalibrar">📏 Calibrar con una referencia</button>
+      <p class="vf-nota">
+        Sirve una regla, una tarjeta apoyada en la mejilla, o cualquier objeto de tamaño
+        conocido, siempre que esté a la misma distancia de la cámara que la cara.
+      </p>`;
+  }
+  const mm = (px) => (px * cal.mmPorPixel).toFixed(1) + " mm";
+  const filas = [
+    ["Anchura facial (bicigomática)", a.prop.px.anchuraFacial],
+    ["Altura facial (nasion–mentón)", a.prop.px.alturaFacial],
+    ["Anchura nasal", a.prop.px.anchuraNasal],
+    ["Altura nasal", a.prop.px.alturaNasal],
+    ["Distancia interpupilar", a.prop.px.interpupilar],
+    ["Ancho de boca", a.prop.px.anchuraBucal],
+  ];
+  return `
+    ${filas.map(([l, px]) => `
+      <div class="vf-medida">
+        <div class="vf-medida-fila">
+          <span class="vf-medida-label">${esc(l)}</span>
+          <span class="vf-medida-valor vf-mm">${mm(px)}</span>
+        </div>
+      </div>`).join("")}
+    <p class="vf-nota">Calibrado con: ${esc(cal.referencia || "referencia manual")}.
+      <a href="#" id="vfCalibrar">Volver a calibrar</a></p>
+    <div class="vf-callout">
+      Válido solo para lo que esté en el mismo plano que la referencia. Una cara es curva:
+      lo que está más cerca de la cámara sale más grande.
+    </div>`;
+}
+
+// ═══ EL VISOR ══════════════════════════════════════════════════════════════
+function vfMontarVisor() {
+  const { capa, vistas, ref } = vf;
+  const lienzo = capa.querySelector("#vfLienzo");
+  const refImg = (vistas.find(v => v.esReferencia) || vistas[0]).img;
+
+  let motor;
+  try {
+    motor = s25Motor(lienzo, vistas, ref);
+  } catch (e) {
+    capa.querySelector("#vfVisor").innerHTML =
+      `<p class="vf-nota" style="padding:20px">Este navegador no puede mostrar el visor: ${esc(e.message)}</p>`;
+    return;
+  }
+  vf.motor = motor;
+  const r = motor.recorte;
+  lienzo.width = Math.max(16, Math.round(refImg.naturalWidth * (r.x1 - r.x0)));
+  lienzo.height = Math.max(16, Math.round(refImg.naturalHeight * (r.y1 - r.y0)));
+
+  const dibujo = capa.querySelector("#vfCapaDibujo");
+  dibujo.width = lienzo.width;
+  dibujo.height = lienzo.height;
+
+  vfRender();
+}
+
+function vfRender() {
+  if (!vf.motor) return;
+  const valores = vf.simulando ? vf.valores : Object.fromEntries(SF_CONTROLES.map(c => [c.id, 0]));
+  vf.vistaActual = vf.motor.render(vf.grados, valores, vf.verOriginal);
+  vfDibujarCapa();
+  vfActualizarPie();
+}
+
+function vfActualizarPie() {
+  const v = vf.vistaActual;
+  const nom = vf.capa.querySelector("#vfNombreVista");
+  if (nom) nom.textContent = v ? v.label : "";
+  const et = vf.capa.querySelector("#vfEtiqueta");
+  if (et) {
+    et.textContent = vf.verOriginal ? "ORIGINAL" : (vf.simulando ? "SIMULADO" : "");
+    et.style.display = et.textContent ? "" : "none";
+  }
+  const aviso = vf.capa.querySelector("#vfAvisoMarcar");
+  if (aviso) {
+    const sinMarcar = v && v.modo === "sinMarcar";
+    aviso.style.display = sinMarcar ? "" : "none";
+    if (sinMarcar) aviso.querySelector("b").textContent = v.label;
+  }
+  const sello = vf.capa.querySelector(".vf-sello");
+  if (sello) sello.style.display = vf.simulando && !vf.verOriginal ? "" : "none";
+}
+
+// Del lienzo a las coordenadas propias de la foto que se está viendo, que es
+// donde las distancias significan algo: cada vista tiene su escala y su
+// calibración, y medir en el lienzo compuesto mezclaría las dos.
+function vfDelLienzoALaVista(u, v, vista) {
+  const r = vf.motor.recorte;
+  const { s, dx, dy } = s25Encuadre(vista, vf.ref);
+  const xRef = r.x0 + u * (r.x1 - r.x0);
+  const yRef = r.y0 + v * (r.y1 - r.y0);
+  return { x: (xRef - dx) / s, y: (yRef - dy) / s };
+}
+function vfDeLaVistaAlLienzo(p, vista) {
+  const r = vf.motor.recorte;
+  const { s, dx, dy } = s25Encuadre(vista, vf.ref);
+  return {
+    u: (p.x * s + dx - r.x0) / (r.x1 - r.x0),
+    v: (p.y * s + dy - r.y0) / (r.y1 - r.y0),
+  };
+}
+
+function vfDibujarCapa() {
+  const c = vf.capa.querySelector("#vfCapaDibujo");
+  if (!c) return;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+  const vista = vf.vistaActual;
+  if (!vista) return;
+  const aLienzo = (p) => {
+    const q = vfDeLaVistaAlLienzo(p, vista);
+    return { x: q.u * c.width, y: q.v * c.height };
+  };
+
+  if (vf.landmarks) {
+    ctx.fillStyle = "rgba(45,212,191,.9)";
+    const puntos = vista.modo === "auto" ? vista.landmarks
+      : vista.modo === "perfil" ? vista.marcados : [];
+    const radio = Math.max(1.2, c.width * 0.0022);
+    for (const p of puntos) {
+      const q = aLienzo(p);
+      ctx.beginPath(); ctx.arc(q.x, q.y, radio, 0, Math.PI * 2); ctx.fill();
+    }
+    // En un perfil marcado, la línea del contorno explica más que los puntos.
+    if (vista.modo === "perfil" && vista.marcados) {
+      ctx.beginPath();
+      vista.marcados.forEach((p, i) => {
+        const q = aLienzo(p);
+        i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y);
+      });
+      ctx.strokeStyle = "rgba(45,212,191,.75)";
+      ctx.lineWidth = Math.max(1.5, c.width * 0.003);
+      ctx.stroke();
+    }
+  }
+
+  const gruesa = Math.max(2, c.width * 0.004);
+  for (const m of vf.medidas.filter(m => m.angulo === vista.grados)) {
+    const a = aLienzo(m.a), b = aLienzo(m.b);
+    ctx.strokeStyle = "#2dd4bf"; ctx.lineWidth = gruesa;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.fillStyle = "#2dd4bf";
+    for (const q of [a, b]) { ctx.beginPath(); ctx.arc(q.x, q.y, gruesa * 1.4, 0, Math.PI * 2); ctx.fill(); }
+    const tam = Math.max(11, Math.round(c.width * 0.026));
+    ctx.font = `600 ${tam}px system-ui, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - tam * 0.4;
+    const ancho = ctx.measureText(m.texto).width;
+    ctx.fillStyle = "rgba(0,0,0,.65)";
+    ctx.fillRect(mx - ancho / 2 - 5, my - tam, ancho + 10, tam * 1.3);
+    ctx.fillStyle = "#7ff3dd";
+    ctx.fillText(m.texto, mx, my + tam * 0.22);
+  }
+  for (const p of vf.puntosMedida) {
+    const q = aLienzo(p);
+    ctx.fillStyle = "#2dd4bf";
+    ctx.beginPath(); ctx.arc(q.x, q.y, gruesa * 1.4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  for (const a of vf.anotaciones.filter(a => a.angulo === vista.grados)) {
+    const q = aLienzo(a);
+    ctx.strokeStyle = "#c084fc"; ctx.lineWidth = gruesa;
+    ctx.beginPath(); ctx.arc(q.x, q.y, gruesa * 4, 0, Math.PI * 2); ctx.stroke();
+    if (a.texto) {
+      const tam = Math.max(11, Math.round(c.width * 0.024));
+      ctx.font = `600 ${tam}px system-ui, sans-serif`;
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      const ancho = ctx.measureText(a.texto).width;
+      ctx.fillStyle = "rgba(0,0,0,.65)";
+      ctx.fillRect(q.x + gruesa * 5, q.y - tam * 0.75, ancho + 10, tam * 1.5);
+      ctx.fillStyle = "#e9d5ff";
+      ctx.fillText(a.texto, q.x + gruesa * 5 + 5, q.y);
+    }
+  }
+}
+
+// ═══ INTERACCIÓN ═══════════════════════════════════════════════════════════
 function vfEnganchar() {
-  const { capa, analisis } = vf;
+  const { capa } = vf;
 
-  capa.querySelectorAll("[data-vista]").forEach(b => b.onclick = () => {
-    vf.seleccion = b.dataset.vista;
+  const irA = (g) => {
+    const sl = capa.querySelector("#vfGiro");
+    vf.grados = Math.max(Number(sl.min), Math.min(Number(sl.max), Math.round(g)));
+    sl.value = String(vf.grados);
+    capa.querySelector("#vfGiroVal").textContent = vf.grados + "°";
+    capa.querySelectorAll(".vf-giro-presets [data-ir]").forEach(b =>
+      b.classList.toggle("vf-preset-activo", Number(b.dataset.ir) === vf.grados));
+    capa.querySelectorAll(".vf-tira-item").forEach(b =>
+      b.classList.toggle("vf-tira-activa", Number(b.dataset.ir) === vf.grados));
+    vfRender();
+  };
+  capa.querySelector("#vfGiro").oninput = (e) => irA(Number(e.target.value));
+  capa.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => irA(Number(b.dataset.ir)));
+  capa.querySelector("#vfMenos").onclick = () => irA(vf.grados - 45);
+  capa.querySelector("#vfMas").onclick = () => irA(vf.grados + 45);
+
+  // Arrastrar sobre la foto para girar — pero solo cuando no hay una
+  // herramienta activa, si no cada intento de medir movería la cabeza.
+  const visor = capa.querySelector("#vfVisor");
+  let arrastre = null;
+  visor.onpointerdown = (ev) => {
+    if (vf.herramienta) { vfClicHerramienta(ev); return; }
+    arrastre = { x: ev.clientX, g: vf.grados };
+    visor.setPointerCapture(ev.pointerId);
+  };
+  visor.onpointermove = (ev) => {
+    if (!arrastre) return;
+    const sl = capa.querySelector("#vfGiro");
+    const rango = Number(sl.max) - Number(sl.min);
+    irA(arrastre.g + (ev.clientX - arrastre.x) / visor.getBoundingClientRect().width * rango);
+  };
+  visor.onpointerup = () => { arrastre = null; };
+  visor.onpointercancel = () => { arrastre = null; };
+
+  capa.querySelectorAll("[data-zona]").forEach(b => b.onclick = () => {
+    vf.zona = b.dataset.zona;
     vfPintar();
   });
 
-  const girar = capa.querySelector("#vfGirar");
-  if (girar) girar.onclick = () => abrirSimulador25D(vf.pacienteId, vf.estudios);
+  const btnL = capa.querySelector("#vfBtnLandmarks");
+  btnL.onclick = () => {
+    vf.landmarks = !vf.landmarks;
+    btnL.classList.toggle("vf-chip-activo", vf.landmarks);
+    vfDibujarCapa();
+  };
 
-  if (analisis) {
-    const cMapa = capa.querySelector("#vfMapa");
-    if (cMapa) {
-      cMapa.width = analisis.w; cMapa.height = analisis.h;
-      dibujarMapaAnatomico(cMapa.getContext("2d"), analisis.vista.img, analisis.deteccion.landmarks, analisis.deteccion.FaceLandmarker);
-      const ley = capa.querySelector("#vfLeyenda");
-      if (ley) ley.innerHTML = Object.entries(ETIQUETAS).map(([k, l]) =>
-        `<span style="display:inline-flex;align-items:center;gap:4px;opacity:.7"><i style="width:9px;height:9px;border-radius:2px;background:rgb(${COLOR_REGION[k]});display:inline-block"></i>${esc(l)}</span>`).join("");
-    }
-    const cSim = capa.querySelector("#vfSimetria");
-    if (cSim) {
-      cSim.width = analisis.w; cSim.height = analisis.h;
-      dibujarSimetria(cSim.getContext("2d"), analisis.vista.img, analisis.deteccion.landmarks, analisis.deteccion.FaceLandmarker);
-    }
-  }
+  const btnS = capa.querySelector("#vfBtnSimular");
+  const alternarSim = () => {
+    vf.simulando = !vf.simulando;
+    if (!vf.simulando) vf.verOriginal = false;
+    vfPintar();
+    vfAviso(vf.simulando
+      ? "Simulación encendida: los cambios se ven en todos los ángulos."
+      : "Simulación apagada. Volvés a ver las fotos como son.");
+  };
+  btnS.onclick = alternarSim;
+  btnS.classList.toggle("vf-chip-activo", vf.simulando);
+  const activar = capa.querySelector("#vfActivarSim");
+  if (activar) activar.onclick = alternarSim;
 
-  const marcar = capa.querySelector("#vfMarcarPerfil");
-  if (marcar) marcar.onclick = (ev) => { ev.preventDefault(); vfMarcarPerfil(); };
-
-  for (const id of ["#vfCalibrar", "#vfRecalibrar"]) {
-    const b = capa.querySelector(id);
-    if (b) b.onclick = (ev) => { ev.preventDefault(); vfCalibrar(); };
-  }
-
-  const antes = capa.querySelector("#vfAntes"), despues = capa.querySelector("#vfDespues");
-  if (antes && despues) {
-    const cargar = async (sel, img) => {
-      const blob = await traerBlobEstudio(sel.value);
-      if (blob) img.src = URL.createObjectURL(blob);
+  capa.querySelectorAll("[data-ctrl-vf]").forEach(sl => {
+    sl.oninput = () => {
+      vf.valores[sl.dataset.ctrlVf] = Number(sl.value);
+      const et = capa.querySelector("#vfval-" + sl.dataset.ctrlVf);
+      if (et) et.textContent = sl.value;
+      vfRender();
     };
-    const iA = capa.querySelector("#vfImgAntes"), iD = capa.querySelector("#vfImgDespues");
-    antes.onchange = () => cargar(antes, iA);
-    despues.onchange = () => cargar(despues, iD);
-    cargar(antes, iA); cargar(despues, iD);
+  });
+
+  const btnC = capa.querySelector("#vfBtnComparar");
+  btnC.disabled = !vf.simulando;
+  btnC.textContent = vf.verOriginal ? "👁 Ver simulación" : "👁 Ver original";
+  btnC.onclick = () => {
+    vf.verOriginal = !vf.verOriginal;
+    btnC.textContent = vf.verOriginal ? "👁 Ver simulación" : "👁 Ver original";
+    vfRender();
+  };
+
+  const herramienta = (id, nombre, aviso) => {
+    const b = capa.querySelector(id);
+    b.onclick = () => {
+      vf.herramienta = vf.herramienta === nombre ? null : nombre;
+      vf.puntosMedida = [];
+      capa.querySelectorAll("#vfBtnMedir,#vfBtnAnotar").forEach(x => x.classList.remove("vf-chip-activo"));
+      if (vf.herramienta === nombre) { b.classList.add("vf-chip-activo"); vfAviso(aviso); }
+      visor.style.cursor = vf.herramienta ? "crosshair" : "grab";
+      vfDibujarCapa();
+    };
+  };
+  herramienta("#vfBtnMedir", "medir", "Marcá dos puntos sobre la foto.");
+  herramienta("#vfBtnAnotar", "anotar", "Tocá donde quieras dejar una marca.");
+
+  capa.querySelector("#vfBtnLimpiar").onclick = () => {
+    const g = vf.vistaActual ? vf.vistaActual.grados : null;
+    vf.medidas = vf.medidas.filter(m => m.angulo !== g);
+    vf.anotaciones = vf.anotaciones.filter(a => a.angulo !== g);
+    vf.puntosMedida = [];
+    vfPintar();
+  };
+
+  capa.querySelector("#vfSimulador").onclick = () => abrirSimulador25D(vf.pacienteId, vf.estudios);
+  capa.querySelector("#vfGuardar").onclick = vfGuardarVista;
+
+  const marcarActual = capa.querySelector("#vfMarcarActual");
+  if (marcarActual) marcarActual.onclick = (ev) => {
+    ev.preventDefault();
+    vfMarcarVista(vf.vistaActual);
+  };
+  const marcarPerfil = capa.querySelector("#vfMarcarPerfil");
+  if (marcarPerfil) marcarPerfil.onclick = (ev) => {
+    ev.preventDefault();
+    vfMarcarVista(vfPerfilAMarcar());
+  };
+
+  const cal = capa.querySelector("#vfCalibrar");
+  if (cal) cal.onclick = (ev) => { ev.preventDefault(); vfCalibrar(); };
+
+  const sim = capa.querySelector("#vfVerSimetria");
+  if (sim) sim.onclick = vfVerSimetria;
+}
+
+function vfClicHerramienta(ev) {
+  const c = vf.capa.querySelector("#vfCapaDibujo");
+  const rect = c.getBoundingClientRect();
+  const u = (ev.clientX - rect.left) / rect.width;
+  const v = (ev.clientY - rect.top) / rect.height;
+  const vista = vf.vistaActual;
+  if (!vista) return;
+  const p = vfDelLienzoALaVista(u, v, vista);
+
+  if (vf.herramienta === "anotar") {
+    vf.anotaciones.push({ ...p, angulo: vista.grados, texto: "Zona de interés" });
+    vfDibujarCapa();
+    return;
+  }
+
+  vf.puntosMedida.push(p);
+  if (vf.puntosMedida.length < 2) { vfDibujarCapa(); return; }
+
+  const [a, b] = vf.puntosMedida;
+  vf.puntosMedida = [];
+  const W = vista.img.naturalWidth, H = vista.img.naturalHeight;
+  const px = vfDist(a, b, W, H);
+  const cal = vista.estudio && vista.estudio.calibracion;
+
+  // Con calibración, milímetros. Sin ella, porcentaje de la altura
+  // nariz-mentón de ESTA vista, que es una referencia que la foto sí trae.
+  // Lo que no va a pasar nunca es que salga un número en mm sin escala.
+  let texto;
+  if (cal && cal.mmPorPixel) {
+    texto = (px * cal.mmPorPixel).toFixed(1) + " mm";
+  } else if (vista.ancla) {
+    const alto = vfDist(vista.ancla.punta, vista.ancla.menton, W, H);
+    texto = (px / alto * 100).toFixed(0) + "% nariz–mentón";
+  } else {
+    texto = Math.round(px) + " px";
+  }
+  vf.medidas.push({ a, b, angulo: vista.grados, vista: vista.label, texto });
+  vfPintar();
+  if (!(cal && cal.mmPorPixel)) {
+    vfAviso("Sin calibrar: la medida va en % de la altura nariz–mentón, no en mm.", "ambar");
   }
 }
 
-// ═══ MARCAR EL PERFIL DESDE LA CONSOLA ═════════════════════════════════════
-// Cuál perfil se marca: el que está seleccionado en la tira, si es un
-// perfil. Elegir siempre "el primero" hace que el cirujano marque el
-// izquierdo creyendo que marcaba el que está mirando.
+// ═══ MARCAR UNA VISTA ══════════════════════════════════════════════════════
 function vfPerfilAMarcar() {
   const perfiles = vf.vistas.filter(v => Math.abs(v.grados) === 90 && v.img);
-  return perfiles.find(v => v.angulo === vf.seleccion) || perfiles[0] || null;
+  return perfiles.find(v => v.grados === vf.grados) || perfiles[0] || null;
 }
 
-function vfMarcarPerfil() {
-  const perfil = vfPerfilAMarcar();
-  if (!perfil) {
-    alert("No hay una foto de perfil cargada. Subila con su ángulo (perfil derecho o izquierdo).");
+function vfMarcarVista(vista) {
+  if (!vista || !vista.img) {
+    vfAviso("No hay una foto de perfil cargada.", "ambar");
     return;
   }
   const capa = document.createElement("div");
-  capa.style.cssText = "position:fixed;inset:0;background:#16161c;z-index:9700;overflow-y:auto";
+  capa.style.cssText = "position:fixed;inset:0;background:#16161c;z-index:9800;overflow-y:auto";
   document.body.appendChild(capa);
   const cerrar = () => capa.remove();
-  capa.querySelectorAll("[data-cerrar-simu]").forEach(b => b.onclick = cerrar);
 
-  sfPantallaMarcado(capa, perfil.img, async (marcados) => {
+  sfPantallaMarcado(capa, vista.img, async (marcados) => {
     cerrar();
+    vista.marcados = marcados;
+    vista.modo = "perfil";
+    vista.malla = sfMallaPerfil(marcados, vista.img.naturalHeight / vista.img.naturalWidth);
+    vista.ancla = s25Ancla(vista);
+    vista.estudio.perfilMarcado = marcados.map(p => ({ x: p.x, y: p.y }));
     try {
-      await api(`/medico/estudios/${perfil.estudio._id}/visor`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ perfilMarcado: marcados.map(p => ({ x: p.x, y: p.y })) }),
+      await api(`/medico/estudios/${vista.estudio._id}/visor`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ perfilMarcado: vista.estudio.perfilMarcado }),
       });
-    } catch { /* si no guarda, igual se muestran los ángulos de esta sesión */ }
-    perfil.estudio.perfilMarcado = marcados;
-    vf.perfilAngulos = perfil;
-    vf.angulos = vfAngulosPerfil(marcados, perfil.img.naturalWidth, perfil.img.naturalHeight);
+      vfAviso("Perfil marcado y guardado en la ficha.");
+    } catch { vfAviso("Marcado, pero no se pudo guardar en la ficha.", "ambar"); }
+    vfRecalcularAngulos();
+    vf.grados = vista.grados;
     vfPintar();
   });
-  // sfPantallaMarcado pone su propio botón de cerrar con data-cerrar-simu.
   capa.querySelectorAll("[data-cerrar-simu]").forEach(b => b.onclick = cerrar);
+}
+
+// ═══ MAPA DE SIMETRÍA ══════════════════════════════════════════════════════
+function vfVerSimetria() {
+  const a = vf.analisis;
+  if (!a) return;
+  const capa = document.createElement("div");
+  capa.style.cssText = "position:fixed;inset:0;background:#0b0d12;z-index:9800;overflow-y:auto;padding:16px;color:#e8ebf0";
+  capa.innerHTML = `
+    <div style="max-width:760px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+        <div>
+          <div style="font-weight:600">Mapa de simetría</div>
+          <div style="font-size:12px;opacity:.6">Rojo: el lado izquierdo del paciente sobresale más · Azul: el derecho</div>
+        </div>
+        <button class="vf-btn" id="vfSimCerrar">✕</button>
+      </div>
+      <canvas id="vfSimLienzo" style="width:100%;border-radius:12px;display:block"></canvas>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+        <div style="background:#11141b;border:1px solid #1b1f29;border-radius:10px;padding:12px">
+          <div style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.1em">Mapa anatómico</div>
+          <canvas id="vfMapaLienzo" style="width:100%;border-radius:8px;display:block;margin-top:8px"></canvas>
+        </div>
+        <div style="background:#11141b;border:1px solid #1b1f29;border-radius:10px;padding:12px;font-size:12px;line-height:1.6;opacity:.75">
+          Las regiones se derivan de los puntos detectados: sirven para ubicar rápido dónde fue
+          cada procedimiento, no reemplazan el ojo clínico.
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  capa.querySelector("#vfSimCerrar").onclick = () => capa.remove();
+
+  const cs = capa.querySelector("#vfSimLienzo");
+  cs.width = a.w; cs.height = a.h;
+  dibujarSimetria(cs.getContext("2d"), a.vista.img, a.vista.landmarks, a.vista.FaceLandmarker || null);
+  const cm = capa.querySelector("#vfMapaLienzo");
+  cm.width = a.w; cm.height = a.h;
+  dibujarMapaAnatomico(cm.getContext("2d"), a.vista.img, a.vista.landmarks, a.vista.FaceLandmarker || null);
+}
+
+// ═══ GUARDAR LA VISTA ══════════════════════════════════════════════════════
+async function vfGuardarVista() {
+  const btn = vf.capa.querySelector("#vfGuardar");
+  btn.disabled = true;
+  const antes = btn.textContent;
+  btn.textContent = "Guardando...";
+  try {
+    const lienzo = vf.capa.querySelector("#vfLienzo");
+    const dibujo = vf.capa.querySelector("#vfCapaDibujo");
+    const salida = document.createElement("canvas");
+    salida.width = lienzo.width; salida.height = lienzo.height;
+    const ctx = salida.getContext("2d");
+    ctx.drawImage(lienzo, 0, 0);
+    ctx.drawImage(dibujo, 0, 0);
+    // El sello va solo si hay simulación encima. Una foto con una medida no
+    // es una simulación, y sellarla como tal le quitaría valor a la marca
+    // justo donde sí hace falta.
+    if (vf.simulando && !vf.verOriginal) sfSelloEnLienzo(salida);
+    const png = await new Promise(res => salida.toBlob(res, "image/png"));
+    const params = new URLSearchParams({
+      nombre: `Vitalis Face · ${vf.vistaActual ? vf.vistaActual.label : "vista"}`,
+      fecha: new Date().toISOString().slice(0, 10),
+      tipo: "foto",
+    });
+    await fetch(`${API}/medico/pacientes/${vf.pacienteId}/estudios?${params}`, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + TOKEN, "Content-Type": "image/png" },
+      body: png,
+    });
+    vfAviso("Guardado en la ficha del paciente.");
+  } catch (e) {
+    vfAviso("No se pudo guardar.", "ambar");
+  }
+  btn.disabled = false;
+  btn.textContent = antes;
 }
 
 // ═══ CALIBRACIÓN EN MILÍMETROS ═════════════════════════════════════════════
@@ -640,22 +1138,22 @@ function vfCalibrar() {
   const a = vf.analisis;
   if (!a) return;
   const capa = document.createElement("div");
-  capa.style.cssText = "position:fixed;inset:0;background:#0b0d12;z-index:9700;overflow-y:auto;color:#e8ebf0";
+  capa.style.cssText = "position:fixed;inset:0;background:#0b0d12;z-index:9800;overflow-y:auto;color:#e8ebf0";
   capa.innerHTML = `
     <div style="padding:12px 14px;background:#11141b;position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div>
         <div style="font-weight:600">Calibrar en milímetros</div>
         <div id="vfCalPaso" style="font-size:12px;opacity:.65">Marcá los dos extremos de algo cuyo tamaño real conozcas.</div>
       </div>
-      <button class="visor-btn" id="vfCalCerrar">✕</button>
+      <button class="vf-btn" id="vfCalCerrar">✕</button>
     </div>
     <div style="text-align:center;background:#000">
       <canvas id="vfCalLienzo" style="display:block;max-width:100%;margin:0 auto;cursor:crosshair"></canvas>
     </div>
     <div style="padding:12px 14px 30px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="visor-btn" id="vfCalReiniciar">↺ Empezar de nuevo</button>
+      <button class="vf-btn" id="vfCalReiniciar">↺ Empezar de nuevo</button>
       <input id="vfCalMm" type="number" step="0.1" min="1" placeholder="mm reales" style="width:120px;font-size:13px" disabled>
-      <button class="visor-btn" id="vfCalGuardar" style="background:var(--primary);color:#fff" disabled>Guardar escala</button>
+      <button class="vf-btn vf-btn-primario" id="vfCalGuardar" disabled>Guardar escala</button>
       <div style="flex:1 1 100%;font-size:11.5px;opacity:.5;line-height:1.55;margin-top:4px">
         La referencia tiene que estar a la misma distancia de la cámara que la cara.
         Un objeto sostenido más adelante sale más grande y toda la escala queda corrida.
@@ -706,7 +1204,7 @@ function vfCalibrar() {
     const mm = Number(capa.querySelector("#vfCalMm").value);
     const distPx = vfDist(puntos[0], puntos[1], img.naturalWidth, img.naturalHeight);
     if (!Number.isFinite(mm) || mm <= 0 || distPx < 5) {
-      alert("Revisá el valor en milímetros y que los dos puntos no estén encima.");
+      vfAviso("Revisá el valor en mm y que los dos puntos no estén encima.", "ambar");
       return;
     }
     const calibracion = {
@@ -716,15 +1214,14 @@ function vfCalibrar() {
     };
     try {
       await api(`/medico/estudios/${a.vista.estudio._id}/visor`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ calibracion }),
       });
     } catch { /* se muestra igual en esta sesión */ }
     a.vista.estudio.calibracion = calibracion;
-    vf.calibracion = calibracion;
     capa.remove();
     vfPintar();
+    vfAviso("Escala guardada. Ahora las medidas salen en milímetros.");
   };
 
   pintar();

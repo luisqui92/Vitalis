@@ -194,7 +194,9 @@ async function s25CargarVista(entrada) {
   await new Promise((ok, mal) => { img.onload = ok; img.onerror = mal; img.src = url; });
 
   const vista = {
-    ...entrada, img,
+    // La url se guarda además de la imagen: la consola pone miniaturas con
+    // <img src>, y sin esto salían todas negras.
+    ...entrada, img, url,
     modo: "sinMarcar",
     malla: s25MallaPlana(),
   };
@@ -225,6 +227,9 @@ async function s25CargarVista(entrada) {
     vista.modo = "auto";
     vista.landmarks = landmarks;
     vista.base = base;
+    // Se guarda el propio FaceLandmarker porque el mapa anatómico y el de
+    // simetría lo piden para volver a derivar sus regiones.
+    vista.FaceLandmarker = FaceLandmarker;
     vista.marco = sfMarcoDeLaCara(landmarks, base);
     vista.grupos = sfGruposAnatomicos(landmarks, base, vista.marco);
     vista.malla = sfArmarMalla(landmarks);
@@ -245,12 +250,12 @@ function s25MallaPlana() {
 }
 
 // ═══ LOS VÉRTICES DE UNA VISTA, YA DEFORMADOS Y ENCUADRADOS ════════════════
-function s25Vertices(vista, valores, ref) {
+function s25Vertices(vista, valores, ref, recorte, verOriginal) {
   const malla = vista.malla;
   const n = malla.cantidadCara;
   let desp = null;
 
-  if (!s25.verOriginal && n > 0) {
+  if (!verOriginal && n > 0) {
     if (vista.modo === "auto") {
       desp = sfDesplazamientos(valores, vista.landmarks, vista.base, vista.marco, vista.grupos);
     } else if (vista.modo === "perfil") {
@@ -261,7 +266,7 @@ function s25Vertices(vista, valores, ref) {
   }
 
   const { s, dx, dy } = s25Encuadre(vista, ref);
-  const r = s25.recorte;
+  const r = recorte;
   const anchoR = r.x1 - r.x0, altoR = r.y1 - r.y0;
   const verts = new Float32Array(malla.puntos.length * 2);
   for (let i = 0; i < malla.puntos.length; i++) {
@@ -273,18 +278,34 @@ function s25Vertices(vista, valores, ref) {
   return verts;
 }
 
-// ═══ EL GIRO ═══════════════════════════════════════════════════════════════
+// ═══ EL MOTOR DEL GIRO ═════════════════════════════════════════════════════
+// Vive aparte de la pantalla que lo usa: lo dibuja igual el simulador a
+// pantalla completa que el visor embebido de la consola. Tener dos copias de
+// esto era garantía de que una de las dos se quedara vieja.
+function s25Motor(canvas, vistas, ref) {
+  const ctx = s25IniciarGL(canvas);
+  for (const v of vistas) v.tex = s25Textura(ctx, v.img);
+  return {
+    ctx, vistas, ref,
+    recorte: s25RectoComun(vistas, ref),
+    // Devuelve cuál vista quedó al frente, que es lo que la interfaz necesita
+    // saber para poder nombrarla y avisar si no está marcada.
+    render(grados, valores, verOriginal) {
+      return s25RenderEn(this, grados, valores, verOriginal);
+    },
+  };
+}
+
 // Entre dos vistas reales se funde de una a la otra. No se interpola la
 // geometría: no hay información para saber cómo se ve la cara a 22°, y
 // fabricarla sería exactamente el error del que venimos.
-function s25RenderGiro() {
-  const { ctx, vistas, valores, ref } = s25;
+function s25RenderEn(motor, g, valores, verOriginal) {
+  const { ctx, vistas, ref, recorte } = motor;
   const gl = ctx.gl;
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0.043, 0.043, 0.059, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  const g = s25.grados;
   let antes = vistas[0], despues = vistas[vistas.length - 1];
   for (const v of vistas) {
     if (v.grados <= g && v.grados >= antes.grados) antes = v;
@@ -307,12 +328,18 @@ function s25RenderGiro() {
     t = u * u * (3 - 2 * u);
   }
 
-  s25Dibujar(ctx, antes.tex, s25Vertices(antes, valores, ref), antes.malla.uvs, antes.malla.indices, 1);
+  s25Dibujar(ctx, antes.tex, s25Vertices(antes, valores, ref, recorte, verOriginal),
+             antes.malla.uvs, antes.malla.indices, 1);
   if (t > 0.001) {
-    s25Dibujar(ctx, despues.tex, s25Vertices(despues, valores, ref), despues.malla.uvs, despues.malla.indices, t);
+    s25Dibujar(ctx, despues.tex, s25Vertices(despues, valores, ref, recorte, verOriginal),
+               despues.malla.uvs, despues.malla.indices, t);
   }
+  return t < 0.5 ? antes : despues;
+}
 
-  s25.vistaActual = t < 0.5 ? antes : despues;
+// La pantalla completa: dibuja con el motor y después acomoda su propio pie.
+function s25RenderGiro() {
+  s25.vistaActual = s25.motor.render(s25.grados, s25.valores, s25.verOriginal);
   s25ActualizarPie();
 }
 
@@ -330,48 +357,29 @@ function s25ActualizarPie() {
   }
 }
 
-// ═══ LA PANTALLA ═══════════════════════════════════════════════════════════
-async function abrirSimulador25D(pacienteId, estudios) {
-  const capa = document.createElement("div");
-  capa.id = "simulador25d";
-  capa.style.cssText = "position:fixed;inset:0;background:#16161c;z-index:9600;overflow-y:auto";
-  capa.innerHTML = `<div class="loading" style="margin:80px auto;color:#eee"><div class="spinner"></div>Cargando las vistas...</div>`;
-  document.body.appendChild(capa);
-  document.body.style.overflow = "hidden";
-
+// ═══ CARGA DEL JUEGO DE VISTAS ═════════════════════════════════════════════
+// Aparte de la pantalla, porque la consola de Vitalis Face carga exactamente
+// lo mismo y no tiene por qué repetirlo.
+async function s25CargarVistas(estudios, avisar) {
   // Una foto por ángulo: si hay varias del mismo ángulo se toma la más
   // reciente, que en una ficha de estética es la del control más nuevo.
   const porAngulo = new Map();
   for (const e of estudios) {
     if (e.tipo !== "foto" || !e.anguloFoto) continue;
-    const def = S25_VISTAS.find(v => v.angulo === e.anguloFoto);
-    if (!def) continue;
+    if (!S25_VISTAS.some(v => v.angulo === e.anguloFoto)) continue;
     const previo = porAngulo.get(e.anguloFoto);
     if (!previo || new Date(e.fecha) > new Date(previo.fecha)) porAngulo.set(e.anguloFoto, e);
   }
-
   const entradas = S25_VISTAS
     .filter(v => porAngulo.has(v.angulo))
     .map(v => ({ ...v, estudio: porAngulo.get(v.angulo) }));
 
-  if (entradas.length < 2) {
-    capa.innerHTML = s25ErrorHtml(
-      "Para girar hacen falta al menos dos vistas. Subí las fotos con su ángulo "
-      + "(frontal, 45° y perfil de cada lado) y volvé a entrar.");
-    s25EngancharCerrar(capa);
-    return;
-  }
-
   const vistas = [];
   for (const e of entradas) {
+    if (avisar) avisar(`Cargando ${e.label.toLowerCase()}...`);
     const blob = await traerBlobEstudio(e.estudio._id);
     if (!blob) continue;
     vistas.push(await s25CargarVista({ ...e, blob, estudioId: e.estudio._id }));
-  }
-  if (!vistas.length) {
-    capa.innerHTML = s25ErrorHtml("No se pudieron cargar las fotos.");
-    s25EngancharCerrar(capa);
-    return;
   }
 
   // El encuadre de referencia sale de la vista de más al centro que se haya
@@ -385,9 +393,33 @@ async function abrirSimulador25D(pacienteId, estudios) {
     alto: Math.abs(base.ancla.menton.y - base.ancla.punta.y),
   } : null;
 
+  return { vistas, ref };
+}
+
+function s25LiberarVistas(vistas) {
+  for (const v of vistas || []) if (v.url) URL.revokeObjectURL(v.url);
+}
+
+// ═══ LA PANTALLA ═══════════════════════════════════════════════════════════
+async function abrirSimulador25D(pacienteId, estudios) {
+  const capa = document.createElement("div");
+  capa.id = "simulador25d";
+  capa.style.cssText = "position:fixed;inset:0;background:#16161c;z-index:9600;overflow-y:auto";
+  capa.innerHTML = `<div class="loading" style="margin:80px auto;color:#eee"><div class="spinner"></div>Cargando las vistas...</div>`;
+  document.body.appendChild(capa);
+  document.body.style.overflow = "hidden";
+
+  const { vistas, ref } = await s25CargarVistas(estudios);
+  if (vistas.length < 2) {
+    capa.innerHTML = s25ErrorHtml(
+      "Para girar hacen falta al menos dos vistas. Subí las fotos con su ángulo "
+      + "(frontal, 45° y perfil de cada lado) y volvé a entrar.");
+    s25EngancharCerrar(capa);
+    return;
+  }
+
   s25 = {
     capa, pacienteId, vistas, ref,
-    recorte: s25RectoComun(vistas, ref),
     grados: vistas.some(v => v.grados === 0) ? 0 : vistas[0].grados,
     valores: Object.fromEntries(SF_CONTROLES.map(c => [c.id, 0])),
     verOriginal: false,
@@ -420,7 +452,7 @@ function s25Pintar() {
   // El lienzo toma el tamaño del recorte común sobre la vista de referencia,
   // para que los píxeles no queden estirados en ningún eje.
   const refImg = (vistas.find(v => v.esReferencia) || vistas[0]).img;
-  const rec = s25.recorte;
+  const rec = s25.motor ? s25.motor.recorte : s25RectoComun(vistas, s25.ref);
   const lienzoW = Math.max(16, Math.round(refImg.naturalWidth * (rec.x1 - rec.x0)));
   const lienzoH = Math.max(16, Math.round(refImg.naturalHeight * (rec.y1 - rec.y0)));
   const porGrupo = {};
@@ -500,13 +532,13 @@ function s25Pintar() {
   canvas.width = lienzoW;
   canvas.height = lienzoH;
   try {
-    s25.ctx = s25IniciarGL(canvas);
+    s25.motor = s25Motor(canvas, s25.vistas, s25.ref);
+    s25.ctx = s25.motor.ctx; // lo usa el exportador del PNG
   } catch (e) {
     capa.innerHTML = s25ErrorHtml("Este navegador no puede mostrar la simulación: " + e.message);
     s25EngancharCerrar(capa);
     return;
   }
-  for (const v of s25.vistas) v.tex = s25Textura(s25.ctx, v.img);
 
   const giro = capa.querySelector("#s25Giro");
   const aplicarGiro = (g) => {
@@ -578,8 +610,8 @@ function s25MarcarVistaActual() {
     s25GuardarMarcado(vista);
     vista.ancla = s25Ancla(vista);
     // Marcar una vista le da un ancla que antes no tenía: el rectángulo que
-    // todas cubren cambia y hay que recalcularlo.
-    s25.recorte = s25RectoComun(s25.vistas, s25.ref);
+    // todas cubren cambia. s25Pintar rearma el motor entero, que lo recalcula.
+    s25.motor = null;
     s25.grados = guardado.grados;
     s25.valores = guardado.valores;
     s25Pintar();
