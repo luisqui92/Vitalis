@@ -371,7 +371,16 @@ function wireTabEstudios(p, estudios) {
     finally { btn25d.disabled = false; btn25d.textContent = antes; }
   };
   const btnFace = document.getElementById("btnFaceConsola");
-  if (btnFace) btnFace.onclick = () => vfAbrirConsola(p._id);
+  if (btnFace) {
+    btnFace.onclick = () => vfAbrirConsola(p._id);
+    // El detector facial son 5 MB comprimidos. Se empieza a bajar apenas se
+    // abre la pestaña, no cuando el médico hace clic: para cuando decide
+    // entrar, ya suele estar. Si no llega a tiempo no pasa nada, es la misma
+    // espera de antes.
+    if (typeof cargarFaceLandmarker === "function") {
+      setTimeout(() => { try { cargarFaceLandmarker(); } catch {} }, 400);
+    }
+  }
   document.querySelectorAll("[data-mapa-facial]").forEach(btn => {
     btn.onclick = async (ev) => {
       ev.stopPropagation();

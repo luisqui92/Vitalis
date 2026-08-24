@@ -5,6 +5,7 @@ const path = require("path");
 const http = require("http");
 const express = require("express");
 const helmet = require("helmet");
+const { servirComprimidos, prepararEnSegundoPlano } = require("./services/estaticosComprimidos");
 const app = express();
 
 const { CONFIG, log, validateConfig } = require("./config");
@@ -109,11 +110,30 @@ require("./routes/push")(app);
 require("./routes/asistenteVitalis")(app);
 require("./routes/backup")(app);
 
+// Los .br se generan una vez, en segundo plano, para no demorar el arranque.
+// Mientras no estén se sirven los originales: nada se rompe.
+prepararEnSegundoPlano([path.join(__dirname, "public", "vendor")]);
+
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
 
 // ─── ESTÁTICOS + LA APP ───────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
+// Antes de express.static: si el navegador acepta brotli y existe el .br
+// precomprimido, se manda ese. El detector facial de Vitalis Face son 13 MB
+// —9 de WebAssembly— y sin esto son 45 segundos de spinner en la primera
+// carga; comprimido son 5,4 MB. Ver services/estaticosComprimidos.js.
+const PUBLICO = path.join(__dirname, "public");
+app.use(servirComprimidos(PUBLICO, { inmutables: ["/vendor/", "/fonts/"] }));
+app.use(express.static(PUBLICO, {
+  maxAge: "5m",
+  setHeaders(res, ruta) {
+    // El modelo, el wasm y las tipografías no cambian nunca: se guardan un
+    // año en vez de revalidarse cada cinco minutos.
+    if (/[\\/](vendor|fonts)[\\/]/.test(ruta)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  },
+}));
 // Vitalis Veterinaria vive en /veterinaria como landing propia (mismo
 // frontend/SPA de siempre — el JS detecta la ruta y ajusta marca/tema/
 // registro antes incluso de loguearse; ver public/js/auth.js y estado.js).

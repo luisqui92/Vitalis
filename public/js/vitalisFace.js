@@ -177,6 +177,47 @@ function vfProporciones(lm, base, marco, grupos, w, h) {
   };
 }
 
+// ═══ CALIBRACIÓN POR EL IRIS ═══════════════════════════════════════════════
+// La pregunta obvia es: ¿y el sistema no puede sacar los milímetros solo?
+// De una foto suelta, no: no hay escala. Pero SÍ hay una regla escondida en
+// la cara, y es el iris.
+//
+// El diámetro horizontal del iris visible mide 11,7 mm de promedio en un
+// adulto, con una desviación de medio milímetro, y —a diferencia de casi
+// cualquier otra medida del cuerpo— no cambia con la estatura, ni con el
+// sexo, ni con el grupo étnico. Es tan constante que la optometría la usa
+// justamente como referencia. El modelo de MediaPipe devuelve 478 puntos y
+// los últimos diez son los dos iris: el diámetro en píxeles sale de ahí.
+//
+// Qué NO es: una medición. Es una estimación con un error conocido de
+// alrededor del 4%, que en un ancho facial de 130 mm son unos 5 mm. Sirve
+// para tener una escala razonable sin pedirle a nadie que sostenga una
+// regla; no sirve para decidir milímetros finos de una cirugía. La pantalla
+// lo dice con esas palabras.
+const VF_IRIS_MM = 11.7;
+
+// Índices del modelo: 468 centro y 469-472 borde del iris derecho;
+// 473 centro y 474-477 del izquierdo. El borde va derecha, arriba,
+// izquierda, abajo.
+function vfDiametroIris(lm, w, h) {
+  if (!lm || lm.length < 478) return null;
+  // Se usa el diámetro HORIZONTAL a propósito: los párpados tapan el iris
+  // por arriba y por abajo, y la medida vertical sale corta. Por eso la
+  // referencia clínica se llama "diámetro horizontal del iris visible".
+  const horizontal = (der, izq) => vfDist(lm[der], lm[izq], w, h);
+  const d1 = horizontal(469, 471);
+  const d2 = horizontal(474, 476);
+  if (!(d1 > 0) || !(d2 > 0)) return null;
+  return {
+    px: (d1 + d2) / 2,
+    derecho: d1,
+    izquierdo: d2,
+    // Si los dos iris miden muy distinto, la cara está girada o uno está
+    // tapado, y la estimación no vale. Mejor decirlo que promediar basura.
+    discrepancia: Math.abs(d1 - d2) / ((d1 + d2) / 2),
+  };
+}
+
 // ═══ SIMETRÍA ══════════════════════════════════════════════════════════════
 // Un número, no un semáforo: la diferencia media entre cada punto y su
 // espejo respecto de la línea media, como porcentaje del ancho de la cara.
@@ -275,10 +316,20 @@ async function vfAbrirConsola(pacienteId) {
   capa.innerHTML = `<div class="vf-cargando">
     <div class="spinner"></div>
     <div id="vfPaso">Cargando la ficha...</div>
+    <div id="vfPasoNota" class="vf-nota" style="max-width:360px;text-align:center;display:none">
+      La primera vez hay que bajar el detector facial: son 5 MB y quedan guardados
+      en el navegador. Las siguientes veces abre al instante.
+    </div>
   </div>`;
   document.body.appendChild(capa);
   document.body.style.overflow = "hidden";
   const paso = (t) => { const e = capa.querySelector("#vfPaso"); if (e) e.textContent = t; };
+  // Si a los tres segundos seguimos cargando, es la descarga del modelo:
+  // explicarlo evita que parezca que el sistema se colgó.
+  const avisoDescarga = setTimeout(() => {
+    const n = capa.querySelector("#vfPasoNota");
+    if (n) n.style.display = "";
+  }, 3000);
 
   let datos, tratamientos = [];
   try {
@@ -314,6 +365,7 @@ async function vfAbrirConsola(pacienteId) {
       vista: auto, w, h,
       prop: vfProporciones(auto.landmarks, auto.base, auto.marco, auto.grupos, w, h),
       sim: vfSimetria(auto.landmarks, auto.base, auto.marco, w, h),
+      iris: vfDiametroIris(auto.landmarks, w, h),
     };
   }
 
@@ -333,6 +385,7 @@ async function vfAbrirConsola(pacienteId) {
     vistaActual: null,
     motor: null,
   };
+  clearTimeout(avisoDescarga);
   vfRecalcularAngulos();
   vfPintar();
 }
@@ -669,15 +722,32 @@ function vfBloqueMilimetrosHtml() {
   const a = vf.analisis;
   const cal = a.vista.estudio.calibracion;
   if (!cal || !cal.mmPorPixel) {
+    const iris = a.iris;
+    const irisSirve = iris && iris.discrepancia < 0.15;
     return `
       <p class="vf-nota">
-        Todavía no hay milímetros, y no los va a haber inventados. Una foto no trae escala:
-        la misma nariz, de cerca y de lejos, ocupa distinta cantidad de píxeles.
+        Todavía no hay milímetros. Una foto no trae escala: la misma nariz, de cerca y de
+        lejos, ocupa distinta cantidad de píxeles. Hay dos maneras de darle una.
       </p>
-      <button class="vf-btn vf-btn-borde" id="vfCalibrar">📏 Calibrar con una referencia</button>
+      ${irisSirve ? `
+        <button class="vf-btn vf-btn-borde" id="vfCalibrarIris">👁 Estimar con el iris</button>
+        <p class="vf-nota">
+          El iris mide ${String(VF_IRIS_MM).replace(".", ",")} mm de ancho en un adulto y casi no varía —ni con la
+          estatura, ni con el sexo, ni con el grupo étnico—, así que sirve de regla.
+          Acá mide ${iris.px.toFixed(1)} px.
+          <b>Es una estimación con un error de alrededor del 4%</b>: en un ancho facial de
+          130 mm, unos 5 mm. Alcanza para tener una escala; no para decidir milímetros
+          finos de una cirugía.
+        </p>` : `
+        <p class="vf-nota">
+          ${iris ? "Los dos iris miden distinto en esta foto (la cara está girada o uno está tapado), "
+                 + "así que estimar con el iris daría una escala equivocada."
+                 : "En esta foto no se leen los dos iris, así que no se puede estimar con ellos."}
+        </p>`}
+      <button class="vf-btn vf-btn-borde" id="vfCalibrar">📏 Medir contra una referencia</button>
       <p class="vf-nota">
-        Sirve una regla, una tarjeta apoyada en la mejilla, o cualquier objeto de tamaño
-        conocido, siempre que esté a la misma distancia de la cámara que la cara.
+        Lo exacto: una regla, una tarjeta apoyada en la mejilla, o cualquier objeto de
+        tamaño conocido, siempre que esté a la misma distancia de la cámara que la cara.
       </p>`;
   }
   const mm = (px) => (px * cal.mmPorPixel).toFixed(1) + " mm";
@@ -699,6 +769,11 @@ function vfBloqueMilimetrosHtml() {
       </div>`).join("")}
     <p class="vf-nota">Calibrado con: ${esc(cal.referencia || "referencia manual")}.
       <a href="#" id="vfCalibrar">Volver a calibrar</a></p>
+    ${/iris/.test(cal.referencia || "") ? `
+      <div class="vf-callout">
+        Escala estimada con el iris: los números de arriba llevan un error de alrededor
+        del 4%. Para milímetros finos, medí contra una referencia de tamaño conocido.
+      </div>` : ""}
     <div class="vf-callout">
       Válido solo para lo que esté en el mismo plano que la referencia. Una cara es curva:
       lo que está más cerca de la cámara sale más grande.
@@ -1070,6 +1145,8 @@ function vfEnganchar() {
 
   const cal = capa.querySelector("#vfCalibrar");
   if (cal) cal.onclick = (ev) => { ev.preventDefault(); vfCalibrar(); };
+  const calIris = capa.querySelector("#vfCalibrarIris");
+  if (calIris) calIris.onclick = (ev) => { ev.preventDefault(); vfCalibrarConIris(); };
 
   const sim = capa.querySelector("#vfVerSimetria");
   if (sim) sim.onclick = vfVerSimetria;
@@ -1251,6 +1328,26 @@ async function vfGuardarVista() {
   }
   btn.disabled = false;
   btn.textContent = antes;
+}
+
+// Calibrar con el iris: un clic, sin objetos ni reglas.
+async function vfCalibrarConIris() {
+  const a = vf.analisis;
+  if (!a || !a.iris) return;
+  const calibracion = {
+    mmPorPixel: VF_IRIS_MM / a.iris.px,
+    referencia: `iris de ${VF_IRIS_MM} mm (estimación, ±4%) · ${a.iris.px.toFixed(1)} px en ${esc(a.vista.label)}`,
+    origen: "manual",
+  };
+  try {
+    await api(`/medico/estudios/${a.vista.estudio._id}/visor`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ calibracion }),
+    });
+  } catch { /* se muestra igual en esta sesión */ }
+  a.vista.estudio.calibracion = calibracion;
+  vfPintar();
+  vfAviso("Escala estimada con el iris. Es aproximada: ±4%.", "ambar");
 }
 
 // ═══ CALIBRACIÓN EN MILÍMETROS ═════════════════════════════════════════════
