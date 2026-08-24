@@ -236,6 +236,9 @@ const TABS_KARDEX_NEURO = {
   perfilNeuro: { icono: ICONOS.persona, label: "Perfil" },
   consultas: { icono: ICONOS.mic, label: "Sesiones" },
   objetivos: { icono: ICONOS.tendencia, label: "Objetivos" },
+  // ADOS-2, ADI-R, Vineland... Vitalis registra el resultado, nunca el
+  // instrumento: son propiedad de sus editoriales y requieren entrenamiento.
+  instrumentos: { icono: ICONOS.clipboard, label: "Instrumentos" },
   salud: { icono: ICONOS.jeringa, label: "Salud" },
   crecimiento: { icono: ICONOS.tendencia, label: "Crecimiento" },
   medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },

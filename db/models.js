@@ -861,6 +861,89 @@ const vigilanciaSaludSchema = new mongoose.Schema({
 vigilanciaSaludSchema.index({ pacienteId: 1, desdeMeses: 1 });
 const VigilanciaSalud = mongoose.model("VigilanciaSalud", vigilanciaSaludSchema);
 
+// ─── INSTRUMENTOS APLICADOS ───────────────────────────────────────────────
+// ADOS-2, ADI-R, CARS-2, Vineland, WISC... El diagnóstico de TEA no sale de
+// una charla: sale de instrumentos estandarizados, y hoy sus resultados
+// viven en un PDF adjunto o en una frase suelta de la evolución.
+//
+// UNA LÍNEA QUE NO SE CRUZA: Vitalis registra el RESULTADO, nunca el
+// instrumento. El ADOS-2 es propiedad de WPS —los ítems, las hojas de
+// codificación, el algoritmo y las tablas de conversión— y exige
+// calificación profesional y entrenamiento formal. Reproducir cualquiera de
+// esas partes acá sería una infracción de copyright y, peor, invitaría a
+// que alguien sin entrenamiento lo "aplique" leyendo una pantalla.
+//
+// Lo que se guarda es lo que el profesional produjo con SUS materiales y su
+// licencia: qué aplicó, cuándo, quién, qué le dio. Anotar que un paciente
+// puntuó X en una prueba no es reproducir la prueba, igual que anotar una
+// glucemia no es reproducir el laboratorio.
+//
+// Los puntajes van como lista abierta {nombre, valor} y no como campos
+// fijos: cada instrumento devuelve lo suyo, y calzar la estructura de uno
+// solo en el modelo sería empezar a copiarlo.
+const instrumentoAplicadoSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  instrumento: { type: String, required: true },   // "ADOS-2", "Vineland-3", "WISC-V"...
+  version: { type: String, default: "" },
+  // ADOS-2 tiene módulos (T, 1, 2, 3, 4) según lenguaje y edad; Vineland
+  // tiene formas; otros no tienen nada. Campo libre a propósito.
+  modulo: { type: String, default: "" },
+  fecha: { type: Date, required: true },
+  // Quién lo aplicó y con qué matrícula. En un instrumento que requiere
+  // entrenamiento, esto no es burocracia: es parte del resultado.
+  aplicadoPor: { type: String, default: "" },
+  matricula: { type: String, default: "" },
+  puntajes: {
+    type: [{
+      nombre: { type: String, required: true },  // "Total del algoritmo", "Puntaje de comparación"
+      valor: { type: String, required: true },   // texto y no número: hay puntajes que son rangos o percentiles
+      _id: false,
+    }],
+    default: [],
+  },
+  // Lo que el manual del instrumento arroja, tal cual. Texto libre porque
+  // cada uno usa sus propias categorías.
+  clasificacion: { type: String, default: "" },
+  // La lectura del profesional. Un instrumento no es un diagnóstico: el
+  // ADOS-2 es una observación estandarizada y se interpreta junto con la
+  // historia del desarrollo y el juicio clínico. Este campo es donde eso
+  // queda escrito, para que la clasificación no se lea sola.
+  interpretacion: { type: String, default: "" },
+  // Si el informe original vino en PDF, queda enganchado acá.
+  estudioId: { type: mongoose.Schema.Types.ObjectId, ref: "Estudio", default: null },
+}, { timestamps: true });
+instrumentoAplicadoSchema.index({ pacienteId: 1, fecha: -1 });
+const InstrumentoAplicado = mongoose.model("InstrumentoAplicado", instrumentoAplicadoSchema);
+
+// Catálogo de ayuda para la pantalla: los nombres de los instrumentos y de
+// los puntajes que devuelven. Nombrar un instrumento y decir qué campos
+// arroja es descriptivo y está publicado en toda la literatura — no son ni
+// los ítems ni el algoritmo ni los puntos de corte, que son justamente lo
+// que no puede estar acá.
+const INSTRUMENTOS_NEURO = [
+  { nombre: "ADOS-2", modulos: ["T", "1", "2", "3", "4"],
+    puntajes: ["Total del algoritmo", "Puntaje de comparación (1-10)"],
+    nota: "Requiere entrenamiento formal. Es una observación estandarizada: se interpreta junto con la historia del desarrollo, no sola." },
+  { nombre: "ADI-R", modulos: [],
+    puntajes: ["Interacción social recíproca", "Comunicación", "Conductas restringidas y repetitivas", "Edad de inicio"],
+    nota: "Entrevista al cuidador. Complementa al ADOS-2 con la historia del desarrollo." },
+  { nombre: "CARS-2", modulos: ["ST", "HF"], puntajes: ["Puntaje total"], nota: "" },
+  { nombre: "SCQ", modulos: ["Vida entera", "Actual"], puntajes: ["Puntaje total"], nota: "Cuestionario de tamizaje, no diagnóstico." },
+  { nombre: "SRS-2", modulos: [], puntajes: ["Puntaje T total"], nota: "" },
+  { nombre: "M-CHAT-R/F", modulos: [], puntajes: ["Puntaje total", "Nivel de riesgo"],
+    nota: "Tamizaje entre los 16 y 30 meses. Un resultado positivo indica derivar a evaluación, no diagnostica." },
+  { nombre: "Vineland-3", modulos: ["Entrevista", "Padres/cuidadores", "Docente"],
+    puntajes: ["Conducta adaptativa (compuesto)", "Comunicación", "Habilidades de la vida diaria", "Socialización", "Motricidad"], nota: "" },
+  { nombre: "WISC-V", modulos: [], puntajes: ["CI total", "Comprensión verbal", "Visoespacial", "Razonamiento fluido", "Memoria de trabajo", "Velocidad de procesamiento"], nota: "" },
+  { nombre: "WPPSI-IV", modulos: [], puntajes: ["CI total"], nota: "" },
+  { nombre: "Bayley-4", modulos: [], puntajes: ["Cognitiva", "Lenguaje", "Motora", "Socioemocional", "Conducta adaptativa"], nota: "" },
+  { nombre: "Battelle-2", modulos: [], puntajes: ["Cociente de desarrollo total"], nota: "" },
+  { nombre: "Conners-4", modulos: ["Padres", "Docente", "Autoinforme"], puntajes: ["Inatención", "Hiperactividad/impulsividad"], nota: "" },
+  { nombre: "PEP-3", modulos: [], puntajes: ["Comunicación", "Motricidad", "Conductas desadaptativas"], nota: "" },
+  { nombre: "Otro", modulos: [], puntajes: [], nota: "" },
+];
+
 
 // ═══ INFORMES CON MEMBRETE ════════════════════════════════════════════════
 // El informe ES el producto que vende un centro de imagen: el paciente no
@@ -1078,5 +1161,5 @@ module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medici
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
-  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, Membrete, Informe,
+  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, Informe,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO };

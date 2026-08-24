@@ -26,7 +26,7 @@ const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const {
   Medico, Paciente, ConsultaMedica, Medicion,
-  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud,
+  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado,
 } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 const { PLANTILLAS_VIGILANCIA } = require("../services/vigilancia");
@@ -106,6 +106,19 @@ const PACIENTES = [
       },
     ],
     vigilancia: "tea",
+    instrumentos: [
+      { instrumento: "M-CHAT-R/F", dias: 700, puntajes: [["Puntaje total", "9"], ["Nivel de riesgo", "Alto"]],
+        clasificacion: "Riesgo alto — derivar a evaluación diagnóstica",
+        interpretacion: "Tamizaje en el control de los 2 años. Se deriva a evaluación; no diagnostica por sí solo." },
+      { instrumento: "ADOS-2", modulo: "1", dias: 430,
+        puntajes: [["Total del algoritmo", "17"], ["Puntaje de comparación (1-10)", "8"]],
+        clasificacion: "Autismo",
+        interpretacion: "Observación consistente con TEA. Se interpreta junto con la entrevista de desarrollo (ADI-R) y la observación en el jardín, no de forma aislada." },
+      { instrumento: "ADI-R", dias: 420,
+        puntajes: [["Interacción social recíproca", "18"], ["Comunicación", "13"], ["Conductas restringidas y repetitivas", "6"], ["Edad de inicio", "4"]],
+        clasificacion: "Compatible con TEA en los cuatro dominios",
+        interpretacion: "La historia del desarrollo relatada por la madre coincide con lo observado en el ADOS-2." },
+    ],
     sesiones: [
       { dias: 7, duracion: 2700, motivo: "Sesión individual — comunicación funcional",
         texto: "Hoy trabajamos el tablero de pedidos. Mateo señaló agua nueve de diez veces sin que le tocara la mano, que es la primera vez que pasa. La mamá cuenta que en casa lo pidió solo dos veces esta semana, una de ellas sin que nadie estuviera mirando. Seguimos con el mismo criterio dos semanas más antes de agregar un segundo pictograma. Le dije a Carla que no le adelante el vaso cuando lo ve mirar la heladera: si se lo damos antes de que pida, le sacamos la oportunidad.",
@@ -179,6 +192,19 @@ const PACIENTES = [
       },
     ],
     vigilancia: "tea",
+    instrumentos: [
+      { instrumento: "ADOS-2", modulo: "3", dias: 400,
+        puntajes: [["Total del algoritmo", "9"], ["Puntaje de comparación (1-10)", "5"]],
+        clasificacion: "Espectro autista",
+        interpretacion: "Puntaje más bajo que el de un perfil clásico, algo esperable en niñas con lenguaje fluido y estrategias de camuflaje. NO descarta el diagnóstico: se sostiene con la historia del desarrollo y con lo que reporta la escuela." },
+      { instrumento: "SRS-2", dias: 395, puntajes: [["Puntaje T total", "68"]],
+        clasificacion: "Moderado",
+        interpretacion: "Informe de la madre. La docente puntuó más bajo, cosa frecuente: en el aula compensa y el costo lo paga en casa." },
+      { instrumento: "WISC-V", dias: 200,
+        puntajes: [["CI total", "112"], ["Comprensión verbal", "124"], ["Visoespacial", "108"], ["Razonamiento fluido", "115"], ["Memoria de trabajo", "95"], ["Velocidad de procesamiento", "88"]],
+        clasificacion: "Capacidad intelectual promedio alto, con perfil disarmónico",
+        interpretacion: "La diferencia entre comprensión verbal y velocidad de procesamiento explica por qué termina tarde las evaluaciones aunque sepa el contenido. Fundamenta el pedido de tiempo adicional." },
+    ],
     sesiones: [
       { dias: 10, duracion: 3000, motivo: "Sesión individual + reunión con la escuela",
         texto: "Reunión con la maestra y la directora. Tuve que explicar de nuevo que el hecho de que Sofía saque las mejores notas no significa que no necesite apoyo: lo que le cuesta no es la matemática, es el recreo. La directora preguntó si no estaba exagerando el diagnóstico porque la nena habla perfecto. Le mostré la diferencia entre los dos ejes. Quedamos en que la tarjeta de descanso se respeta sin pedir explicaciones, y que la avisen de los cambios de horario el día anterior.",
@@ -256,6 +282,12 @@ const PACIENTES = [
       { nombre: /cardiol/i, dias: 120, resultado: "Post-quirúrgico sin secuelas. Control anual." },
       { nombre: /tiroide/i, dias: 400, resultado: "TSH y T4 normales." },
     ],
+    instrumentos: [
+      { instrumento: "Bayley-4", dias: 120,
+        puntajes: [["Cognitiva", "78"], ["Lenguaje", "71"], ["Motora", "69"], ["Socioemocional", "92"]],
+        clasificacion: "Retraso del desarrollo en las áreas motora y de lenguaje",
+        interpretacion: "El área socioemocional es la más conservada y es por donde conviene entrar. La audiometría está pendiente: sin ella, el puntaje de lenguaje no se puede interpretar del todo." },
+    ],
     sesiones: [
       { dias: 14, duracion: 2400, motivo: "Sesión de estimulación + revisión del calendario de salud",
         texto: "Emilia caminó ocho pasos sola hacia la mamá y las dos nos pusimos a aplaudir. Repasamos el calendario de controles: el ecocardiograma está al día y la tiroides también, pero la audiometría está vencida hace casi un año y la evaluación oftalmológica nunca se hizo. Le expliqué a Daniela que en síndrome de Down la hipoacusia es muy frecuente y que si Emilia no escucha bien vamos a estar trabajando lenguaje contra una pared. Sale con las dos órdenes.",
@@ -323,6 +355,16 @@ const PACIENTES = [
       { nombre: /audiometr|audi/i, dias: 200, resultado: "Hipoacusia conductiva leve bilateral. Control en 6 meses." },
       { nombre: /oftalm|visi/i, dias: 300, resultado: "Astigmatismo. Usa anteojos." },
     ],
+    instrumentos: [
+      { instrumento: "ADOS-2", modulo: "1", dias: 250,
+        puntajes: [["Total del algoritmo", "20"], ["Puntaje de comparación (1-10)", "9"]],
+        clasificacion: "Autismo",
+        interpretacion: "Aplicado recién a los 5 años. Durante tres años la rigidez y las conductas repetitivas se habían atribuido al síndrome de Down — el llamado eclipsamiento diagnóstico." },
+      { instrumento: "Vineland-3", modulo: "Entrevista", dias: 240,
+        puntajes: [["Conducta adaptativa (compuesto)", "52"], ["Comunicación", "45"], ["Habilidades de la vida diaria", "58"], ["Socialización", "50"], ["Motricidad", "61"]],
+        clasificacion: "Nivel bajo",
+        interpretacion: "Se usa como línea de base para medir los apoyos, no como etiqueta. Se reaplica en 12 meses." },
+    ],
     sesiones: [
       { dias: 12, duracion: 2700, motivo: "Sesión individual — comunicación aumentativa",
         texto: "Luana entregó el pictograma de agua siete veces de diez, que es la primera vez que llega al criterio. Le comenté al papá que esto no es poco: hasta hace tres meses había que ponerle la mano encima cada vez. Marcelo preguntó cuándo va a hablar. Le dije la verdad, que no lo sé, y que mientras tanto el tablero no le va a quitar el habla — al revés, todo lo que sabemos dice que la comunicación aumentativa favorece el lenguaje oral, no lo frena. Se quedó más tranquilo.",
@@ -387,6 +429,17 @@ const PACIENTES = [
       },
     ],
     vigilancia: null,
+    instrumentos: [
+      { instrumento: "Conners-4", modulo: "Padres", dias: 300, puntajes: [["Inatención", "T 76"], ["Hiperactividad/impulsividad", "T 71"]],
+        clasificacion: "Elevado en ambas escalas", interpretacion: "" },
+      { instrumento: "Conners-4", modulo: "Docente", dias: 298, puntajes: [["Inatención", "T 72"], ["Hiperactividad/impulsividad", "T 74"]],
+        clasificacion: "Elevado en ambas escalas",
+        interpretacion: "Coincidencia entre casa y escuela: se cumple el criterio de presencia en más de un ámbito." },
+      { instrumento: "WISC-V", dias: 280,
+        puntajes: [["CI total", "97"], ["Memoria de trabajo", "79"], ["Velocidad de procesamiento", "85"]],
+        clasificacion: "Capacidad promedio con memoria de trabajo descendida",
+        interpretacion: "No hay discapacidad intelectual. Lo que falla es la memoria de trabajo, y eso explica que se pierda con consignas de tres pasos." },
+    ],
     sesiones: [
       { dias: 9, duracion: 2700, motivo: "Sesión individual + orientación a la familia",
         texto: "Thiago llegó contando que lo sacaron del aula otra vez. Cuando le pregunté qué había pasado no pudo armar la explicación, se enredó y terminó diciendo que no importaba. Eso es exactamente el problema del lenguaje expresivo, no falta de ganas: no puede contar su versión y entonces siempre queda como el culpable. Trabajamos un guion corto para explicar lo que pasó. A Vanessa le pedí que en casa no le pregunte '¿por qué hiciste eso?', que es una pregunta que él no puede contestar, y que use '¿qué pasó primero?'.",
@@ -455,6 +508,12 @@ const PACIENTES = [
       },
     ],
     vigilancia: "tea",
+    instrumentos: [
+      { instrumento: "ADOS-2", modulo: "4", dias: 800,
+        puntajes: [["Total del algoritmo", "8"], ["Puntaje de comparación (1-10)", "4"]],
+        clasificacion: "Espectro autista",
+        interpretacion: "Diagnosticado a los 11, tarde. Buen nivel de lenguaje formal, dificultad en reciprocidad e interpretación de intenciones." },
+    ],
     sesiones: [
       { dias: 6, duracion: 3000, motivo: "Sesión individual — autodefensa y adaptaciones",
         texto: "Benjamín le pidió solo al profesor de química rendir por escrito en vez de oral. Es la primera vez que gestiona una adaptación sin que la madre escriba por él. Le pregunté cómo se sintió y dijo que le costó pero que fue más rápido que explicárselo a la mamá para que ella lo explicara. Hablamos de a quién le cuenta que es autista y a quién no, y le insistí en que eso es decisión suya y de nadie más. Está yendo al club de robótica y ahí habla con dos chicos.",
@@ -588,6 +647,25 @@ async function crearPaciente(medicoPhone, d) {
     });
   }
 
+  // ─── Instrumentos aplicados ────────────────────────────────────────────
+  // Vitalis registra el RESULTADO, no el instrumento: el ADOS-2 y la mayoría
+  // de estos son propiedad de sus editoriales y requieren entrenamiento
+  // formal. Lo que se guarda es lo que la profesional obtuvo con sus propios
+  // materiales, igual que se guarda una glucemia sin ser el laboratorio.
+  for (const i of d.instrumentos || []) {
+    await InstrumentoAplicado.create({
+      pacienteId: paciente._id, medicoPhone,
+      instrumento: i.instrumento,
+      modulo: i.modulo || "",
+      fecha: haceDias(i.dias),
+      aplicadoPor: "Lic. Fernanda Suárez",
+      matricula: "PSI-4471",
+      puntajes: (i.puntajes || []).map(([nombre, valor]) => ({ nombre, valor })),
+      clasificacion: i.clasificacion || "",
+      interpretacion: i.interpretacion || "",
+    });
+  }
+
   // ─── Medidas, para que las curvas de crecimiento muestren algo ─────────
   for (const m of d.medidas || []) {
     for (const [dias, valor] of m.valores) {
@@ -599,7 +677,8 @@ async function crearPaciente(medicoPhone, d) {
   }
 
   const cuantos = (d.objetivos || []).length;
-  console.log(`   ✓ ${d.nombre} (${paciente.codigo}) — ${d.perfil.condiciones.join(" + ")} · ${cuantos} objetivo${cuantos === 1 ? "" : "s"}${d.vigilancia ? " · calendario de salud" : ""}`);
+  const instr = (d.instrumentos || []).length;
+  console.log(`   ✓ ${d.nombre} (${paciente.codigo}) — ${d.perfil.condiciones.join(" + ")} · ${cuantos} objetivo${cuantos === 1 ? "" : "s"}${instr ? ` · ${instr} instrumento${instr === 1 ? "" : "s"}` : ""}${d.vigilancia ? " · calendario de salud" : ""}`);
   return paciente;
 }
 

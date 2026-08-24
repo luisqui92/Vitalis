@@ -94,6 +94,7 @@ require("./routes/estudios")(app);
 require("./routes/rayos")(app);
 require("./routes/cajaDicom")(app);
 require("./routes/neurodesarrollo")(app);
+require("./routes/instrumentos")(app);
 require("./routes/informes")(app);
 require("./routes/memoriaClinica")(app);
 require("./routes/recetas")(app);
