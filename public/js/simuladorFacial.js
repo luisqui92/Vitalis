@@ -14,14 +14,15 @@
 //
 // ─── LOS DOS LÍMITES QUE HAY QUE SABER ───────────────────────────────────
 //
-// 1. LA ROTACIÓN LLEGA HASTA ±20°, y no es un defecto de implementación.
-//    MediaPipe da una profundidad aproximada por sfDot, suficiente para
-//    inclinar la foto un poco. Más allá de eso aparece lo que la cámara
-//    nunca vio: no hay píxeles de lo que estaba detrás de la nariz. Para
-//    ver el perfil hace falta una FOTO de perfil. Por eso el simulador
-//    trabaja sobre el juego estándar de fotos (frente, tres cuartos y
-//    perfil) y cada una se simula por separado — que además es como se
-//    hace una consulta de verdad.
+// 1. ACÁ NO SE GIRA. Hubo un control de rotación de ±20° apoyado en la
+//    profundidad aproximada que da MediaPipe, y estaba mal de raíz: la
+//    malla se tríangula en la proyección 2D de la foto, así que al rotarla
+//    los triángulos se cruzan entre sí. En una frontal casi no se notaba;
+//    en una foto de 45° —la mitad del protocolo— la cara salía hecha
+//    tiras. Y aunque la malla aguantara, no hay píxeles de lo que estaba
+//    detrás de la nariz: la cámara nunca los vio.
+//    El giro de verdad está en simulador25d.js, donde cada ángulo es una
+//    FOTO real del paciente y no hay nada que inventar.
 //
 // 2. LOS SF_CONTROLES TIENEN TOPE, a propósito. Una herramienta que te deja
 //    arrastrar la nariz a cualquier lado produce imágenes que ningún
@@ -411,7 +412,7 @@ function sfArmarMalla(lm) {
   const tris = sfTriangular(puntos);
   const indices = new Uint16Array(tris.flat());
   const uvs = new Float32Array(puntos.flatMap(p => [p.x, p.y]));
-  return { puntos, indices, uvs, cantidadCara: base.length };
+  return { puntos, indices, uvs, cantidadCara: base.length, cantidadMarco: marco.length };
 }
 
 // ═══ LA PANTALLA ══════════════════════════════════════════════════════════
@@ -458,7 +459,6 @@ async function abrirSimuladorFacial(fotoBlob, { estudioId = null, pacienteId = n
   simu = {
     capa, img, landmarks, base, marco, grupos, malla,
     valores: Object.fromEntries(SF_CONTROLES.map(c => [c.id, 0])),
-    giro: 0,
     verOriginal: false,
     estudioId, pacienteId, nombreFoto,
   };
@@ -474,7 +474,6 @@ function sfArrancarPerfil(marcados) {
   simu.malla = malla;
   simu.marcados = marcados;
   simu.valores = Object.fromEntries(SF_CONTROLES_PERFIL.map(c => [c.id, 0]));
-  simu.giro = 0;
   simu.verOriginal = false;
   pintarSimulador();
 }
@@ -534,14 +533,11 @@ function pintarSimulador() {
           profundidad para rotar, y girarla sería inventar.
           <a href="#" id="sfVolverAMarcar" style="color:var(--primary)">Corregir los puntos</a>
         </div>` : `
-        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px;margin-bottom:14px">
-          <span style="opacity:.7;width:64px">Girar</span>
-          <input type="range" id="simuGiro" min="-20" max="20" step="1" value="${simu.giro}">
-          <span id="simuGiroVal" style="opacity:.7;width:44px;text-align:right">${simu.giro}°</span>
-        </div>
-        <div style="font-size:11.5px;opacity:.6;margin:-8px 0 16px;line-height:1.5">
-          El giro llega hasta 20° porque más allá aparecería lo que la cámara nunca vio.
-          Para ver el perfil hace falta una foto de perfil, y se simula aparte.
+        <div style="font-size:11.5px;opacity:.6;margin:0 0 16px;line-height:1.5">
+          Esta pantalla trabaja sobre una sola foto y no gira: una foto no trae
+          profundidad, y girarla obliga a inventar el relieve — en una foto de
+          costado la cara se rompe. Para girar están las cinco vistas, en
+          <b>Simulación 2.5D</b>, donde cada ángulo es una foto real.
           Si esta foto está de costado, conviene
           <a href="#" id="sfMarcarAMano" style="color:var(--primary)">marcar el perfil a mano</a>:
           el detector automático mira de frente.
@@ -609,13 +605,6 @@ function pintarSimulador() {
     sfPantallaMarcado(capa, img, (m) => sfArrancarPerfil(m), simu.marcados);
   };
 
-  const giro = capa.querySelector("#simuGiro");
-  if (giro) giro.oninput = () => {
-    simu.giro = Number(giro.value);
-    capa.querySelector("#simuGiroVal").textContent = simu.giro + "°";
-    renderSimulador();
-  };
-
   const btnComparar = capa.querySelector("#simuComparar");
   const mostrar = (orig) => {
     simu.verOriginal = orig;
@@ -632,7 +621,6 @@ function pintarSimulador() {
 
   capa.querySelector("#simuReset").onclick = () => {
     for (const c of controles) simu.valores[c.id] = 0;
-    simu.giro = 0;
     pintarSimulador();
   };
 
@@ -642,7 +630,7 @@ function pintarSimulador() {
 }
 
 function renderSimulador() {
-  const { gl, malla, valores, giro, img } = simu;
+  const { gl, malla, valores, img } = simu;
   const esPerfil = simu.modo === "perfil";
   const n = malla.cantidadCara;
 
@@ -665,7 +653,10 @@ function renderSimulador() {
     ? { x: malla.contorno[Math.floor(malla.contorno.length / 2)].x, y: malla.contorno[Math.floor(malla.contorno.length / 2)].y }
     : { x: simu.marco.centro.x, y: simu.marco.centro.y };
   const aspecto = img.naturalHeight / img.naturalWidth;
-  sfDibujar(gl, verts, malla.uvs, malla.indices, simu.verOriginal || esPerfil ? 0 : giro, centro, aspecto);
+  // El giro va siempre en 0: rotar una foto sola obliga a inventar el
+  // relieve y en una vista de costado la malla se cruza consigo misma. El
+  // giro de verdad está en el 2.5D, donde cada ángulo es una foto real.
+  sfDibujar(gl, verts, malla.uvs, malla.indices, 0, centro, aspecto);
 
   const et = simu.capa.querySelector("#simuEtiqueta");
   if (et) et.textContent = simu.verOriginal ? "ORIGINAL" : "SIMULADO";
@@ -679,9 +670,16 @@ function exportarSimulacionPng() {
   const salida = document.createElement("canvas");
   salida.width = img.naturalWidth;
   salida.height = img.naturalHeight;
-  const ctx = salida.getContext("2d");
-  ctx.drawImage(gl.gl.canvas, 0, 0);
+  salida.getContext("2d").drawImage(gl.gl.canvas, 0, 0);
+  sfSelloEnLienzo(salida);
+  return new Promise(res => salida.toBlob(res, "image/png"));
+}
 
+// El sello, aparte, porque lo queman los dos simuladores —el de una foto y
+// el de las cinco vistas— y una marca que dependa de cuál de los dos exportó
+// es una marca que algún día no se pone.
+function sfSelloEnLienzo(salida) {
+  const ctx = salida.getContext("2d");
   const texto = "SIMULACIÓN — NO ES UNA PROMESA DE RESULTADO";
   const tipografia = (px) => `600 ${px}px system-ui, sans-serif`;
   ctx.textAlign = "center";
@@ -705,8 +703,6 @@ function exportarSimulacionPng() {
   ctx.fillRect((salida.width - ancho) / 2 - alto * 0.5, y - alto * 1.15, ancho + alto, alto * 1.5);
   ctx.fillStyle = "#fff";
   ctx.fillText(texto, salida.width / 2, y);
-
-  return new Promise(res => salida.toBlob(res, "image/png"));
 }
 
 async function guardarSimulacion() {
@@ -869,6 +865,7 @@ function sfMallaPerfil(marcados, aspecto) {
   return {
     puntos, contorno, normales, alto, signo,
     cantidadContorno: contorno.length,
+    cantidadMarco: marco.length,
     indices: new Uint16Array(tris.flat()),
     uvs: new Float32Array(puntos.flatMap(p => [p.x, p.y])),
     cantidadCara: contorno.length,

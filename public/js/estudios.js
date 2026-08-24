@@ -49,7 +49,21 @@ function angulosFotoActivos() { return MEDICO_TIPO_ESPECIALIDAD === "estetica" ?
 
 function tabEstudiosHtml(estudios) {
   const hayFotos = estudios.some(e => e.tipo === "foto" && e.anguloFoto);
+  // El 2.5D necesita al menos dos ángulos distintos: con una sola foto no
+  // hay nada que recorrer, y el simulador de una foto ya la cubre.
+  const angulos25d = new Set(estudios
+    .filter(e => e.tipo === "foto" && S25_VISTAS.some(v => v.angulo === e.anguloFoto))
+    .map(e => e.anguloFoto));
   return `
+    ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && angulos25d.size >= 2 ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="seccion-titulo" style="margin-top:0">Simulación 2.5D</div>
+      <div class="hint" style="margin:0 0 10px">
+        ${angulos25d.size} vistas cargadas. Girá entre ellas y mirá la misma
+        cirugía desde cada ángulo — cada posición es una foto real del paciente.
+      </div>
+      <button class="item-action" id="btn25d">🔄 Girar las ${angulos25d.size} vistas</button>
+    </div>` : ""}
     ${bloqueCapturaHtml()}
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">Subir estudio</div>
@@ -347,6 +361,14 @@ function wireTabEstudios(p, estudios) {
       });
     };
   });
+  const btn25d = document.getElementById("btn25d");
+  if (btn25d) btn25d.onclick = async () => {
+    btn25d.disabled = true;
+    const antes = btn25d.textContent;
+    btn25d.textContent = "Cargando las vistas...";
+    try { await abrirSimulador25D(p._id, estudios); }
+    finally { btn25d.disabled = false; btn25d.textContent = antes; }
+  };
   document.querySelectorAll("[data-mapa-facial]").forEach(btn => {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
