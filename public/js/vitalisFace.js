@@ -373,6 +373,8 @@ async function vfAbrirConsola(pacienteId) {
     capa, pacienteId, paciente: datos.paciente || {}, estudios, vistas, ref, tratamientos,
     analisis,
     zona: "cara",
+    acercar: true,
+    aumento: 1,
     grados: vistas.some(v => v.grados === 0) ? 0 : vistas[0].grados,
     valores: Object.fromEntries(SF_CONTROLES.map(c => [c.id, 0])),
     verOriginal: false,
@@ -539,6 +541,7 @@ function vfPintar() {
         <section class="vf-visor-caja">
           <div class="vf-barra">
             <div class="vf-barra-grupo">
+              <button class="vf-chip" id="vfBtnAcercar">🔍 Acercar a la zona</button>
               <button class="vf-chip" id="vfBtnLandmarks">◦ Puntos</button>
               <button class="vf-chip" id="vfBtnSimular">✨ Simular</button>
               <button class="vf-chip" id="vfBtnComparar">👁 Ver original</button>
@@ -780,6 +783,109 @@ function vfBloqueMilimetrosHtml() {
     </div>`;
 }
 
+// ═══ ACERCARSE A UNA ZONA ══════════════════════════════════════════════════
+// Elegir "Mentón" tiene que llevar la vista al mentón: mirar una foto entera
+// mientras se lee el ángulo mentolabial es pedirle al médico que haga el
+// zoom con los ojos.
+//
+// El acercamiento tiene un tope, y el tope lo pone la foto. Ampliar más allá
+// de la resolución que hay no muestra más detalle: muestra el mismo detalle
+// más borroso, con pinta de precisión que no existe. Cuando se llega a ese
+// punto, la pantalla lo dice.
+const VF_AUMENTO_MAX = 2.4;
+
+// Qué puntos definen cada zona, en la vista que se esté mirando.
+function vfPuntosZona(vista, zona) {
+  if (vista.modo === "auto" && vista.landmarks) {
+    const b = vista.base, g = vista.grupos, lm = vista.landmarks;
+    const idx = {
+      cara: b.ovalo,
+      nariz: [...g.dorso, ...g.punta, ...g.alas],
+      ojos: [...b.ojo_izquierdo, ...b.ojo_derecho, ...b.ceja_izquierda, ...b.ceja_derecha],
+      labios: b.labios,
+      menton: [...g.menton, ...g.mandibula],
+      pomulos: g.pomulos,
+    }[zona];
+    return idx && idx.length ? idx.map(i => lm[i]) : null;
+  }
+  if (vista.modo === "perfil" && vista.marcados) {
+    const i = SF_IDX_PERFIL, m = vista.marcados;
+    const tramo = (a, b) => m.slice(Math.min(i[a], i[b]), Math.max(i[a], i[b]) + 1);
+    const por = {
+      cara: m,
+      nariz: tramo("nasion", "subnasal"),
+      labios: tramo("subnasal", "surco"),
+      menton: tramo("surco", "gnation"),
+    }[zona];
+    // De perfil no hay ojos ni pómulos marcados: no se inventa un recuadro.
+    return por && por.length ? por : null;
+  }
+  return null;
+}
+
+// El rectángulo del lienzo que hay que mostrar para ver esa zona.
+// Devuelve null cuando corresponde ver la foto entera.
+//
+// El recuadro NO se fuerza a la forma del lienzo: es al revés, el lienzo
+// toma la forma del recuadro. Forzarlo al revés fue el primer intento y
+// fallaba justo donde importaba — los ojos son anchos y bajos, y metidos en
+// una tira vertical el recuadro se desbordaba y volvía a mostrar la cara
+// entera.
+function vfEncuadreZona(vista, zona) {
+  if (!vf.motor || zona === "cara") return null;
+  const puntos = vfPuntosZona(vista, zona);
+  if (!puntos || puntos.length < 2) return null;
+
+  const caja = puntos.reduce((c, p) => {
+    const q = vfDeLaVistaAlLienzo(p, vista, true);
+    return { x0: Math.min(c.x0, q.u), y0: Math.min(c.y0, q.v),
+             x1: Math.max(c.x1, q.u), y1: Math.max(c.y1, q.v) };
+  }, { x0: 1, y0: 1, x1: 0, y1: 0 });
+
+  // Aire alrededor: una zona pegada al borde del recuadro no se puede leer
+  // en contexto, y en una cara el contexto es la mitad del juicio clínico.
+  const margen = 0.6;
+  const cx = (caja.x0 + caja.x1) / 2, cy = (caja.y0 + caja.y1) / 2;
+  let ancho = Math.max(0.08, (caja.x1 - caja.x0) * (1 + margen));
+  let alto = Math.max(0.08, (caja.y1 - caja.y0) * (1 + margen));
+
+  // El tope lo pone la foto: el recuadro no puede tener menos píxeles de
+  // origen que los que el visor va a mostrar, dividido el aumento que se
+  // acepta. Más allá de eso se agranda el grano, no el detalle.
+  const fuente = vfPixelesDelRecorte();
+  const caja2 = vf.capa.querySelector("#vfVisor").getBoundingClientRect();
+  const minAncho = Math.min(1, (caja2.width / VF_AUMENTO_MAX) / fuente.w);
+  const minAlto = Math.min(1, (caja2.height / VF_AUMENTO_MAX) / fuente.h);
+  if (ancho < minAncho) ancho = minAncho;
+  if (alto < minAlto) alto = minAlto;
+
+  ancho = Math.min(1, ancho);
+  alto = Math.min(1, alto);
+  const x0 = Math.max(0, Math.min(1 - ancho, cx - ancho / 2));
+  const y0 = Math.max(0, Math.min(1 - alto, cy - alto / 2));
+
+  // Si el recuadro terminó siendo casi toda la foto, no vale la pena: se
+  // deja la vista entera en vez de un "zoom" de 1,05x que solo desconcierta.
+  if (ancho > 0.92 && alto > 0.92) return null;
+
+  return {
+    x0, y0, x1: x0 + ancho, y1: y0 + alto,
+    // Píxeles de origen que abarca, para dimensionar el lienzo.
+    pxAncho: Math.round(ancho * fuente.w),
+    pxAlto: Math.round(alto * fuente.h),
+  };
+}
+
+// Cuántos píxeles de la foto original abarca el recorte común.
+function vfPixelesDelRecorte() {
+  const r = vf.motor.recorte;
+  const img = (vf.vistas.find(v => v.esReferencia) || vf.vistas[0]).img;
+  return {
+    w: Math.max(16, Math.round(img.naturalWidth * (r.x1 - r.x0))),
+    h: Math.max(16, Math.round(img.naturalHeight * (r.y1 - r.y0))),
+  };
+}
+
 // ═══ EL VISOR ══════════════════════════════════════════════════════════════
 function vfMontarVisor() {
   const { capa, vistas, ref } = vf;
@@ -830,15 +936,69 @@ function vfAjustarCapaDibujo() {
 function vfRender() {
   if (!vf.motor) return;
   const valores = vf.simulando ? vf.valores : Object.fromEntries(SF_CONTROLES.map(c => [c.id, 0]));
-  vf.vistaActual = vf.motor.render(vf.grados, valores, vf.verOriginal);
+
+  // El encuadre se recalcula en cada cuadro porque la zona se mueve al girar:
+  // el mentón de la frontal no está donde el mentón del perfil.
+  vf.motor.encuadre = null;
+  const provisional = vf.motor.render(vf.grados, valores, vf.verOriginal);
+
+  const lienzo = vf.capa.querySelector("#vfLienzo");
+  const fuente = vfPixelesDelRecorte();
+  const enc = vf.acercar ? vfEncuadreZona(provisional, vf.zona) : null;
+  // El lienzo toma el tamaño en píxeles ORIGINALES de lo que va a mostrar:
+  // así no se pierde detalle al acercarse ni se gasta memoria de más.
+  const w = enc ? enc.pxAncho : fuente.w;
+  const h = enc ? enc.pxAlto : fuente.h;
+  if (lienzo.width !== w || lienzo.height !== h) {
+    lienzo.width = w; lienzo.height = h;
+    lienzo.style.maxWidth = w + "px";
+    vfAjustarCapaDibujo();
+  }
+  vf.motor.encuadre = enc;
+  vf.fuenteVisible = { w, h, completa: fuente };
+  vf.motor.render(vf.grados, valores, vf.verOriginal);
+  vf.vistaActual = provisional;
   vfDibujarCapa();
   vfActualizarPie();
+}
+
+// El aumento se mide DESPUÉS de que el navegador reacomodó: el lienzo acaba
+// de cambiar de tamaño y preguntarle su caja en el mismo instante devuelve la
+// anterior. Por eso el nombre de la vista se completa en el cuadro siguiente.
+function vfMedirAumento() {
+  const f = vf.fuenteVisible;
+  const visor = vf.capa && vf.capa.querySelector("#vfVisor");
+  if (!f || !visor) return { aumento: 1, alTope: false };
+  const caja = visor.getBoundingClientRect();
+  if (caja.width < 2) return { aumento: 1, alTope: false };
+  const escala = (w, h) => Math.min(caja.width / w, caja.height / h);
+  const ahora = escala(f.w, f.h);
+  const completa = escala(f.completa.w, f.completa.h);
+  return {
+    // Cuánto más grande se ve la cara que mirando la foto entera.
+    aumento: completa > 0 ? ahora / completa : 1,
+    // Y si se está estirando más allá de los píxeles que hay.
+    alTope: ahora >= VF_AUMENTO_MAX - 0.05,
+  };
 }
 
 function vfActualizarPie() {
   const v = vf.vistaActual;
   const nom = vf.capa.querySelector("#vfNombreVista");
-  if (nom) nom.textContent = v ? v.label : "";
+  if (nom) {
+    nom.textContent = v ? v.label : "";
+    requestAnimationFrame(() => {
+      if (!vf || !nom.isConnected) return;
+      const m = vfMedirAumento();
+      vf.aumento = m.aumento;
+      const zoom = vf.acercar && m.aumento > 1.05 ? ` · ${m.aumento.toFixed(1)}×` : "";
+      // "Tope de la foto" significa que se acabó la resolución, no que el
+      // programa no pueda acercar más. Decirlo evita que alguien saque
+      // conclusiones de un pixelado.
+      const tope = vf.acercar && m.alTope ? " · tope de la foto" : "";
+      nom.textContent = (v ? v.label : "") + zoom + tope;
+    });
+  }
   const et = vf.capa.querySelector("#vfEtiqueta");
   if (et) {
     et.textContent = vf.verOriginal ? "ORIGINAL" : (vf.simulando ? "SIMULADO" : "");
@@ -880,17 +1040,21 @@ function vfActualizarPie() {
 function vfDelLienzoALaVista(u, v, vista) {
   const r = vf.motor.recorte;
   const { s, dx, dy } = s25Encuadre(vista, vf.ref);
-  const xRef = r.x0 + u * (r.x1 - r.x0);
-  const yRef = r.y0 + v * (r.y1 - r.y0);
+  const e = vf.motor.encuadre;
+  const uu = e ? e.x0 + u * (e.x1 - e.x0) : u;
+  const vv = e ? e.y0 + v * (e.y1 - e.y0) : v;
+  const xRef = r.x0 + uu * (r.x1 - r.x0);
+  const yRef = r.y0 + vv * (r.y1 - r.y0);
   return { x: (xRef - dx) / s, y: (yRef - dy) / s };
 }
-function vfDeLaVistaAlLienzo(p, vista) {
+function vfDeLaVistaAlLienzo(p, vista, sinEncuadre) {
   const r = vf.motor.recorte;
   const { s, dx, dy } = s25Encuadre(vista, vf.ref);
-  return {
-    u: (p.x * s + dx - r.x0) / (r.x1 - r.x0),
-    v: (p.y * s + dy - r.y0) / (r.y1 - r.y0),
-  };
+  const u = (p.x * s + dx - r.x0) / (r.x1 - r.x0);
+  const v = (p.y * s + dy - r.y0) / (r.y1 - r.y0);
+  const e = sinEncuadre ? null : vf.motor.encuadre;
+  if (!e) return { u, v };
+  return { u: (u - e.x0) / (e.x1 - e.x0), v: (v - e.y0) / (e.y1 - e.y0) };
 }
 
 // El contorno denso del perfil marcado: los mismos puntos que deforma la
@@ -1058,6 +1222,14 @@ function vfEnganchar() {
     vf.zona = b.dataset.zona;
     vfPintar();
   });
+
+  const btnA = capa.querySelector("#vfBtnAcercar");
+  btnA.classList.toggle("vf-chip-activo", vf.acercar);
+  btnA.onclick = () => {
+    vf.acercar = !vf.acercar;
+    btnA.classList.toggle("vf-chip-activo", vf.acercar);
+    vfRender();
+  };
 
   const btnL = capa.querySelector("#vfBtnLandmarks");
   btnL.onclick = () => {

@@ -287,7 +287,12 @@ function s25MallaPlana() {
 }
 
 // ═══ LOS VÉRTICES DE UNA VISTA, YA DEFORMADOS Y ENCUADRADOS ════════════════
-function s25Vertices(vista, valores, ref, recorte, verOriginal) {
+// El "encuadre" es un recorte de segundo nivel: sobre el recorte común de
+// todas las vistas, se puede pedir mirar solo una parte —la nariz, el
+// mentón— y que ocupe el lienzo entero. Va acá y no en CSS porque tiene que
+// aplicarse a los vértices: si se hiciera con transform, las mediciones y
+// las anotaciones quedarían corridas respecto de la foto.
+function s25Vertices(vista, valores, ref, recorte, verOriginal, encuadre) {
   const malla = vista.malla;
   const n = malla.cantidadCara;
   let desp = null;
@@ -305,12 +310,16 @@ function s25Vertices(vista, valores, ref, recorte, verOriginal) {
   const { s, dx, dy } = s25Encuadre(vista, ref);
   const r = recorte;
   const anchoR = r.x1 - r.x0, altoR = r.y1 - r.y0;
+  const e = encuadre || { x0: 0, y0: 0, x1: 1, y1: 1 };
+  const anchoE = e.x1 - e.x0, altoE = e.y1 - e.y0;
   const verts = new Float32Array(malla.puntos.length * 2);
   for (let i = 0; i < malla.puntos.length; i++) {
     const p = malla.puntos[i];
     const d = desp && i < n ? desp[i] : null;
-    verts[i * 2]     = ((p.x + (d ? d.x : 0)) * s + dx - r.x0) / anchoR;
-    verts[i * 2 + 1] = ((p.y + (d ? d.y : 0)) * s + dy - r.y0) / altoR;
+    const x = ((p.x + (d ? d.x : 0)) * s + dx - r.x0) / anchoR;
+    const y = ((p.y + (d ? d.y : 0)) * s + dy - r.y0) / altoR;
+    verts[i * 2]     = (x - e.x0) / anchoE;
+    verts[i * 2 + 1] = (y - e.y0) / altoE;
   }
   return verts;
 }
@@ -327,6 +336,8 @@ function s25Motor(canvas, vistas, ref) {
     recorte: s25RectoComun(vistas, ref),
     // Devuelve cuál vista quedó al frente, que es lo que la interfaz necesita
     // saber para poder nombrarla y avisar si no está marcada.
+    // encuadre: opcional, para acercarse a una zona de la cara.
+    encuadre: null,
     render(grados, valores, verOriginal) {
       return s25RenderEn(this, grados, valores, verOriginal);
     },
@@ -365,10 +376,11 @@ function s25RenderEn(motor, g, valores, verOriginal) {
     t = u * u * (3 - 2 * u);
   }
 
-  s25Dibujar(ctx, antes.tex, s25Vertices(antes, valores, ref, recorte, verOriginal),
+  const enc = motor.encuadre;
+  s25Dibujar(ctx, antes.tex, s25Vertices(antes, valores, ref, recorte, verOriginal, enc),
              antes.malla.uvs, antes.malla.indices, 1);
   if (t > 0.001) {
-    s25Dibujar(ctx, despues.tex, s25Vertices(despues, valores, ref, recorte, verOriginal),
+    s25Dibujar(ctx, despues.tex, s25Vertices(despues, valores, ref, recorte, verOriginal, enc),
                despues.malla.uvs, despues.malla.indices, t);
   }
   return t < 0.5 ? antes : despues;
