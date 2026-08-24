@@ -63,6 +63,7 @@ function tabEstudiosHtml(estudios) {
         cirugía desde cada ángulo — cada posición es una foto real del paciente.
       </div>
       <button class="item-action" id="btn25d">🔄 Girar las ${angulos25d.size} vistas</button>
+      <button class="item-action" id="btnFaceConsola" style="margin-top:8px">🧠 Abrir Vitalis Face — análisis completo</button>
     </div>` : ""}
     ${bloqueCapturaHtml()}
     <div class="card">
@@ -369,6 +370,8 @@ function wireTabEstudios(p, estudios) {
     try { await abrirSimulador25D(p._id, estudios); }
     finally { btn25d.disabled = false; btn25d.textContent = antes; }
   };
+  const btnFace = document.getElementById("btnFaceConsola");
+  if (btnFace) btnFace.onclick = () => vfAbrirConsola(p._id);
   document.querySelectorAll("[data-mapa-facial]").forEach(btn => {
     btn.onclick = async (ev) => {
       ev.stopPropagation();

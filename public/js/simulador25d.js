@@ -138,7 +138,8 @@ function s25Ancla(vista) {
     return { punta: prom(g.punta), menton: { x: vista.marco.menton.x, y: vista.marco.menton.y } };
   }
   if (vista.marcados) {
-    return { punta: { ...vista.marcados[3] }, menton: { ...vista.marcados[9] } };
+    return { punta: { ...vista.marcados[SF_IDX_PERFIL.punta] },
+             menton: { ...vista.marcados[SF_IDX_PERFIL.gnation] } };
   }
   return null;
 }
@@ -198,8 +199,26 @@ async function s25CargarVista(entrada) {
     malla: s25MallaPlana(),
   };
 
+  // Si esta vista ya se marcó alguna vez —acá o en la consola— se usa lo
+  // guardado y no se le vuelven a pedir los clics.
+  const guardado = entrada.estudio && entrada.estudio.perfilMarcado;
+  const hayMarcado = Array.isArray(guardado) && guardado.length === SF_PUNTOS_PERFIL.length;
+  const usarMarcado = () => {
+    vista.marcados = guardado.map(p => ({ x: p.x, y: p.y }));
+    vista.malla = sfMallaPerfil(vista.marcados, img.naturalHeight / img.naturalWidth);
+    vista.modo = "perfil";
+    vista.ancla = s25Ancla(vista);
+    return vista;
+  };
+  // En un perfil, lo que marcó el cirujano gana sobre el detector y ni
+  // siquiera se lo consulta: el detector necesita ver los dos ojos, y lo que
+  // devuelve en un perfil cerrado —cuando devuelve algo— es peor que diez
+  // clics de alguien que sabe dónde está el rinion.
+  if (hayMarcado && Math.abs(entrada.grados) === 90) return usarMarcado();
+
   let deteccion = null;
   try { deteccion = await detectarEnImagen(img); } catch { deteccion = null; }
+  if (!deteccion && hayMarcado) return usarMarcado();
   if (deteccion) {
     const { FaceLandmarker, landmarks } = deteccion;
     const base = regionesBase(FaceLandmarker);
@@ -444,7 +463,7 @@ function s25Pintar() {
 
       <div id="s25Aviso" style="display:none;font-size:11.5px;background:#2a2410;border:1px solid #574a19;color:#e8d9a8;padding:8px 10px;border-radius:8px;margin-bottom:14px;line-height:1.5">
         La vista <b></b> todavía no está marcada: se ve la foto original, sin la simulación encima.
-        <a href="#" id="s25Marcar" style="color:#ffd76e">Marcarla ahora</a> — son 10 clics sobre el contorno.
+        <a href="#" id="s25Marcar" style="color:#ffd76e">Marcarla ahora</a> — son ${SF_PUNTOS_PERFIL.length} clics sobre el contorno.
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
@@ -556,6 +575,7 @@ function s25MarcarVistaActual() {
     vista.malla = sfMallaPerfil(marcados, aspecto);
     vista.marcados = marcados;
     vista.modo = "perfil";
+    s25GuardarMarcado(vista);
     vista.ancla = s25Ancla(vista);
     // Marcar una vista le da un ancla que antes no tenía: el rectángulo que
     // todas cubren cambia y hay que recalcularlo.
@@ -564,6 +584,20 @@ function s25MarcarVistaActual() {
     s25.valores = guardado.valores;
     s25Pintar();
   }, vista.marcados);
+}
+
+// Marcar el perfil cuesta una decena de clics; se guardan para no volver a pedirlos
+// —y porque de esos puntos salen los ángulos del perfil que muestra la
+// consola. Si falla, no se interrumpe nada: la simulación en curso sigue.
+async function s25GuardarMarcado(vista) {
+  if (!vista.estudioId || !Array.isArray(vista.marcados)) return;
+  try {
+    await fetch(`${API}/medico/estudios/${vista.estudioId}/visor`, {
+      method: "PATCH",
+      headers: { Authorization: "Bearer " + TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ perfilMarcado: vista.marcados.map(p => ({ x: p.x, y: p.y })) }),
+    });
+  } catch { /* que no se pierda la sesión de trabajo por esto */ }
 }
 
 // ═══ EXPORTAR Y GUARDAR ════════════════════════════════════════════════════

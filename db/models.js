@@ -591,6 +591,15 @@ const estudioSchema = new mongoose.Schema({
     // olvide.
     planoDetector: { type: Boolean, default: false },
   },
+  // Vitalis Face: los diez puntos del perfil que el cirujano marcó a mano
+  // sobre esta foto, normalizados 0..1 (glabela, nasion, dorso, punta,
+  // subnasal, labio sup., labio inf., surco, pogonion, gnation).
+  //
+  // Se guardan porque marcarlos cuesta diez clics y porque de ellos salen los
+  // ángulos del perfil —nasofrontal, nasolabial, nasofacial—, que son los
+  // números que de verdad se miran en una rinoplastia y que no necesitan
+  // ninguna calibración para ser correctos.
+  perfilMarcado: { type: [{ x: Number, y: Number, _id: false }], default: [] },
   mediciones: {
     type: [{
       tipo: { type: String, enum: ["distancia", "angulo"], required: true },

@@ -129,6 +129,20 @@ module.exports = function (app) {
         : { mmPorPixel: null, mmPorPixelY: null, referencia: "", fecha: null, origen: "", planoDetector: false };
     }
 
+    // Los puntos del perfil marcados a mano (Vitalis Face). Se exige la lista
+    // COMPLETA: si falta uno, los índices se corren y el ángulo nasolabial
+    // pasa a calcularse sobre el labio equivocado — un número creíble y mal,
+    // que es la peor clase de número. El largo lo fija el cliente
+    // (SF_PUNTOS_PERFIL) y acá se acota a un rango sano.
+    if (req.body?.perfilMarcado !== undefined) {
+      const p = req.body.perfilMarcado;
+      const dentro = (n) => Number.isFinite(n) && n >= -0.2 && n <= 1.2;
+      estudio.perfilMarcado = Array.isArray(p) && p.length >= 8 && p.length <= 16
+        && p.every(q => dentro(Number(q?.x)) && dentro(Number(q?.y)))
+        ? p.map(q => ({ x: Number(q.x), y: Number(q.y) }))
+        : [];
+    }
+
     await estudio.save();
     registrar({ req, medicoPhone, accion: "editar_visor_estudio", recurso: `Estudio:${estudio._id}` });
     res.json({ ok: true, estudio });

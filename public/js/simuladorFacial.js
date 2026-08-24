@@ -753,6 +753,12 @@ const SF_PUNTOS_PERFIL = [
   { id: "nasion",   label: "Nasion",        ayuda: "El hundimiento entre la frente y la nariz" },
   { id: "rinion",   label: "Dorso",         ayuda: "La mitad del puente — sobre la giba, si la hay" },
   { id: "punta",    label: "Punta",         ayuda: "El punto más saliente de la punta" },
+  // La columela va aparte de la punta a propósito. El ángulo nasolabial —el
+  // número que define la rotación de la punta en una rinoplastia— se mide
+  // entre la COLUMELA y el labio, no entre la punta y el labio. Calculado
+  // desde la punta da entre 30° y 50° de más: un número creíble y mal, que
+  // es la peor clase de número.
+  { id: "columela", label: "Columela",      ayuda: "El borde de abajo de la columela, entre la punta y la base" },
   { id: "subnasal", label: "Subnasal",      ayuda: "Donde la base de la nariz se junta con el labio" },
   { id: "labioSup", label: "Labio superior" },
   { id: "labioInf", label: "Labio inferior" },
@@ -760,6 +766,10 @@ const SF_PUNTOS_PERFIL = [
   { id: "pogonion", label: "Pogonion",      ayuda: "Lo más saliente del mentón" },
   { id: "gnation",  label: "Gnation",       ayuda: "El punto más bajo del mentón" },
 ];
+
+// Los índices, por nombre: contarlos a mano en la lista es exactamente cómo
+// se rompe esto en silencio cuando se agrega un punto en el medio.
+const SF_IDX_PERFIL = Object.fromEntries(SF_PUNTOS_PERFIL.map((p, i) => [p.id, i]));
 
 // Qué tramo del contorno mueve cada control. Los índices son de la lista de
 // arriba: el tramo va del primero al segundo, con difuminado en los bordes
@@ -769,10 +779,10 @@ const SF_CONTROLES_PERFIL = [
     ayuda: "Bajar el puente. Es LA maniobra del perfil." },
   { id: "puntaProy",   label: "Proyección de la punta", grupo: "Nariz",  desde: 3, hasta: 4, max: 0.035,
     ayuda: "Cuánto sobresale la punta." },
-  { id: "puntaRot",    label: "Rotación de la punta",   grupo: "Nariz",  desde: 3, hasta: 5, max: 0.028, vertical: true, invertido: true,
+  { id: "puntaRot",    label: "Rotación de la punta",   grupo: "Nariz",  desde: 3, hasta: 6, max: 0.028, vertical: true, invertido: true,
     ayuda: "Levantar o bajar la punta — cambia el ángulo nasolabial." },
-  { id: "labiosPerfil",label: "Proyección de labios",   grupo: "Boca",   desde: 5, hasta: 7, max: 0.022 },
-  { id: "mentonPerfil",label: "Proyección del mentón",  grupo: "Mentón", desde: 7, hasta: 9, max: 0.045,
+  { id: "labiosPerfil",label: "Proyección de labios",   grupo: "Boca",   desde: 6, hasta: 8, max: 0.022 },
+  { id: "mentonPerfil",label: "Proyección del mentón",  grupo: "Mentón", desde: 8, hasta: 10, max: 0.045,
     ayuda: "Cambia el equilibrio del perfil más que casi cualquier otra cosa." },
 ];
 
@@ -807,8 +817,8 @@ function sfMallaPerfil(marcados, aspecto) {
   // ¿Para qué lado mira? La punta es el punto más extremo en horizontal
   // respecto de la línea frente-mentón. Con eso se sabe cuál es "afuera",
   // que es lo único que hace falta para orientar todas las normales.
-  const medioX = (marcados[0].x + marcados[8].x) / 2;
-  const signo = marcados[3].x < medioX ? -1 : 1;
+  const medioX = (marcados[0].x + marcados[SF_IDX_PERFIL.pogonion].x) / 2;
+  const signo = marcados[SF_IDX_PERFIL.punta].x < medioX ? -1 : 1;
 
   // Normal de cada punto: perpendicular a la tangente, apuntando afuera.
   // Se corrige por la relación de aspecto porque las coordenadas están
@@ -826,7 +836,8 @@ function sfMallaPerfil(marcados, aspecto) {
 
   // Alto del perfil, para escalar los desplazamientos igual que el ancho de
   // la cara escala los del modo frontal.
-  const alto = Math.hypot(marcados[9].x - marcados[0].x, (marcados[9].y - marcados[0].y) * aspecto);
+  const g = marcados[SF_IDX_PERFIL.gnation];
+  const alto = Math.hypot(g.x - marcados[0].x, (g.y - marcados[0].y) * aspecto);
 
   // La línea interior: el mismo contorno empujado hacia adentro. Queda FIJA,
   // y es lo que confina la deformación a una franja pegada al perfil en vez
@@ -917,7 +928,7 @@ function sfPantallaMarcado(capa, img, alTerminar, previos = []) {
     </div>
     <div class="hint" style="color:#bbb;background:#0f0f14;padding:0 14px 10px;margin:0;font-size:12.5px">
       El detector automático necesita ver los dos ojos, y en un perfil cerrado no puede.
-      Marcalo vos: son 10 clics y para el perfil sale mejor, porque vos sabés dónde está
+      Marcalo vos: son ${SF_PUNTOS_PERFIL.length} clics y para el perfil sale mejor, porque vos sabés dónde está
       cada punto y el modelo no.
     </div>
     <div style="position:relative;background:#0b0b0f;text-align:center">
@@ -968,7 +979,7 @@ function sfPantallaMarcado(capa, img, alTerminar, previos = []) {
       paso.innerHTML = `<b>${marcados.length + 1}/${SF_PUNTOS_PERFIL.length} · ${esc(p.label)}</b>${p.ayuda ? " — " + esc(p.ayuda) : ""}`;
       listo.style.display = "none";
     } else {
-      paso.innerHTML = "Los 10 puntos están. Podés corregir cualquiera arrastrándolo.";
+      paso.innerHTML = `Los ${SF_PUNTOS_PERFIL.length} puntos están. Podés corregir cualquiera arrastrándolo.`;
       listo.style.display = "";
     }
   }
