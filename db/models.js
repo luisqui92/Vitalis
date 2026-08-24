@@ -600,6 +600,20 @@ const estudioSchema = new mongoose.Schema({
   // números que de verdad se miran en una rinoplastia y que no necesitan
   // ninguna calibración para ser correctos.
   perfilMarcado: { type: [{ x: Number, y: Number, _id: false }], default: [] },
+  // Vitalis Face: anotaciones del médico sobre la foto, en coordenadas
+  // normalizadas 0..1. Van pegadas al estudio y no a la consulta porque lo
+  // que anotan es ESTA foto: "acá la asimetría del ala", "cicatriz previa".
+  // Al abrir la foto de nuevo —hoy, o en el control de los tres meses—
+  // tienen que seguir ahí.
+  anotaciones: {
+    type: [{
+      x: Number, y: Number,
+      texto: { type: String, default: "" },
+      fecha: { type: Date, default: Date.now },
+      _id: false,
+    }],
+    default: [],
+  },
   mediciones: {
     type: [{
       tipo: { type: String, enum: ["distancia", "angulo"], required: true },

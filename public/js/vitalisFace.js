@@ -380,10 +380,13 @@ async function vfAbrirConsola(pacienteId) {
     verOriginal: false,
     simulando: false,
     landmarks: false,
-    herramienta: null,      // null | "medir" | "anotar"
+    herramienta: null,      // null | "medir" | "contorno" | "anotar"
     puntosMedida: [],
     medidas: [],            // las que tomó el médico, de esta sesión
-    anotaciones: [],
+    // Las anotaciones SÍ se guardan: vienen del estudio y vuelven a él.
+    anotaciones: vistas.flatMap(v => (v.estudio.anotaciones || []).map(a => ({
+      x: a.x, y: a.y, texto: a.texto, fecha: a.fecha, angulo: v.grados,
+    }))),
     vistaActual: null,
     motor: null,
   };
@@ -412,6 +415,11 @@ function vfEngancharCerrar(capa) {
   capa.querySelectorAll("[data-cerrar-vf]").forEach(b => b.onclick = vfCerrarConsola);
 }
 function vfCerrarConsola() {
+  // El observador de tamaño sobrevive a la capa: al quitarla dispara una
+  // última vez, con vf ya en null, y revienta. Se corta antes.
+  if (vf && vf.observador) vf.observador.disconnect();
+  const editor = document.getElementById("vfEditorNota");
+  if (editor) editor.remove();
   if (vf) s25LiberarVistas(vf.vistas);
   const c = document.getElementById("vitalisFace");
   if (c) c.remove();
@@ -634,6 +642,23 @@ function vfPintar() {
               El detector necesita una frontal con los dos ojos visibles, sin lentes ni gorra.
             </p>
           </div>`}
+
+        ${vf.anotaciones.length ? `
+          <div class="vf-panel">
+            <div class="vf-panel-tit">Anotaciones</div>
+            ${vf.anotaciones.map((a, i) => `
+              <div class="vf-nota-item">
+                <div>
+                  <div class="vf-nota-texto">${esc(a.texto)}</div>
+                  <div class="vf-nota-meta">
+                    ${esc((vf.vistas.find(v => v.grados === a.angulo) || {}).label || "")}
+                    ${a.fecha ? " · " + new Date(a.fecha).toLocaleDateString("es-BO") : ""}
+                  </div>
+                </div>
+                <button class="vf-nota-borrar" data-borrar-nota="${i}" title="Borrar">✕</button>
+              </div>`).join("")}
+            <p class="vf-nota">Guardadas en la ficha del paciente, junto a la foto donde se marcaron.</p>
+          </div>` : ""}
 
         ${vf.medidas.length ? `
           <div class="vf-panel">
@@ -921,6 +946,7 @@ function vfMontarVisor() {
 // Tamaño de la capa de dibujo = tamaño en pantalla del lienzo, por la
 // densidad del display para que no salga borrosa.
 function vfAjustarCapaDibujo() {
+  if (!vf || !vf.capa) return;
   const lienzo = vf.capa.querySelector("#vfLienzo");
   const dibujo = vf.capa.querySelector("#vfCapaDibujo");
   if (!lienzo || !dibujo) return;
@@ -1091,6 +1117,7 @@ function vfLargoContorno(contorno, i, j, w, h) {
 }
 
 function vfDibujarCapa() {
+  if (!vf || !vf.capa) return;
   const c = vf.capa.querySelector("#vfCapaDibujo");
   if (!c || c.width < 2) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1293,11 +1320,19 @@ function vfEnganchar() {
   btnCont.disabled = !hayContorno;
   btnCont.title = hayContorno ? "" : "Hace falta un perfil marcado en esta vista";
 
-  capa.querySelector("#vfBtnLimpiar").onclick = () => {
-    const g = vf.vistaActual ? vf.vistaActual.grados : null;
+  capa.querySelectorAll("[data-borrar-nota]").forEach(b =>
+    b.onclick = () => vfBorrarAnotacion(Number(b.dataset.borrarNota)));
+
+  capa.querySelector("#vfBtnLimpiar").onclick = async () => {
+    const vista = vf.vistaActual;
+    const g = vista ? vista.grados : null;
     vf.medidas = vf.medidas.filter(m => m.angulo !== g);
-    vf.anotaciones = vf.anotaciones.filter(a => a.angulo !== g);
     vf.puntosMedida = [];
+    const habia = vf.anotaciones.some(a => a.angulo === g);
+    vf.anotaciones = vf.anotaciones.filter(a => a.angulo !== g);
+    // Limpiar borra también de la ficha: dejarlas guardadas mientras
+    // desaparecen de la pantalla sería la peor de las dos opciones.
+    if (habia && vista) await vfGuardarAnotaciones(vista);
     vfPintar();
   };
 
@@ -1334,8 +1369,7 @@ function vfClicHerramienta(ev) {
   const p = vfDelLienzoALaVista(u, v, vista);
 
   if (vf.herramienta === "anotar") {
-    vf.anotaciones.push({ ...p, angulo: vista.grados, texto: "Zona de interés" });
-    vfDibujarCapa();
+    vfEditorAnotacion(ev.clientX, ev.clientY, p, vista);
     return;
   }
 
@@ -1386,6 +1420,85 @@ function vfClicHerramienta(ev) {
   if (!(cal && cal.mmPorPixel)) {
     vfAviso("Sin calibrar: la medida va en % de la altura nariz–mentón, no en mm.", "ambar");
   }
+}
+
+// Un campito flotante donde se hizo clic. Antes la anotación decía siempre
+// "Zona de interés", que sirve para probar que el punto se dibuja y para
+// nada más: lo que el cirujano necesita escribir es "asimetría del ala
+// izquierda" o "cicatriz previa", y que eso siga ahí en el control de los
+// tres meses.
+function vfEditorAnotacion(clienteX, clienteY, punto, vista) {
+  const previo = vf.capa.querySelector("#vfEditorNota");
+  if (previo) previo.remove();
+
+  const caja = document.createElement("div");
+  caja.id = "vfEditorNota";
+  caja.className = "vf-editor-nota";
+  caja.innerHTML = `
+    <input type="text" maxlength="200" placeholder="¿Qué anotás acá?">
+    <div class="vf-editor-acciones">
+      <button data-guardar>Guardar</button>
+      <button data-cancelar>Cancelar</button>
+    </div>
+    <div class="vf-editor-sugerencias">
+      ${["Asimetría", "Cicatriz previa", "Zona a tratar", "Control post"]
+        .map(t => `<button data-sugerencia="${esc(t)}">${esc(t)}</button>`).join("")}
+    </div>`;
+  document.body.appendChild(caja);
+
+  // Que no se salga de la pantalla si el clic fue cerca del borde.
+  const w = 260, h = 130;
+  caja.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, clienteX - w / 2)) + "px";
+  caja.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, clienteY + 14)) + "px";
+
+  const input = caja.querySelector("input");
+  input.focus();
+  const cerrar = () => caja.remove();
+  const guardar = async () => {
+    const texto = input.value.trim();
+    if (!texto) { cerrar(); return; }
+    vf.anotaciones.push({ ...punto, angulo: vista.grados, texto, fecha: new Date().toISOString() });
+    cerrar();
+    await vfGuardarAnotaciones(vista);
+    vfPintar();
+  };
+  caja.querySelector("[data-guardar]").onclick = guardar;
+  caja.querySelector("[data-cancelar]").onclick = cerrar;
+  caja.querySelectorAll("[data-sugerencia]").forEach(b => b.onclick = () => {
+    input.value = b.dataset.sugerencia;
+    input.focus();
+  });
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); guardar(); }
+    if (e.key === "Escape") { e.preventDefault(); cerrar(); }
+  };
+}
+
+// Las anotaciones de una vista viven en SU estudio: así aparecen al abrir esa
+// foto, hoy o dentro de tres meses, sin depender de esta pantalla.
+async function vfGuardarAnotaciones(vista) {
+  const propias = vf.anotaciones
+    .filter(a => a.angulo === vista.grados)
+    .map(a => ({ x: a.x, y: a.y, texto: a.texto, fecha: a.fecha }));
+  vista.estudio.anotaciones = propias;
+  try {
+    await api(`/medico/estudios/${vista.estudio._id}/visor`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anotaciones: propias }),
+    });
+    vfAviso(propias.length ? "Anotación guardada en la ficha." : "Anotaciones borradas de la ficha.");
+  } catch {
+    vfAviso("No se pudo guardar la anotación en la ficha.", "ambar");
+  }
+}
+
+async function vfBorrarAnotacion(indice) {
+  const a = vf.anotaciones[indice];
+  if (!a) return;
+  const vista = vf.vistas.find(v => v.grados === a.angulo);
+  vf.anotaciones.splice(indice, 1);
+  if (vista) await vfGuardarAnotaciones(vista);
+  vfPintar();
 }
 
 // ═══ MARCAR UNA VISTA ══════════════════════════════════════════════════════

@@ -143,6 +143,22 @@ module.exports = function (app) {
         : [];
     }
 
+    // Anotaciones de Vitalis Face. Se guarda la lista completa que manda el
+    // cliente: es lo que el médico ve en pantalla, y mezclarla con la que ya
+    // estaba dejaría duplicados al reabrir.
+    if (Array.isArray(req.body?.anotaciones)) {
+      const dentro = (n) => Number.isFinite(n) && n >= -0.2 && n <= 1.2;
+      estudio.anotaciones = req.body.anotaciones
+        .filter(a => dentro(Number(a?.x)) && dentro(Number(a?.y)))
+        .map(a => ({
+          x: Number(a.x), y: Number(a.y),
+          texto: String(a.texto || "").trim().slice(0, 200),
+          fecha: a.fecha ? new Date(a.fecha) : new Date(),
+        }))
+        .filter(a => a.texto)
+        .slice(0, 40);
+    }
+
     await estudio.save();
     registrar({ req, medicoPhone, accion: "editar_visor_estudio", recurso: `Estudio:${estudio._id}` });
     res.json({ ok: true, estudio });

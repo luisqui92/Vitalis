@@ -109,6 +109,10 @@ function tabEstudiosHtml(estudios) {
         </div>
         <div class="fecha">${new Date(e.fecha).toLocaleDateString("es-BO")}</div>
         ${e.notas ? `<div class="paciente-info">📝 ${esc(e.notas)}</div>` : ""}
+        ${(e.anotaciones || []).length ? `
+        <div class="paciente-info" style="margin-top:6px">
+          ✎ ${(e.anotaciones || []).map(a => esc(a.texto)).join(" · ")}
+        </div>` : ""}
         ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" && e.anguloFoto === "frontal" ? `
         <button class="item-action" data-mapa-facial="${e._id}" style="margin-top:10px">🧭 Ver mapa anatómico y simetría</button>` : ""}
         ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" ? `
