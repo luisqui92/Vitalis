@@ -166,9 +166,23 @@ function s25Ancla(vista) {
 // centrada en todas las vistas, que además es lo que se está mirando cuando
 // se evalúa una rinoplastia. En vertical sigue mandando el mentón, que es el
 // borde duro de la cara y el que el giro de la cabeza casi no mueve.
-function s25Encuadre(vista, ref) {
+function s25Encuadre(vista, ref, recorte) {
   const a = vista.ancla;
-  if (!a || !ref) return { s: 1, dx: 0, dy: 0 };
+  if (!a || !ref) {
+    // Sin ancla no se sabe dónde está la cara en esta foto, así que no hay
+    // con qué alinearla. Lo que NO se puede hacer es dejarla en su sitio y
+    // recortarla con el rectángulo de la vista de referencia: la cara de
+    // esta foto no está donde la de aquella, y salía cortada por la mitad.
+    // Se centra la foto entera sobre el recorte y se ve completa.
+    if (!recorte) return { s: 1, dx: 0, dy: 0 };
+    const anchoR = recorte.x1 - recorte.x0, altoR = recorte.y1 - recorte.y0;
+    const s = Math.max(anchoR, altoR);
+    return {
+      s,
+      dx: recorte.x0 + (anchoR - s) / 2,
+      dy: recorte.y0 + (altoR - s) / 2,
+    };
+  }
   const propio = Math.abs(a.menton.y - a.punta.y) || 1;
   const s = ref.alto / propio;
   return { s, dx: ref.punta.x - a.punta.x * s, dy: ref.menton.y - a.menton.y * s };
@@ -192,7 +206,10 @@ function s25Encuadre(vista, ref) {
 // sacando las cinco fotos con la cabeza en el mismo lugar del cuadro.
 function s25RectoComun(vistas, ref) {
   let x0 = 0, y0 = 0, x1 = 1, y1 = 1;
-  for (const v of vistas) {
+  // Solo las vistas alineadas acotan el recorte: una sin ancla no aporta
+  // información de dónde está la cara, y meterla achicaría el cuadro por una
+  // coincidencia y no por un dato.
+  for (const v of vistas.filter(v => v.ancla)) {
     const { s, dx, dy } = s25Encuadre(v, ref);
     x0 = Math.max(x0, dx);       y0 = Math.max(y0, dy);
     x1 = Math.min(x1, s + dx);   y1 = Math.min(y1, s + dy);
@@ -307,7 +324,7 @@ function s25Vertices(vista, valores, ref, recorte, verOriginal, encuadre) {
     }
   }
 
-  const { s, dx, dy } = s25Encuadre(vista, ref);
+  const { s, dx, dy } = s25Encuadre(vista, ref, recorte);
   const r = recorte;
   const anchoR = r.x1 - r.x0, altoR = r.y1 - r.y0;
   const e = encuadre || { x0: 0, y0: 0, x1: 1, y1: 1 };

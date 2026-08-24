@@ -664,11 +664,15 @@ function vfPintar() {
           <div class="vf-panel">
             <div class="vf-panel-tit">Medido a mano</div>
             ${vf.medidas.map((m, i) => `
-              <div class="vf-medida">
-                <div class="vf-medida-fila">
-                  <span class="vf-medida-label">${esc(m.vista)} · ${m.porContorno ? "por el borde" : "recta"}</span>
-                  <span class="vf-medida-valor">${esc(m.texto)}</span>
+              <div class="vf-nota-item">
+                <div>
+                  <div class="vf-medida-fila" style="gap:14px">
+                    <span class="vf-medida-label">${esc(m.vista)} · ${m.porContorno ? "por el borde" : "recta"}</span>
+                    <span class="vf-medida-valor">${esc(m.texto)}</span>
+                  </div>
+                  ${m.detalle ? `<div class="vf-nota-meta">${esc(m.detalle)}</div>` : ""}
                 </div>
+                <button class="vf-nota-borrar" data-borrar-medida="${i}" title="Borrar">✕</button>
               </div>`).join("")}
             <p class="vf-nota">De esta sesión: no quedan guardadas en la ficha.</p>
           </div>` : ""}
@@ -806,6 +810,45 @@ function vfBloqueMilimetrosHtml() {
       Válido solo para lo que esté en el mismo plano que la referencia. Una cara es curva:
       lo que está más cerca de la cámara sale más grande.
     </div>`;
+}
+
+// ═══ LA ESCALA DE UNA VISTA ════════════════════════════════════════════════
+// Calibrar la frontal con el iris alcanza para TODAS las vistas, y no hace
+// falta calibrar cada una.
+//
+// El puente es la distancia punta de la nariz → borde del mentón: es una
+// distancia física del paciente, la misma en las cinco fotos, y es la que ya
+// se usa para alinear las vistas entre sí (por eso se eligió: el giro de la
+// cabeza casi no la cambia). Si en la frontal esa distancia mide 850 px y
+// sabemos cuántos mm son, en un perfil donde mide 800 px la escala es la
+// misma distancia repartida en menos píxeles.
+//
+// Lo que arrastra es el error: una escala derivada hereda el error de la
+// original —el 4% del iris, si vino de ahí— más lo que se equivoque el
+// detector ubicando la punta y el mentón. Por eso se muestra con "≈" y la
+// pantalla dice de dónde salió.
+function vfEscalaDe(vista) {
+  const propia = vista.estudio && vista.estudio.calibracion;
+  if (propia && propia.mmPorPixel > 0) {
+    return { mmPorPixel: propia.mmPorPixel, derivada: false, referencia: propia.referencia || "" };
+  }
+  if (!vista.ancla) return null;
+  const altoDe = (v) => vfDist(v.ancla.punta, v.ancla.menton, v.img.naturalWidth, v.img.naturalHeight);
+  const propio = altoDe(vista);
+  if (!(propio > 0)) return null;
+
+  for (const otra of vf.vistas) {
+    const c = otra.estudio && otra.estudio.calibracion;
+    if (!c || !(c.mmPorPixel > 0) || !otra.ancla || otra === vista) continue;
+    const suyo = altoDe(otra);
+    if (!(suyo > 0)) continue;
+    return {
+      mmPorPixel: c.mmPorPixel * suyo / propio,
+      derivada: true,
+      referencia: `escala tomada de ${otra.label.toLowerCase()}`,
+    };
+  }
+  return null;
 }
 
 // ═══ ACERCARSE A UNA ZONA ══════════════════════════════════════════════════
@@ -1065,7 +1108,7 @@ function vfActualizarPie() {
 // calibración, y medir en el lienzo compuesto mezclaría las dos.
 function vfDelLienzoALaVista(u, v, vista) {
   const r = vf.motor.recorte;
-  const { s, dx, dy } = s25Encuadre(vista, vf.ref);
+  const { s, dx, dy } = s25Encuadre(vista, vf.ref, r);
   const e = vf.motor.encuadre;
   const uu = e ? e.x0 + u * (e.x1 - e.x0) : u;
   const vv = e ? e.y0 + v * (e.y1 - e.y0) : v;
@@ -1075,7 +1118,7 @@ function vfDelLienzoALaVista(u, v, vista) {
 }
 function vfDeLaVistaAlLienzo(p, vista, sinEncuadre) {
   const r = vf.motor.recorte;
-  const { s, dx, dy } = s25Encuadre(vista, vf.ref);
+  const { s, dx, dy } = s25Encuadre(vista, vf.ref, r);
   const u = (p.x * s + dx - r.x0) / (r.x1 - r.x0);
   const v = (p.y * s + dy - r.y0) / (r.y1 - r.y0);
   const e = sinEncuadre ? null : vf.motor.encuadre;
@@ -1159,14 +1202,31 @@ function vfDibujarCapa() {
 
   const grosor = Math.max(2, W * 0.008);
   const tam = Math.max(13, Math.round(W * 0.05));
+  // Las etiquetas se acomodan para que no se salgan del cuadro ni se tapen
+  // entre sí: dos medidas cercanas dejaban un texto encima del otro y los
+  // dos ilegibles, y una pegada al borde salía cortada a la mitad.
+  const ocupadas = [];
   const etiqueta = (texto, x, y, color) => {
     ctx.font = `600 ${tam}px system-ui, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const ancho = ctx.measureText(texto).width;
+    const alto = tam * 1.44;
+    const medio = ancho / 2 + 6;
+    let cx = Math.max(medio, Math.min(W - medio, x));
+    let cy = Math.max(alto / 2, Math.min(H - alto / 2, y));
+    // Si choca con una etiqueta ya puesta, baja hasta encontrar lugar.
+    for (let intento = 0; intento < 8; intento++) {
+      const choca = ocupadas.some(o =>
+        Math.abs(o.x - cx) < (o.ancho + ancho) / 2 + 6 && Math.abs(o.y - cy) < alto + 3);
+      if (!choca) break;
+      cy += alto + 4;
+      if (cy > H - alto / 2) { cy = Math.max(alto / 2, y - alto - 4); break; }
+    }
+    ocupadas.push({ x: cx, y: cy, ancho });
     ctx.fillStyle = "rgba(0,0,0,.72)";
-    ctx.fillRect(x - ancho / 2 - 6, y - tam * 0.72, ancho + 12, tam * 1.44);
+    ctx.fillRect(cx - medio, cy - alto / 2, ancho + 12, alto);
     ctx.fillStyle = color;
-    ctx.fillText(texto, x, y);
+    ctx.fillText(texto, cx, cy);
   };
 
   for (const m of vf.medidas.filter(m => m.angulo === vista.grados)) {
@@ -1322,6 +1382,8 @@ function vfEnganchar() {
 
   capa.querySelectorAll("[data-borrar-nota]").forEach(b =>
     b.onclick = () => vfBorrarAnotacion(Number(b.dataset.borrarNota)));
+  capa.querySelectorAll("[data-borrar-medida]").forEach(b =>
+    b.onclick = () => { vf.medidas.splice(Number(b.dataset.borrarMedida), 1); vfPintar(); });
 
   capa.querySelector("#vfBtnLimpiar").onclick = async () => {
     const vista = vf.vistaActual;
@@ -1401,24 +1463,28 @@ function vfClicHerramienta(ev) {
     px = vfDist(a, b, W, H);
   }
 
-  const cal = vista.estudio && vista.estudio.calibracion;
-  // Con calibración, milímetros. Sin ella, porcentaje de la altura
-  // nariz-mentón de ESTA vista, que es una referencia que la foto sí trae.
-  // Lo que no va a pasar nunca es que salga un número en mm sin escala.
-  let texto;
-  if (cal && cal.mmPorPixel) {
-    texto = (px * cal.mmPorPixel).toFixed(1) + " mm";
+  // Con escala, milímetros —propios o derivados de otra vista—. Sin ninguna
+  // escala en ningún lado, una proporción contra una referencia que la foto
+  // sí trae. Lo que no va a pasar nunca es que salga un número en mm sin
+  // saber cuánto mide un píxel.
+  const escala = vfEscalaDe(vista);
+  let texto, detalle;
+  if (escala) {
+    texto = (escala.derivada ? "≈ " : "") + (px * escala.mmPorPixel).toFixed(1) + " mm";
+    detalle = escala.derivada ? escala.referencia : "escala propia de esta foto";
   } else if (vista.ancla) {
     const alto = vfDist(vista.ancla.punta, vista.ancla.menton, W, H);
-    texto = (px / alto * 100).toFixed(0) + "% nariz–mentón";
+    texto = (px / alto).toFixed(2) + "× cara";
+    detalle = "veces la altura nariz–mentón · sin escala";
   } else {
     texto = Math.round(px) + " px";
+    detalle = "píxeles de la foto · sin escala";
   }
   vf.medidas.push({ a, b, camino, angulo: vista.grados, vista: vista.label,
-                    texto, porContorno });
+                    texto, detalle, porContorno });
   vfPintar();
-  if (!(cal && cal.mmPorPixel)) {
-    vfAviso("Sin calibrar: la medida va en % de la altura nariz–mentón, no en mm.", "ambar");
+  if (!escala) {
+    vfAviso("Sin escala: la medida va en veces la altura nariz–mentón. Calibrá con el iris para tener milímetros.", "ambar");
   }
 }
 
