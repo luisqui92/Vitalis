@@ -830,3 +830,6 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .vf-nota-meta{font-size:10.5px;color:var(--vf-suave);opacity:.7;margin-top:2px}
 .vf-nota-borrar{all:unset;cursor:pointer;color:var(--vf-suave);font-size:12px;padding:2px 5px;border-radius:5px}
 .vf-nota-borrar:hover{color:#f08a8a;background:#241419}
+.vf-editor-pie{font-size:10.5px;color:#93a1b5;margin-top:7px;line-height:1.4}
+.vf-nota-cuerpo{cursor:pointer;flex:1;min-width:0;border-radius:6px;padding:2px 4px;margin:-2px -4px}
+.vf-nota-cuerpo:hover{background:#182231}

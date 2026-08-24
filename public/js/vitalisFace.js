@@ -648,7 +648,7 @@ function vfPintar() {
             <div class="vf-panel-tit">Anotaciones</div>
             ${vf.anotaciones.map((a, i) => `
               <div class="vf-nota-item">
-                <div>
+                <div class="vf-nota-cuerpo" data-editar-nota="${i}" title="Tocar para corregir">
                   <div class="vf-nota-texto">${esc(a.texto)}</div>
                   <div class="vf-nota-meta">
                     ${esc((vf.vistas.find(v => v.grados === a.angulo) || {}).label || "")}
@@ -1290,20 +1290,58 @@ function vfEnganchar() {
   // Arrastrar sobre la foto para girar — pero solo cuando no hay una
   // herramienta activa, si no cada intento de medir movería la cabeza.
   const visor = capa.querySelector("#vfVisor");
-  let arrastre = null;
+  let arrastre = null, moviendo = null;
+  const enLienzo = (ev) => {
+    const c = capa.querySelector("#vfCapaDibujo").getBoundingClientRect();
+    return { u: (ev.clientX - c.left) / c.width, v: (ev.clientY - c.top) / c.height };
+  };
+
   visor.onpointerdown = (ev) => {
+    if (vf.herramienta === "anotar" && vf.vistaActual) {
+      // Con la herramienta de anotar, tocar una marca existente la agarra:
+      // si se arrastra se mueve, y si se suelta en el sitio se abre para
+      // corregir el texto.
+      const { u, v } = enLienzo(ev);
+      const i = vfAnotacionCercana(u, v, vf.vistaActual);
+      if (i >= 0) {
+        moviendo = { i, x0: ev.clientX, y0: ev.clientY, movio: false };
+        visor.setPointerCapture(ev.pointerId);
+        return;
+      }
+    }
     if (vf.herramienta) { vfClicHerramienta(ev); return; }
     arrastre = { x: ev.clientX, g: vf.grados };
     visor.setPointerCapture(ev.pointerId);
   };
+
   visor.onpointermove = (ev) => {
+    if (moviendo) {
+      if (Math.abs(ev.clientX - moviendo.x0) + Math.abs(ev.clientY - moviendo.y0) > 4) moviendo.movio = true;
+      if (!moviendo.movio) return;
+      const { u, v } = enLienzo(ev);
+      const p = vfDelLienzoALaVista(u, v, vf.vistaActual);
+      const a = vf.anotaciones[moviendo.i];
+      a.x = p.x; a.y = p.y;
+      vfDibujarCapa();
+      return;
+    }
     if (!arrastre) return;
     const sl = capa.querySelector("#vfGiro");
     const rango = Number(sl.max) - Number(sl.min);
     irA(arrastre.g + (ev.clientX - arrastre.x) / visor.getBoundingClientRect().width * rango);
   };
-  visor.onpointerup = () => { arrastre = null; };
-  visor.onpointercancel = () => { arrastre = null; };
+
+  visor.onpointerup = async (ev) => {
+    if (moviendo) {
+      const { i, movio } = moviendo;
+      moviendo = null;
+      if (movio) await vfGuardarAnotaciones(vf.vistaActual);
+      else vfEditorAnotacion(ev.clientX, ev.clientY, null, vf.vistaActual, i);
+      return;
+    }
+    arrastre = null;
+  };
+  visor.onpointercancel = () => { arrastre = null; moviendo = null; };
 
   capa.querySelectorAll("[data-zona]").forEach(b => b.onclick = () => {
     vf.zona = b.dataset.zona;
@@ -1382,6 +1420,18 @@ function vfEnganchar() {
 
   capa.querySelectorAll("[data-borrar-nota]").forEach(b =>
     b.onclick = () => vfBorrarAnotacion(Number(b.dataset.borrarNota)));
+  capa.querySelectorAll("[data-editar-nota]").forEach(el => el.onclick = (ev) => {
+    const i = Number(el.dataset.editarNota);
+    const a = vf.anotaciones[i];
+    const vista = vf.vistas.find(v => v.grados === a.angulo);
+    // Se salta a la vista donde vive la anotación: corregir a ciegas una
+    // marca que está en otra foto es la forma de moverla sin querer.
+    if (vista && vf.grados !== a.angulo) {
+      const sl = capa.querySelector("#vfGiro");
+      sl.value = String(a.angulo); sl.dispatchEvent(new Event("input"));
+    }
+    vfEditorAnotacion(ev.clientX, ev.clientY, null, vista, i);
+  });
   capa.querySelectorAll("[data-borrar-medida]").forEach(b =>
     b.onclick = () => { vf.medidas.splice(Number(b.dataset.borrarMedida), 1); vfPintar(); });
 
@@ -1431,7 +1481,13 @@ function vfClicHerramienta(ev) {
   const p = vfDelLienzoALaVista(u, v, vista);
 
   if (vf.herramienta === "anotar") {
-    vfEditorAnotacion(ev.clientX, ev.clientY, p, vista);
+    // Si el clic cae sobre una anotación que ya está, se abre para
+    // corregirla en vez de apilar otra encima.
+    const c = vf.capa.querySelector("#vfCapaDibujo");
+    const rectC = c.getBoundingClientRect();
+    const i = vfAnotacionCercana((ev.clientX - rectC.left) / rectC.width,
+                                 (ev.clientY - rectC.top) / rectC.height, vista);
+    vfEditorAnotacion(ev.clientX, ev.clientY, p, vista, i >= 0 ? i : undefined);
     return;
   }
 
@@ -1493,9 +1549,12 @@ function vfClicHerramienta(ev) {
 // nada más: lo que el cirujano necesita escribir es "asimetría del ala
 // izquierda" o "cicatriz previa", y que eso siga ahí en el control de los
 // tres meses.
-function vfEditorAnotacion(clienteX, clienteY, punto, vista) {
-  const previo = vf.capa.querySelector("#vfEditorNota");
+function vfEditorAnotacion(clienteX, clienteY, punto, vista, indice) {
+  const previo = document.getElementById("vfEditorNota");
   if (previo) previo.remove();
+
+  const editando = indice !== undefined && indice >= 0;
+  const actual = editando ? vf.anotaciones[indice] : null;
 
   const caja = document.createElement("div");
   caja.id = "vfEditorNota";
@@ -1503,33 +1562,45 @@ function vfEditorAnotacion(clienteX, clienteY, punto, vista) {
   caja.innerHTML = `
     <input type="text" maxlength="200" placeholder="¿Qué anotás acá?">
     <div class="vf-editor-acciones">
-      <button data-guardar>Guardar</button>
+      <button data-guardar>${editando ? "Guardar cambios" : "Guardar"}</button>
+      ${editando ? `<button data-borrar>Borrar</button>` : ""}
       <button data-cancelar>Cancelar</button>
     </div>
     <div class="vf-editor-sugerencias">
       ${["Asimetría", "Cicatriz previa", "Zona a tratar", "Control post"]
         .map(t => `<button data-sugerencia="${esc(t)}">${esc(t)}</button>`).join("")}
-    </div>`;
+    </div>
+    ${editando ? `<div class="vf-editor-pie">Arrastrala sobre la foto para moverla.</div>` : ""}`;
   document.body.appendChild(caja);
 
   // Que no se salga de la pantalla si el clic fue cerca del borde.
-  const w = 260, h = 130;
+  const w = 260, h = editando ? 158 : 130;
   caja.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, clienteX - w / 2)) + "px";
   caja.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, clienteY + 14)) + "px";
 
   const input = caja.querySelector("input");
+  if (actual) input.value = actual.texto;
   input.focus();
+  input.select();
+
   const cerrar = () => caja.remove();
   const guardar = async () => {
     const texto = input.value.trim();
     if (!texto) { cerrar(); return; }
-    vf.anotaciones.push({ ...punto, angulo: vista.grados, texto, fecha: new Date().toISOString() });
+    if (editando) {
+      actual.texto = texto;
+      actual.fecha = new Date().toISOString();
+    } else {
+      vf.anotaciones.push({ ...punto, angulo: vista.grados, texto, fecha: new Date().toISOString() });
+    }
     cerrar();
     await vfGuardarAnotaciones(vista);
     vfPintar();
   };
   caja.querySelector("[data-guardar]").onclick = guardar;
   caja.querySelector("[data-cancelar]").onclick = cerrar;
+  const borrar = caja.querySelector("[data-borrar]");
+  if (borrar) borrar.onclick = () => { cerrar(); vfBorrarAnotacion(indice); };
   caja.querySelectorAll("[data-sugerencia]").forEach(b => b.onclick = () => {
     input.value = b.dataset.sugerencia;
     input.focus();
@@ -1538,6 +1609,26 @@ function vfEditorAnotacion(clienteX, clienteY, punto, vista) {
     if (e.key === "Enter") { e.preventDefault(); guardar(); }
     if (e.key === "Escape") { e.preventDefault(); cerrar(); }
   };
+}
+
+// Cuál anotación está bajo el dedo. El radio se mide en píxeles de PANTALLA,
+// no de la foto: con el zoom puesto, un radio en coordenadas de la imagen
+// sería enorme de cerca y minúsculo de lejos.
+function vfAnotacionCercana(u, v, vista) {
+  const c = vf.capa.querySelector("#vfCapaDibujo");
+  if (!c) return -1;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = c.width / dpr, H = c.height / dpr;
+  const radio = Math.max(14, W * 0.045);
+  let mejor = -1, mejorD = radio * radio;
+  vf.anotaciones.forEach((a, i) => {
+    if (a.angulo !== vista.grados) return;
+    const q = vfDeLaVistaAlLienzo(a, vista);
+    const dx = (q.u - u) * W, dy = (q.v - v) * H;
+    const d = dx * dx + dy * dy;
+    if (d < mejorD) { mejorD = d; mejor = i; }
+  });
+  return mejor;
 }
 
 // Las anotaciones de una vista viven en SU estudio: así aparecen al abrir esa
