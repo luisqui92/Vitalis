@@ -96,6 +96,8 @@ function tabEstudiosHtml(estudios) {
         ${e.notas ? `<div class="paciente-info">📝 ${esc(e.notas)}</div>` : ""}
         ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" && e.anguloFoto === "frontal" ? `
         <button class="item-action" data-mapa-facial="${e._id}" style="margin-top:10px">🧭 Ver mapa anatómico y simetría</button>` : ""}
+        ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" ? `
+        <button class="item-action" data-simular="${e._id}" data-simular-nombre="${esc(e.nombre || "")}" style="margin-top:8px">✨ Simular cirugía sobre esta foto</button>` : ""}
       </div>`).join("")}
   `;
 }
@@ -331,6 +333,18 @@ function wireTabEstudios(p, estudios) {
       // mediciones); los PDF y todo lo demás, como siempre.
       if (e && String(e.archivoMime || "").startsWith("image/")) abrirVisorImagen(e._id, e);
       else abrirArchivoEstudio(el.dataset.verEstudio);
+    };
+  });
+  document.querySelectorAll("[data-simular]").forEach(btn => {
+    btn.onclick = async (ev) => {
+      ev.stopPropagation();
+      const blob = await traerBlobEstudio(btn.dataset.simular);
+      if (!blob) { alert("No se pudo cargar la foto"); return; }
+      abrirSimuladorFacial(blob, {
+        estudioId: btn.dataset.simular,
+        pacienteId: p._id,
+        nombreFoto: btn.dataset.simularNombre,
+      });
     };
   });
   document.querySelectorAll("[data-mapa-facial]").forEach(btn => {
