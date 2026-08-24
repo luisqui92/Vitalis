@@ -653,6 +653,10 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
   min-height:300px;max-height:72vh}
 .vf-visor:active{cursor:grabbing}
 .vf-visor canvas{display:block;max-width:100%;max-height:72vh;width:auto;height:auto}
+@media (max-width:900px){
+  .vf-visor{max-height:48vh}
+  .vf-visor canvas{max-height:48vh}
+}
 .vf-visor #vfCapaDibujo{position:absolute;inset:0;margin:auto;pointer-events:none}
 .vf-etiqueta{position:absolute;left:10px;top:10px;font-size:11px;background:rgba(0,0,0,.6);
   padding:3px 9px;border-radius:20px;pointer-events:none;letter-spacing:.06em}
@@ -733,3 +737,74 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .vf-control-fila span:last-child{color:var(--vf-suave);font-variant-numeric:tabular-nums}
 .vf-control input[type=range]{width:100%;accent-color:var(--vf-acento)}
 .vf-chip[disabled]{opacity:.4;cursor:default}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SIMULADOR 2.5D a pantalla completa
+   ──────────────────────────────────────────────────────────────────────────
+   En una sola columna el lienzo se comía la altura entera y los controles
+   quedaban abajo, fuera de la vista: había que hacer scroll para mover un
+   deslizador y volver a subir para ver el efecto, que es exactamente lo que
+   no se puede hacer con un paciente al lado. En pantalla ancha van en dos
+   columnas, y en angosta el lienzo se limita por ALTURA para que el giro y
+   los botones entren en la misma pantalla que la cara.
+   ══════════════════════════════════════════════════════════════════════════ */
+#simulador25d{--s25-panel:#0f0f14;--s25-borde:#26262f;color:#eee}
+.s25-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:10px 14px;background:var(--s25-panel);position:sticky;top:0;z-index:3;
+  border-bottom:1px solid var(--s25-borde)}
+.s25-cab-tit{font-weight:600}
+.s25-cab-sub{font-size:12px;opacity:.65}
+
+.s25-cuerpo{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;
+  padding:14px;max-width:1500px;margin:0 auto;align-items:start}
+@media (max-width:900px){ .s25-cuerpo{grid-template-columns:1fr;gap:10px;padding:10px} }
+
+.s25-col-foto{position:sticky;top:56px;display:flex;flex-direction:column;gap:10px}
+@media (max-width:900px){ .s25-col-foto{position:static} }
+.s25-visor{position:relative;background:#0b0b0f;border-radius:12px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center}
+.s25-visor canvas{display:block;max-width:100%;max-height:calc(100vh - 260px);
+  width:auto;height:auto;touch-action:none;cursor:ew-resize}
+@media (max-width:900px){ .s25-visor canvas{max-height:46vh} }
+.s25-sello{position:absolute;left:0;right:0;bottom:8px;text-align:center;color:#fff;
+  font-size:12px;letter-spacing:.14em;text-shadow:0 1px 4px #000;pointer-events:none;opacity:.9}
+.s25-etiqueta{position:absolute;left:10px;top:10px;color:#fff;font-size:12px;
+  background:rgba(0,0,0,.55);padding:3px 9px;border-radius:20px;pointer-events:none}
+
+.s25-giro{background:var(--s25-panel);border:1px solid var(--s25-borde);
+  border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+.s25-giro-barra{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;font-size:12px}
+.s25-giro-barra span{opacity:.7}
+.s25-giro-barra span:last-child{min-width:42px;text-align:right;font-variant-numeric:tabular-nums}
+.s25-presets{display:flex;gap:6px;flex-wrap:wrap}
+.s25-presets .visor-btn{font-size:11.5px;padding:4px 9px}
+.s25-aviso{font-size:11.5px;background:#2a2410;border:1px solid #574a19;color:#e8d9a8;
+  padding:8px 10px;border-radius:8px;line-height:1.5}
+.s25-aviso a{color:#ffd76e}
+
+.s25-col-controles{background:var(--s25-panel);border:1px solid var(--s25-borde);
+  border-radius:12px;padding:12px;max-height:calc(100vh - 90px);overflow-y:auto}
+@media (max-width:900px){ .s25-col-controles{max-height:none;overflow:visible;padding-bottom:26px} }
+.s25-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.s25-btn-primario{background:var(--primary);color:#fff}
+.s25-nota{font-size:11.5px;opacity:.6;line-height:1.55;margin:0 0 14px}
+.s25-nota-borde{border-top:1px solid var(--s25-borde);padding-top:12px;margin-top:4px;margin-bottom:0}
+.s25-grupo{margin-bottom:16px}
+.s25-grupo-tit{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-bottom:8px}
+.s25-control{margin-bottom:11px}
+.s25-control-fila{display:grid;grid-template-columns:1fr auto;gap:8px;font-size:13px;margin-bottom:3px}
+.s25-control-fila i{opacity:.45;font-size:11px;font-style:normal}
+.s25-control-fila span:last-child{opacity:.6;font-variant-numeric:tabular-nums}
+.s25-control input[type=range]{width:100%}
+.s25-control-ayuda{font-size:11px;opacity:.5;margin-top:2px}
+
+/* .visor-btn no estaba definido en ninguna hoja: eran botones nativos del
+   navegador, que sobre una capa oscura salen blancos y desentonan. Se estila
+   SOLO dentro del simulador — la misma clase se usa en las hojas de informe,
+   que son claras y se romperían con un estilo oscuro global. */
+#simulador25d .visor-btn{
+  background:#1c1c24;color:#e8e8ee;border:1px solid #33333f;border-radius:9px;
+  padding:7px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;line-height:1.2}
+#simulador25d .visor-btn:hover{background:#26262f}
+#simulador25d .s25-btn-primario{
+  background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}

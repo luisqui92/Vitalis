@@ -462,67 +462,71 @@ function s25Pintar() {
   const maxG = Math.max(...vistas.map(v => v.grados));
 
   capa.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#0f0f14;color:#eee;gap:10px;position:sticky;top:0;z-index:2">
+    <div class="s25-cab">
       <div>
-        <div style="font-weight:600">Simulación 2.5D</div>
-        <div style="font-size:12px;opacity:.65">${vistas.length} vistas reales · <span id="s25Vista"></span></div>
+        <div class="s25-cab-tit">Simulación 2.5D</div>
+        <div class="s25-cab-sub">${vistas.length} vistas reales · <span id="s25Vista"></span></div>
       </div>
       <button class="visor-btn" data-cerrar-25d>✕</button>
     </div>
 
-    <div style="position:relative;background:#0b0b0f">
-      <canvas id="s25Canvas" style="display:block;width:100%;max-width:${lienzoW}px;margin:0 auto;touch-action:none;cursor:ew-resize"></canvas>
-      <div id="s25Sello" style="position:absolute;left:0;right:0;bottom:8px;text-align:center;color:#fff;font-size:12px;letter-spacing:.14em;text-shadow:0 1px 4px #000;pointer-events:none;opacity:.9">
-        SIMULACIÓN — NO ES UNA PROMESA DE RESULTADO
-      </div>
-      <div id="s25Etiqueta" style="position:absolute;left:10px;top:10px;color:#fff;font-size:12px;background:rgba(0,0,0,.55);padding:3px 9px;border-radius:20px;pointer-events:none"></div>
-    </div>
+    <div class="s25-cuerpo">
+      <div class="s25-col-foto">
+        <div class="s25-visor">
+          <canvas id="s25Canvas" style="aspect-ratio:${lienzoW} / ${lienzoH}"></canvas>
+          <div id="s25Sello" class="s25-sello">SIMULACIÓN — NO ES UNA PROMESA DE RESULTADO</div>
+          <div id="s25Etiqueta" class="s25-etiqueta"></div>
+        </div>
 
-    <div style="background:#0f0f14;color:#eee;padding:12px 14px 30px">
-      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px;margin-bottom:6px">
-        <span style="opacity:.7;width:52px">Girar</span>
-        <input type="range" id="s25Giro" min="${minG}" max="${maxG}" step="1" value="${s25.grados}">
-        <span id="s25GiroVal" style="opacity:.7;width:44px;text-align:right">${s25.grados}°</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        ${vistas.map(v => `<button class="visor-btn" data-ir="${v.grados}" style="font-size:11.5px;padding:4px 9px">${esc(v.label)}</button>`).join("")}
-      </div>
-      <div style="font-size:11.5px;opacity:.6;margin:0 0 14px;line-height:1.5">
-        Cada posición es una foto real del paciente, no un modelo. Entre una y otra
-        se funde: no se inventa cómo se vería la cara en un ángulo del que no hay foto.
-        Arrastrá sobre la imagen para girar.
-      </div>
-
-      <div id="s25Aviso" style="display:none;font-size:11.5px;background:#2a2410;border:1px solid #574a19;color:#e8d9a8;padding:8px 10px;border-radius:8px;margin-bottom:14px;line-height:1.5">
-        La vista <b></b> todavía no está marcada: se ve la foto original, sin la simulación encima.
-        <a href="#" id="s25Marcar" style="color:#ffd76e">Marcarla ahora</a> — son ${SF_PUNTOS_PERFIL.length} clics sobre el contorno.
+        <div class="s25-giro">
+          <div class="s25-giro-barra">
+            <span>Girar</span>
+            <input type="range" id="s25Giro" min="${minG}" max="${maxG}" step="1" value="${s25.grados}">
+            <span id="s25GiroVal">${s25.grados}°</span>
+          </div>
+          <div class="s25-presets">
+            ${vistas.map(v => `<button class="visor-btn" data-ir="${v.grados}">${esc(v.label)}</button>`).join("")}
+          </div>
+          <div id="s25Aviso" class="s25-aviso" style="display:none">
+            La vista <b></b> todavía no está marcada: se ve la foto original, sin la simulación encima.
+            <a href="#" id="s25Marcar">Marcarla ahora</a> — son ${SF_PUNTOS_PERFIL.length} clics sobre el contorno.
+          </div>
+        </div>
       </div>
 
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-        <button class="visor-btn" id="s25Comparar">👁️ Ver original</button>
-        <button class="visor-btn" id="s25Reset">↺ Reiniciar</button>
-        <button class="visor-btn" id="s25Guardar" style="background:var(--primary);color:#fff">Guardar esta vista</button>
-      </div>
+      <div class="s25-col-controles">
+        <div class="s25-acciones">
+          <button class="visor-btn" id="s25Comparar">👁️ Ver original</button>
+          <button class="visor-btn" id="s25Reset">↺ Reiniciar</button>
+          <button class="visor-btn s25-btn-primario" id="s25Guardar">Guardar esta vista</button>
+        </div>
 
-      ${Object.entries(porGrupo).map(([grupo, ctrls]) => `
-        <div style="margin-bottom:16px">
-          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-bottom:8px">${esc(grupo)}</div>
-          ${ctrls.map(c => `
-            <div style="margin-bottom:10px">
-              <div style="display:grid;grid-template-columns:1fr auto;gap:8px;font-size:13px;margin-bottom:2px">
-                <span>${esc(c.label)}${S25_MAPA_PERFIL[c.id] ? "" : ` <span style="opacity:.45;font-size:11px">· no se ve de perfil</span>`}</span>
-                <span id="s25val-${c.id}" style="opacity:.6;font-variant-numeric:tabular-nums">${s25.valores[c.id]}</span>
-              </div>
-              <input type="range" data-ctrl25="${c.id}" min="-100" max="100" step="1" value="${s25.valores[c.id]}" style="width:100%">
-              <div style="font-size:11px;opacity:.5;margin-top:1px">${esc(c.ayuda)}</div>
-            </div>`).join("")}
-        </div>`).join("")}
+        <p class="s25-nota">
+          Cada posición es una foto real del paciente, no un modelo. Entre una y otra se
+          funde: no se inventa cómo se vería la cara en un ángulo del que no hay foto.
+          Arrastrá sobre la imagen para girar.
+        </p>
 
-      <div style="font-size:11.5px;opacity:.6;border-top:1px solid #26262f;padding-top:12px;line-height:1.6">
-        Los rangos están acotados a lo quirúrgicamente plausible. Una simulación
-        es una herramienta para entenderse con el paciente, no un resultado
-        garantizado: el tejido, la cicatrización y la anatomía de cada persona
-        mandan por encima de esto.
+        ${Object.entries(porGrupo).map(([grupo, ctrls]) => `
+          <div class="s25-grupo">
+            <div class="s25-grupo-tit">${esc(grupo)}</div>
+            ${ctrls.map(c => `
+              <div class="s25-control">
+                <div class="s25-control-fila">
+                  <span>${esc(c.label)}${S25_MAPA_PERFIL[c.id] ? "" : ` <i>· no se ve de perfil</i>`}</span>
+                  <span id="s25val-${c.id}">${s25.valores[c.id]}</span>
+                </div>
+                <input type="range" data-ctrl25="${c.id}" min="-100" max="100" step="1" value="${s25.valores[c.id]}">
+                <div class="s25-control-ayuda">${esc(c.ayuda)}</div>
+              </div>`).join("")}
+          </div>`).join("")}
+
+        <p class="s25-nota s25-nota-borde">
+          Los rangos están acotados a lo quirúrgicamente plausible. Una simulación
+          es una herramienta para entenderse con el paciente, no un resultado
+          garantizado: el tejido, la cicatrización y la anatomía de cada persona
+          mandan por encima de esto.
+        </p>
       </div>
     </div>`;
 
