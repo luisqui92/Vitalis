@@ -42,6 +42,20 @@ const S25_MAPA_PERFIL = {
   mentonProyeccion: "mentonPerfil",
 };
 
+// Hasta qué giro se le cree al detector automático para SIMULAR.
+//
+// Los grupos anatómicos (dorso, alas, pómulos) se derivan del marco de la
+// cara, y ese marco necesita ver los dos lados. Medido sobre el juego de
+// cinco vistas: una frontal da 0,04 · una de 45°, entre 0,45 y 0,51 · un
+// perfil, 0,72. Pasado ese punto el eje izquierda-derecha se degenera y el
+// grupo "dorso" termina agarrando la zona del ojo: mover la giba deformaba
+// el ojo, que es exactamente lo que reportó el cirujano.
+//
+// Los puntos SÍ se siguen usando para alinear las vistas entre sí —la punta
+// de la nariz y el borde del mentón son de lo más confiable que hay incluso
+// de perfil—; lo que no se hace es deformar con ellos.
+const S25_YAW_MAX = 0.60;
+
 let s25 = null;
 
 // ═══ WEBGL CON VARIAS TEXTURAS Y FUNDIDO ═══════════════════════════════════
@@ -212,6 +226,7 @@ async function s25CargarVista(entrada) {
     // <img src>, y sin esto salían todas negras.
     ...entrada, img, url,
     modo: "sinMarcar",
+    simulable: false,
     malla: s25MallaPlana(),
   };
 
@@ -223,6 +238,7 @@ async function s25CargarVista(entrada) {
     vista.marcados = guardado.map(p => ({ x: p.x, y: p.y }));
     vista.malla = sfMallaPerfil(vista.marcados, img.naturalHeight / img.naturalWidth);
     vista.modo = "perfil";
+    vista.simulable = true;
     vista.ancla = s25Ancla(vista);
     return vista;
   };
@@ -247,6 +263,13 @@ async function s25CargarVista(entrada) {
     vista.marco = sfMarcoDeLaCara(landmarks, base);
     vista.grupos = sfGruposAnatomicos(landmarks, base, vista.marco);
     vista.malla = sfArmarMalla(landmarks);
+    vista.yaw = estimarYaw(landmarks, FaceLandmarker);
+    // Una vista muy girada se sigue MOSTRANDO y sigue sirviendo para
+    // alinear, pero no se simula con los 468 puntos: para eso hay que
+    // marcarla a mano. El ángulo declarado por quien sacó la foto vale
+    // tanto como la medición — si dice que es un perfil, es un perfil.
+    vista.simulable = Math.abs(entrada.grados) !== 90
+      && Math.abs(vista.yaw) <= S25_YAW_MAX;
   }
   vista.ancla = s25Ancla(vista);
   return vista;
@@ -269,7 +292,7 @@ function s25Vertices(vista, valores, ref, recorte, verOriginal) {
   const n = malla.cantidadCara;
   let desp = null;
 
-  if (!verOriginal && n > 0) {
+  if (!verOriginal && n > 0 && vista.simulable) {
     if (vista.modo === "auto") {
       desp = sfDesplazamientos(valores, vista.landmarks, vista.base, vista.marco, vista.grupos);
     } else if (vista.modo === "perfil") {
@@ -365,9 +388,15 @@ function s25ActualizarPie() {
   if (nom) nom.textContent = v ? v.label : "";
   const aviso = s25.capa.querySelector("#s25Aviso");
   if (aviso) {
-    const sinMarcar = v && v.modo === "sinMarcar";
-    aviso.style.display = sinMarcar ? "" : "none";
-    if (sinMarcar) aviso.querySelector("b").textContent = v.label;
+    const falta = v && !v.simulable;
+    aviso.style.display = falta ? "" : "none";
+    if (falta) {
+      aviso.querySelector("b").textContent = v.label;
+      const razon = aviso.querySelector("i");
+      if (razon) razon.textContent = v.modo === "auto"
+        ? "está demasiado girada para el detector automático"
+        : "todavía no está marcada";
+    }
   }
 }
 
@@ -502,7 +531,7 @@ function s25Pintar() {
             ${vistas.map(v => `<button class="visor-btn" data-ir="${v.grados}">${esc(v.label)}</button>`).join("")}
           </div>
           <div id="s25Aviso" class="s25-aviso" style="display:none">
-            La vista <b></b> todavía no está marcada: se ve la foto original, sin la simulación encima.
+            La vista <b></b> <i>todavía no está marcada</i>: se ve la foto original, sin la simulación encima.
             <a href="#" id="s25Marcar">Marcarla ahora</a> — son ${SF_PUNTOS_PERFIL.length} clics sobre el contorno.
           </div>
         </div>
@@ -625,6 +654,7 @@ function s25MarcarVistaActual() {
     vista.malla = sfMallaPerfil(marcados, aspecto);
     vista.marcados = marcados;
     vista.modo = "perfil";
+    vista.simulable = true;
     s25GuardarMarcado(vista);
     vista.ancla = s25Ancla(vista);
     // Marcar una vista le da un ancla que antes no tenía: el rectángulo que

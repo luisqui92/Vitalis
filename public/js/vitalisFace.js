@@ -443,7 +443,7 @@ function vfPintar() {
               <button class="vf-tira-item${v.grados === vf.grados ? " vf-tira-activa" : ""}" data-ir="${v.grados}">
                 <div class="vf-tira-foto">${v.url ? `<img src="${v.url}" alt="">` : ""}</div>
                 <span>${esc(v.label)}</span>
-                ${v.modo === "sinMarcar" ? `<i class="vf-tira-punto" title="sin marcar"></i>` : ""}
+                ${v.simulable ? "" : `<i class="vf-tira-punto" title="no se puede simular hasta marcarla"></i>`}
               </button>`).join("")}
           </div>
           <p class="vf-nota">
@@ -505,7 +505,7 @@ function vfPintar() {
           </div>
 
           <div class="vf-aviso-marcar" id="vfAvisoMarcar" style="display:none">
-            La vista <b></b> no está marcada: se ve la foto original, sin la simulación encima.
+            La vista <b></b> <i></i>. Se ve la foto original, sin la simulación encima.
             <a href="#" id="vfMarcarActual">Marcarla ahora</a>
           </div>
 
@@ -771,9 +771,16 @@ function vfActualizarPie() {
   }
   const aviso = vf.capa.querySelector("#vfAvisoMarcar");
   if (aviso) {
-    const sinMarcar = v && v.modo === "sinMarcar";
-    aviso.style.display = sinMarcar ? "" : "none";
-    if (sinMarcar) aviso.querySelector("b").textContent = v.label;
+    const falta = v && !v.simulable;
+    aviso.style.display = falta ? "" : "none";
+    if (falta) {
+      aviso.querySelector("b").textContent = v.label;
+      const razon = aviso.querySelector("i");
+      if (razon) razon.textContent = v.modo === "auto"
+        ? "está demasiado girada para el detector automático: los grupos anatómicos "
+          + "dejan de ser confiables y mover la giba movería el ojo"
+        : "todavía no está marcada";
+    }
   }
   const sello = vf.capa.querySelector(".vf-sello");
   if (sello) sello.style.display = vf.simulando && !vf.verOriginal ? "" : "none";
@@ -1152,6 +1159,8 @@ function vfMarcarVista(vista) {
     cerrar();
     vista.marcados = marcados;
     vista.modo = "perfil";
+    vista.simulable = true;
+    vista.__contorno = null;
     vista.malla = sfMallaPerfil(marcados, vista.img.naturalHeight / vista.img.naturalWidth);
     vista.ancla = s25Ancla(vista);
     vista.estudio.perfilMarcado = marcados.map(p => ({ x: p.x, y: p.y }));
