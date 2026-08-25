@@ -2,11 +2,13 @@
 // WhatsApp), y configuración del horario de atención / calendario de Google.
 
 const ORIGEN_ICONO = { whatsapp: "💬", whatsapp_web: "💬", manual: "🖊️", voz: "📞" };
-const DIAS_SEMANA_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+// Los días salen del diccionario por índice de getDay() (0 = domingo):
+// en portugués cambian todos menos "Dom" y "Sáb".
+function diaCorto(indice) { return t("dia.corto." + indice); }
 
 async function renderAgenda() {
   detenerPolling();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando agenda...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("agenda.cargando")}</div>`;
   try {
     const [dataCitas, dataPacientes, dataWA] = await Promise.all([
       api("/medico/citas"),
@@ -16,7 +18,7 @@ async function renderAgenda() {
     pintarAgenda(dataCitas.citas || [], dataPacientes.pacientes || [], dataWA);
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando la agenda")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("agenda.error"))}</div>`;
   }
 }
 
@@ -24,14 +26,14 @@ function whatsappCardHtml(wa) {
   if (!wa || !wa.configurado) {
     return `
       <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">💬 WhatsApp de reservas</div>
-        <div class="hint">Todavía no está configurado. Podés seguir usando la Agenda a mano mientras tanto.</div>
+        <div class="seccion-titulo" style="margin-top:0">💬 ${t("agenda.wa.titulo")}</div>
+        <div class="hint">${t("agenda.wa.sinConfigurar")}</div>
       </div>`;
   }
   return `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">💬 WhatsApp de reservas</div>
-      <div class="hint" style="color:var(--success)">✅ Conectado — los pacientes ya pueden reservar por WhatsApp.</div>
+      <div class="seccion-titulo" style="margin-top:0">💬 ${t("agenda.wa.titulo")}</div>
+      <div class="hint" style="color:var(--success)">✅ ${t("agenda.wa.conectado")}</div>
     </div>`;
 }
 
@@ -65,32 +67,32 @@ function pintarAgenda(citas, pacientes, wa) {
   const citasDelDia = (porDia[diaAgendaElegido] || []).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← Panel</button>
+    <button class="back" id="btnBack">${t("agenda.volver")}</button>
     ${whatsappCardHtml(wa)}
-    <button class="secondary" id="btnNuevaCita">➕ Nueva cita</button>
-    <button class="link" id="btnConfigHorario">⚙️ Configurar horario de atención</button>
+    <button class="secondary" id="btnNuevaCita">➕ ${t("agenda.nuevaCita")}</button>
+    <button class="link" id="btnConfigHorario">⚙️ ${t("agenda.configurarHorario")}</button>
 
     <div id="citaFormBox" style="display:none;margin-top:12px" class="card">
-      <div class="seccion-titulo" style="margin-top:0">Nueva cita</div>
-      <label>Paciente registrado (opcional)</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("agenda.nuevaCita")}</div>
+      <label>${t("agenda.form.pacienteRegistrado")}</label>
       <select id="citaPacienteId">
-        <option value="">— Paciente nuevo / sin registrar —</option>
+        <option value="">${t("agenda.form.pacienteSinRegistrar")}</option>
         ${pacientes.map(p => `<option value="${p._id}">${esc(p.nombre)}</option>`).join("")}
       </select>
-      <label>Nombre (si no es un paciente registrado)</label>
-      <input id="citaNombre" type="text" placeholder="Nombre completo">
-      <label>Teléfono (opcional)</label>
-      <input id="citaTelefono" type="tel" placeholder="591XXXXXXXX">
-      <label>Fecha y hora</label>
+      <label>${t("agenda.form.nombreLibre")}</label>
+      <input id="citaNombre" type="text" placeholder="${t("agenda.form.nombrePlaceholder")}">
+      <label>${t("agenda.form.telefono")}</label>
+      <input id="citaTelefono" type="tel" placeholder="${t("agenda.form.telefonoPlaceholder")}">
+      <label>${t("agenda.form.fechaHora")}</label>
       <input id="citaFecha" type="datetime-local">
-      <label>Motivo (opcional)</label>
-      <input id="citaMotivo" type="text" placeholder="Ej: Control">
+      <label>${t("agenda.form.motivo")}</label>
+      <input id="citaMotivo" type="text" placeholder="${t("agenda.form.motivoPlaceholder")}">
       <div id="citaErr"></div>
-      <button class="secondary" id="btnGuardarCita">Guardar cita</button>
+      <button class="secondary" id="btnGuardarCita">${t("agenda.form.guardar")}</button>
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Calendario</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("agenda.calendario")}</div>
       <div class="reserva-dias">
         ${dias.map(f => {
           const fd = new Date(f + "T00:00:00Z");
@@ -98,7 +100,7 @@ function pintarAgenda(citas, pacientes, wa) {
           const cant = porDia[f]?.length || 0;
           return `
             <button class="reserva-dia-chip ${activo ? "activo" : ""}" data-dia="${f}">
-              <span class="reserva-dia-semana">${DIAS_SEMANA_CORTO[fd.getUTCDay()]}</span>
+              <span class="reserva-dia-semana">${diaCorto(fd.getUTCDay())}</span>
               <span class="reserva-dia-numero">${fd.getUTCDate()}</span>
               ${cant ? `<span class="reserva-dia-badge">${cant}</span>` : `<span class="reserva-dia-mes">&nbsp;</span>`}
             </button>`;
@@ -107,25 +109,25 @@ function pintarAgenda(citas, pacientes, wa) {
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">${new Date(diaAgendaElegido + "T00:00:00Z").toLocaleDateString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" })}</div>
-      ${citasDelDia.length === 0 ? `<div class="empty">No hay citas este día.</div>` : citasDelDia.map(c => `
+      <div class="seccion-titulo" style="margin-top:0">${new Date(diaAgendaElegido + "T00:00:00Z").toLocaleDateString(localeActual(), { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "UTC" })}</div>
+      ${citasDelDia.length === 0 ? `<div class="empty">${t("agenda.sinCitas")}</div>` : citasDelDia.map(c => `
         <div class="item" style="cursor:default">
           <div class="top">
             <div class="nombre">${ORIGEN_ICONO[c.origen] || ""} ${esc(c.pacienteNombre)}</div>
-            <button class="link" data-cancelar-cita="${c._id}" style="margin:0;width:auto;color:var(--danger)">Cancelar</button>
+            <button class="link" data-cancelar-cita="${c._id}" style="margin:0;width:auto;color:var(--danger)">${t("agenda.cancelar")}</button>
           </div>
           <div class="fecha">${new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", timeZone: "America/La_Paz" })}</div>
           ${c.motivo ? `<div class="paciente-info">${esc(c.motivo)}</div>` : ""}
           ${!c.pacienteId ? `
-            <button class="link" data-abrir-crear-paciente="${c._id}" style="margin:6px 0 0">➕ Crear ficha de paciente</button>
+            <button class="link" data-abrir-crear-paciente="${c._id}" style="margin:6px 0 0">➕ ${t("agenda.ficha.crear")}</button>
             <div id="crearPacienteBox-${c._id}" style="display:none;margin-top:8px">
-              <div class="hint" style="margin-bottom:6px">Reservó por WhatsApp y todavía no tiene ficha en el Kardex. Revisá los datos antes de crearla:</div>
-              <label>Nombre</label>
+              <div class="hint" style="margin-bottom:6px">${t("agenda.ficha.aviso")}</div>
+              <label>${t("agenda.ficha.nombre")}</label>
               <input class="cp-nombre" data-cp="${c._id}" type="text" value="${esc(c.pacienteNombre || "")}">
-              <label>Teléfono</label>
+              <label>${t("agenda.ficha.telefono")}</label>
               <input class="cp-telefono" data-cp="${c._id}" type="tel" value="${esc(c.pacienteTelefono || "")}">
               <div class="cp-err" data-cp-err="${c._id}"></div>
-              <button class="secondary" data-confirmar-crear-paciente="${c._id}">Crear ficha</button>
+              <button class="secondary" data-confirmar-crear-paciente="${c._id}">${t("agenda.ficha.boton")}</button>
             </div>` : ""}
         </div>`).join("")}
     </div>
@@ -151,7 +153,7 @@ function pintarAgenda(citas, pacientes, wa) {
     const nombreManual = document.getElementById("citaNombre").value.trim();
     const fecha = document.getElementById("citaFecha").value;
     if (!fecha || (!pacienteId && !nombreManual)) {
-      errBox.innerHTML = `<div class="error">Elegí un paciente o escribí un nombre, y una fecha</div>`;
+      errBox.innerHTML = `<div class="error">${t("agenda.form.errFaltanDatos")}</div>`;
       return;
     }
     try {
@@ -168,13 +170,13 @@ function pintarAgenda(citas, pacientes, wa) {
       if (data?.avisoCalendario) alert(data.avisoCalendario);
       renderAgenda();
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar la cita")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("agenda.form.errGuardar"))}</div>`;
     }
   };
 
   document.querySelectorAll("[data-cancelar-cita]").forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm("¿Cancelar esta cita?")) return;
+      if (!confirm(t("agenda.confirmarCancelar"))) return;
       const data = await api("/medico/citas/" + btn.dataset.cancelarCita, {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ estado: "cancelada" }),
       });
@@ -196,18 +198,18 @@ function pintarAgenda(citas, pacientes, wa) {
       errBox.innerHTML = "";
       const nombre = document.querySelector(`.cp-nombre[data-cp="${citaId}"]`).value.trim();
       const telefono = document.querySelector(`.cp-telefono[data-cp="${citaId}"]`).value.trim();
-      if (!nombre) { errBox.innerHTML = `<div class="error">Falta el nombre</div>`; return; }
+      if (!nombre) { errBox.innerHTML = `<div class="error">${t("agenda.ficha.errFaltaNombre")}</div>`; return; }
       btn.disabled = true;
-      btn.textContent = "Creando...";
+      btn.textContent = t("agenda.ficha.creando");
       try {
         const data = await api(`/medico/citas/${citaId}/crear-paciente`, {
           method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ nombre, telefono }),
         });
         renderPacienteDetalle(data.paciente._id, "consultas");
       } catch (e) {
-        errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo crear la ficha")}</div>`;
+        errBox.innerHTML = `<div class="error">${esc(e.error || t("agenda.ficha.errCrear"))}</div>`;
         btn.disabled = false;
-        btn.textContent = "Crear ficha";
+        btn.textContent = t("agenda.ficha.boton");
       }
     };
   });
@@ -216,13 +218,13 @@ function pintarAgenda(citas, pacientes, wa) {
 
 async function renderConfigHorario() {
   detenerPolling();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("horario.cargando")}</div>`;
   try {
     const data = await api("/medico/horario");
     pintarConfigHorario(data.horario);
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando el horario")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("horario.error"))}</div>`;
   }
 }
 
@@ -232,33 +234,33 @@ function pintarConfigHorario(horario) {
   (horario.horarioAtencion || []).forEach(h => { porDia[h.diaSemana] = h; });
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← Agenda</button>
+    <button class="back" id="btnBack">${t("horario.volver")}</button>
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Días y horarios de atención</div>
-      <div class="hint" style="margin-bottom:10px">Tildá los días en los que atendés, con su horario. Los días sin tilde no ofrecen turnos.</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("horario.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${t("horario.ayuda")}</div>
       ${dias.map(d => `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
           <label style="margin:0;display:flex;align-items:center;gap:6px;min-width:70px">
             <input type="checkbox" class="diaActivo" data-dia="${d}" ${porDia[d] ? "checked" : ""} style="width:auto">
-            ${DIAS_SEMANA_CORTO[d]}
+            ${diaCorto(d)}
           </label>
           <input type="time" class="horaInicio" data-dia="${d}" value="${porDia[d]?.horaInicio || "08:00"}" style="flex:1">
           <input type="time" class="horaFin" data-dia="${d}" value="${porDia[d]?.horaFin || "17:00"}" style="flex:1">
         </div>`).join("")}
 
-      <label>Duración de cada consulta (minutos)</label>
+      <label>${t("horario.duracion")}</label>
       <input id="cfgDuracion" type="number" min="10" step="5" value="${horario.duracionConsultaMinutos || 30}">
 
-      <label>Calendario de Google (opcional)</label>
-      <input id="cfgCalendarId" type="text" placeholder="tu-email@gmail.com" value="${esc(horario.googleCalendarId || "")}">
-      <div class="hint">Compartí ese calendario con la cuenta de servicio de Vitalis ("hacer cambios en eventos"). Con esto conectado, Vitalis hace las dos cosas: refleja ahí las citas que se agendan, y antes de ofrecer un horario por WhatsApp revisa que no tengas algo ya puesto directo en tu calendario. Si lo dejás vacío, las citas quedan solo dentro de Vitalis.</div>
+      <label>${t("horario.googleCalendar")}</label>
+      <input id="cfgCalendarId" type="text" placeholder="${t("horario.googleCalendarPlaceholder")}" value="${esc(horario.googleCalendarId || "")}">
+      <div class="hint">${t("horario.googleCalendarAyuda")}</div>
 
-      <label>Información del consultorio (para el asistente de WhatsApp)</label>
-      <textarea id="cfgInfoConsultorio" rows="6" placeholder="Ej: Atendemos de lunes a viernes de 8 a 17hs. Consulta general: 150 Bs. Estamos en Av. América #123, Cochabamba. Aceptamos efectivo y QR. Si no podés venir, avisá con 24hs de anticipación.">${esc(horario.infoConsultorio || "")}</textarea>
-      <div class="hint">El número de WhatsApp usa esto para responder preguntas de los pacientes (horarios, precios, ubicación, políticas...) — solo contesta con lo que escribas acá, nunca inventa.</div>
+      <label>${t("horario.infoConsultorio")}</label>
+      <textarea id="cfgInfoConsultorio" rows="6" placeholder="${t("horario.infoConsultorioPlaceholder")}">${esc(horario.infoConsultorio || "")}</textarea>
+      <div class="hint">${t("horario.infoConsultorioAyuda")}</div>
 
       <div id="cfgErr"></div>
-      <button class="secondary" id="btnGuardarHorario">Guardar</button>
+      <button class="secondary" id="btnGuardarHorario">${t("horario.guardar")}</button>
     </div>`;
 
   document.getElementById("btnBack").onclick = renderAgenda;
@@ -284,7 +286,7 @@ function pintarConfigHorario(horario) {
       });
       renderAgenda();
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("horario.errGuardar"))}</div>`;
     }
   };
 }

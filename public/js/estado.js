@@ -273,6 +273,9 @@ function logout() {
   localStorage.removeItem("salud_token");
   localStorage.removeItem("salud_nombre");
   localStorage.removeItem("salud_tipo_especialidad");
+  // Al salir, la pantalla de login vuelve al español: el idioma era de la
+  // cuenta que se acaba de cerrar, no de este navegador.
+  fijarIdioma("es");
   aplicarTemaSegunEspecialidad();
   if (typeof desactivarEscritorio === "function") desactivarEscritorio();
   if (typeof desconectarTiempoReal === "function") desconectarTiempoReal();

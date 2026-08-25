@@ -28,6 +28,12 @@ const medicoSchema = new mongoose.Schema({
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
   tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"], default: "medicina_general" },
+  // Idioma en el que este médico trabaja: la interfaz, sus notas clínicas y
+  // lo que sus pacientes reciben por WhatsApp. Va acá y no en el servidor
+  // porque es un ajuste profesional, no de infraestructura — el mismo
+  // Vitalis desplegado en Brasil puede atender a un médico que escribe en
+  // español, y al revés.
+  idioma: { type: String, enum: ["es", "pt"], default: "es" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,

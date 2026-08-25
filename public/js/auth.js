@@ -35,6 +35,9 @@ function completarLogin(data) {
   localStorage.setItem("salud_token", TOKEN);
   localStorage.setItem("salud_nombre", MEDICO_NOMBRE);
   localStorage.setItem("salud_tipo_especialidad", MEDICO_TIPO_ESPECIALIDAD);
+  // El idioma llega del servidor igual que la especialidad: es un dato de la
+  // cuenta, no del navegador. Se fija antes de pintar nada.
+  fijarIdioma(data.idioma || "es");
   aplicarTemaSegunEspecialidad();
   if (typeof conectarTiempoReal === "function") conectarTiempoReal();
   if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
