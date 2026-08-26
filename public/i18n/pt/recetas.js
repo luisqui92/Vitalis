@@ -1,0 +1,51 @@
+// Vitalis — Português · receita de medicamentos e receita óptica.
+//
+// Traduzir estes rótulos faz a receita ser LIDA em português. Não a torna
+// válida no Brasil: falta o CRM do médico, o formato do receituário exigido
+// pelo CFM/ANVISA e o receituário de controle especial. Isso é trabalho à
+// parte e precisa de assessoria local.
+Object.assign(I18N.pt, {
+  "receta.med.nombre": "Medicamento (ex: Amoxicilina)",
+  "receta.med.dosis": "Dose (ex: 500mg)",
+  "receta.med.frecuencia": "Frequência (ex: a cada 8 horas)",
+  "receta.med.duracion": "Duração (ex: 7 dias)",
+  "receta.quitar": "✕ Remover",
+  "receta.nueva": "Nova receita",
+  "receta.fecha": "Data",
+  "receta.agregarFila": "➕ Adicionar outro medicamento",
+  "receta.indicaciones": "Orientações gerais (opcional)",
+  "receta.indicacionesPlaceholder": "Repouso, dieta, retorno em 7 dias...",
+  "receta.guardar": "💾 Salvar e ver receita",
+  "receta.vacio": "Ainda não há receitas emitidas.",
+  "receta.errSinMedicamentos": "Adicione ao menos um medicamento",
+  "receta.guardando": "Salvando...",
+  "receta.errGuardar": "Não foi possível salvar a receita",
+  "receta.confirmarBorrar": "Excluir esta receita?",
+  "receta.cargando": "Carregando...",
+  "receta.volver": "← Voltar",
+  "receta.paciente": "Paciente:",
+  "receta.rp": "Uso:",
+  "receta.indicacionesTitulo": "Orientações",
+  "receta.imprimir": "🖨️ Imprimir / Baixar PDF",
+  "receta.errCargar": "Erro ao carregar a receita",
+
+  "optica.cargando": "Carregando receitas ópticas...",
+  "optica.errCargar": "Não foi possível carregar as receitas ópticas",
+  "optica.nueva": "👓 Nova receita óptica",
+  "optica.esfera": "Esférico",
+  "optica.cilindro": "Cilíndrico",
+  "optica.eje": "Eixo °",
+  "optica.ejeCorto": "Eixo",
+  "optica.adicion": "Adição",
+  "optica.dp": "Distância pupilar (mm, opcional)",
+  "optica.dpPlaceholder": "Ex: 62",
+  "optica.dpTitulo": "Distância pupilar:",
+  "optica.notas": "Observações (opcional)",
+  "optica.notasPlaceholder": "Ex: uso permanente, retorno em 1 ano",
+  "optica.guardar": "💾 Salvar receita óptica",
+  "optica.vacio": "Ainda não há receitas ópticas emitidas.",
+  "optica.errSinDatos": "Preencha ao menos esférico ou cilíndrico de algum olho",
+  "optica.errGuardar": "Não foi possível salvar",
+  "optica.confirmarBorrar": "Excluir esta receita óptica?",
+  "optica.errCargarUna": "Erro ao carregar a receita óptica",
+});

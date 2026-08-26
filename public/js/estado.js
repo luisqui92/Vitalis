@@ -33,7 +33,7 @@ function aplicarTemaSegunEspecialidad() {
   document.body.classList.toggle("tema-pediatria", esPediatria);
   document.body.classList.toggle("tema-neuro", esNeuro);
   const marcaH1 = document.querySelector(".brand h1");
-  if (marcaH1) marcaH1.textContent = esDental ? "Vitalis Dental" : esEstetica ? "Vitalis Face" : esOftalmologia ? "Vitalis Visión" : esVeterinaria ? "Vitalis Veterinaria" : esGinecologia ? "Vitalis Obstetricia" : esPediatria ? "Vitalis Pediatría" : esNeuro ? "Vitalis Neurodesarrollo" : "Vitalis";
+  if (marcaH1) marcaH1.textContent = t(esDental ? "marca.dental" : esEstetica ? "marca.estetica" : esOftalmologia ? "marca.oftalmologia" : esVeterinaria ? "marca.veterinaria" : esGinecologia ? "marca.ginecologia" : esPediatria ? "marca.pediatria" : esNeuro ? "marca.neuro" : "marca.base");
 }
 
 // /veterinaria es la "landing" de Vitalis Veterinaria: mismo frontend, pero
@@ -45,10 +45,10 @@ const ES_LANDING_VETERINARIA = location.pathname.replace(/\/+$/, "") === "/veter
 function aplicarLandingVeterinariaSiCorresponde() {
   if (!ES_LANDING_VETERINARIA || TOKEN) return;
   document.body.classList.add("tema-veterinaria");
-  document.title = "Vitalis Veterinaria · Kardex inteligente";
+  document.title = t("marca.tituloVet");
   const marcaH1 = document.querySelector(".brand h1");
-  if (marcaH1) marcaH1.textContent = "Vitalis Veterinaria";
-  if (headerSub) headerSub.textContent = "Kardex inteligente para tu clínica veterinaria";
+  if (marcaH1) marcaH1.textContent = t("marca.veterinaria");
+  if (headerSub) headerSub.textContent = t("marca.subtituloVet");
 }
 
 // La transcripción y la nota clínica de consultas largas corren en segundo
@@ -124,56 +124,56 @@ const ICONOS = {
 // fichas distintas (a un odontólogo no le sirven Vacunas/Evolución, y a
 // cambio necesita el Odontograma), así que hay dos sets separados.
 const TABS_KARDEX_MEDICINA_GENERAL = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
-  evolucion: { icono: ICONOS.tendencia, label: "Evolución" },
-  estudios: { icono: ICONOS.frasco, label: "Estudios" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  vacunas: { icono: ICONOS.jeringa, claveLabel: "tab.vacunas" },
+  evolucion: { icono: ICONOS.tendencia, claveLabel: "tab.evolucion" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 const TABS_KARDEX_ODONTOLOGIA = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  odontograma: { icono: ICONOS.diente, label: "Odontograma" },
-  plan: { icono: ICONOS.clipboard, label: "Presupuesto" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  estudios: { icono: ICONOS.frasco, label: "Estudios" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  odontograma: { icono: ICONOS.diente, claveLabel: "tab.odontograma" },
+  plan: { icono: ICONOS.clipboard, claveLabel: "tab.presupuesto" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 // Vitalis Face (estética/plástica/dermatología): sin odontograma ni
 // vacunas/evolución — en cambio, Estudios se usa para las fotos clínicas
 // con ángulo guiado, y "plan" (mismo backend que el presupuesto dental)
 // pasa a llamarse Procedimientos.
 const TABS_KARDEX_ESTETICA = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  plan: { icono: ICONOS.clipboard, label: "Procedimientos" },
-  estudios: { icono: ICONOS.camara, label: "Fotos" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  plan: { icono: ICONOS.clipboard, claveLabel: "tab.procedimientos" },
+  estudios: { icono: ICONOS.camara, claveLabel: "tab.fotos" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 // Vitalis Visión (oftalmología): "ojos" es el mapa ocular por estructura,
 // "evolucion" acá se usa para presión intraocular/agudeza visual (con
 // alerta si la tendencia sube), y "plan" (mismo backend de Odonto/Face)
 // pasa a llamarse Procedimientos (cirugía de catarata, láser, etc.).
 const TABS_KARDEX_OFTALMOLOGIA = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  ojos: { icono: ICONOS.ojo, label: "Ojos" },
-  plan: { icono: ICONOS.clipboard, label: "Procedimientos" },
-  evolucion: { icono: ICONOS.tendencia, label: "Evolución" },
-  estudios: { icono: ICONOS.frasco, label: "Estudios" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  ojos: { icono: ICONOS.ojo, claveLabel: "tab.ojos" },
+  plan: { icono: ICONOS.clipboard, claveLabel: "tab.procedimientos" },
+  evolucion: { icono: ICONOS.tendencia, claveLabel: "tab.evolucion" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 // Vitalis Veterinaria: mismas fichas que medicina general (consultas,
 // medicación, antecedentes, vacunas, evolución de peso, estudios, recetas)
@@ -181,16 +181,16 @@ const TABS_KARDEX_OFTALMOLOGIA = {
 // Kardex es la misma; lo que cambia son los campos de "Paciente" (especie,
 // raza, dueño) y el tema visual.
 const TABS_KARDEX_VETERINARIA = {
-  paciente: { icono: ICONOS.pata, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  mapaCorporal: { icono: ICONOS.pata, label: "Lesiones" },
-  vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
-  evolucion: { icono: ICONOS.tendencia, label: "Peso" },
-  estudios: { icono: ICONOS.frasco, label: "Estudios" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.pata, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  mapaCorporal: { icono: ICONOS.pata, claveLabel: "tab.lesiones" },
+  vacunas: { icono: ICONOS.jeringa, claveLabel: "tab.vacunas" },
+  evolucion: { icono: ICONOS.tendencia, claveLabel: "tab.peso" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 // Vitalis Obstetricia (ginecología y obstetricia): "embarazo" es la FUM/FPP
 // y semanas de gestación del embarazo activo (o para abrir uno nuevo);
@@ -198,16 +198,16 @@ const TABS_KARDEX_VETERINARIA = {
 // cardíaca fetal control a control, y "estudios" para las ecografías
 // obstétricas (mismo backend de Estudios de siempre).
 const TABS_KARDEX_GINECOLOGIA = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  embarazo: { icono: ICONOS.embarazo, label: "Embarazo" },
-  mapaGineco: { icono: ICONOS.utero, label: "Mapa" },
-  evolucion: { icono: ICONOS.corazon, label: "Controles" },
-  estudios: { icono: ICONOS.frasco, label: "Ecografías" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  embarazo: { icono: ICONOS.embarazo, claveLabel: "tab.embarazo" },
+  mapaGineco: { icono: ICONOS.utero, claveLabel: "tab.mapa" },
+  evolucion: { icono: ICONOS.corazon, claveLabel: "tab.controles" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.ecografias" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 // Vitalis Pediatría: "crecimiento" son las curvas de la OMS (peso, talla,
 // perímetro cefálico e IMC para la edad) y es la pestaña que define la rama
@@ -215,16 +215,16 @@ const TABS_KARDEX_GINECOLOGIA = {
 // signos vitales de siempre (temperatura, saturación), que en un chico con
 // fiebre siguen haciendo falta.
 const TABS_KARDEX_PEDIATRIA = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  consultas: { icono: ICONOS.mic, label: "Consultas" },
-  crecimiento: { icono: ICONOS.tendencia, label: "Crecimiento" },
-  vacunas: { icono: ICONOS.jeringa, label: "Vacunas" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  evolucion: { icono: ICONOS.corazon, label: "Signos" },
-  estudios: { icono: ICONOS.frasco, label: "Estudios" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.consultas" },
+  crecimiento: { icono: ICONOS.tendencia, claveLabel: "tab.crecimiento" },
+  vacunas: { icono: ICONOS.jeringa, claveLabel: "tab.vacunas" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  evolucion: { icono: ICONOS.corazon, claveLabel: "tab.signos" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
 // Vitalis Neurodesarrollo (autismo, síndrome de Down y otras condiciones):
 // "perfilNeuro" es quién es la persona, qué apoyos necesita y su mapa
@@ -232,30 +232,41 @@ const TABS_KARDEX_PEDIATRIA = {
 // el calendario de controles que hay que ir a buscar. No hay pestaña de
 // diagnóstico a propósito — ver el comentario en db/models.js.
 const TABS_KARDEX_NEURO = {
-  paciente: { icono: ICONOS.persona, label: "Paciente" },
-  perfilNeuro: { icono: ICONOS.persona, label: "Perfil" },
-  consultas: { icono: ICONOS.mic, label: "Sesiones" },
-  objetivos: { icono: ICONOS.tendencia, label: "Objetivos" },
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  perfilNeuro: { icono: ICONOS.persona, claveLabel: "tab.perfil" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.sesiones" },
+  objetivos: { icono: ICONOS.tendencia, claveLabel: "tab.objetivos" },
   // ADOS-2, ADI-R, Vineland... Vitalis registra el resultado, nunca el
   // instrumento: son propiedad de sus editoriales y requieren entrenamiento.
-  instrumentos: { icono: ICONOS.clipboard, label: "Instrumentos" },
-  salud: { icono: ICONOS.jeringa, label: "Salud" },
-  crecimiento: { icono: ICONOS.tendencia, label: "Crecimiento" },
-  medicamentos: { icono: ICONOS.pastilla, label: "Medicación" },
-  antecedentes: { icono: ICONOS.clipboard, label: "Antecedentes" },
-  estudios: { icono: ICONOS.frasco, label: "Estudios" },
-  recetas: { icono: ICONOS.documento, label: "Recetas" },
-  informes: { icono: ICONOS.documento, label: "Informes" },
+  instrumentos: { icono: ICONOS.clipboard, claveLabel: "tab.instrumentos" },
+  salud: { icono: ICONOS.jeringa, claveLabel: "tab.salud" },
+  crecimiento: { icono: ICONOS.tendencia, claveLabel: "tab.crecimiento" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
+// Los mapas de arriba guardan la CLAVE del texto, no el texto. La traducción
+// se resuelve acá, en cada llamada, y no al cargar el archivo: estado.js se
+// carga antes del login, cuando todavía no se sabe en qué idioma trabaja el
+// médico. Si las etiquetas se resolvieran arriba, quedarían congeladas en el
+// idioma que hubiera al abrir la página y no cambiarían al iniciar sesión.
 function tabsKardexPara(tipoEspecialidad) {
-  if (tipoEspecialidad === "neurodesarrollo") return TABS_KARDEX_NEURO;
-  if (tipoEspecialidad === "pediatria") return TABS_KARDEX_PEDIATRIA;
-  if (tipoEspecialidad === "odontologia") return TABS_KARDEX_ODONTOLOGIA;
-  if (tipoEspecialidad === "estetica") return TABS_KARDEX_ESTETICA;
-  if (tipoEspecialidad === "oftalmologia") return TABS_KARDEX_OFTALMOLOGIA;
-  if (tipoEspecialidad === "veterinaria") return TABS_KARDEX_VETERINARIA;
-  if (tipoEspecialidad === "ginecologia") return TABS_KARDEX_GINECOLOGIA;
-  return TABS_KARDEX_MEDICINA_GENERAL;
+  const mapa =
+    tipoEspecialidad === "neurodesarrollo" ? TABS_KARDEX_NEURO :
+    tipoEspecialidad === "pediatria" ? TABS_KARDEX_PEDIATRIA :
+    tipoEspecialidad === "odontologia" ? TABS_KARDEX_ODONTOLOGIA :
+    tipoEspecialidad === "estetica" ? TABS_KARDEX_ESTETICA :
+    tipoEspecialidad === "oftalmologia" ? TABS_KARDEX_OFTALMOLOGIA :
+    tipoEspecialidad === "veterinaria" ? TABS_KARDEX_VETERINARIA :
+    tipoEspecialidad === "ginecologia" ? TABS_KARDEX_GINECOLOGIA :
+    TABS_KARDEX_MEDICINA_GENERAL;
+  const salida = {};
+  for (const clave of Object.keys(mapa)) {
+    salida[clave] = { icono: mapa[clave].icono, label: t(mapa[clave].claveLabel) };
+  }
+  return salida;
 }
 
 async function api(path, opts = {}) {
@@ -282,6 +293,6 @@ function logout() {
   btnLogout.style.display = "none";
   btnAsistente.style.display = "none";
   if (typeof cerrarAsistente === "function") cerrarAsistente();
-  headerSub.textContent = "Kardex inteligente";
+  headerSub.textContent = t("marca.subtitulo");
   renderLogin();
 }

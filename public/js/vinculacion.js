@@ -3,25 +3,25 @@
 
 async function renderVincular() {
   detenerPolling();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("vincular.cargando")}</div>`;
   try {
     const data = await api("/medico/vinculacion");
     pintarVincular(data.vinculacion);
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando la vinculación")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("vincular.error"))}</div>`;
   }
 }
 
 function pintarVincular(v) {
   if (!v.vinculado) {
     app.innerHTML = `
-      <button class="back" id="btnBack">← Volver</button>
+      <button class="back" id="btnBack">${t("vincular.volver")}</button>
       <div class="card">
-        <div class="hint" style="margin-bottom:14px">Escribí el código de 6 dígitos que aparece en la compu:</div>
+        <div class="hint" style="margin-bottom:14px">${t("vincular.pedirCodigo")}</div>
         <input id="vCodigo" type="tel" maxlength="6" placeholder="000000" style="text-align:center;font-size:24px;letter-spacing:6px">
         <div id="vErr"></div>
-        <button class="primary" id="vBtn">Vincular</button>
+        <button class="primary" id="vBtn">${t("vincular.boton")}</button>
       </div>`;
     document.getElementById("btnBack").onclick = renderDashboard;
     document.getElementById("vBtn").onclick = async () => {
@@ -34,7 +34,7 @@ function pintarVincular(v) {
         });
         pintarVincular(data.vinculacion);
       } catch (e) {
-        errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo vincular")}</div>`;
+        errBox.innerHTML = `<div class="error">${esc(e.error || t("vincular.errVincular"))}</div>`;
       }
     };
     return;
@@ -42,10 +42,10 @@ function pintarVincular(v) {
 
   // Ya vinculado: queda "armado" mirando si la compu mandó una orden.
   app.innerHTML = `
-    <button class="back" id="btnBack">← Volver</button>
+    <button class="back" id="btnBack">${t("vincular.volver")}</button>
     <div class="card" id="vCard">
-      <div class="hint">📱 Celular vinculado. Dejalo con la pantalla prendida al lado de la compu.</div>
-      <div class="hint" style="margin-top:10px" id="vEstado">🟢 Esperando la orden de grabar...</div>
+      <div class="hint">${t("vincular.listo")}</div>
+      <div class="hint" style="margin-top:10px" id="vEstado">${t("vincular.esperando")}</div>
     </div>`;
 
   let mediaRecorder = null, chunks = [], mimeType = "audio/webm", stream = null;
@@ -61,7 +61,7 @@ function pintarVincular(v) {
   // de navegar directo.
   document.getElementById("btnBack").onclick = () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
-      if (!confirm('Hay una grabación en curso. Hay que detenerla antes de salir (se sube la consulta grabada hasta ahora). ¿Detener y volver?')) return;
+      if (!confirm(t("vincular.confirmarSalir"))) return;
       mediaRecorder.stop();
       return;
     }
@@ -79,10 +79,10 @@ function pintarVincular(v) {
           <img src="/logo.png" alt="" class="listen-logo">
         </div>
         <div class="listen-time" id="recTimeRemoto">00:00</div>
-        <div class="listen-label">🎙️ Grabando: ${esc(pacienteNombre)}</div>
+        <div class="listen-label">${t("vincular.grabando", { paciente: esc(pacienteNombre) })}</div>
       </div>
-      <div class="hint" style="text-align:center">Esperando que la compu diga "detener"...</div>
-      <button class="secondary" id="btnDetenerLocal">⏹️ Detener acá mismo</button>`;
+      <div class="hint" style="text-align:center">${t("vincular.esperandoDetener")}</div>
+      <button class="secondary" id="btnDetenerLocal">${t("vincular.detenerAca")}</button>`;
     const visual = crearIndicadorAudio(document.getElementById("audioOrbRemoto"));
     const recTime = document.getElementById("recTimeRemoto");
 
@@ -99,7 +99,7 @@ function pintarVincular(v) {
       visual.detener();
       stream.getTracks().forEach(t => t.stop());
       const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
-      document.getElementById("vCard").innerHTML = `<div class="hint">⏳ Subiendo la grabación...</div>`;
+      document.getElementById("vCard").innerHTML = `<div class="hint">${t("vincular.subiendo")}</div>`;
       try {
         const data = await subirConsulta(pacienteActual.pacienteId, blob, mimeType);
         await api("/medico/vinculacion/estado", {

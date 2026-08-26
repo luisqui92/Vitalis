@@ -1,0 +1,51 @@
+// Vitalis — Español · receta de medicamentos y receta óptica.
+//
+// Ojo: la receta es un documento con valor legal, y Brasil tiene sus propias
+// exigencias de forma (CFM/ANVISA, CRM del médico, receituário de control
+// especial). Traducir estas etiquetas hace que se lea en portugués; NO hace
+// que la receta sea válida en Brasil. Eso es trabajo aparte.
+Object.assign(I18N.es, {
+  "receta.med.nombre": "Medicamento (ej: Amoxicilina)",
+  "receta.med.dosis": "Dosis (ej: 500mg)",
+  "receta.med.frecuencia": "Frecuencia (ej: cada 8 horas)",
+  "receta.med.duracion": "Duración (ej: 7 días)",
+  "receta.quitar": "✕ Quitar",
+  "receta.nueva": "Nueva receta",
+  "receta.fecha": "Fecha",
+  "receta.agregarFila": "➕ Agregar otro medicamento",
+  "receta.indicaciones": "Indicaciones generales (opcional)",
+  "receta.indicacionesPlaceholder": "Reposo, dieta, control en 7 días...",
+  "receta.guardar": "💾 Guardar y ver receta",
+  "receta.vacio": "Todavía no hay recetas emitidas.",
+  "receta.errSinMedicamentos": "Agregá al menos un medicamento",
+  "receta.guardando": "Guardando...",
+  "receta.errGuardar": "No se pudo guardar la receta",
+  "receta.confirmarBorrar": "¿Eliminar esta receta?",
+  "receta.cargando": "Cargando...",
+  "receta.volver": "← Volver",
+  "receta.paciente": "Paciente:",
+  "receta.rp": "Rp/",
+  "receta.indicacionesTitulo": "Indicaciones",
+  "receta.imprimir": "🖨️ Imprimir / Descargar PDF",
+  "receta.errCargar": "Error cargando la receta",
+
+  "optica.cargando": "Cargando recetas ópticas...",
+  "optica.errCargar": "No se pudieron cargar las recetas ópticas",
+  "optica.nueva": "👓 Nueva receta óptica",
+  "optica.esfera": "Esfera",
+  "optica.cilindro": "Cilindro",
+  "optica.eje": "Eje °",
+  "optica.ejeCorto": "Eje",
+  "optica.adicion": "Adición",
+  "optica.dp": "Distancia pupilar (mm, opcional)",
+  "optica.dpPlaceholder": "Ej: 62",
+  "optica.dpTitulo": "Distancia pupilar:",
+  "optica.notas": "Notas (opcional)",
+  "optica.notasPlaceholder": "Ej: uso permanente, control en 1 año",
+  "optica.guardar": "💾 Guardar receta óptica",
+  "optica.vacio": "Todavía no hay recetas ópticas emitidas.",
+  "optica.errSinDatos": "Cargá al menos esfera o cilindro de algún ojo",
+  "optica.errGuardar": "No se pudo guardar",
+  "optica.confirmarBorrar": "¿Eliminar esta receta óptica?",
+  "optica.errCargarUna": "Error cargando la receta óptica",
+});
