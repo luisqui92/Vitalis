@@ -17,8 +17,31 @@ mongoose.connection.on("disconnected", () => log.warn("⚠️ MongoDB desconecta
 mongoose.connection.on("reconnected", () => log.info("✅ MongoDB reconectado"));
 
 // ─── MÓDULO CONSULTAS MÉDICAS ────────────────────────────────────────────────
+// Clínica: varios consultorios bajo un mismo techo, con alguien que mira el
+// conjunto. NO es dueña de las historias clínicas — cada ficha sigue
+// colgando del médico que la escribió (medicoPhone, en 30 colecciones), y
+// eso no cambia. La clínica es una capa de arriba: agrupa médicos para
+// poder sumar números y administrar cuentas, nada más.
+//
+// Que el aislamiento por médico se mantenga NO es una limitación técnica que
+// no tuvimos ganas de resolver: es lo que hace que un administrativo no
+// pueda leer la consulta de un paciente que no es suyo. Ver services/clinica.js.
+const clinicaSchema = new mongoose.Schema({
+  nombre: { type: String, required: true },
+  direccion: { type: String, default: "" },
+  ciudad: { type: String, default: "" },
+  telefono: { type: String, default: "" },
+  activa: { type: Boolean, default: true },
+}, { timestamps: true });
+const Clinica = mongoose.model("Clinica", clinicaSchema);
+
 // Médico que sube consultas para transcribir. Login con teléfono + contraseña;
 // solo médicos ya registrados/activos pueden entrar.
+//
+// Un administrativo de clínica también vive acá, con rol "admin": reusa el
+// login, el 2FA, el limitador de intentos y la auditoría que ya existen. No
+// es un médico y el sistema lo sabe — su token NO lleva rol "medico", así
+// que las rutas clínicas lo rechazan por el mismo camino de siempre.
 const medicoSchema = new mongoose.Schema({
   phone: { type: String, unique: true, index: true, required: true },
   nombre: { type: String, required: true },
@@ -34,6 +57,29 @@ const medicoSchema = new mongoose.Schema({
   // Vitalis desplegado en Brasil puede atender a un médico que escribe en
   // español, y al revés.
   idioma: { type: String, enum: ["es", "pt"], default: "es" },
+
+  // ─── Clínica (opcional: un médico solo no tiene ninguna) ───────────────
+  clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", default: null, index: true },
+  // "medico"   — lo de siempre.
+  // "admin"    — administrativo. NO es médico: no ve ninguna ficha, ninguna
+  //              consulta, ninguna receta. Solo números y cuentas.
+  // "director" — es médico Y administra. Ve SUS pacientes como cualquier
+  //              médico, y los números de la clínica como admin. Ser
+  //              director no le da acceso a las fichas de sus colegas: para
+  //              eso está la interconsulta, y queda auditada.
+  rol: { type: String, enum: ["medico", "admin", "director"], default: "medico" },
+  // Cómo está vinculado a la clínica. Cambia QUÉ ve el administrador:
+  //   "empleado" — la clínica factura al paciente, así que la plata es de la
+  //                clínica y el admin ve la facturación de este médico.
+  //   "alquila"  — el médico alquila el consultorio y factura por su cuenta.
+  //                El admin ve que usó la sala (ocupación), NO cuánto cobró:
+  //                esa plata no es de la clínica. Y si se va, se lleva sus
+  //                fichas, porque nunca dejaron de ser suyas.
+  vinculo: { type: String, enum: ["empleado", "alquila"], default: "empleado" },
+  // Nombre del consultorio dentro de la clínica ("Consultorio 3"), para que
+  // el panel muestre la ocupación por sala y no solo por persona.
+  consultorio: { type: String, default: "" },
+
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
@@ -1186,7 +1232,7 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { Clinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

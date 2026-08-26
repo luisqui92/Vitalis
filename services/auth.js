@@ -34,10 +34,21 @@ async function verificarPassword(pwd, hashGuardado) {
   return { ok, requiereRehash: false };
 }
 
-function generarToken(usuario, rol, duracionMs = 8 * 60 * 60 * 1000) {
+// "extra" lleva lo de la clínica: { admin: true, clinicaId }. Va en el token
+// y no se consulta en cada pedido porque cambia solo cuando el dueño de la
+// clínica lo cambia, y el token dura 8 horas.
+//
+// Ojo con el reparto de responsabilidades, que es lo que hace segura toda
+// esta parte: el ROL es lo que abre las rutas clínicas. Un administrativo
+// tiene rol "admin", así que requireAuth(["medico"]) lo rechaza —el mismo
+// camino de siempre, sin excepciones nuevas—. La bandera "admin" solo abre
+// las rutas /admin, que no devuelven ni una línea de historia clínica.
+// Un director lleva rol "medico" Y admin:true, y por eso pasa por las dos.
+function generarToken(usuario, rol, duracionMs = 8 * 60 * 60 * 1000, extra = {}) {
   const payload = {
     usuario,
     rol,
+    ...extra,
     exp: Date.now() + duracionMs,
     iat: Date.now(),
   };
@@ -91,4 +102,22 @@ function requireAuth(rolesPermitidos = ["medico"]) {
   };
 }
 
-module.exports = { hashPassword, verificarPassword, generarToken, verificarToken, requireAuth };
+// Guardia de las rutas /admin. Exige la bandera admin Y una clínica: un
+// administrador sin clínica no tiene nada que administrar, y dejarlo pasar
+// abriría la puerta a que una consulta mal filtrada devuelva datos de todas.
+//
+// req.clinicaId queda listo para que cada ruta filtre por ahí. Ninguna ruta
+// /admin debe aceptar un clinicaId que venga del cliente: sale del token o
+// no sale.
+function requireAdmin(req, res, next) {
+  const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
+  const payload = verificarToken(token);
+  if (!payload) return res.status(401).json({ error: "No autorizado — iniciá sesión" });
+  if (!payload.admin) return res.status(403).json({ error: "No tenés permiso para esta acción" });
+  if (!payload.clinicaId) return res.status(403).json({ error: "Tu cuenta no está asociada a ninguna clínica" });
+  req.adminUser = payload;
+  req.clinicaId = payload.clinicaId;
+  next();
+}
+
+module.exports = { hashPassword, verificarPassword, generarToken, verificarToken, requireAuth, requireAdmin };

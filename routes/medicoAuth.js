@@ -10,6 +10,32 @@ const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
 
+// El rol del TOKEN no es el mismo campo que el rol de la cuenta, y la
+// diferencia es la que sostiene el permiso: un director es médico para todo
+// efecto clínico (rol "medico"), y además administra (admin: true). Un
+// administrativo NO es médico, así que su token lleva rol "admin" y las
+// rutas clínicas lo rechazan solas, por el requireAuth(["medico"]) que ya
+// tenían — sin agregar un chequeo nuevo en cada una de las 30 rutas.
+function tokenDeMedico(medico) {
+  const esAdmin = medico.rol === "admin" || medico.rol === "director";
+  const rolToken = medico.rol === "admin" ? "admin" : "medico";
+  return generarToken(medico.phone, rolToken, 8 * 60 * 60 * 1000, {
+    ...(esAdmin ? { admin: true } : {}),
+    ...(medico.clinicaId ? { clinicaId: String(medico.clinicaId) } : {}),
+  });
+}
+
+function datosDeSesion(medico) {
+  return {
+    phone: medico.phone,
+    nombre: medico.nombre,
+    tipoEspecialidad: medico.tipoEspecialidad,
+    idioma: medico.idioma || "es",
+    rol: medico.rol || "medico",
+    clinica: medico.clinicaId ? String(medico.clinicaId) : null,
+  };
+}
+
 module.exports = function (app) {
   // ─── REGISTRO ───────────────────────────────────────────────────────────
   app.post("/medico/registro", limitAuth, asyncRoute(async (req, res) => {
@@ -62,8 +88,8 @@ module.exports = function (app) {
     }
 
     registrar({ req, medicoPhone: phone, accion: "login" });
-    const token = generarToken(medico.phone, "medico");
-    res.json({ token, phone: medico.phone, nombre: medico.nombre, tipoEspecialidad: medico.tipoEspecialidad, idioma: medico.idioma || "es" });
+    const token = tokenDeMedico(medico);
+    res.json({ token, ...datosDeSesion(medico) });
   }));
 
   // ─── LOGIN (paso 2: código de 2FA) ───────────────────────────────────────
@@ -80,8 +106,8 @@ module.exports = function (app) {
       throw new ErrorHttp(401, "Código incorrecto");
     }
     registrar({ req, medicoPhone: medico.phone, accion: "login" });
-    const token = generarToken(medico.phone, "medico");
-    res.json({ token, phone: medico.phone, nombre: medico.nombre, tipoEspecialidad: medico.tipoEspecialidad, idioma: medico.idioma || "es" });
+    const token = tokenDeMedico(medico);
+    res.json({ token, ...datosDeSesion(medico) });
   }));
 
   // ─── IDIOMA DE LA CUENTA ────────────────────────────────────────────────

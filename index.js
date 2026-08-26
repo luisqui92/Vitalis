@@ -110,6 +110,9 @@ require("./routes/reservaPublica")(app);
 require("./routes/push")(app);
 require("./routes/asistenteVitalis")(app);
 require("./routes/backup")(app);
+// Panel de clínica: varios consultorios vistos desde arriba. Solo agrega
+// números — ver el comentario de arriba de routes/admin.js.
+require("./routes/admin")(app);
 
 // Los .br se generan una vez, en segundo plano, para no demorar el arranque.
 // Mientras no estén se sirven los originales: nada se rompe.
