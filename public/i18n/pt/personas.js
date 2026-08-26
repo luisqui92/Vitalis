@@ -1,0 +1,29 @@
+// Vitalis — Português · pessoa compartilhada entre os consultórios de uma clínica.
+Object.assign(I18N.pt, {
+  "persona.alergias": "Alergias",
+  "persona.titulo": "Pessoa da clínica",
+  "persona.enVariosConsultorios": "Esta pessoa é atendida em {n} consultórios da clínica. O que se compartilha entre eles é a identidade e as alergias — o prontuário não.",
+  "persona.soloAca": "Por enquanto só é atendida no seu consultório. Se começar em outro, as alergias dela vão estar lá também.",
+  "persona.alergiasCampo": "Alergias (separadas por vírgula)",
+  "persona.alergiasPlaceholder": "Ex: penicilina, AINEs, látex",
+  "persona.alergiasAyuda": "Isto é visto por qualquer médico da clínica que a atenda. É a única informação clínica compartilhada, e existe para que ninguém receite algo que lhe faça mal.",
+  "persona.alergiasActualizadas": "Última atualização: {fecha}",
+  "persona.guardarAlergias": "Salvar alergias",
+  "persona.errGuardar": "Não foi possível salvar as alergias",
+  "persona.desvincular": "Não é a mesma pessoa",
+  "persona.confirmarDesvincular": "O vínculo com a pessoa da clínica é desfeito. A ficha e o prontuário não são alterados. Seguimos?",
+
+  "persona.sinVincular": "Esta ficha ainda não está associada a uma pessoa da clínica. Associá-la faz com que as alergias apareçam em todos os consultórios onde ela for atendida.",
+  "persona.buscar": "Buscar na clínica",
+  "persona.buscando": "Buscando...",
+  "persona.errBuscar": "Não foi possível buscar",
+  "persona.sinClinica": "Sua conta não está em nenhuma clínica, então não há com quem compartilhar.",
+  "persona.sinCandidatos": "Ninguém com esse nome vem à clínica ainda.",
+  "persona.candidatos": "É alguma destas pessoas?",
+  "persona.crearNueva": "É alguém novo — criar a pessoa",
+  "persona.confirmarVincular": "Associar esta ficha a essa pessoa faz com que compartilhem identidade e alergias.\n\nSe na verdade forem duas pessoas diferentes, ficam misturadas.\n\nÉ a mesma pessoa?",
+  "persona.errVincular": "Não foi possível associar",
+
+  "persona.yaViene": "Alguém com esse nome já vem à clínica:",
+  "persona.elegida": "Vai ser associada a essa pessoa ao salvar.",
+});

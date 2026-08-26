@@ -124,6 +124,7 @@ function renderNuevoPaciente() {
     <div class="card">
       <label>${esVet ? t("pacientes.nuevo.nombreMascota") : t("pacientes.nuevo.nombre")}</label>
       <input id="pNombre" type="text" placeholder="${esVet ? t("pacientes.nuevo.nombrePlaceholderVet") : t("pacientes.nuevo.nombrePlaceholder")}">
+      <div id="personaAltaBox"></div>
       ${esVet ? `
       <label>${t("pacientes.nuevo.especie")}</label>
       <input id="pEspecie" type="text" placeholder="${t("pacientes.nuevo.especiePlaceholder")}">
@@ -161,6 +162,10 @@ function renderNuevoPaciente() {
       <button class="primary" id="pBtn">${t("pacientes.nuevo.guardar")}</button>
     </div>`;
   document.getElementById("btnBack").onclick = renderDashboard;
+  // Mientras escribe el nombre, mira si esa persona ya viene a la clínica.
+  // Es el momento en que sirve: después de crear la ficha, el duplicado ya
+  // existe.
+  engancharBuscadorPersonaEnAlta();
   document.getElementById("pBtn").onclick = async () => {
     const nombre = document.getElementById("pNombre").value.trim();
     const fechaNacimiento = document.getElementById("pFecha").value || null;
@@ -181,6 +186,10 @@ function renderNuevoPaciente() {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer }),
       });
+      // Si el médico reconoció a la persona mientras escribía, se asocia
+      // ahora. Si falla, la ficha ya está creada y se puede asociar después
+      // desde el Kardex — no se pierde nada.
+      await vincularPersonaElegidaEnAlta(data.paciente._id);
       renderPacienteDetalle(data.paciente._id);
     } catch (e) {
       errBox.innerHTML = `<div class="error">${esc(e.error || t("pacientes.nuevo.errGuardar"))}</div>`;
@@ -371,6 +380,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   app.innerHTML = `
     <button class="back" id="btnBack">${t("kardex.volver")}</button>
     <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
+    ${bloquePersonaHtml()}
     <div class="tabs">
       ${Object.entries(tabsKardex).map(([key, t]) => `
         <button class="tab ${tabActiva === key ? "activo" : ""}" data-tab="${key}">
@@ -381,6 +391,9 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
+  // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
+  // igual. El bloque aparece cuando llega.
+  cargarBloquePersona(p);
   document.querySelectorAll(".tab").forEach(btn => {
     btn.onclick = () => pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios, recetas, btn.dataset.tab);
   });

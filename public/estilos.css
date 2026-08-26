@@ -863,3 +863,18 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 /* El que alquila se ve distinto a propósito: de él NO se muestra
    facturación, y conviene que se note en la fila. */
 .clin-chip-alquila { background: var(--border); color: var(--text-muted); }
+
+/* ─── Aviso de alergias (persona compartida en una clínica) ──────────────
+   Va arriba de las pestañas del Kardex y con el color de peligro: una
+   alergia que hay que buscar no protege a nadie. El odontólogo que va a
+   recetar tiene que verla sin haberla buscado. */
+.persona-alergias {
+  background: var(--danger); color: #fff;
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+}
+.persona-alergias-titulo { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
+.persona-alergias-lista { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.persona-alergias-lista span {
+  background: rgba(255, 255, 255, .22); border-radius: 999px;
+  padding: 2px 10px; font-size: 13px; font-weight: 600;
+}

@@ -84,6 +84,11 @@ function entorno(idioma) {
     renderTabMapaCorporal: () => {}, renderTabPlanTratamiento: () => {}, renderTabEmbarazo: () => {},
     renderTabPerfilNeuro: () => {}, renderTabObjetivosNeuro: () => {}, renderTabVigilancia: () => {},
     renderTabInstrumentos: () => {}, renderTabInformes: () => {},
+    // Persona compartida (personas.js). El bloque se carga aparte y sin
+    // await, así que para comparar el pintado alcanza con el hueco.
+    bloquePersonaHtml: () => `<div id="personaBox"></div>`,
+    cargarBloquePersona: () => {}, engancharBuscadorPersonaEnAlta: () => {},
+    vincularPersonaElegidaEnAlta: async () => {},
   };
   vm.createContext(s);
   if (idioma) {
@@ -123,8 +128,17 @@ function pintarConsultas(codigoConsultas, idioma) {
   return out;
 }
 
+// El hueco donde después se pinta la persona de la clínica es un agregado
+// deliberado (ver personas.js), así que se descuenta antes de comparar —
+// mismo criterio que el selector de idioma en probar_auth.js.
+// Son dos: el aviso arriba del Kardex y el buscador del alta.
+const sinBloquePersona = (html) => html
+  .replace(/\n?\s*<div id="personaBox"><\/div>/g, "")
+  .replace(/\n?\s*<div id="personaAltaBox"><\/div>/g, "");
+
 let fallos = 0;
-function comparar(nombre, viejo, nuevo) {
+function comparar(nombre, viejo, nuevoBruto) {
+  const nuevo = Object.fromEntries(Object.entries(nuevoBruto).map(([k, v]) => [k, sinBloquePersona(v)]));
   for (const k of Object.keys(viejo)) {
     if (viejo[k] === nuevo[k]) {
       console.log(`✅ ${nombre}/${k}: idéntico (${viejo[k].length} car.)`);

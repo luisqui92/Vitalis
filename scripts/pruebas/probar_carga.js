@@ -173,6 +173,10 @@ const pantallas = [
     { porMedico: [{ phone: "1", nombre: "Dra. A", consultorio: "Consultorio 1", facturado: 1500, cobrado: 900, pendiente: 600, items: 3 }], totales: { facturado: 1500, cobrado: 900, pendiente: 600 }, inquilinosExcluidos: 1 },
     { equipos: [{ nombre: "PC 1", conectado: true, subidas: 5 }] }
   )`],
+  ["persona con alergias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: ["penicilina", "látex"], alergiasActualizadasEn: new Date().toISOString() }, 3)`],
+  ["persona sin alergias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: [] }, 1)`],
+  ["ficha sin persona", `pintarSinPersona(document.getElementById("x"), { _id: "p1", nombre: "María" })`],
+  ["candidato a persona", `candidatoHtml({ _id: "per1", nombre: "María", fechaNacimiento: "1985-04-12", documento: "1234567", telefono: "70000000", alergias: ["penicilina"] })`],
   ["clínica sin facturación", `pintarClinica(
     { clinica: { _id: "c1", nombre: "Clínica" }, medicos: [] },
     { medicos: [], consultasPorMes: {}, totales: { consultasMes: 0, pacientes: 0, citasHoy: 0 } },

@@ -1,0 +1,29 @@
+// Vitalis — Español · persona compartida entre los consultorios de una clínica.
+Object.assign(I18N.es, {
+  "persona.alergias": "Alergias",
+  "persona.titulo": "Persona de la clínica",
+  "persona.enVariosConsultorios": "Esta persona se atiende en {n} consultorios de la clínica. Lo que se comparte entre ellos es su identidad y sus alergias — su historia clínica no.",
+  "persona.soloAca": "Por ahora solo se atiende en tu consultorio. Si empieza en otro, sus alergias van a estar cargadas allá también.",
+  "persona.alergiasCampo": "Alergias (separadas por coma)",
+  "persona.alergiasPlaceholder": "Ej: penicilina, AINEs, látex",
+  "persona.alergiasAyuda": "Esto lo ve cualquier médico de la clínica que la atienda. Es lo único clínico que se comparte, y es para que nadie le recete algo que le hace mal.",
+  "persona.alergiasActualizadas": "Última actualización: {fecha}",
+  "persona.guardarAlergias": "Guardar alergias",
+  "persona.errGuardar": "No se pudieron guardar las alergias",
+  "persona.desvincular": "No es la misma persona",
+  "persona.confirmarDesvincular": "Se corta el vínculo con la persona de la clínica. La ficha y su historia clínica no se tocan. ¿Seguimos?",
+
+  "persona.sinVincular": "Esta ficha todavía no está asociada a una persona de la clínica. Asociarla hace que sus alergias se vean en todos los consultorios donde la atiendan.",
+  "persona.buscar": "Buscar en la clínica",
+  "persona.buscando": "Buscando...",
+  "persona.errBuscar": "No se pudo buscar",
+  "persona.sinClinica": "Tu cuenta no está en ninguna clínica, así que no hay con quién compartir.",
+  "persona.sinCandidatos": "Nadie con ese nombre viene a la clínica todavía.",
+  "persona.candidatos": "¿Es alguna de estas personas?",
+  "persona.crearNueva": "Es alguien nuevo — crear su persona",
+  "persona.confirmarVincular": "Asociar esta ficha a esa persona hace que compartan identidad y alergias.\n\nSi en realidad son dos personas distintas, quedan mezcladas.\n\n¿Es la misma persona?",
+  "persona.errVincular": "No se pudo asociar",
+
+  "persona.yaViene": "Alguien con ese nombre ya viene a la clínica:",
+  "persona.elegida": "Se va a asociar a esa persona al guardar.",
+});
