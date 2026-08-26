@@ -54,6 +54,13 @@ Object.assign(I18N.pt, {
   "clin.agendaSinNombre": "{n} consultório(s) alugados: os horários aparecem ocupados, sem o nome do paciente. Esses pacientes são do médico que aluga, não da clínica.",
   "clin.agendaCompletada": "Atendido",
 
+  "clin.editar": "Editar",
+  "clin.guardarMedico": "Salvar alterações",
+  "clin.sacar": "Remover da clínica",
+  "clin.confirmarSacar": "Remover este médico da clínica? Ele deixa de aparecer no painel. Os pacientes, consultas e receitas dele NÃO são alterados: continuam sendo dele e ficam completos.",
+  "clin.errSacar": "Não foi possível remover da clínica",
+  "clin.noSeSacaAdmin": "Quem administra a clínica não pode ser removido por aqui.",
+
   "clin.nav.clinica": "Clínica",
   "clin.nav.misPacientes": "Meus pacientes",
 });

@@ -90,20 +90,10 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
             <th>${t("clin.col.medico")}</th><th>${t("clin.col.consultorio")}</th>
             <th>${t("clin.col.vinculo")}</th><th class="num">${t("clin.col.consultasMes")}</th>
             <th class="num">${t("clin.col.pacientes")}</th><th class="num">${t("clin.col.hoy")}</th>
+            <th></th>
           </tr></thead>
           <tbody>
-            ${resumen.medicos.map(m => `
-              <tr>
-                <td>
-                  <div style="font-weight:600">${esc(m.nombre)}</div>
-                  <div class="hint" style="margin:0">${esc(m.especialidad || t("area." + m.tipoEspecialidad))}</div>
-                </td>
-                <td>${esc(m.consultorio || "—")}</td>
-                <td><span class="clin-chip clin-chip-${m.vinculo}">${t("clin.vinculo." + m.vinculo)}</span></td>
-                <td class="num">${m.consultasMes}</td>
-                <td class="num">${m.pacientes}</td>
-                <td class="num">${m.citasHoy}</td>
-              </tr>`).join("")}
+            ${resumen.medicos.map(m => filaMedicoHtml(m)).join("")}
           </tbody>
         </table>
       </div>
@@ -169,6 +159,8 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
       <button class="secondary" id="btnVincularMedico">${t("clin.vincular")}</button>
     </div>`;
 
+  engancharFilasDeMedicos();
+
   clinAgendaFecha = agenda?.fecha || null;
   clinPintarFecha();
   document.getElementById("clinDiaAnterior").onclick = () => clinMoverDia(-1);
@@ -201,6 +193,106 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
       errBox.innerHTML = `<div class="error">${esc(e.error || t("clin.errVincular"))}</div>`;
     }
   };
+}
+
+// ─── UNA FILA DE MÉDICO, Y SU EDICIÓN ─────────────────────────────────────
+//
+// Corregir un consultorio mal escrito o sacar a alguien que se fue eran las
+// dos cosas que había que pedirle a alguien con acceso al servidor. Ahora
+// están donde se miran los médicos.
+//
+// La fila de edición va escondida abajo de la del médico en vez de en una
+// ventana aparte: así el administrador sigue viendo los números de esa
+// persona mientras decide.
+function filaMedicoHtml(m) {
+  // A quien administra no se lo puede sacar desde acá — el servidor lo
+  // rechaza igual (409), pero ofrecer un botón que siempre falla es peor
+  // que no ofrecerlo. Se explica en su lugar.
+  const administra = m.rol === "admin" || m.rol === "director";
+  return `
+    <tr>
+      <td>
+        <div style="font-weight:600">${esc(m.nombre)}</div>
+        <div class="hint" style="margin:0">${esc(m.especialidad || t("area." + m.tipoEspecialidad))}</div>
+      </td>
+      <td>${esc(m.consultorio || "—")}</td>
+      <td><span class="clin-chip clin-chip-${m.vinculo}">${t("clin.vinculo." + m.vinculo)}</span></td>
+      <td class="num">${m.consultasMes}</td>
+      <td class="num">${m.pacientes}</td>
+      <td class="num">${m.citasHoy}</td>
+      <td><button class="link" style="width:auto;margin:0" data-editar="${esc(m.phone)}">${t("clin.editar")}</button></td>
+    </tr>
+    <tr class="clin-fila-edicion" data-edicion="${esc(m.phone)}" style="display:none">
+      <td colspan="7">
+        <label>${t("clin.vinculoCampo")}</label>
+        <select data-campo="vinculo" data-de="${esc(m.phone)}">
+          <option value="empleado"${m.vinculo === "empleado" ? " selected" : ""}>${t("clin.vinculo.empleado")}</option>
+          <option value="alquila"${m.vinculo === "alquila" ? " selected" : ""}>${t("clin.vinculo.alquila")}</option>
+        </select>
+        <label>${t("clin.consultorioCampo")}</label>
+        <input type="text" data-campo="consultorio" data-de="${esc(m.phone)}" value="${esc(m.consultorio || "")}" placeholder="${t("clin.consultorioPlaceholder")}">
+        <div data-error="${esc(m.phone)}"></div>
+        <button class="secondary" data-guardar="${esc(m.phone)}">${t("clin.guardarMedico")}</button>
+        ${administra
+          ? `<div class="hint" style="margin:8px 0 0">${t("clin.noSeSacaAdmin")}</div>`
+          : `<button class="link" style="width:auto;color:var(--danger)" data-sacar="${esc(m.phone)}">${t("clin.sacar")}</button>`}
+      </td>
+    </tr>`;
+}
+
+function engancharFilasDeMedicos() {
+  document.querySelectorAll("[data-editar]").forEach(btn => {
+    btn.onclick = () => {
+      const fila = document.querySelector(`[data-edicion="${btn.dataset.editar}"]`);
+      if (fila) fila.style.display = fila.style.display === "none" ? "" : "none";
+    };
+  });
+
+  const valorDe = (campo, phone) => document.querySelector(`[data-campo="${campo}"][data-de="${phone}"]`)?.value || "";
+  const errorDe = (phone) => document.querySelector(`[data-error="${phone}"]`);
+
+  document.querySelectorAll("[data-guardar]").forEach(btn => {
+    btn.onclick = async () => {
+      const phone = btn.dataset.guardar;
+      const err = errorDe(phone);
+      if (err) err.innerHTML = "";
+      btn.disabled = true;
+      try {
+        // La misma ruta que suma un médico: pedirla de nuevo con otros datos
+        // los actualiza. No hace falta una ruta de edición aparte.
+        await api(`/admin/medicos/${encodeURIComponent(phone)}/vincular`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vinculo: valorDe("vinculo", phone), consultorio: valorDe("consultorio", phone) }),
+        });
+        renderClinica();
+      } catch (e) {
+        btn.disabled = false;
+        if (err) err.innerHTML = `<div class="error">${esc(e.error || t("clin.errVincular"))}</div>`;
+      }
+    };
+  });
+
+  document.querySelectorAll("[data-sacar]").forEach(btn => {
+    btn.onclick = async () => {
+      const phone = btn.dataset.sacar;
+      // Se confirma con lo que de verdad importa: que las fichas no se
+      // tocan. El miedo del que aprieta es borrarle la historia clínica a
+      // alguien, y eso no pasa.
+      if (!confirm(t("clin.confirmarSacar"))) return;
+      const err = errorDe(phone);
+      if (err) err.innerHTML = "";
+      btn.disabled = true;
+      try {
+        await api(`/admin/medicos/${encodeURIComponent(phone)}/desvincular`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+        });
+        renderClinica();
+      } catch (e) {
+        btn.disabled = false;
+        if (err) err.innerHTML = `<div class="error">${esc(e.error || t("clin.errSacar"))}</div>`;
+      }
+    };
+  });
 }
 
 // ─── AGENDA UNIFICADA ─────────────────────────────────────────────────────

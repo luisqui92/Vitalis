@@ -864,6 +864,16 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    facturación, y conviene que se note en la fila. */
 .clin-chip-alquila { background: var(--border); color: var(--text-muted); }
 
+/* Fila de edición de un médico: va escondida abajo de la suya, con un
+   fondo distinto para que se lea como "esto es de la fila de arriba" y no
+   como un médico más. */
+.clin-fila-edicion > td {
+  background: var(--bg-suave, rgba(127, 127, 127, .07));
+  padding: 12px 12px 14px;
+  border-bottom: 2px solid var(--border);
+}
+.clin-fila-edicion label:first-child { margin-top: 0; }
+
 /* Agenda unificada: el día de los siete consultorios en una sola lista.
    Las flechas quedan a los costados de la fecha, que es lo que se mira. */
 .clin-agenda-dias {

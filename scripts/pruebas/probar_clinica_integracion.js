@@ -335,6 +335,16 @@ async function main() {
   verificar("se suma a la clínica un médico que ya tenía cuenta", suma.estado === 200);
   const traido = await Medico.findOne({ phone: solo.phone }).lean();
   verificar("  ...y le queda el vínculo y el consultorio", traido.vinculo === "alquila" && traido.consultorio === "Consultorio 4");
+  // Editar es pedir la misma ruta de nuevo con otros datos — es lo que hace
+  // el botón "Editar" de cada fila del panel, y por eso no hay ruta aparte.
+  await POST(`/admin/medicos/${ana.phone}/vincular`, tk.carla, { vinculo: "alquila", consultorio: "Consultorio 1 bis" });
+  const anaEditada = await Medico.findOne({ phone: ana.phone }).lean();
+  verificar("volver a vincular corrige el consultorio y el vínculo",
+    anaEditada.consultorio === "Consultorio 1 bis" && anaEditada.vinculo === "alquila");
+  verificar("  ...sin tocarle un paciente", await Paciente.countDocuments({ medicoPhone: ana.phone }) === 2);
+  // Y se deja como estaba, que abajo se sigue usando la clínica.
+  await POST(`/admin/medicos/${ana.phone}/vincular`, tk.carla, { vinculo: "empleado", consultorio: "Consultorio 1" });
+
   const robo = await POST(`/admin/medicos/${solo.phone}/vincular`, tk.elena, { vinculo: "empleado" });
   verificar("otra clínica NO puede llevárselo", robo.estado === 409);
   const bajaAdmin = await POST(`/admin/medicos/${diego.phone}/desvincular`, tk.carla, {});

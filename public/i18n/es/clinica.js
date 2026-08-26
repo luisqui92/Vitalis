@@ -54,6 +54,13 @@ Object.assign(I18N.es, {
   "clin.agendaSinNombre": "{n} consultorio(s) alquilados: sus horas aparecen ocupadas, sin el nombre del paciente. Esos pacientes son del médico que alquila, no de la clínica.",
   "clin.agendaCompletada": "Atendida",
 
+  "clin.editar": "Editar",
+  "clin.guardarMedico": "Guardar cambios",
+  "clin.sacar": "Sacar de la clínica",
+  "clin.confirmarSacar": "¿Sacar a este médico de la clínica? Deja de aparecer en el panel. Sus pacientes, consultas y recetas NO se tocan: siguen siendo suyos y los conserva enteros.",
+  "clin.errSacar": "No se pudo sacar de la clínica",
+  "clin.noSeSacaAdmin": "A quien administra la clínica no se lo puede sacar desde acá.",
+
   "clin.nav.clinica": "Clínica",
   "clin.nav.misPacientes": "Mis pacientes",
 });
