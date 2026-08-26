@@ -864,6 +864,28 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    facturación, y conviene que se note en la fila. */
 .clin-chip-alquila { background: var(--border); color: var(--text-muted); }
 
+/* ─── Saldo prepago ──────────────────────────────────────────────────────
+   El monto grande porque es lo único que el médico viene a mirar acá: si le
+   alcanza o no para seguir trabajando hoy. */
+.saldo-monto {
+  font-family: var(--font-marca); font-size: 30px; font-weight: 600;
+  line-height: 1.1; margin: 4px 0 0; font-variant-numeric: tabular-nums;
+}
+.saldo-aviso {
+  margin: 12px 0 0; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border-left: 3px solid var(--warning);
+  font-size: 12.5px; line-height: 1.5;
+}
+.saldo-aviso.saldo-aviso-grave {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-left-color: var(--danger);
+}
+/* El aviso de arriba del panel: aparece SOLO cuando queda poco. Una barra
+   permanente con el saldo se deja de ver justo antes de que importe. */
+.saldo-aviso-panel { border-color: var(--warning); }
+.saldo-aviso-panel.saldo-aviso-grave { border-color: var(--danger); }
+
 /* Fila de edición de un médico: va escondida abajo de la suya, con un
    fondo distinto para que se lea como "esto es de la fila de arriba" y no
    como un médico más. */

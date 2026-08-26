@@ -79,6 +79,9 @@ async function renderDashboard() {
       api("/medico/recordatorios"),
       // Si la bandeja falla, el panel tiene que abrirse igual.
       api("/medico/dicom/bandeja").catch(() => ({ entrantes: [] })),
+      // El saldo se trae acá para poder avisar ANTES de grabar. Si falla, el
+      // panel se abre igual y simplemente no hay aviso.
+      traerSaldo(),
     ]);
     // Si mientras esto viajaba el médico ya abrió otra pantalla, este pintado
     // llega tarde y le taparía lo que está haciendo.
@@ -94,6 +97,7 @@ async function renderDashboard() {
     const sinAsignar = (dataBandeja.entrantes || []).length;
 
     app.innerHTML = `
+      ${avisoSaldoHtml()}
       ${sinAsignar ? `
         <div class="card no-imprimir" style="border-color:var(--warning);cursor:pointer" id="avisoBandeja">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -113,6 +117,7 @@ async function renderDashboard() {
         <div class="empty" id="buscarVacio" style="display:none">${t("pacientes.buscarVacio")}</div>
       `}
     `;
+    engancharAvisoSaldo();
     const avisoBandeja = document.getElementById("avisoBandeja");
     if (avisoBandeja) avisoBandeja.onclick = () => renderBandejaDicom();
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;

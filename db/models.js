@@ -82,6 +82,13 @@ const medicoSchema = new mongoose.Schema({
 
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
+
+  // Saldo prepago, en centavos de boliviano (Bs 12 = 1200). Es una COPIA
+  // rápida de la suma de MovimientoSaldo, no la verdad — para no sumar toda
+  // la historia cada vez que se pinta una pantalla. Puede quedar en negativo
+  // a propósito: una consulta que ya se está transcribiendo se termina aunque
+  // el saldo se acabe en el medio (ver services/saldo.js).
+  saldoCentavos: { type: Number, default: 0 },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
   // opcional, el calendario de Google donde se reflejan las citas (se
   // comparte ese calendario con la cuenta de servicio de Vitalis).
@@ -1256,6 +1263,66 @@ const suscripcionPushSchema = new mongoose.Schema({
 }, { timestamps: true });
 const SuscripcionPush = mongoose.model("SuscripcionPush", suscripcionPushSchema);
 
+// ─── SALDO PREPAGO ─────────────────────────────────────────────────────────
+//
+// El médico carga saldo (transferencia o QR) y cada consulta transcrita se lo
+// descuenta. Esto es lo que el MÉDICO le paga a Vitalis — no confundir con
+// TratamientoPlan.pagos, que es lo que el PACIENTE le paga al médico. Son dos
+// plateas distintas y nunca se tocan.
+//
+// ═══ POR QUÉ UN LIBRO DE MOVIMIENTOS Y NO UN NÚMERO ════════════════════════
+//
+// Un campo "saldo" que se suma y se resta no se puede auditar. El día que un
+// médico diga "cargué 200 y me descontaron mal" —y va a pasar— hay que poder
+// mostrarle la lista: cargó tanto tal día, gastó 12 en esta consulta y 12 en
+// esta otra. Sin eso, la discusión es su palabra contra un número.
+//
+// Entonces la VERDAD son estos movimientos. Medico.saldoCentavos es una copia
+// rápida para no sumar todo en cada pantalla, y se puede reconstruir entera
+// desde acá (ver reconciliar() en services/saldo.js).
+//
+// ═══ POR QUÉ CENTAVOS Y NÚMEROS ENTEROS ════════════════════════════════════
+//
+// Bs 12 se guarda como 1200, no como 12.0. Con decimales, 0.1 + 0.2 no da 0.3
+// y los saldos empiezan a mostrar 99.99999999 después de unas cuantas
+// operaciones. Con plata de verdad eso no es un detalle estético.
+const movimientoSaldoSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  // carga     — el médico transfirió y se le acreditó
+  // consumo   — una consulta transcrita
+  // ajuste    — corrección a mano (con motivo obligatorio)
+  // devolucion— se le devolvió plata
+  tipo: { type: String, enum: ["carga", "consumo", "ajuste", "devolucion"], required: true, index: true },
+  // Positivo suma, negativo resta. Un consumo de Bs 12 son -1200.
+  montoCentavos: { type: Number, required: true },
+  // Cómo quedó el saldo después de este movimiento. Redundante a propósito:
+  // permite auditar un movimiento suelto sin recalcular toda la historia, y
+  // delata un descuadre si algún día aparece.
+  //
+  // Arranca en null y se completa un instante después, cuando el $inc dice
+  // cómo quedó el saldo — ver el orden en aplicar() de services/saldo.js. Un
+  // null acá significa que el movimiento se anotó pero el saldo no llegó a
+  // actualizarse: reconciliar() lo encuentra. Poner un 0 en su lugar sería
+  // más cómodo y sería mentira.
+  saldoDespuesCentavos: { type: Number, default: null },
+  concepto: { type: String, default: "" },
+  // Qué consulta lo generó. El índice único de abajo es lo que impide cobrar
+  // dos veces la misma consulta si la transcripción reintenta.
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  // De una carga: quién la acreditó y contra qué comprobante. Sin esto, una
+  // carga es plata que apareció de la nada.
+  acreditadoPor: { type: String, default: "" },
+  referencia: { type: String, default: "" },
+}, { timestamps: true });
+movimientoSaldoSchema.index({ medicoPhone: 1, createdAt: -1 });
+// Una consulta se cobra UNA vez. Parcial porque solo aplica a los consumos:
+// las cargas y los ajustes no tienen consultaId y no deben chocar entre sí.
+movimientoSaldoSchema.index(
+  { consultaId: 1 },
+  { unique: true, partialFilterExpression: { tipo: "consumo", consultaId: { $type: "objectId" } }, name: "consumo_por_consulta_unico" }
+);
+const MovimientoSaldo = mongoose.model("MovimientoSaldo", movimientoSaldoSchema);
+
 // Registro de auditoría: quién accedió/hizo qué y cuándo — clave para el
 // secreto médico (poder responder "quién vio la historia de este paciente")
 // y para detectar accesos anómalos. Se escribe siempre, nunca se edita.
@@ -1288,7 +1355,7 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

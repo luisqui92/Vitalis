@@ -14,6 +14,7 @@ const { enviarTexto } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { registrar } = require("../services/auditoria");
 const { registrarCorreccion } = require("../services/correccionesIA");
+const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -52,6 +53,19 @@ module.exports = function (app) {
     }
   }));
 
+  // ─── SALDO PREPAGO ─────────────────────────────────────────────────────
+  // Lo mira la pantalla ANTES de grabar, que es el único momento en que el
+  // médico todavía puede hacer algo al respecto. Después de grabar ya es
+  // tarde: la consulta existe y hay que procesarla.
+  app.get("/medico/saldo", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const [estado, movimientos] = await Promise.all([
+      estadoDe(medicoPhone),
+      movimientosDe(medicoPhone, Number(req.query.movimientos) || 30),
+    ]);
+    res.json({ ...estado, movimientos });
+  }));
+
   // ─── SUBIR AUDIO DE CONSULTA → TRANSCRIBIR (en segundo plano) ──────────
   // Con consultas de 30-45 min, esperar la transcripción entera en el mismo
   // pedido HTTP no funciona (nginx corta conexiones largas). Por eso acá solo
@@ -62,6 +76,18 @@ module.exports = function (app) {
     const audioBuffer = req.body;
     if (!Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) {
       throw new ErrorHttp(400, "Falta el audio (Content-Type debe ser audio/*)");
+    }
+
+    // El saldo se mira acá, pero con la mano muy liviana: para cuando este
+    // pedido llega, el médico YA grabó la consulta con el paciente adelante.
+    // Rechazarlo le tira a la basura una grabación que no puede repetir.
+    //
+    // Por eso solo se corta pasado el piso de negativo —cinco consultas de
+    // margen— y no en cero. El aviso de "te queda poco" va en la pantalla,
+    // ANTES de grabar, que es donde todavía se puede hacer algo.
+    const saldo = await estadoDe(medicoPhone);
+    if (saldo.bloqueado) {
+      throw new ErrorHttp(402, `Tu saldo llegó al límite (Bs ${saldo.saldoBs}). Cargá saldo para seguir transcribiendo consultas.`);
     }
 
     const pacienteId = String(req.query.pacienteId || "").trim();
@@ -85,6 +111,19 @@ module.exports = function (app) {
         consulta.segmentos = segmentos;
         consulta.duracionSegundos = duracionSegundos;
         await consulta.save();
+
+        // El cobro va acá y no al subir el audio: recién ahora sabemos que la
+        // consulta salió bien. Si AssemblyAI hubiera fallado, el médico no
+        // paga nada — y con razón, porque no recibió nada.
+        //
+        // Va en su propio try: que falle el cobro no puede hacerle perder la
+        // consulta al médico. Un cobro perdido lo detecta reconciliar(); una
+        // consulta perdida no la recupera nadie.
+        try {
+          await cobrarConsulta({ medicoPhone, consultaId: consulta._id });
+        } catch (e) {
+          log.error(`[SALDO] no se pudo cobrar la consulta ${consulta._id} de ${medicoPhone}:`, e.message);
+        }
 
         try {
           const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })

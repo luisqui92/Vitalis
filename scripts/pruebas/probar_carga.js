@@ -178,6 +178,13 @@ const pantallas = [
     agendaDemo
   )`],
   ["pestañas del celular", `tabsPacientesHtml(3)`],
+  ["movimientos de saldo", `movimientosHtml([
+    { tipo: "carga", montoCentavos: 20000, saldoDespuesCentavos: 20000, concepto: "Carga de Bs 200.00", referencia: "QR BCP 4471", createdAt: new Date().toISOString() },
+    { tipo: "consumo", montoCentavos: -1200, saldoDespuesCentavos: 18800, concepto: "Consulta transcrita", createdAt: new Date().toISOString() },
+    // saldoDespues en null es el caso real de un movimiento anotado cuyo
+    // saldo no llegó a actualizarse — la tabla tiene que mostrar algo.
+    { tipo: "consumo", montoCentavos: -1200, saldoDespuesCentavos: null, concepto: "Consulta transcrita", createdAt: new Date().toISOString() },
+  ])`],
   ["agenda de la clínica", `agendaClinicaHtml(agendaDemo)`],
   // El día vacío y el error son ramas distintas del mismo cuadro, y las dos
   // se ven en producción: una clínica cerrada el domingo, un backend caído.
@@ -220,6 +227,16 @@ vm.runInContext(`var agendaDemo = ${JSON.stringify({
       ] },
   ],
 })};`, sandbox);
+
+// El aviso de saldo tiene tres estados y los tres se ven en producción: con
+// saldo de sobra no aparece nada, con poco avisa, y en negativo avisa fuerte.
+for (const [nombre, estado, esperado] of [
+  ["saldo holgado", { bajo: false, enNegativo: false, consultasRestantes: 40, saldoBs: "480.00" }, false],
+  ["saldo bajo", { bajo: true, enNegativo: false, consultasRestantes: 3, saldoBs: "36.00" }, true],
+  ["saldo en negativo", { bajo: true, enNegativo: true, consultasRestantes: 0, saldoBs: "-24.00" }, true],
+]) {
+  pantallas.push([nombre, `SALDO_ESTADO = ${JSON.stringify(estado)}; avisoSaldoHtml()`]);
+}
 
 for (const idioma of ["es", "pt"]) {
   vm.runInContext(`MEDICO_IDIOMA = ${JSON.stringify(idioma)};`, sandbox);
