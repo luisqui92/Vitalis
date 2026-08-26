@@ -163,6 +163,23 @@ const pantallas = [
   ["detalle de órgano", `pintarDetalleOrgano("p1", { organo: "utero", hallazgo: "mioma", notas: "", historial: [{ hallazgo: "normal", fecha: new Date().toISOString() }] })`],
   ["detalle de estructura ocular", `pintarDetalleEstructura("p1", "OD", { estructura: "retina", estado: "leve", notas: "", historial: [] })`],
   ["detalle de lesión", `pintarDetalleLesion("p1", { _id: "l1", titulo: "Nódulo", region: "dorso", lado: "izquierdo", estado: "activa", historial: [{ estado: "activa", fecha: new Date().toISOString(), tamanoCm: 2 }, { estado: "resuelta", fecha: new Date().toISOString(), tamanoCm: 1 }] })`],
+  ["panel de clínica", `pintarClinica(
+    { clinica: { _id: "c1", nombre: "Clínica San Rafael" }, medicos: [{ phone: "1", nombre: "Dra. A" }, { phone: "2", nombre: "Dr. B" }] },
+    { medicos: [
+        { phone: "1", nombre: "Dra. A", especialidad: "Cardiología", tipoEspecialidad: "medicina_general", rol: "medico", vinculo: "empleado", consultorio: "Consultorio 1", consultasMes: 40, pacientes: 120, citasHoy: 6 },
+        { phone: "2", nombre: "Dr. B", especialidad: "", tipoEspecialidad: "odontologia", rol: "medico", vinculo: "alquila", consultorio: "Consultorio 2", consultasMes: 22, pacientes: 65, citasHoy: 3 },
+      ], consultasPorMes: {}, totales: { consultasMes: 62, pacientes: 185, citasHoy: 9 } },
+    { dias: 7, salas: [{ phone: "1", nombre: "Dra. A", consultorio: "Consultorio 1", vinculo: "empleado", porDia: {} }] },
+    { porMedico: [{ phone: "1", nombre: "Dra. A", consultorio: "Consultorio 1", facturado: 1500, cobrado: 900, pendiente: 600, items: 3 }], totales: { facturado: 1500, cobrado: 900, pendiente: 600 }, inquilinosExcluidos: 1 },
+    { equipos: [{ nombre: "PC 1", conectado: true, subidas: 5 }] }
+  )`],
+  ["clínica sin facturación", `pintarClinica(
+    { clinica: { _id: "c1", nombre: "Clínica" }, medicos: [] },
+    { medicos: [], consultasPorMes: {}, totales: { consultasMes: 0, pacientes: 0, citasHoy: 0 } },
+    { dias: 7, salas: [] },
+    { porMedico: [], totales: { facturado: 0, cobrado: 0, pendiente: 0 }, inquilinosExcluidos: 2 },
+    { equipos: [] }
+  )`],
 ];
 
 for (const idioma of ["es", "pt"]) {

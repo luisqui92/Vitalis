@@ -71,6 +71,7 @@ async function renderDashboard() {
         <button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>
         <button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>
         <button class="tab" id="btnSeguridad"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.seguridad")}</button>
+        ${esAdministrador() ? `<button class="tab" id="btnClinica"><span class="tab-icono">${ICONOS.escudo}</span>${t("clin.nav.clinica")}</button>` : ""}
       </div>
       ${items.length === 0 ? `<div class="empty">${t("pacientes.vacio")}</div>` : `
         <input id="buscarPaciente" type="text" placeholder="${t("pacientes.buscar")}" style="margin:16px 0 12px">
@@ -87,6 +88,9 @@ async function renderDashboard() {
     document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
     document.getElementById("btnVincular").onclick = renderVincular;
     document.getElementById("btnSeguridad").onclick = renderSeguridad;
+    // Solo existe para quien administra una clínica (ver clinica.js).
+    const btnClinica = document.getElementById("btnClinica");
+    if (btnClinica) btnClinica.onclick = renderClinica;
     document.querySelectorAll(".item[data-id]").forEach(el => {
       el.onclick = () => renderPacienteDetalle(el.dataset.id);
     });

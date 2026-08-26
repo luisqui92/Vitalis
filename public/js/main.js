@@ -14,8 +14,7 @@ aplicarTemaSegunEspecialidad();
 aplicarLandingVeterinariaSiCorresponde();
 if (TOKEN) {
   conectarTiempoReal();
-  if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
-  else renderDashboard();
+  irAPantallaInicial();
 } else {
   renderLogin();
 }

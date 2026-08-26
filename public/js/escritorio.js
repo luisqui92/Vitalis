@@ -28,6 +28,12 @@ const ESCR_NAV_ITEMS = [
   { id: "configuracion", claveLabel: "escr.nav.configuracion", icono: ICONOS.escudo, fn: "renderSeguridad" },
 ];
 
+// El panel de clínica solo aparece para quien administra una. Se agrega
+// primero para que sea lo primero que ve un director al abrir el menú.
+if (typeof esAdministrador === "function" && esAdministrador()) {
+  ESCR_NAV_ITEMS.unshift({ id: "clinica", claveLabel: "clin.nav.clinica", icono: ICONOS.escudo, fn: "renderClinica" });
+}
+
 function escritorioShellActivo() {
   return ES_ESCRITORIO && document.getElementById("escritorioShell").style.display !== "none";
 }

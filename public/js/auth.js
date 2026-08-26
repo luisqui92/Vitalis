@@ -74,10 +74,23 @@ function completarLogin(data) {
   // El idioma llega del servidor igual que la especialidad: es un dato de la
   // cuenta, no del navegador. Se fija antes de pintar nada.
   fijarIdioma(data.idioma || "es");
+  MEDICO_ROL = data.rol || "medico";
+  localStorage.setItem("salud_rol", MEDICO_ROL);
   aplicarTemaSegunEspecialidad();
   if (typeof conectarTiempoReal === "function") conectarTiempoReal();
-  if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) renderInicioEscritorio();
-  else renderDashboard();
+  irAPantallaInicial();
+}
+
+// Un administrativo NO es médico: sus rutas clínicas están cerradas del
+// lado del servidor, así que mandarlo al panel de pacientes sería mandarlo
+// a una pantalla de errores. Va directo a su clínica.
+//
+// Un director sí es médico, y arranca donde arranca cualquiera: en sus
+// pacientes. La clínica está a un clic, en el menú.
+function irAPantallaInicial() {
+  if (typeof esSoloAdministrador === "function" && esSoloAdministrador()) return renderClinica();
+  if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) return renderInicioEscritorio();
+  renderDashboard();
 }
 
 // ─── LOGIN, paso 2: código de la app autenticadora (si el médico tiene 2FA) ──

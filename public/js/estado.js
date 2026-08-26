@@ -284,6 +284,8 @@ function logout() {
   localStorage.removeItem("salud_token");
   localStorage.removeItem("salud_nombre");
   localStorage.removeItem("salud_tipo_especialidad");
+  localStorage.removeItem("salud_rol");
+  if (typeof MEDICO_ROL !== "undefined") MEDICO_ROL = "medico";
   // Al salir, la pantalla de login vuelve al español: el idioma era de la
   // cuenta que se acaba de cerrar, no de este navegador.
   fijarIdioma("es");

@@ -1,0 +1,45 @@
+// Vitalis — Español · panel de clínica (varios consultorios).
+Object.assign(I18N.es, {
+  "clin.cargando": "Cargando la clínica...",
+  "clin.error": "Error cargando la clínica",
+  "clin.consultorios": "{n} consultorios",
+  "clin.stat.consultasMes": "Consultas este mes",
+  "clin.stat.citasHoy": "Citas hoy",
+  "clin.stat.pacientes": "Pacientes",
+  "clin.stat.medicos": "Médicos",
+
+  "clin.porConsultorio": "Actividad por consultorio",
+  "clin.porConsultorioAyuda": "Cuántas consultas hizo cada uno. El panel cuenta consultas — no las abre: la historia clínica es del médico y su paciente.",
+  "clin.col.medico": "Médico",
+  "clin.col.consultorio": "Consultorio",
+  "clin.col.vinculo": "Vínculo",
+  "clin.col.consultasMes": "Consultas mes",
+  "clin.col.pacientes": "Pacientes",
+  "clin.col.hoy": "Hoy",
+
+  "clin.ocupacion": "Ocupación de las salas",
+  "clin.ocupacionAyuda": "Citas confirmadas por día. Sirve para ver dónde hay lugar y para cobrar el alquiler de un consultorio.",
+
+  "clin.finanzas": "Facturación de la clínica",
+  "clin.finanzasInquilinos": "{n} médico(s) alquilan su consultorio y facturan por su cuenta: esa plata no es de la clínica y no aparece acá.",
+  "clin.finanzasVacio": "Todavía no hay planes de tratamiento cargados por médicos en relación de dependencia.",
+
+  "clin.equipos": "Equipos conectados",
+
+  "clin.sumar": "Sumar un médico a la clínica",
+  "clin.sumarAyuda": "El médico se registra él mismo, con su propia contraseña. Acá solo lo asociás a la clínica — vos nunca ves ni elegís su contraseña.",
+  "clin.telefonoMedico": "Teléfono del médico",
+  "clin.vinculoCampo": "Vínculo",
+  "clin.vinculo.empleado": "En relación de dependencia",
+  "clin.vinculo.alquila": "Alquila el consultorio",
+  "clin.vinculoAyudaEmpleado": "La clínica factura al paciente, así que vas a ver su facturación en el panel.",
+  "clin.vinculoAyudaAlquila": "Factura por su cuenta. Vas a ver que usó la sala, pero NO cuánto cobró — esa plata no es de la clínica.",
+  "clin.consultorioCampo": "Consultorio (opcional)",
+  "clin.consultorioPlaceholder": "Ej: Consultorio 3",
+  "clin.vincular": "Sumar a la clínica",
+  "clin.errFaltaTelefono": "Poné el teléfono del médico",
+  "clin.errVincular": "No se pudo sumar a la clínica",
+
+  "clin.nav.clinica": "Clínica",
+  "clin.nav.misPacientes": "Mis pacientes",
+});
