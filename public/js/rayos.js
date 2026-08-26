@@ -58,8 +58,8 @@ async function pintarBloqueCaptura(p) {
   if (equipos.length === 0) {
     caja.innerHTML = `
       <div class="hint" style="margin:0 0 14px">
-        🩻 ¿Tenés equipo de rayos digital?
-        <a href="#" id="rxConectar" style="color:var(--primary)">Conectalo y las placas entran solas</a>
+        ${t("rx.invitacion")}
+        <a href="#" id="rxConectar" style="color:var(--primary)">${t("rx.invitacionLink")}</a>
       </div>`;
     caja.querySelector("#rxConectar").onclick = (e) => { e.preventDefault(); renderEquiposRayos(p); };
     return;
@@ -75,21 +75,20 @@ async function pintarBloqueCaptura(p) {
 
   caja.innerHTML = `
     <div class="card" style="border-color:var(--primary)">
-      <div class="seccion-titulo" style="margin-top:0">🩻 Equipo de rayos</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("rx.equipo")}</div>
       ${esperandoAOtro ? `
         <div class="hint" style="color:var(--warning);margin-bottom:10px">
-          Ahora mismo estás esperando una radiografía de <b>${esc(captura.pacienteNombre)}</b>.
-          Si tocás el botón, la próxima placa se guarda en ${esc(p.nombre)}.
+          ${t("rx.esperandoOtro", { otro: esc(captura.pacienteNombre), actual: esc(p.nombre) })}
         </div>` : ""}
       <div class="hint" style="margin-bottom:10px">
         ${conectado
-          ? `Tocá el botón y tomá la placa como siempre — aparece acá sola.`
-          : `<span style="color:var(--danger)">La PC del consultorio está apagada o sin internet.</span> Prendela y volvé a intentar.`}
+          ? t("rx.conectado")
+          : t("rx.desconectado")}
       </div>
-      <button class="secondary" id="btnCapturarRx">📸 Capturar radiografía</button>
+      <button class="secondary" id="btnCapturarRx">${t("rx.capturar")}</button>
       <div class="hint" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
         <span>${equipos.map(e => `${conectado && e.conectado ? "🟢" : "⚪"} ${esc(e.nombre)}`).join(" · ")}</span>
-        <a href="#" id="rxAdmin" style="color:var(--primary)">Administrar</a>
+        <a href="#" id="rxAdmin" style="color:var(--primary)">${t("rx.administrar")}</a>
       </div>
       <div id="rxErr"></div>
     </div>`;
@@ -107,12 +106,12 @@ async function pintarBloqueCaptura(p) {
     try {
       data = await api(`/medico/pacientes/${p._id}/captura`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo: "radiografia", nombre: "Radiografía" }),
+        body: JSON.stringify({ tipo: "radiografia", nombre: t("rx.nombreCaptura") }),
       });
     } catch (e2) {
       btn.disabled = false;
       const err = caja.querySelector("#rxErr");
-      if (err) err.innerHTML = `<div class="error">${esc(e2.error || "No se pudo abrir la captura")}</div>`;
+      if (err) err.innerHTML = `<div class="error">${esc(e2.error || t("rx.errCaptura"))}</div>`;
       return;
     }
 
@@ -128,19 +127,19 @@ function pintarEsperaCaptura(p, captura, caja) {
   detenerTemporizadorCaptura();
   caja.innerHTML = `
     <div class="card" style="border-color:var(--primary)">
-      <div class="seccion-titulo" style="margin-top:0">🩻 Esperando la radiografía</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("rx.esperando")}</div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
         <div class="spinner" style="margin:0"></div>
         <div>
           <div style="font-weight:600">${esc(p.nombre)}</div>
-          <div class="hint" style="margin:0">Tomá la placa ahora — se guarda sola acá.</div>
+          <div class="hint" style="margin:0">${t("rx.tomaAhora")}</div>
         </div>
       </div>
       <div class="hint" style="margin-bottom:10px">
-        Se cierra sola en <b id="rxReloj">--:--</b>
-        <span id="rxRecibidas">${captura.recibidas ? ` · ya llegaron ${captura.recibidas}` : ""}</span>
+        ${t("rx.cierraEn")} <b id="rxReloj">--:--</b>
+        <span id="rxRecibidas">${captura.recibidas ? t("rx.yaLlegaron", { n: captura.recibidas }) : ""}</span>
       </div>
-      <button class="secondary" id="btnCancelarRx">Cancelar la espera</button>
+      <button class="secondary" id="btnCancelarRx">${t("rx.cancelarEspera")}</button>
     </div>`;
 
   // Búsquedas dentro de "caja" y no en todo el documento: esta tarjeta
@@ -187,7 +186,7 @@ async function renderEquiposRayos(pacienteVuelta, { preservarToken = false } = {
     equipos = (await api("/medico/rayos/estado")).equipos || [];
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando equipos")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("rx.errEquipos"))}</div>`;
     return;
   }
   pintarEquiposRayos(equipos, pacienteVuelta);
@@ -195,36 +194,34 @@ async function renderEquiposRayos(pacienteVuelta, { preservarToken = false } = {
 
 function pintarEquiposRayos(equipos, pacienteVuelta) {
   app.innerHTML = `
-    <button class="back" id="rxBack">← ${pacienteVuelta ? "Volver a la ficha" : "Panel"}</button>
+    <button class="back" id="rxBack">${t(pacienteVuelta ? "rx.volverFicha" : "rx.volverPanel")}</button>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">🩻 Equipo de rayos</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("rx.equipo")}</div>
       <div class="hint" style="margin-bottom:12px">
-        El aparato de rayos no manda imágenes por sí solo: las manda la PC donde está
-        el software del sensor. Se instala una vez un programita en esa PC y de ahí en
-        adelante cada placa entra sola a la ficha del paciente.
+        ${t("rx.explicacion")}
       </div>
 
-      ${equipos.length === 0 ? `<div class="empty" style="margin-bottom:12px">Todavía no conectaste ninguna PC.</div>` : equipos.map(e => `
+      ${equipos.length === 0 ? `<div class="empty" style="margin-bottom:12px">${t("rx.sinEquipos")}</div>` : equipos.map(e => `
         <div class="item" style="cursor:default">
           <div class="top">
             <div class="nombre">${e.conectado ? "🟢" : "⚪"} ${esc(e.nombre)}</div>
             <button class="link" data-baja-equipo="${e._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
           </div>
           <div class="fecha">
-            ${e.conectado ? "Conectada ahora" : (e.ultimoContacto ? "Última señal: " + new Date(e.ultimoContacto).toLocaleString("es-BO") : "Nunca se conectó")}
+            ${e.conectado ? t("rx.conectadaAhora") : (e.ultimoContacto ? t("rx.ultimaSenal", { fecha: new Date(e.ultimoContacto).toLocaleString(localeActual()) }) : t("rx.nuncaConecto"))}
           </div>
           <div class="paciente-info">
-            ${e.subidas ? `${e.subidas} ${e.subidas === 1 ? "imagen subida" : "imágenes subidas"}` : "Sin imágenes todavía"}
-            ${e.ultimaSubida ? ` · última el ${new Date(e.ultimaSubida).toLocaleDateString("es-BO")}` : ""}
+            ${e.subidas ? t(e.subidas === 1 ? "rx.unaImagen" : "rx.variasImagenes", { n: e.subidas }) : t("rx.sinImagenes")}
+            ${e.ultimaSubida ? t("rx.ultimaEl", { fecha: new Date(e.ultimaSubida).toLocaleDateString(localeActual()) }) : ""}
           </div>
-          <button class="item-action" data-token-equipo="${e._id}" style="margin-top:10px">🔑 Generar token nuevo</button>
+          <button class="item-action" data-token-equipo="${e._id}" style="margin-top:10px">${t("rx.tokenNuevo")}</button>
         </div>`).join("")}
 
-      <label style="margin-top:14px">Nombre de la PC (para reconocerla)</label>
-      <input id="rxNombre" type="text" placeholder="Ej: PC del consultorio 1">
+      <label style="margin-top:14px">${t("rx.nombrePc")}</label>
+      <input id="rxNombre" type="text" placeholder="${t("rx.nombrePcPlaceholder")}">
       <div id="rxAdminErr"></div>
-      <button class="secondary" id="btnAltaEquipo">➕ Conectar una PC</button>
+      <button class="secondary" id="btnAltaEquipo">${t("rx.conectarPc")}</button>
     </div>
 
     <div id="rxToken"></div>`;
@@ -250,30 +247,30 @@ function pintarEquiposRayos(equipos, pacienteVuelta) {
       mostrarTokenEquipo(data.token);
     } catch (e) {
       btn.disabled = false;
-      mostrarErrorEquipos(e.error || "No se pudo crear el equipo");
+      mostrarErrorEquipos(e.error || t("rx.errCrear"));
     }
   };
 
   document.querySelectorAll("[data-token-equipo]").forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm("Se genera un token nuevo y el anterior deja de funcionar en el acto. Vas a tener que pegarlo en el config.json de esa PC. ¿Seguimos?")) return;
+      if (!confirm(t("rx.confirmarRegenerar"))) return;
       try {
         const data = await api(`/medico/rayos/equipos/${btn.dataset.tokenEquipo}/token`, { method: "POST" });
         mostrarTokenEquipo(data.token);
       } catch (e) {
-        mostrarErrorEquipos(e.error || "No se pudo regenerar");
+        mostrarErrorEquipos(e.error || t("rx.errRegenerar"));
       }
     };
   });
 
   document.querySelectorAll("[data-baja-equipo]").forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm("Esa PC deja de poder subir radiografías en el acto. ¿Darla de baja?")) return;
+      if (!confirm(t("rx.confirmarBaja"))) return;
       try {
         await api(`/medico/rayos/equipos/${btn.dataset.bajaEquipo}`, { method: "DELETE" });
         renderEquiposRayos(pacienteVuelta);
       } catch (e) {
-        mostrarErrorEquipos(e.error || "No se pudo dar de baja");
+        mostrarErrorEquipos(e.error || t("rx.errBaja"));
       }
     };
   });
@@ -287,35 +284,30 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
   if (!caja) return;
   caja.innerHTML = `
     <div class="card" style="border-color:var(--warning)">
-      <div class="seccion-titulo" style="margin-top:0">🔑 Token de esta PC</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("rx.tokenTitulo")}</div>
       <div class="hint" style="color:var(--warning);margin-bottom:10px">
-        Copialo ahora. Por seguridad no se puede volver a ver — si se pierde, se genera otro.
+        ${t("rx.tokenAviso")}
       </div>
       <div id="rxTokenTexto" style="font-family:monospace;font-size:13px;word-break:break-all;background:var(--bg);padding:10px;border-radius:8px;user-select:all">${esc(token)}</div>
-      <button class="secondary" id="btnCopiarToken" style="margin-top:10px">📋 Copiar</button>
+      <button class="secondary" id="btnCopiarToken" style="margin-top:10px">${t("rx.copiar")}</button>
 
-      <div class="seccion-titulo">Instalación en la PC del consultorio</div>
+      <div class="seccion-titulo">${t("rx.instalacion")}</div>
       <div class="hint" style="margin-bottom:10px">
-        Hacé esto <b>desde esa misma PC</b> — la que tiene el software del sensor.
-        Pegá abajo la carpeta donde ese software guarda las imágenes y Vitalis te
-        arma el archivo de configuración ya listo, con el token adentro.
+        ${t("rx.instalacionAyuda")}
       </div>
-      <label>Carpeta donde el software guarda las imágenes</label>
-      <input id="rxCarpeta" type="text" placeholder="C:\\Ai-Dental\\Images" spellcheck="false">
+      <label>${t("rx.carpeta")}</label>
+      <input id="rxCarpeta" type="text" placeholder="${t("rx.carpetaPlaceholder")}" spellcheck="false">
       <div class="hint" style="margin:6px 0 0">
-        Copiala de la barra de direcciones del Explorador y pegala tal cual —
-        de las barras nos ocupamos nosotros.
+        ${t("rx.carpetaAyuda")}
       </div>
       <div id="rxCarpetaErr"></div>
-      <button class="secondary" id="btnBajarConfig" style="margin-top:10px">⬇️ 1. Descargar config.json</button>
+      <button class="secondary" id="btnBajarConfig" style="margin-top:10px">${t("rx.bajarConfig")}</button>
       <a class="secondary" id="btnBajarAgente" href="/rayos/agente.js" download="agente.js"
-         style="display:block;text-align:center;text-decoration:none;margin-top:8px">⬇️ 2. Descargar agente.js</a>
+         style="display:block;text-align:center;text-decoration:none;margin-top:8px">${t("rx.bajarAgente")}</a>
       <div class="hint" style="margin-top:10px">
-        Poné los dos archivos <b>en una misma carpeta nueva</b> (por ejemplo
-        <b>C:\\VitalisRayos</b>). Después abrí ahí una ventana de comandos y escribí:
+        ${t("rx.pasosFinales")}
         <div style="font-family:monospace;font-size:13px;background:var(--bg);padding:8px;border-radius:8px;margin-top:6px;user-select:all">node agente.js</div>
-        Si dice <b>conectado a Vitalis</b>, ya está andando. Si dice que
-        <i>node</i> no se reconoce, instalá Node.js desde nodejs.org y volvé a intentar.
+        ${t("rx.pasoFinal2")}
       </div>
     </div>`;
   if (desplazar) caja.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -324,7 +316,7 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
     const btn = document.getElementById("btnCopiarToken");
     try {
       await navigator.clipboard.writeText(token);
-      btn.textContent = "✅ Copiado";
+      btn.textContent = t("rx.copiado");
     } catch {
       // Sin permiso de portapapeles (pasa en http:// y en algunos
       // navegadores viejos): al menos se lo dejamos seleccionado.
@@ -333,7 +325,7 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(rango);
-      btn.textContent = "Seleccionado — copialo con Ctrl+C";
+      btn.textContent = t("rx.seleccionado");
     }
   };
 
@@ -346,7 +338,7 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
     const err = document.getElementById("rxCarpetaErr");
     const carpeta = document.getElementById("rxCarpeta").value.trim().replace(/["']/g, "");
     if (!carpeta) {
-      err.innerHTML = `<div class="error">Falta la carpeta — sin eso el agente no sabe dónde mirar.</div>`;
+      err.innerHTML = `<div class="error">${t("rx.errCarpeta")}</div>`;
       return;
     }
     err.innerHTML = "";

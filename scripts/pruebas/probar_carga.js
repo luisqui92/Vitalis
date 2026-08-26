@@ -146,6 +146,12 @@ const pantallas = [
   ["estudios (pestaña)", `app.innerHTML = tabEstudiosHtml([{ _id: "e1", tipo: "foto", anguloFoto: "frontal", nombre: "Frontal", fecha: new Date().toISOString(), anotaciones: [] }])`],
   ["estudios (vacío)", `app.innerHTML = tabEstudiosHtml([])`],
   ["estado del informe", `estadoInformeHtml({ estado: "firmado" }) + estadoInformeHtml({ estado: "borrador" })`],
+  ["tipos de medición", `tiposMedicion()`],
+  ["evolución (pestaña)", `app.innerHTML = tabEvolucionHtml([{ _id: "m1", tipo: "presion", valor: 120, valorSecundario: 80, fecha: new Date().toISOString() }, { _id: "m2", tipo: "presion", valor: 130, valorSecundario: 85, fecha: new Date().toISOString() }])`],
+  ["evolución (vacía)", `app.innerHTML = tabEvolucionHtml([])`],
+  ["pistas del visor", `pistaDelModo("mover") + pistaDelModo("distancia") + pistaDelModo("angulo") + pistaDelModo("calibrar")`],
+  ["equipos de rayos", `pintarEquiposRayos([{ _id: "eq1", nombre: "PC 1", conectado: true, subidas: 3, ultimaSubida: new Date().toISOString(), ultimoContacto: new Date().toISOString() }], null)`],
+  ["equipos de rayos (vacío)", `pintarEquiposRayos([], null)`],
 ];
 
 for (const idioma of ["es", "pt"]) {

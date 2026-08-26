@@ -16,7 +16,7 @@ let bandejaPacientes = null; // se cachea: la lista no cambia mientras asignás
 async function renderBandejaDicom() {
   if (typeof detenerPolling === "function") detenerPolling();
   const serie = nuevaSeriePantalla();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando bandeja...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("dicom.cargando")}</div>`;
   let entrantes = [];
   try {
     const [b, p] = await Promise.all([
@@ -27,7 +27,7 @@ async function renderBandejaDicom() {
     bandejaPacientes = p.pacientes || [];
   } catch (e) {
     if (e.status === 401) return logout();
-    if (seriePantallaVigente(serie)) app.innerHTML = `<div class="error">${esc(e.error || "Error cargando la bandeja")}</div>`;
+    if (seriePantallaVigente(serie)) app.innerHTML = `<div class="error">${esc(e.error || t("dicom.error"))}</div>`;
     return;
   }
   if (!seriePantallaVigente(serie)) return;
@@ -40,51 +40,49 @@ function pintarBandejaDicom(entrantes) {
     .join("");
 
   app.innerHTML = `
-    <button class="back" id="bdBack">← Panel</button>
+    <button class="back" id="bdBack">${t("dicom.volver")}</button>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">📥 Estudios sin asignar</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("dicom.titulo")}</div>
       <div class="hint">
-        Lo que llegó de la caja y todavía no sabemos de quién es. Si el técnico escribe
-        el <b>código del paciente</b> en el equipo, el estudio se archiva solo y no pasa
-        por acá.
+        ${t("dicom.explicacion")}
       </div>
     </div>
 
     ${entrantes.length === 0 ? `
       <div class="empty">
-        La bandeja está vacía — que es como tiene que estar.
+        ${t("dicom.vacia")}
       </div>` : entrantes.map(e => `
       <div class="card" data-entrante="${e._id}">
         <div style="display:flex;gap:12px;align-items:flex-start">
           <img data-previa="${e._id}" alt="" style="width:92px;height:92px;object-fit:cover;border-radius:8px;background:var(--bg);flex:none">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600">${esc(e.nombre || e.modalidad || "Estudio")}</div>
+            <div style="font-weight:600">${esc(e.nombre || e.modalidad || t("dicom.estudio"))}</div>
             <div class="paciente-info">
-              ${e.pacienteDicom ? `Llegó como <b>${esc(e.pacienteDicom)}</b>` : "El equipo no mandó nombre"}
-              ${e.codigoDicom ? ` · código ${esc(e.codigoDicom)}` : ""}
+              ${e.pacienteDicom ? t("dicom.llegoComo", { nombre: esc(e.pacienteDicom) }) : t("dicom.sinNombre")}
+              ${e.codigoDicom ? t("dicom.codigo", { codigo: esc(e.codigoDicom) }) : ""}
             </div>
             <div class="fecha">
-              ${new Date(e.fecha).toLocaleString("es-BO")}
+              ${new Date(e.fecha).toLocaleString(localeActual())}
               ${e.modalidad ? ` · ${esc(e.modalidad)}` : ""}${e.tamano ? ` · ${esc(e.tamano)}` : ""}
               ${e.equipo ? ` · ${esc(e.equipo)}` : ""}
             </div>
             ${e.conMilimetros
-              ? `<div class="fecha" style="color:var(--success)">Trae la escala del equipo — se mide en milímetros sin calibrar</div>`
-              : `<div class="fecha" style="color:var(--warning)">Sin escala en el archivo — las medidas van en píxeles hasta calibrar</div>`}
+              ? `<div class="fecha" style="color:var(--success)">${t("dicom.conEscala")}</div>`
+              : `<div class="fecha" style="color:var(--warning)">${t("dicom.sinEscala")}</div>`}
           </div>
         </div>
 
-        <label style="margin-top:10px">¿De quién es?</label>
+        <label style="margin-top:10px">${t("dicom.deQuien")}</label>
         <select data-paciente-de="${e._id}">
-          <option value="">Elegí el paciente…</option>
+          <option value="">${t("dicom.elegirPaciente")}</option>
           ${opcionesPacientes}
         </select>
-        <input type="text" data-nombre-de="${e._id}" value="${esc(e.nombre || "")}" placeholder="Nombre del estudio">
+        <input type="text" data-nombre-de="${e._id}" value="${esc(e.nombre || "")}" placeholder="${t("dicom.nombrePlaceholder")}">
         <div data-err-de="${e._id}"></div>
         <div style="display:flex;gap:8px">
-          <button class="secondary" data-asignar="${e._id}" style="flex:1">Guardar en la ficha</button>
-          <button class="link" data-descartar="${e._id}" style="width:auto;color:var(--danger)">Descartar</button>
+          <button class="secondary" data-asignar="${e._id}" style="flex:1">${t("dicom.guardar")}</button>
+          <button class="link" data-descartar="${e._id}" style="width:auto;color:var(--danger)">${t("dicom.descartar")}</button>
         </div>
       </div>`).join("")}`;
 
@@ -109,11 +107,11 @@ function pintarBandejaDicom(entrantes) {
       const pacienteId = document.querySelector(`[data-paciente-de="${id}"]`).value;
       const caja = document.querySelector(`[data-err-de="${id}"]`);
       if (!pacienteId) {
-        caja.innerHTML = `<div class="error">Elegí a qué paciente va antes de guardarlo.</div>`;
+        caja.innerHTML = `<div class="error">${t("dicom.errSinPaciente")}</div>`;
         return;
       }
       btn.disabled = true;
-      btn.textContent = "Guardando...";
+      btn.textContent = t("dicom.guardando");
       try {
         await api(`/medico/dicom/bandeja/${id}/asignar`, {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -122,8 +120,8 @@ function pintarBandejaDicom(entrantes) {
         renderBandejaDicom();
       } catch (e) {
         btn.disabled = false;
-        btn.textContent = "Guardar en la ficha";
-        caja.innerHTML = `<div class="error">${esc(e.error || "No se pudo asignar")}</div>`;
+        btn.textContent = t("dicom.guardar");
+        caja.innerHTML = `<div class="error">${esc(e.error || t("dicom.errAsignar"))}</div>`;
       }
     };
   });
@@ -133,14 +131,14 @@ function pintarBandejaDicom(entrantes) {
       // Descartar borra la vista previa de Vitalis. El DICOM original sigue
       // en la caja de la clínica, así que no se pierde el estudio — pero
       // conviene decirlo, porque desde acá parece que se borra todo.
-      if (!confirm("Se saca de la bandeja y se borra la vista previa.\n\nEl estudio original sigue guardado en la caja de la clínica.\n\n¿Descartar?")) return;
+      if (!confirm(t("dicom.confirmarDescartar"))) return;
       btn.disabled = true;
       try {
         await api(`/medico/dicom/bandeja/${btn.dataset.descartar}`, { method: "DELETE" });
         renderBandejaDicom();
       } catch (e) {
         btn.disabled = false;
-        alert(e.error || "No se pudo descartar");
+        alert(e.error || t("dicom.errDescartar"));
       }
     };
   });

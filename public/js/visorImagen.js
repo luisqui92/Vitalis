@@ -35,7 +35,7 @@ async function abrirVisorImagen(estudioId, estudio) {
   capa.id = "visorImagen";
   capa.className = "no-imprimir";
   capa.style.cssText = "position:fixed;inset:0;z-index:9000;background:#0a0a0c;display:flex;flex-direction:column";
-  capa.innerHTML = `<div class="loading" style="margin:auto;color:#eee"><div class="spinner"></div>Abriendo imagen...</div>`;
+  capa.innerHTML = `<div class="loading" style="margin:auto;color:#eee"><div class="spinner"></div>${t("visor.abriendo")}</div>`;
   document.body.appendChild(capa);
   document.body.style.overflow = "hidden";
 
@@ -46,8 +46,8 @@ async function abrirVisorImagen(estudioId, estudio) {
 
   if (!blob) {
     capa.innerHTML = `<div style="margin:auto;color:#eee;text-align:center">
-      <p>No se pudo abrir la imagen.</p>
-      <button class="secondary" onclick="cerrarVisorImagen()">Cerrar</button></div>`;
+      <p>${t("visor.errAbrir")}</p>
+      <button class="secondary" onclick="cerrarVisorImagen()">${t("visor.cerrar")}</button></div>`;
     return;
   }
 
@@ -109,8 +109,8 @@ function pintarVisor() {
   v.capa.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#15151a;color:#eee;gap:10px">
       <div style="min-width:0">
-        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.estudio.nombre || "Imagen")}</div>
-        <div style="font-size:12px;opacity:.65">${v.img.naturalWidth} × ${v.img.naturalHeight} px${v.mmPorPixel ? " · calibrada" : ""}</div>
+        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.estudio.nombre || t("visor.imagen"))}</div>
+        <div style="font-size:12px;opacity:.65">${v.img.naturalWidth} × ${v.img.naturalHeight} px${v.mmPorPixel ? t("visor.calibrada") : ""}</div>
       </div>
       <button id="visorCerrar" style="background:#2a2a33;color:#eee;border:0;border-radius:8px;padding:8px 14px;font-weight:600">✕</button>
     </div>
@@ -122,10 +122,10 @@ function pintarVisor() {
 
     <div style="background:#15151a;color:#eee;padding:10px 12px 14px">
       <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px">
-        ${botonVisor("mover", "✋", "Mover")}
-        ${botonVisor("distancia", "📏", "Medir")}
-        ${botonVisor("angulo", "📐", "Ángulo")}
-        ${botonVisor("calibrar", "🎯", v.mmPorPixel ? "Recalibrar" : "Calibrar")}
+        ${botonVisor("mover", "✋", t("visor.modo.mover"))}
+        ${botonVisor("distancia", "📏", t("visor.modo.distancia"))}
+        ${botonVisor("angulo", "📐", t("visor.modo.angulo"))}
+        ${botonVisor("calibrar", "🎯", t(v.mmPorPixel ? "visor.modo.recalibrar" : "visor.modo.calibrar"))}
         <div style="width:1px;background:#333;margin:0 4px"></div>
         <button class="visor-btn" data-accion="zoom-mas">🔍+</button>
         <button class="visor-btn" data-accion="zoom-menos">🔍−</button>
@@ -136,11 +136,11 @@ function pintarVisor() {
       </div>
 
       <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px">
-        <span style="opacity:.7;width:62px">Brillo</span>
+        <span style="opacity:.7;width:62px">${t("visor.brillo")}</span>
         <input type="range" id="visorBrillo" min="20" max="250" value="${v.brillo}" style="width:100%">
         <span id="visorBrilloVal" style="opacity:.7;width:38px;text-align:right">${v.brillo}%</span>
 
-        <span style="opacity:.7;width:62px">Contraste</span>
+        <span style="opacity:.7;width:62px">${t("visor.contraste")}</span>
         <input type="range" id="visorContraste" min="20" max="350" value="${v.contraste}" style="width:100%">
         <span id="visorContrasteVal" style="opacity:.7;width:38px;text-align:right">${v.contraste}%</span>
       </div>
@@ -148,9 +148,9 @@ function pintarVisor() {
       <div id="visorMediciones" style="margin-top:8px;font-size:12px"></div>
 
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="visor-btn" data-accion="reset" style="flex:1">Restablecer</button>
-        ${hayMedicion ? `<button class="visor-btn" data-accion="borrar-mediciones" style="flex:1">Borrar mediciones</button>` : ""}
-        <button class="visor-btn" data-accion="guardar" style="flex:1;background:var(--primary);color:#fff">Guardar</button>
+        <button class="visor-btn" data-accion="reset" style="flex:1">${t("visor.restablecer")}</button>
+        ${hayMedicion ? `<button class="visor-btn" data-accion="borrar-mediciones" style="flex:1">${t("visor.borrarMediciones")}</button>` : ""}
+        <button class="visor-btn" data-accion="guardar" style="flex:1;background:var(--primary);color:#fff">${t("visor.guardar")}</button>
       </div>
     </div>
 
@@ -188,12 +188,9 @@ function botonVisor(modo, icono, texto) {
   return `<button class="visor-btn${activo}" data-modo="${modo}">${icono} ${texto}</button>`;
 }
 
-const PISTAS = {
-  mover: "Arrastrá para mover · pellizcá o rueda para acercar",
-  distancia: "Tocá dos puntos para medir",
-  angulo: "Tocá tres puntos: extremo, vértice, extremo",
-  calibrar: "Marcá dos puntos de una distancia que conozcas",
-};
+// Se resuelven al llamar y no en una constante: este archivo se carga antes
+// del login, cuando todavía no se sabe el idioma del médico.
+function pistaDelModo(modo) { return t("visor.pista." + modo); }
 
 // ─── DIBUJO ───────────────────────────────────────────────────────────────
 function dibujarVisor() {
@@ -223,7 +220,7 @@ function dibujarVisor() {
   // Las mediciones van SIN filtro y por encima: si el médico deja la imagen
   // en negativo, la línea de medición tiene que seguir viéndose.
   dibujarMediciones(ctx);
-  v.capa.querySelector("#visorPista").textContent = PISTAS[v.modo] || "";
+  v.capa.querySelector("#visorPista").textContent = pistaDelModo(v.modo) || "";
 }
 
 // Pasa un punto de la imagen a coordenadas de pantalla, aplicando el mismo
@@ -363,8 +360,7 @@ function pintarListaMediciones() {
   let aviso = "";
   if (!v.mmPorPixel && hayDistancias) {
     aviso = `<div style="color:#ffb84d;margin-bottom:6px">
-         Las distancias están en píxeles. Una imagen JPEG o PNG no trae el tamaño real
-         del píxel, así que para tener milímetros hay que calibrar con 🎯.
+         ${t("visor.avisoPixeles")}
        </div>`;
   } else if (hayDistancias && v.origenEscala === "dicom") {
     // Cuando la escala la trajo el archivo, decirlo vale: es la diferencia
@@ -373,10 +369,9 @@ function pintarListaMediciones() {
     // del detector y sale agrandado. Callarlo sería dejar que alguien decida
     // sobre un número que parece más exacto de lo que es.
     aviso = `<div style="color:#8fd6a8;margin-bottom:6px">
-         Escala del equipo (DICOM) — no hace falta calibrar.
+         ${t("visor.avisoDicom")}
          ${v.planoDetector ? `<span style="color:#ffb84d;display:block;margin-top:3px">
-           Es la medida en el detector: en radiografía el objeto sale algo agrandado.
-           Para el milímetro real, poné una referencia conocida en el mismo plano.
+           ${t("visor.avisoDetector")}
          </span>` : ""}
        </div>`;
   }
@@ -526,25 +521,18 @@ function pedirCalibracion(puntos) {
   // contra una referencia que esté en el mismo plano del objeto, para
   // corregir la magnificación— así que no se prohíbe, se pregunta.
   if (v.origenEscala === "dicom" &&
-      !confirm("Esta imagen ya trae la escala del equipo (DICOM), que es más exacta que marcarla a mano.\n\n" +
-               "Recalibrar solo conviene si estás usando una referencia de tamaño conocido apoyada en el mismo plano que lo que vas a medir.\n\n¿Seguir igual?")) {
+      !confirm(t("visor.confirmarRecalibrar"))) {
     v.modo = "mover";
     dibujarVisor();
     return;
   }
 
-  const respuesta = prompt(
-    "¿Cuántos milímetros mide en la realidad la distancia que acabás de marcar?\n\n" +
-    "Marcaste " + Math.round(px) + " píxeles.\n\n" +
-    "Referencias que suelen servir: el largo del sensor intraoral (39 mm en el\n" +
-    "tamaño 2), una regla radiopaca, o un objeto de medida conocida en la placa.",
-    ""
-  );
+  const respuesta = prompt(t("visor.pedirMm", { px: Math.round(px) }), "");
   if (respuesta === null) { dibujarVisor(); return; }
 
   const mm = Number(String(respuesta).replace(",", "."));
   if (!Number.isFinite(mm) || mm <= 0) {
-    alert("Poné un número de milímetros mayor a cero.");
+    alert(t("visor.errMm"));
     dibujarVisor();
     return;
   }
@@ -556,7 +544,7 @@ function pedirCalibracion(puntos) {
   v.mmPorPixelY = null;
   v.origenEscala = "manual";
   v.planoDetector = false;
-  v.referenciaCalibracion = `${mm} mm sobre ${Math.round(px)} px`;
+  v.referenciaCalibracion = t("visor.referencia", { mm, px: Math.round(px) });
   v.sucio = true;
   v.modo = "mover";
   // Las mediciones ya tomadas se recalculan solas al dibujar, porque el
@@ -594,7 +582,7 @@ async function accionVisor(accion) {
       pintarVisor();
       break;
     case "borrar-mediciones":
-      if (!confirm("¿Borrar todas las mediciones de esta imagen?")) return;
+      if (!confirm(t("visor.confirmarBorrarMediciones"))) return;
       v.mediciones = [];
       v.puntosEnCurso = [];
       v.sucio = true;
@@ -627,9 +615,9 @@ async function guardarVisor() {
     });
     v.sucio = false;
     const btn = v.capa.querySelector('[data-accion="guardar"]');
-    if (btn) { btn.textContent = "✅ Guardado"; setTimeout(() => { if (btn.isConnected) btn.textContent = "Guardar"; }, 2000); }
+    if (btn) { btn.textContent = t("visor.guardado"); setTimeout(() => { if (btn.isConnected) btn.textContent = t("visor.guardar"); }, 2000); }
   } catch (e) {
-    alert(e.error || "No se pudo guardar");
+    alert(e.error || t("visor.errGuardar"));
   }
 }
 
@@ -637,7 +625,7 @@ async function guardarVisor() {
 // clínico. Se pregunta.
 function confirmarSalida() {
   const v = visorEstado;
-  if (v?.sucio && !confirm("Tenés cambios sin guardar (mediciones o ajustes). ¿Salir igual?")) return;
+  if (v?.sucio && !confirm(t("visor.confirmarSalir"))) return;
   if (v?.escuchaTeclado) window.removeEventListener("keydown", v.escuchaTeclado);
   cerrarVisorImagen();
 }

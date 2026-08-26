@@ -1,0 +1,43 @@
+// Vitalis — Español · evolución clínica (signos vitales en el tiempo).
+Object.assign(I18N.es, {
+  // La clave ("presion", "glucosa") es lo que se guarda. La unidad NO se
+  // traduce: mmHg, mg/dL y kg son las mismas en todos lados, y cambiarlas
+  // convertiría un número medido en otro.
+  "med.presion": "Presión arterial",
+  "med.glucosa": "Glucosa",
+  "med.peso": "Peso",
+  "med.imc": "IMC",
+  "med.saturacion": "Saturación O₂",
+  "med.colesterol": "Colesterol",
+  "med.temperatura": "Temperatura",
+  "med.frecuenciaCardiaca": "Frec. cardíaca",
+  "med.presionIntraocularOD": "Presión intraocular OD",
+  "med.presionIntraocularOI": "Presión intraocular OI",
+  "med.talla": "Talla",
+  "med.perimetroCefalico": "Perímetro cefálico",
+  "med.pesoMaterno": "Peso materno",
+  "med.alturaUterina": "Altura uterina",
+  "med.fcf": "Frec. cardíaca fetal",
+
+  "evo.comoCambia": "Cómo viene cambiando",
+  "evo.antes": "antes",
+  "evo.ahora": "ahora",
+  "evo.resumen": "{n} mediciones en {meses} {palabraMes}",
+  "evo.mes": "mes",
+  "evo.meses": "meses",
+  "evo.agregar": "Agregar medición",
+  "evo.sistolica": "Sistólica",
+  "evo.valor": "Valor",
+  "evo.diastolicaPlaceholder": "Diastólica (mmHg)",
+  "evo.fecha": "Fecha",
+  "evo.btnAgregar": "➕ Agregar",
+  "evo.alertaTitulo": "⚠️ Evolución detectada",
+  "evo.alertaPie": " Revisar según criterio del especialista.",
+  "evo.sinMediciones": "Sin mediciones registradas todavía.",
+  "evo.tocarGrafico": "Tocá el gráfico para ver cada medición",
+  "evo.legendaSistolica": "Sistólica",
+  "evo.legendaDiastolica": "Diastólica",
+  "evo.confirmarBorrar": "¿Eliminar esta medición?",
+  "evo.alertaUmbral": "Último valor ({valor} {unidad}) por encima de lo esperado ({umbral} {unidad}).",
+  "evo.alertaAlza": "Tendencia en alza en las últimas 3 mediciones: {valores} {unidad}.",
+});

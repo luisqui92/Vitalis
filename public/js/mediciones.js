@@ -2,38 +2,48 @@
 // (presión, glucosa, peso, saturación...) con gráfico de tendencia simple
 // dibujado a mano en <canvas>, sin librerías externas.
 
-const TIPOS_MEDICION = {
-  presion:             { label: "Presión arterial", unidad: "mmHg", doble: true },
-  glucosa:             { label: "Glucosa",           unidad: "mg/dL" },
-  peso:                { label: "Peso",              unidad: "kg" },
-  imc:                 { label: "IMC",               unidad: "" },
-  saturacion:          { label: "Saturación O₂",     unidad: "%" },
-  colesterol:          { label: "Colesterol",        unidad: "mg/dL" },
-  temperatura:         { label: "Temperatura",       unidad: "°C" },
-  frecuenciaCardiaca:  { label: "Frec. cardíaca",    unidad: "lpm" },
+// La clave ("presion", "glucosa") es lo que se guarda en la base. La UNIDAD
+// tampoco se traduce: mmHg, mg/dL y kg son las mismas en todos lados, y
+// cambiarlas convertiría un número medido en otro. Lo único que cambia con
+// el idioma es el nombre, y por eso sale de tiposMedicion() al llamar y no
+// de una constante que se congelaría antes del login.
+const MEDICIONES_META = {
+  presion:             { unidad: "mmHg", doble: true },
+  glucosa:             { unidad: "mg/dL" },
+  peso:                { unidad: "kg" },
+  imc:                 { unidad: "" },
+  saturacion:          { unidad: "%" },
+  colesterol:          { unidad: "mg/dL" },
+  temperatura:         { unidad: "°C" },
+  frecuenciaCardiaca:  { unidad: "lpm" },
   // Vitalis Visión (oftalmología): presión intraocular por ojo — el
   // umbral de alerta (>21 mmHg, o tendencia en alza) es el estándar
   // clínico para sospecha de glaucoma.
-  presionIntraocularOD: { label: "Presión intraocular OD", unidad: "mmHg", alertaUmbral: 21 },
-  presionIntraocularOI: { label: "Presión intraocular OI", unidad: "mmHg", alertaUmbral: 21 },
+  presionIntraocularOD: { unidad: "mmHg", alertaUmbral: 21 },
+  presionIntraocularOI: { unidad: "mmHg", alertaUmbral: 21 },
   // Vitalis Pediatría: van al gráfico normal de evolución como cualquier
   // otra medición, pero además son la materia prima de las curvas de
   // crecimiento (ver crecimiento.js), donde se leen contra la OMS.
-  talla:               { label: "Talla",             unidad: "cm" },
-  perimetroCefalico:   { label: "Perímetro cefálico", unidad: "cm" },
+  talla:               { unidad: "cm" },
+  perimetroCefalico:   { unidad: "cm" },
   // Vitalis Obstetricia: controles prenatales, control a control.
-  pesoMaterno:         { label: "Peso materno",       unidad: "kg" },
-  alturaUterina:       { label: "Altura uterina",      unidad: "cm" },
-  fcf:                 { label: "Frec. cardíaca fetal", unidad: "lpm" },
+  pesoMaterno:         { unidad: "kg" },
+  alturaUterina:       { unidad: "cm" },
+  fcf:                 { unidad: "lpm" },
 };
+function tiposMedicion() {
+  const salida = {};
+  for (const k of Object.keys(MEDICIONES_META)) salida[k] = { ...MEDICIONES_META[k], label: t("med." + k) };
+  return salida;
+}
 
 let evolucionTipoActivo = null;
 
 function primerTipoConDatos(mediciones) {
-  for (const key of Object.keys(TIPOS_MEDICION)) {
+  for (const key of Object.keys(MEDICIONES_META)) {
     if (mediciones.some(m => m.tipo === key)) return key;
   }
-  return Object.keys(TIPOS_MEDICION)[0];
+  return Object.keys(MEDICIONES_META)[0];
 }
 
 function puntosDe(mediciones, tipo) {
@@ -115,7 +125,7 @@ function wireGraficoInteractivo(canvas, posiciones, tipo) {
     }
     const p = mejor.punto;
     const valor = p.valorSecundario != null ? `${p.valor}/${p.valorSecundario}` : p.valor;
-    salida.innerHTML = `<b>${valor}${tipo.unidad ? " " + esc(tipo.unidad) : ""}</b> · ${new Date(p.fecha).toLocaleDateString("es-BO")}`;
+    salida.innerHTML = `<b>${valor}${tipo.unidad ? " " + esc(tipo.unidad) : ""}</b> · ${new Date(p.fecha).toLocaleDateString(localeActual())}`;
   }
 
   canvas.onmousemove = (e) => mostrarDesde(e.clientX);
@@ -147,25 +157,25 @@ function comparativaHtml(puntos, tipo) {
 
   return `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Cómo viene cambiando</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("evo.comoCambia")}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <div style="text-align:center;flex:1">
-          <div class="hint">${new Date(primero.fecha).toLocaleDateString("es-BO")}</div>
+          <div class="hint">${new Date(primero.fecha).toLocaleDateString(localeActual())}</div>
           <div style="font-size:22px;font-weight:700">${fmt(primero)}</div>
-          <div class="hint">antes</div>
+          <div class="hint">${t("evo.antes")}</div>
         </div>
         <div style="text-align:center;color:${color};font-weight:700;white-space:nowrap">
           <div style="font-size:20px">${flecha}</div>
           <div style="font-size:13px">${signo(delta)}${deltaSec != null ? "/" + signo(deltaSec) : ""}</div>
         </div>
         <div style="text-align:center;flex:1">
-          <div class="hint">${new Date(ultimo.fecha).toLocaleDateString("es-BO")}</div>
+          <div class="hint">${new Date(ultimo.fecha).toLocaleDateString(localeActual())}</div>
           <div style="font-size:22px;font-weight:700;color:var(--primary)">${fmt(ultimo)}</div>
-          <div class="hint">ahora</div>
+          <div class="hint">${t("evo.ahora")}</div>
         </div>
       </div>
       <div class="hint" style="text-align:center;margin-top:8px">
-        ${puntos.length} mediciones en ${meses} ${meses === 1 ? "mes" : "meses"}${tipo.unidad ? " · " + esc(tipo.unidad) : ""}
+        ${t("evo.resumen", { n: puntos.length, meses, palabraMes: t(meses === 1 ? "evo.mes" : "evo.meses") })}${tipo.unidad ? " · " + esc(tipo.unidad) : ""}
       </div>
     </div>`;
 }
@@ -177,12 +187,12 @@ function calcularAlertaMedicion(puntos, tipo) {
   if (!tipo.alertaUmbral || puntos.length === 0) return null;
   const ultimo = puntos[puntos.length - 1];
   if (ultimo.valor > tipo.alertaUmbral) {
-    return `Último valor (${ultimo.valor} ${tipo.unidad}) por encima de lo esperado (${tipo.alertaUmbral} ${tipo.unidad}).`;
+    return t("evo.alertaUmbral", { valor: ultimo.valor, unidad: tipo.unidad, umbral: tipo.alertaUmbral });
   }
   if (puntos.length >= 3) {
     const ultimos3 = puntos.slice(-3);
     if (ultimos3[0].valor < ultimos3[1].valor && ultimos3[1].valor < ultimos3[2].valor) {
-      return `Tendencia en alza en las últimas 3 mediciones: ${ultimos3.map(p => p.valor).join(" → ")} ${tipo.unidad}.`;
+      return t("evo.alertaAlza", { valores: ultimos3.map(p => p.valor).join(" → "), unidad: tipo.unidad });
     }
   }
   return null;
@@ -190,34 +200,36 @@ function calcularAlertaMedicion(puntos, tipo) {
 
 // ─── HTML DE LA PESTAÑA ─────────────────────────────────────────────────
 function tabEvolucionHtml(mediciones) {
-  if (!evolucionTipoActivo || !TIPOS_MEDICION[evolucionTipoActivo]) evolucionTipoActivo = primerTipoConDatos(mediciones);
-  const tipo = TIPOS_MEDICION[evolucionTipoActivo];
+  if (!evolucionTipoActivo || !MEDICIONES_META[evolucionTipoActivo]) evolucionTipoActivo = primerTipoConDatos(mediciones);
+  const tipos = tiposMedicion();
+  const tipo = tipos[evolucionTipoActivo];
   const puntos = puntosDe(mediciones, evolucionTipoActivo);
   const alerta = calcularAlertaMedicion(puntos, tipo);
 
-  const chips = Object.entries(TIPOS_MEDICION).map(([key, t]) => `
-    <button class="chip ${key === evolucionTipoActivo ? "activo" : ""}" data-tipo-chip="${key}">${esc(t.label)}</button>
+  // "meta" y no "t": dentro de este map, "t" taparía la función de traducción.
+  const chips = Object.entries(tipos).map(([key, meta]) => `
+    <button class="chip ${key === evolucionTipoActivo ? "activo" : ""}" data-tipo-chip="${key}">${esc(meta.label)}</button>
   `).join("");
 
   return `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Agregar medición</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("evo.agregar")}</div>
       <select id="medTipo">
-        ${Object.entries(TIPOS_MEDICION).map(([key, t]) => `<option value="${key}" ${key === evolucionTipoActivo ? "selected" : ""}>${esc(t.label)}</option>`).join("")}
+        ${Object.entries(tipos).map(([key, meta]) => `<option value="${key}" ${key === evolucionTipoActivo ? "selected" : ""}>${esc(meta.label)}</option>`).join("")}
       </select>
-      <input id="medValor" type="number" step="any" placeholder="${tipo.doble ? "Sistólica" : "Valor"}${tipo.unidad ? " (" + tipo.unidad + ")" : ""}" style="margin-top:8px">
-      <input id="medValor2" type="number" step="any" placeholder="Diastólica (mmHg)" style="margin-top:8px;${tipo.doble ? "" : "display:none"}">
-      <label>Fecha</label>
+      <input id="medValor" type="number" step="any" placeholder="${t(tipo.doble ? "evo.sistolica" : "evo.valor")}${tipo.unidad ? " (" + tipo.unidad + ")" : ""}" style="margin-top:8px">
+      <input id="medValor2" type="number" step="any" placeholder="${t("evo.diastolicaPlaceholder")}" style="margin-top:8px;${tipo.doble ? "" : "display:none"}">
+      <label>${t("evo.fecha")}</label>
       <input id="medFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
-      <button class="secondary" id="btnAgregarMedicion">➕ Agregar</button>
+      <button class="secondary" id="btnAgregarMedicion">${t("evo.btnAgregar")}</button>
     </div>
 
     <div class="chip-row">${chips}</div>
 
     ${alerta ? `
       <div class="card" style="border-left:3px solid var(--warning)">
-        <div style="font-weight:700;color:var(--warning)">⚠️ Evolución detectada</div>
-        <div class="hint" style="margin-top:4px">${esc(alerta)} Revisar según criterio del especialista.</div>
+        <div style="font-weight:700;color:var(--warning)">${t("evo.alertaTitulo")}</div>
+        <div class="hint" style="margin-top:4px">${esc(alerta)}${t("evo.alertaPie")}</div>
       </div>` : ""}
 
     ${comparativaHtml(puntos, tipo)}
@@ -225,11 +237,11 @@ function tabEvolucionHtml(mediciones) {
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${esc(tipo.label)}</div>
       ${puntos.length === 0
-        ? `<div class="hint">Sin mediciones registradas todavía.</div>`
+        ? `<div class="hint">${t("evo.sinMediciones")}</div>`
         : `<canvas id="evolucionCanvas" style="width:100%;height:150px;display:block;touch-action:none"></canvas>
            <div id="medicionTocada" class="hint" style="text-align:center;min-height:18px;margin-top:4px"></div>
-           <div class="hint" style="text-align:center;font-size:11px">Tocá el gráfico para ver cada medición</div>
-           ${tipo.doble ? `<div class="chart-legend"><span><i style="background:#0e7490"></i>Sistólica</span><span><i style="background:#b45309"></i>Diastólica</span></div>` : ""}`}
+           <div class="hint" style="text-align:center;font-size:11px">${t("evo.tocarGrafico")}</div>
+           ${tipo.doble ? `<div class="chart-legend"><span><i style="background:#0e7490"></i>${t("evo.legendaSistolica")}</span><span><i style="background:#b45309"></i>${t("evo.legendaDiastolica")}</span></div>` : ""}`}
     </div>
 
     ${puntos.slice().reverse().map(p => `
@@ -238,7 +250,7 @@ function tabEvolucionHtml(mediciones) {
           <div class="nombre">${p.valorSecundario != null ? p.valor + "/" + p.valorSecundario : p.valor}${tipo.unidad ? " " + esc(tipo.unidad) : ""}</div>
           <button class="link" data-borrar-medicion="${p._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(p.fecha).toLocaleDateString("es-BO")}</div>
+        <div class="fecha">${new Date(p.fecha).toLocaleDateString(localeActual())}</div>
         ${p.notas ? `<div class="paciente-info">📝 ${esc(p.notas)}</div>` : ""}
       </div>`).join("")}
   `;
@@ -251,9 +263,9 @@ function wireTabEvolucion(p, mediciones) {
   const valor2Input = document.getElementById("medValor2");
 
   tipoSelect.onchange = () => {
-    const t = TIPOS_MEDICION[tipoSelect.value];
-    valor2Input.style.display = t.doble ? "block" : "none";
-    valor1Input.placeholder = (t.doble ? "Sistólica" : "Valor") + (t.unidad ? " (" + t.unidad + ")" : "");
+    const meta = MEDICIONES_META[tipoSelect.value];
+    valor2Input.style.display = meta.doble ? "block" : "none";
+    valor1Input.placeholder = t(meta.doble ? "evo.sistolica" : "evo.valor") + (meta.unidad ? " (" + meta.unidad + ")" : "");
   };
 
   document.querySelectorAll("[data-tipo-chip]").forEach(btn => {
@@ -266,18 +278,18 @@ function wireTabEvolucion(p, mediciones) {
 
   const canvas = document.getElementById("evolucionCanvas");
   if (canvas) {
-    const tipoActual = TIPOS_MEDICION[evolucionTipoActivo];
+    const tipoActual = tiposMedicion()[evolucionTipoActivo];
     const posiciones = dibujarGraficoEvolucion(canvas, puntosDe(mediciones, evolucionTipoActivo), tipoActual.doble);
     wireGraficoInteractivo(canvas, posiciones, tipoActual);
   }
 
   document.getElementById("btnAgregarMedicion").onclick = async () => {
     const tipo = tipoSelect.value;
-    const t = TIPOS_MEDICION[tipo];
+    const meta = MEDICIONES_META[tipo];
     const valor = parseFloat(valor1Input.value);
-    const valorSecundario = t.doble ? parseFloat(valor2Input.value) : null;
+    const valorSecundario = meta.doble ? parseFloat(valor2Input.value) : null;
     const fecha = document.getElementById("medFecha").value;
-    if (Number.isNaN(valor) || !fecha || (t.doble && Number.isNaN(valorSecundario))) return;
+    if (Number.isNaN(valor) || !fecha || (meta.doble && Number.isNaN(valorSecundario))) return;
     try {
       await api("/medico/pacientes/" + p._id + "/mediciones", {
         method: "POST", headers: {"Content-Type":"application/json"},
@@ -290,7 +302,7 @@ function wireTabEvolucion(p, mediciones) {
 
   document.querySelectorAll("[data-borrar-medicion]").forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm("¿Eliminar esta medición?")) return;
+      if (!confirm(t("evo.confirmarBorrar"))) return;
       await api("/medico/mediciones/" + btn.dataset.borrarMedicion, { method: "DELETE" });
       renderPacienteDetalle(p._id, "evolucion");
     };
