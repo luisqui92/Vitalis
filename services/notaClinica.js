@@ -7,10 +7,35 @@ const axios = require("axios");
 const { CONFIG, log } = require("../config");
 const { fechaStrBolivia } = require("./utils");
 
-const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+// El idioma sale de la cuenta del médico, igual que en la transcripción.
+// Acá no alcanza con traducir el prompt: hay que decirle explícitamente que
+// las CLAVES del JSON no se tocan. Si el modelo tradujera "diagnostico" a
+// "diagnóstico" o a "diagnóstico" en portugués, la nota no se guarda y el
+// médico pierde la consulta entera.
+const IDIOMAS_NOTA = {
+  es: {
+    nombre: "español",
+    dias: ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"],
+    extra: "",
+  },
+  pt: {
+    nombre: "portugués de Brasil",
+    dias: ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"],
+    // Los nombres de fármacos son el punto donde una nota en portugués se
+    // vuelve peligrosa si sale calcada del español: losartana y no losartán,
+    // varfarina y no warfarina, dipirona y no metamizol.
+    extra: `
+Los nombres de medicamentos van con la denominación que se usa en Brasil (DCB,
+la nomenclatura oficial de ANVISA), no traducidos del español.`,
+  },
+};
+
+function idiomaNota(idioma) {
+  return IDIOMAS_NOTA[idioma] ? idioma : "es";
+}
 
 const PROMPT_SISTEMA = `Eres un asistente clínico. A partir de la transcripción de una consulta
-médica en español (puede tener errores de transcripción, y a veces no queda
+médica en {IDIOMA} (puede tener errores de transcripción, y a veces no queda
 100% claro quién es el médico y quién el paciente), generá una nota clínica
 estructurada.
 
@@ -193,10 +218,25 @@ Reglas:
   así que ante cualquier duda real del órgano, del lado o del hallazgo,
   mejor no reportar ese ítem.`;
 
-function construirContexto(contexto) {
+// El prompt completo para un idioma: la plantilla de arriba con el idioma
+// puesto, más la regla de en qué lengua sale el contenido. Las claves del
+// JSON quedan afuera de esa regla a propósito y se dice explícitamente.
+function promptSistema(idioma) {
+  const cfg = IDIOMAS_NOTA[idiomaNota(idioma)];
+  return PROMPT_SISTEMA.replace("{IDIOMA}", cfg.nombre) + `
+
+IDIOMA DE LA NOTA: escribí el CONTENIDO —todos los valores del JSON— en ${cfg.nombre}.
+Las CLAVES del JSON NO se traducen nunca: van exactamente como están arriba,
+en el mismo idioma y con la misma ortografía. Tampoco se traducen los valores
+que el enunciado pide tomar de una lista dada (ojo, estructura, estado, órgano,
+hallazgo): esos van tal cual figuran en la lista.${cfg.extra}`;
+}
+
+function construirContexto(contexto, idioma) {
   const partes = [];
   const hoy = new Date();
-  partes.push(`Hoy es ${DIAS_SEMANA[hoy.getDay()]} ${fechaStrBolivia(hoy)}.`);
+  const dias = IDIOMAS_NOTA[idiomaNota(idioma)].dias;
+  partes.push(`Hoy es ${dias[hoy.getDay()]} ${fechaStrBolivia(hoy)}.`);
   if (contexto?.veterinaria) {
     partes.push(`Esta consulta es de medicina VETERINARIA — el paciente es un animal, no una persona${contexto.especie ? ` (${contexto.especie}${contexto.raza ? ", raza " + contexto.raza : ""})` : ""}. Interpretá "el paciente"/"el/la ${contexto.especie || "animal"}" en ese sentido, y las dosis de medicamentos en relación al peso del animal si se menciona.`);
   }
@@ -225,14 +265,14 @@ function construirContexto(contexto) {
   return `\n\n(${partes.join(" ")})`;
 }
 
-async function generarNotaClinica(transcripcion, contexto) {
+async function generarNotaClinica(transcripcion, contexto, idioma) {
   const res = await axios.post(
     "https://api.openai.com/v1/chat/completions",
     {
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: PROMPT_SISTEMA },
-        { role: "user", content: transcripcion + construirContexto(contexto) },
+        { role: "system", content: promptSistema(idioma) },
+        { role: "user", content: transcripcion + construirContexto(contexto, idioma) },
       ],
       max_tokens: 1600,
       temperature: 0.1,
@@ -278,4 +318,6 @@ function sanearNota(nota) {
   return nota;
 }
 
-module.exports = { generarNotaClinica };
+// promptSistema se exporta solo para poder verificar el prompt ARMADO en las
+// pruebas, y no que el archivo contenga ciertas palabras sueltas.
+module.exports = { generarNotaClinica, promptSistema };

@@ -107,22 +107,33 @@ function crearTranscriptorEnVivo(onTexto) {
   async function iniciar(stream) {
     detenidoManualmente = false;
     try {
-      const { token, keyterms } = await api("/medico/transcripcion-token");
+      const { token, keyterms, idioma, medicalMode } = await api("/medico/transcripcion-token");
       // Mismo criterio que la transcripción final (services/assemblyai.js):
       // Medical Mode + vocabulario de la especialidad, para que lo que se ve
       // mientras se habla se parezca a lo que después queda guardado.
       // Los parámetros de lista (language_codes, keyterms_prompt) van como
       // array JSON codificado en la URL — probado contra la API: mandarlos
       // como parámetros repetidos devuelve "Invalid JSON array".
+      //
+      // El idioma lo manda el servidor, sacado de la cuenta del médico, y no
+      // se toma de MEDICO_IDIOMA: si el navegador lo eligiera por su cuenta,
+      // la vista previa y la transcripción final podrían quedar en idiomas
+      // distintos para la misma consulta. Si el servidor no lo mandara —una
+      // versión vieja—, español, que es como estaba antes.
+      const lang = idioma || "es";
       const params = new URLSearchParams({
         sample_rate: "16000",
         encoding: "pcm_s16le",
         speech_model: "universal-3-5-pro",
-        domain: "medical-v1",
         mode: "balanced",
-        language_codes: JSON.stringify(["es"]),
+        language_codes: JSON.stringify([lang]),
         token,
       });
+      // Medical Mode no existe para portugués: la API ignora el parámetro.
+      // Quién lo tiene y quién no lo decide el servidor y viaja en la
+      // respuesta — tener acá una copia de la lista de idiomas es tener dos
+      // fuentes de verdad que algún día no van a coincidir.
+      if (medicalMode) params.set("domain", "medical-v1");
       if (Array.isArray(keyterms) && keyterms.length) {
         params.set("keyterms_prompt", JSON.stringify(keyterms));
       }

@@ -188,7 +188,17 @@ Corré primero sin `--aplicar` y leé la salida. Siempre.
   que para un mostrador adentro de la clínica es el correcto. Pero
   `public/js/agenda.js` sigue con `America/La_Paz` escrito a mano, y Brasil
   tiene tres husos.
-- **El idioma todavía no llega a la transcripción.** El médico puede poner su
-  cuenta en portugués y la interfaz cambia entera, pero la consulta se sigue
-  transcribiendo con la configuración de siempre. Falta pasar `idioma` a
-  `services/assemblyai.js` — está identificado, no hecho.
+- **La transcripción en portugués no la escuchó nadie todavía.** El idioma ya
+  llega a todos lados —transcripción, vista previa en vivo, vocabulario y nota
+  clínica—, pero eso solo demuestra que los parámetros viajan bien. Falta lo
+  que ningún test puede dar: **5 audios reales de consultas en portugués** y
+  **un médico brasileño que lea 5 notas clínicas** y diga si sirven.
+
+  Y hay una limitación de fondo que no se arregla con código: el Medical Mode
+  de AssemblyAI no cubre portugués, así que ahí no hay modelo afinado para
+  medicamentos y dosis — solo el vocabulario que le pasamos. El vocabulario
+  pt-BR de `services/assemblyai.js` está armado con nomenclatura DCB pero
+  **todavía no lo revisó un médico brasileño**.
+
+  Hasta que eso pase, lo honesto con los médicos de Brasil es: la interfaz ya
+  está en portugués, la transcripción la estamos afinando.

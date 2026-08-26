@@ -7,7 +7,7 @@ const { CONFIG, log } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara } = require("../services/assemblyai");
+const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("../services/assemblyai");
 const { generarNotaClinica } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
 const { enviarTexto } = require("../services/metaWhatsapp");
@@ -32,8 +32,20 @@ module.exports = function (app) {
       // El vocabulario viaja junto al token para que la vista previa en vivo
       // reconozca exactamente los mismos términos que la transcripción final
       // (una sola fuente de verdad, en services/assemblyai.js).
-      const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("tipoEspecialidad").lean();
-      res.json({ token, keyterms: keytermsPara(medico?.tipoEspecialidad) });
+      // El idioma y el vocabulario salen los dos de la cuenta del médico y
+      // viajan juntos: si el navegador eligiera el idioma por su cuenta,
+      // la vista previa en vivo y la transcripción final podrían terminar
+      // en idiomas distintos para la misma consulta.
+      const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("tipoEspecialidad idioma").lean();
+      const idioma = idiomaSoportado(medico?.idioma);
+      res.json({
+        token, idioma,
+        // Si este idioma tiene Medical Mode lo decide el servidor: una copia
+        // de la lista en el navegador es una segunda fuente de verdad que
+        // algún día no va a coincidir con ésta.
+        medicalMode: IDIOMAS_CON_MEDICAL_MODE.includes(idioma),
+        keyterms: keytermsPara(medico?.tipoEspecialidad, idioma),
+      });
     } catch (e) {
       log.error("[TRANSCRIPCION_TOKEN]", e.response?.data || e.message);
       throw new ErrorHttp(502, "No se pudo generar el token de transcripción en vivo");
@@ -62,10 +74,11 @@ module.exports = function (app) {
 
     res.status(202).json({ ok: true, consulta });
 
-    // La especialidad afina el vocabulario que se le pasa a AssemblyAI.
-    const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+    // La especialidad afina el vocabulario; el idioma decide en qué lengua
+    // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
+    const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
 
-    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad)
+    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma)
       .then(async ({ transcripcionCompleta, segmentos, duracionSegundos }) => {
         consulta.estado = "completado";
         consulta.transcripcionCompleta = transcripcionCompleta;
@@ -106,7 +119,10 @@ module.exports = function (app) {
             veterinaria: esVeterinaria,
             especie: esVeterinaria ? paciente.especie : "",
             raza: esVeterinaria ? paciente.raza : "",
-          });
+          // El mismo idioma con el que se transcribió: una nota en español
+          // sobre una consulta en portugués obliga al médico a traducir de
+          // vuelta lo que él mismo dijo.
+          }, medicoParaVocabulario?.idioma);
           consulta.notaClinicaEstado = "completado";
 
           // El mapa ocular se actualiza solo apenas termina la nota (el
