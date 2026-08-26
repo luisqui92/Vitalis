@@ -7,14 +7,14 @@ function tabMemoriaHtml(pacienteId) {
   const historial = memoriaHistorialPorPaciente[pacienteId] || [];
   return `
     <div class="card">
-      <div class="nota-titulo">💬 Preguntale al Kardex</div>
+      <div class="nota-titulo">${t("memoria.titulo")}</div>
       <div id="memoriaChat">${pintarMemoriaChat(historial)}</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:14px">
-        <input id="memoriaInput" type="text" placeholder="Ej: ¿cuándo fue su último control de presión?" style="flex:1;width:auto;margin-top:0">
-        <button type="button" id="btnMicMemoria" class="mic-btn" title="Preguntar por voz">🎙️</button>
+        <input id="memoriaInput" type="text" placeholder="${t("memoria.placeholder")}" style="flex:1;width:auto;margin-top:0">
+        <button type="button" id="btnMicMemoria" class="mic-btn" title="${t("memoria.porVoz")}">🎙️</button>
       </div>
       <div id="memoriaErr"></div>
-      <button class="secondary" id="btnPreguntar">Preguntar</button>
+      <button class="secondary" id="btnPreguntar">${t("memoria.preguntar")}</button>
     </div>`;
 }
 
@@ -32,7 +32,10 @@ function crearReconocedorVozMemoria() {
   const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Reconocedor) return null;
   const r = new Reconocedor();
-  r.lang = "es-419";
+  // El idioma del reconocimiento sale del diccionario: si quedara fijo en
+  // español, un médico brasileño dictaría en portugués y el navegador se lo
+  // transcribiría como si fuera castellano.
+  r.lang = t("voz.lang");
   r.interimResults = false;
   r.maxAlternatives = 1;
   return r;
@@ -58,7 +61,7 @@ function wireTabMemoria(p) {
     errBox.innerHTML = "";
     input.value = "";
     btn.disabled = true;
-    btn.textContent = "Pensando...";
+    btn.textContent = t("memoria.pensando");
 
     if (!memoriaHistorialPorPaciente[p._id]) memoriaHistorialPorPaciente[p._id] = [];
     const historial = memoriaHistorialPorPaciente[p._id];
@@ -84,10 +87,10 @@ function wireTabMemoria(p) {
     } catch (e) {
       const idx = historial.findIndex(h => h.id === id);
       if (idx !== -1) historial.splice(idx, 1);
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo responder la pregunta")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("memoria.errResponder"))}</div>`;
     }
     btn.disabled = false;
-    btn.textContent = "Preguntar";
+    btn.textContent = t("memoria.preguntar");
     repintar();
   };
 
@@ -97,13 +100,13 @@ function wireTabMemoria(p) {
   const reconocedor = crearReconocedorVozMemoria();
   if (!reconocedor) {
     btnMic.disabled = true;
-    btnMic.title = "Tu navegador no soporta preguntas por voz";
+    btnMic.title = t("memoria.sinVoz");
   } else {
     let escuchando = false;
     reconocedor.onstart = () => { escuchando = true; btnMic.classList.add("escuchando"); };
     reconocedor.onend = () => { escuchando = false; btnMic.classList.remove("escuchando"); };
     reconocedor.onerror = () => {
-      errBox.innerHTML = `<div class="error">No se pudo escuchar la pregunta. Probá de nuevo.</div>`;
+      errBox.innerHTML = `<div class="error">${t("memoria.errEscuchar")}</div>`;
     };
     reconocedor.onresult = (e) => {
       input.value = e.results[0][0].transcript;

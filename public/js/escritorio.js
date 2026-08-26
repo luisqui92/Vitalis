@@ -12,16 +12,20 @@ const ES_ESCRITORIO = window.matchMedia("(min-width: 1024px)").matches;
 // pantalla grande.
 let escrActivo = "inicio";
 
+// Cada ítem guarda la CLAVE del texto, no el texto. Acá importa más que en
+// otros lados: envolverParaEscritorio() se llama al final de este archivo y
+// se queda con el label en un closure, así que un texto puesto acá quedaría
+// congelado en el idioma que hubiera ANTES del login, para toda la sesión.
 const ESCR_NAV_ITEMS = [
-  { id: "inicio", label: "Inicio", icono: ICONOS.tendencia, fn: "renderInicioEscritorio" },
-  { id: "pacientes", label: "Pacientes", icono: ICONOS.persona, fn: "renderDashboard" },
-  { id: "agenda", label: "Agenda", icono: ICONOS.calendario, fn: "renderAgenda" },
-  { id: "voz", label: "Vitalis Voice", icono: ICONOS.mic, fn: "renderVozEscritorio" },
-  { id: "indicaciones", label: "Indicaciones", icono: ICONOS.documento, fn: "renderIndicacionesEscritorio" },
-  { id: "estudios", label: "Estudios e imágenes", icono: ICONOS.frasco, fn: "renderEstudiosEscritorio" },
-  { id: "reportes", label: "Reportes", icono: ICONOS.tendencia, fn: "renderReportesEscritorio" },
-  { id: "finanzas", label: "Finanzas", icono: ICONOS.clipboard, fn: "renderFinanzasEscritorio" },
-  { id: "configuracion", label: "Configuración", icono: ICONOS.escudo, fn: "renderSeguridad" },
+  { id: "inicio", claveLabel: "escr.nav.inicio", icono: ICONOS.tendencia, fn: "renderInicioEscritorio" },
+  { id: "pacientes", claveLabel: "escr.nav.pacientes", icono: ICONOS.persona, fn: "renderDashboard" },
+  { id: "agenda", claveLabel: "escr.nav.agenda", icono: ICONOS.calendario, fn: "renderAgenda" },
+  { id: "voz", claveLabel: "escr.nav.voz", icono: ICONOS.mic, fn: "renderVozEscritorio" },
+  { id: "indicaciones", claveLabel: "escr.nav.indicaciones", icono: ICONOS.documento, fn: "renderIndicacionesEscritorio" },
+  { id: "estudios", claveLabel: "escr.nav.estudios", icono: ICONOS.frasco, fn: "renderEstudiosEscritorio" },
+  { id: "reportes", claveLabel: "escr.nav.reportes", icono: ICONOS.tendencia, fn: "renderReportesEscritorio" },
+  { id: "finanzas", claveLabel: "escr.nav.finanzas", icono: ICONOS.clipboard, fn: "renderFinanzasEscritorio" },
+  { id: "configuracion", claveLabel: "escr.nav.configuracion", icono: ICONOS.escudo, fn: "renderSeguridad" },
 ];
 
 function escritorioShellActivo() {
@@ -34,14 +38,14 @@ function escritorioShellActivo() {
 // título de la barra superior del escritorio se actualicen solos. Así no
 // hace falta tocar pacientes.js/agenda.js/seguridad.js para que naveguen
 // "bien" desde el escritorio — siguen sin saber que existe.
-function envolverParaEscritorio(nombreFn, id, label) {
+function envolverParaEscritorio(nombreFn, id, claveLabel) {
   const original = window[nombreFn];
   window[nombreFn] = function (...args) {
     if (escritorioShellActivo()) {
       escrActivo = id;
       pintarNavEscritorio();
       const titulo = document.getElementById("escrTituloPantalla");
-      if (titulo) titulo.textContent = label;
+      if (titulo) titulo.textContent = t(claveLabel);
     }
     return original.apply(this, args);
   };
@@ -55,7 +59,7 @@ function activarEscritorioSiCorresponde() {
   document.getElementById("escritorioShell").style.display = "flex";
   app = document.getElementById("escritorioContent");
   document.getElementById("escrUsuario").textContent = MEDICO_NOMBRE || "";
-  const marca = document.querySelector(".brand h1")?.textContent || "Vitalis";
+  const marca = document.querySelector(".brand h1")?.textContent || t("marca.base");
   document.getElementById("escrMarcaTexto").textContent = marca;
   pintarNavEscritorio();
   return true;
@@ -74,7 +78,7 @@ function pintarNavEscritorio() {
   const nav = document.getElementById("escrNav");
   nav.innerHTML = ESCR_NAV_ITEMS.map(it => `
     <button class="escr-nav-item${it.id === escrActivo ? " activo" : ""}" data-id="${it.id}">
-      <span class="escr-nav-icono">${it.icono}</span>${esc(it.label)}
+      <span class="escr-nav-icono">${it.icono}</span>${esc(t(it.claveLabel))}
     </button>`).join("");
   nav.querySelectorAll(".escr-nav-item").forEach(btn => {
     btn.onclick = () => {
@@ -91,7 +95,7 @@ document.getElementById("escrBtnLogout").onclick = logout;
 // ─── INICIO (resumen del consultorio, con datos reales) ─────────────────
 async function renderInicioEscritorio() {
   detenerPolling();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando tu panel...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("escr.cargando")}</div>`;
   try {
     const [dataPacientes, dataCitas, dataRecordatorios, dataConsultas] = await Promise.all([
       api("/medico/pacientes"),
@@ -107,7 +111,7 @@ async function renderInicioEscritorio() {
     );
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando el panel")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("escr.error"))}</div>`;
   }
 }
 
@@ -131,22 +135,22 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
 
   app.innerHTML = `
     <div class="escr-stats">
-      ${escrStatCardHtml(pacientes.length, esVet ? "Mascotas" : "Pacientes")}
-      ${escrStatCardHtml(citasHoy.length, "Citas hoy")}
-      ${escrStatCardHtml(consultasEsteMes, "Consultas este mes")}
-      ${escrStatCardHtml(recordatorios.length, "Recordatorios pendientes")}
+      ${escrStatCardHtml(pacientes.length, t(esVet ? "escr.stat.mascotas" : "escr.stat.pacientes"))}
+      ${escrStatCardHtml(citasHoy.length, t("escr.stat.citasHoy"))}
+      ${escrStatCardHtml(consultasEsteMes, t("escr.stat.consultasMes"))}
+      ${escrStatCardHtml(recordatorios.length, t("escr.stat.recordatorios"))}
     </div>
 
     <div class="escr-grid-2">
       <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">📅 Agenda de hoy</div>
-        ${citasHoy.length === 0 ? `<div class="hint">No tenés citas confirmadas para hoy.</div>` : `
+        <div class="seccion-titulo" style="margin-top:0">${t("escr.agendaHoy")}</div>
+        ${citasHoy.length === 0 ? `<div class="hint">${t("escr.sinCitasHoy")}</div>` : `
           <div class="escr-lista">
             ${citasHoy.map(c => `
               <div class="escr-lista-item">
-                <div class="escr-lista-hora">${esc(new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }))}</div>
+                <div class="escr-lista-hora">${esc(new Date(c.fecha).toLocaleTimeString(localeActual(), { hour: "2-digit", minute: "2-digit" }))}</div>
                 <div>
-                  <div class="escr-lista-titulo">${esc(c.pacienteNombre || "Sin nombre")}</div>
+                  <div class="escr-lista-titulo">${esc(c.pacienteNombre || t("escr.sinNombre"))}</div>
                   ${c.motivo ? `<div class="escr-lista-sub">${esc(c.motivo)}</div>` : ""}
                 </div>
               </div>`).join("")}
@@ -154,40 +158,40 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
       </div>
 
       <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">⚡ Acciones rápidas</div>
+        <div class="seccion-titulo" style="margin-top:0">${t("escr.acciones")}</div>
         <div class="escr-acciones">
-          <button class="secondary" id="escrBtnNuevoPaciente">${esVet ? "🐾" : "➕"} Nuevo ${esVet ? "paciente" : "paciente"}</button>
-          <button class="secondary" id="escrBtnIrAgenda">📅 Ir a la agenda</button>
-          <button class="secondary" id="escrBtnIrConfig">⚙️ Configuración</button>
+          <button class="secondary" id="escrBtnNuevoPaciente">${t(esVet ? "escr.nuevoPacienteVet" : "escr.nuevoPaciente")}</button>
+          <button class="secondary" id="escrBtnIrAgenda">${t("escr.irAgenda")}</button>
+          <button class="secondary" id="escrBtnIrConfig">${t("escr.irConfig")}</button>
         </div>
       </div>
     </div>
 
     <div class="escr-grid-2">
       <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">🔔 Pendientes</div>
-        ${recordatorios.length === 0 && notasConError.length === 0 ? `<div class="hint">Estás al día — no hay nada pendiente.</div>` : `
+        <div class="seccion-titulo" style="margin-top:0">${t("escr.pendientes")}</div>
+        ${recordatorios.length === 0 && notasConError.length === 0 ? `<div class="hint">${t("escr.alDia")}</div>` : `
           <div class="escr-lista">
             ${recordatorios.slice(0, 5).map(r => `
               <div class="escr-lista-item">
                 <div>
-                  <div class="escr-lista-titulo">${esc(TIPOS_RECORDATORIO[r.tipo] || "🔔")} ${esc(r.titulo)} — ${esc(r.pacienteNombre)}</div>
-                  <div class="escr-lista-sub">${r.fecha ? esc(new Date(r.fecha).toLocaleDateString("es-BO")) : ""}</div>
+                  <div class="escr-lista-titulo">${esc(tiposRecordatorio()[r.tipo] || "🔔")} ${esc(r.titulo)} — ${esc(r.pacienteNombre)}</div>
+                  <div class="escr-lista-sub">${r.fecha ? esc(new Date(r.fecha).toLocaleDateString(localeActual())) : ""}</div>
                 </div>
               </div>`).join("")}
             ${notasConError.map(c => `
               <div class="escr-lista-item escr-lista-item-error" data-consulta-id="${c._id}">
                 <div>
-                  <div class="escr-lista-titulo">⚠️ Nota clínica con error — ${esc(c.pacienteNombre || "")}</div>
-                  <div class="escr-lista-sub">Revisar y reintentar</div>
+                  <div class="escr-lista-titulo">${t("escr.notaError", { paciente: esc(c.pacienteNombre || "") })}</div>
+                  <div class="escr-lista-sub">${t("escr.revisarReintentar")}</div>
                 </div>
               </div>`).join("")}
           </div>`}
       </div>
 
       <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">${esVet ? "🐾 Mascotas recientes" : "👤 Pacientes recientes"}</div>
-        ${pacientesRecientes.length === 0 ? `<div class="hint">Todavía no registraste ningún ${esVet ? "paciente" : "paciente"}.</div>` : `
+        <div class="seccion-titulo" style="margin-top:0">${t(esVet ? "escr.recientesVet" : "escr.recientes")}</div>
+        ${pacientesRecientes.length === 0 ? `<div class="hint">${t("escr.sinPacientes")}</div>` : `
           <div class="escr-lista">
             ${pacientesRecientes.map(p => `
               <div class="escr-lista-item escr-lista-item-click" data-paciente-id="${p._id}">
@@ -199,14 +203,14 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">🎙️ Consultas recientes</div>
-      ${consultasRecientes.length === 0 ? `<div class="hint">Todavía no hay consultas registradas.</div>` : `
+      <div class="seccion-titulo" style="margin-top:0">${t("escr.consultasRecientes")}</div>
+      ${consultasRecientes.length === 0 ? `<div class="hint">${t("escr.sinConsultas")}</div>` : `
         <div class="escr-lista">
           ${consultasRecientes.map(c => `
             <div class="escr-lista-item escr-lista-item-click" data-consulta-id="${c._id}">
               <div>
                 <div class="escr-lista-titulo">${esc(c.pacienteNombre || "")}</div>
-                <div class="escr-lista-sub">${esc(new Date(c.createdAt).toLocaleString("es-BO"))} · ${c.estado === "completado" ? "Completada" : c.estado === "error" ? "Con error" : "Procesando"}</div>
+                <div class="escr-lista-sub">${esc(new Date(c.createdAt).toLocaleString(localeActual()))} · ${t(c.estado === "completado" ? "escr.consulta.completada" : c.estado === "error" ? "escr.consulta.error" : "escr.consulta.procesando")}</div>
               </div>
             </div>`).join("")}
         </div>`}
@@ -224,4 +228,4 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
   });
 }
 
-ESCR_NAV_ITEMS.forEach(it => envolverParaEscritorio(it.fn, it.id, it.label));
+ESCR_NAV_ITEMS.forEach(it => envolverParaEscritorio(it.fn, it.id, it.claveLabel));

@@ -8,13 +8,11 @@
 let asistenteConversacion = [];
 let asistenteAbierto = false;
 
-const SUGERENCIAS_ASISTENTE = [
-  "¿Cómo grabo una consulta?",
-  "¿Cómo configuro mi horario de atención?",
-  "¿Cómo hago para que me avisen las reservas?",
-  "¿Cuántos pacientes tengo?",
-  "¿Qué tengo agendado esta semana?",
-];
+// Se resuelven en cada llamada y no en una constante: este archivo se carga
+// antes del login, cuando todavía no se sabe el idioma del médico.
+function sugerenciasAsistente() {
+  return [1, 2, 3, 4, 5].map(n => t("asistente.sug." + n));
+}
 
 function abrirAsistente() {
   if (asistenteAbierto) return cerrarAsistente();
@@ -26,15 +24,15 @@ function abrirAsistente() {
   panel.innerHTML = `
     <div class="asistente-cabecera">
       <div>
-        <div class="asistente-titulo">Preguntale a Vitalis</div>
-        <div class="asistente-sub">Dudas sobre cómo usar el sistema</div>
+        <div class="asistente-titulo">${t("asistente.titulo")}</div>
+        <div class="asistente-sub">${t("asistente.sub")}</div>
       </div>
-      <button class="asistente-cerrar" id="btnCerrarAsistente" aria-label="Cerrar">✕</button>
+      <button class="asistente-cerrar" id="btnCerrarAsistente" aria-label="${t("asistente.cerrar")}">✕</button>
     </div>
     <div class="asistente-mensajes" id="asistenteMensajes"></div>
     <div class="asistente-pie">
-      <input id="asistenteInput" type="text" placeholder="Escribí tu pregunta..." autocomplete="off">
-      <button class="primary" id="btnEnviarAsistente">Enviar</button>
+      <input id="asistenteInput" type="text" placeholder="${t("asistente.placeholder")}" autocomplete="off">
+      <button class="primary" id="btnEnviarAsistente">${t("asistente.enviar")}</button>
     </div>`;
   document.body.appendChild(panel);
 
@@ -61,8 +59,8 @@ function pintarMensajesAsistente() {
     caja.innerHTML = `
       <div class="asistente-vacio">
         <div style="font-size:30px">💬</div>
-        <div style="margin:8px 0 14px">Preguntame lo que necesites sobre Vitalis: dónde está cada cosa, cómo se hace algo, o los números de tu consultorio.</div>
-        ${SUGERENCIAS_ASISTENTE.map(s => `<button class="asistente-sugerencia" data-sugerencia="${esc(s)}">${esc(s)}</button>`).join("")}
+        <div style="margin:8px 0 14px">${t("asistente.vacio")}</div>
+        ${sugerenciasAsistente().map(s => `<button class="asistente-sugerencia" data-sugerencia="${esc(s)}">${esc(s)}</button>`).join("")}
       </div>`;
     caja.querySelectorAll("[data-sugerencia]").forEach(b => {
       b.onclick = () => {
@@ -106,7 +104,7 @@ async function enviarPreguntaAsistente() {
   } catch (e) {
     asistenteConversacion[asistenteConversacion.length - 1] = {
       rol: "ia",
-      texto: e.error || "No pude responder ahora mismo. Probá de nuevo en un momento.",
+      texto: e.error || t("asistente.errResponder"),
     };
   }
   pintarMensajesAsistente();

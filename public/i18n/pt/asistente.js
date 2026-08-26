@@ -1,0 +1,25 @@
+// Vitalis — Português · assistente de ajuda e Memória Clínica.
+Object.assign(I18N.pt, {
+  "asistente.titulo": "Pergunte ao Vitalis",
+  "asistente.sub": "Dúvidas sobre como usar o sistema",
+  "asistente.cerrar": "Fechar",
+  "asistente.placeholder": "Escreva sua pergunta...",
+  "asistente.enviar": "Enviar",
+  "asistente.vacio": "Pergunte o que precisar sobre o Vitalis: onde fica cada coisa, como se faz algo, ou os números do seu consultório.",
+  "asistente.errResponder": "Não consegui responder agora. Tente de novo em instantes.",
+  "asistente.sug.1": "Como gravo uma consulta?",
+  "asistente.sug.2": "Como configuro meu horário de atendimento?",
+  "asistente.sug.3": "Como faço para ser avisado dos agendamentos?",
+  "asistente.sug.4": "Quantos pacientes eu tenho?",
+  "asistente.sug.5": "O que tenho agendado esta semana?",
+
+  "memoria.titulo": "💬 Pergunte ao Prontuário",
+  "memoria.placeholder": "Ex: quando foi o último controle de pressão dele?",
+  "memoria.porVoz": "Perguntar por voz",
+  "memoria.preguntar": "Perguntar",
+  "memoria.pensando": "Pensando...",
+  "memoria.errResponder": "Não foi possível responder a pergunta",
+  "memoria.sinVoz": "Seu navegador não suporta perguntas por voz",
+  "memoria.errEscuchar": "Não foi possível ouvir a pergunta. Tente de novo.",
+  "voz.lang": "pt-BR",
+});
