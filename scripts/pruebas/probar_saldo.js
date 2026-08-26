@@ -130,7 +130,7 @@ async function main() {
 
   console.log("\n── 7. Aviso de saldo bajo, antes de que se acabe ──");
   const beto = "70000002";
-  await saldos.cargar({ medicoPhone: beto, montoCentavos: 6000, acreditadoPor: "luis", referencia: "efectivo" });
+  await saldos.cargar({ medicoPhone: beto, montoCentavos: 6000, acreditadoPor: "luis", referencia: "EFECTIVO 2026-08-26 recibido por Luis" });
   e = await saldos.estadoDe(beto);
   verificar("con Bs 60 le quedan 5 consultas", e.consultasRestantes === 5);
   verificar("  ...y ya se le avisa", e.bajo === true);
@@ -173,6 +173,45 @@ async function main() {
   verificar("un ajuste sin motivo escrito se rechaza", sinMotivo);
   await saldos.ajustar({ medicoPhone: beto, montoCentavos: 1200, concepto: "Consulta 4471 no se transcribió, se devuelve", acreditadoPor: "luis" });
   verificar("con motivo sí se aplica", (await saldos.estadoDe(beto)).saldoCentavos === 5200);
+
+  console.log("\n── 12b. La misma transferencia NO se acredita dos veces ──");
+  // El caso más probable de todos: el médico manda el mismo comprobante otra
+  // vez porque no le llegó la confirmación, y el operador —que ve dos
+  // mensajes con días de diferencia— lo carga dos veces.
+  const REF = "QR BCP 9988-1122";
+  await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 10000, acreditadoPor: "luis", referencia: REF });
+  const antesDelIntento = (await saldos.estadoDe(ana.phone)).saldoCentavos;
+  let repetida = null;
+  try {
+    await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 10000, acreditadoPor: "luis", referencia: REF });
+  } catch (err) { repetida = err; }
+  verificar("la segunda carga con la misma referencia se rechaza", repetida?.codigo === "referencia_repetida");
+  verificar("  ...y dice cuándo y a quién se acreditó la primera", /ya se acreditó/.test(repetida?.message || ""));
+  verificar("  ...y no se movió el saldo", (await saldos.estadoDe(ana.phone)).saldoCentavos === antesDelIntento);
+
+  // Ni escribiéndola distinto: mayúsculas y espacios de más no la disfrazan.
+  repetida = null;
+  try {
+    await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 10000, acreditadoPor: "luis", referencia: "  qr bcp   9988-1122 " });
+  } catch (err) { repetida = err; }
+  verificar("tampoco escrita en minúsculas y con espacios de más", repetida?.codigo === "referencia_repetida");
+
+  // Pero a OTRO médico tampoco: la misma transferencia no puede acreditarse
+  // dos veces ni repartida entre dos cuentas.
+  repetida = null;
+  try {
+    await saldos.cargar({ medicoPhone: beto, montoCentavos: 10000, acreditadoPor: "luis", referencia: REF });
+  } catch (err) { repetida = err; }
+  verificar("ni acreditándosela a otro médico", repetida?.codigo === "referencia_repetida");
+
+  // Y una carga sin referencia no se acepta: sin ella el índice no ataja nada.
+  let sinRef = false;
+  try { await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "  " }); } catch { sinRef = true; }
+  verificar("una carga sin referencia se rechaza", sinRef);
+
+  // Una transferencia distinta sí entra.
+  await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "QR BCP 9988-1123" });
+  verificar("otra referencia sí se acredita", (await saldos.estadoDe(ana.phone)).saldoCentavos === antesDelIntento + 5000);
 
   console.log("\n── 12. Los movimientos cuadran con el saldo ──");
   for (const phone of [ana.phone, beto]) {

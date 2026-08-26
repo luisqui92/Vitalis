@@ -1313,6 +1313,10 @@ const movimientoSaldoSchema = new mongoose.Schema({
   // carga es plata que apareció de la nada.
   acreditadoPor: { type: String, default: "" },
   referencia: { type: String, default: "" },
+  // La referencia normalizada (mayúsculas, sin espacios de más), que es sobre
+  // la que actúa el índice único de abajo. Se guarda aparte para que la
+  // original se siga mostrando tal como la escribió el operador.
+  referenciaClave: { type: String, default: null },
 }, { timestamps: true });
 movimientoSaldoSchema.index({ medicoPhone: 1, createdAt: -1 });
 // Una consulta se cobra UNA vez. Parcial porque solo aplica a los consumos:
@@ -1320,6 +1324,17 @@ movimientoSaldoSchema.index({ medicoPhone: 1, createdAt: -1 });
 movimientoSaldoSchema.index(
   { consultaId: 1 },
   { unique: true, partialFilterExpression: { tipo: "consumo", consultaId: { $type: "objectId" } }, name: "consumo_por_consulta_unico" }
+);
+// Una transferencia se acredita UNA vez. El caso que esto ataja es el más
+// probable de todos: el médico manda el mismo comprobante dos veces —porque
+// no le llegó la confirmación, o a propósito— y el operador, que ve dos
+// mensajes distintos con días de diferencia, lo carga dos veces.
+//
+// Va sobre la referencia normalizada para que "QR BCP 4471" y "qr bcp  4471"
+// no pasen como dos transferencias distintas.
+movimientoSaldoSchema.index(
+  { referenciaClave: 1 },
+  { unique: true, partialFilterExpression: { tipo: "carga", referenciaClave: { $type: "string" } }, name: "carga_por_referencia_unica" }
 );
 const MovimientoSaldo = mongoose.model("MovimientoSaldo", movimientoSaldoSchema);
 

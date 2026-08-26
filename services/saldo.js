@@ -98,7 +98,7 @@ async function movimientosDe(medicoPhone, limite = 50) {
 // actualizar. Eso lo detecta y lo arregla reconciliar(), y es el lado seguro
 // para fallar: el libro dice que se cobró y la copia se pone al día. Al revés
 // —plata descontada sin registro— no hay cómo reconstruirlo.
-async function aplicar({ medicoPhone, tipo, montoCentavos, concepto, consultaId, acreditadoPor, referencia }) {
+async function aplicar({ medicoPhone, tipo, montoCentavos, concepto, consultaId, acreditadoPor, referencia, referenciaClave }) {
   if (!await Medico.exists({ phone: medicoPhone })) {
     throw new Error(`No existe la cuenta ${medicoPhone}`);
   }
@@ -108,6 +108,7 @@ async function aplicar({ medicoPhone, tipo, montoCentavos, concepto, consultaId,
     medicoPhone, tipo, montoCentavos,
     concepto: concepto || "", consultaId: consultaId || null,
     acreditadoPor: acreditadoPor || "", referencia: referencia || "",
+    referenciaClave: referenciaClave || null,
   });
 
   // 2. Recién ahora se mueve el saldo. $inc es atómico: dos consultas que
@@ -125,19 +126,57 @@ async function aplicar({ medicoPhone, tipo, montoCentavos, concepto, consultaId,
   return mov;
 }
 
+// Para comparar referencias sin que un espacio de más o una mayúscula hagan
+// pasar la misma transferencia por dos distintas.
+function claveDeReferencia(referencia) {
+  const limpia = String(referencia || "").toUpperCase().replace(/\s+/g, " ").trim();
+  return limpia || null;
+}
+
 // Acreditar una transferencia o un QR. Lo hace una persona que vio el
 // comprobante; por eso pide quién y contra qué referencia — una carga sin eso
 // es plata que apareció de la nada.
+//
+// ⚠️ LA REFERENCIA TIENE QUE SALIR DEL BANCO, NO DEL COMPROBANTE QUE MANDÓ EL
+// MÉDICO. Una captura de pantalla se falsifica en dos minutos con cualquier
+// editor de imágenes, y el operador que la mira no tiene cómo notarlo. Lo
+// único que prueba que el dinero entró es verlo en el extracto o en la app
+// del banco. Esto el código no lo puede garantizar: es del procedimiento.
 async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, concepto }) {
   const monto = Math.round(Number(montoCentavos));
   if (!Number.isFinite(monto) || monto <= 0) throw new Error("El monto a cargar tiene que ser un número positivo");
   if (!acreditadoPor) throw new Error("Falta quién acredita la carga");
+  // Sin referencia no hay contra qué comparar, y el índice único no puede
+  // atajar nada: una carga sin comprobante se puede repetir infinitas veces
+  // sin que el sistema lo note. Por eso es obligatoria, incluso en efectivo
+  // (ahí sirve algo como "efectivo 2026-08-26 recibido por Luis").
+  if (!claveDeReferencia(referencia)) {
+    throw new Error("Falta la referencia del comprobante. Sin ella la misma carga se puede repetir sin que nadie lo note.");
+  }
+
+  // Se busca antes para poder decir CUÁL fue la carga anterior. El guardia de
+  // verdad sigue siendo el índice único (dos operadores a la vez).
+  const referenciaClave = claveDeReferencia(referencia);
+  if (referenciaClave) {
+    const yaCargada = await MovimientoSaldo.findOne({ tipo: "carga", referenciaClave })
+      .select("medicoPhone montoCentavos createdAt acreditadoPor").lean();
+    if (yaCargada) {
+      const e = new Error(
+        `La referencia "${referencia}" ya se acreditó el ${new Date(yaCargada.createdAt).toLocaleString("es-BO")} ` +
+        `a +${yaCargada.medicoPhone} por Bs ${bolivianos(yaCargada.montoCentavos)} (${yaCargada.acreditadoPor}).`
+      );
+      e.codigo = "referencia_repetida";
+      e.anterior = yaCargada;
+      throw e;
+    }
+  }
+
   const mov = await aplicar({
     medicoPhone, tipo: "carga", montoCentavos: monto,
     concepto: concepto || `Carga de Bs ${bolivianos(monto)}`,
-    acreditadoPor, referencia,
+    acreditadoPor, referencia, referenciaClave,
   });
-  log.info(`[SALDO] carga de Bs ${bolivianos(monto)} a ${medicoPhone} por ${acreditadoPor} — queda Bs ${bolivianos(mov.saldoDespuesCentavos)}`);
+  log.info(`[SALDO] carga de Bs ${bolivianos(monto)} a ${medicoPhone} por ${acreditadoPor} [${referencia || "sin referencia"}] — queda Bs ${bolivianos(mov.saldoDespuesCentavos)}`);
   return mov;
 }
 
@@ -207,6 +246,6 @@ async function reconciliar(medicoPhone, { corregir = false } = {}) {
 }
 
 module.exports = {
-  estadoDe, movimientosDe, cargar, cobrarConsulta, ajustar, reconciliar,
+  estadoDe, movimientosDe, cargar, cobrarConsulta, ajustar, reconciliar, claveDeReferencia,
   bolivianos, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE,
 };
