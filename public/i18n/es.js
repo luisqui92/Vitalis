@@ -19,6 +19,54 @@ Object.assign(I18N.es, {
   "dia.corto.5": "Vie",
   "dia.corto.6": "Sáb",
 
+  // ─── Login y registro ─────────────────────────────────────────────────
+  // Es la primera pantalla que ve un médico, y hasta que no ingresa el
+  // sistema todavía no sabe quién es: por eso acá —y solo acá— el idioma
+  // sale del selector de abajo y no de la cuenta.
+  "auth.telefono": "Teléfono",
+  "auth.telefonoPlaceholder": "591XXXXXXXX",
+  "auth.password": "Contraseña",
+  "auth.ingresar": "Ingresar",
+  "auth.irRegistro": "¿No tenés cuenta? Registrate",
+  "auth.errFaltanDatos": "Completá teléfono y contraseña",
+  "auth.errIngresar": "No se pudo iniciar sesión",
+  "auth.idioma": "Idioma",
+
+  "auth.2fa.ayuda": "🔐 Ingresá el código de 6 dígitos de tu app autenticadora (Google Authenticator, Authy...).",
+  "auth.2fa.confirmar": "Confirmar",
+  "auth.2fa.volver": "← Volver",
+  "auth.2fa.errCodigo": "Código incorrecto",
+
+  "auth.reg.nombre": "Nombre completo",
+  "auth.reg.nombrePlaceholder": "Dra. Fulana Pérez",
+  "auth.reg.nombrePlaceholderVet": "Dra. Fulana Pérez (veterinaria)",
+  "auth.reg.area": "Área",
+  "auth.reg.especialidad": "Especialidad (opcional)",
+  "auth.reg.especialidadPlaceholder": "Medicina general",
+  "auth.reg.especialidadPlaceholderVet": "Medicina veterinaria general",
+  "auth.reg.password": "Contraseña (mínimo 8 caracteres)",
+  "auth.reg.boton": "Registrarme",
+  "auth.reg.irLogin": "Ya tengo cuenta, ingresar",
+  "auth.reg.errFaltanDatos": "Completá teléfono, nombre y contraseña",
+  "auth.reg.errRegistrar": "No se pudo registrar",
+  "auth.reg.creada": "✅ Cuenta creada. Ahora ingresá con tu teléfono y contraseña.",
+
+  "area.medicina_general": "🩺 Medicina general",
+  "area.odontologia": "🦷 Odontología",
+  "area.estetica": "💉 Estética / Plástica / Dermatología",
+  "area.oftalmologia": "👁️ Oftalmología",
+  "area.ginecologia": "🤰 Ginecología y Obstetricia",
+  "area.pediatria": "🧸 Pediatría",
+  "area.neurodesarrollo": "🧩 Neurodesarrollo (autismo, síndrome de Down)",
+  "area.veterinaria": "🐾 Veterinaria",
+
+  // ─── Idioma de la cuenta (Configuración) ──────────────────────────────
+  "config.idioma.titulo": "🌐 Idioma",
+  "config.idioma.ayuda": "En qué idioma trabajás: la pantalla, tus notas clínicas y lo que tus pacientes reciben por WhatsApp. Lo que ya escribiste no se traduce — una historia clínica se lee como se escribió.",
+  "config.idioma.guardar": "Guardar idioma",
+  "config.idioma.guardado": "✅ Idioma actualizado.",
+  "config.idioma.errGuardar": "No se pudo cambiar el idioma",
+
   // ─── Agenda ───────────────────────────────────────────────────────────
   "agenda.cargando": "Cargando agenda...",
   "agenda.error": "Error cargando la agenda",

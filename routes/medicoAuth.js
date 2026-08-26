@@ -84,6 +84,27 @@ module.exports = function (app) {
     res.json({ token, phone: medico.phone, nombre: medico.nombre, tipoEspecialidad: medico.tipoEspecialidad, idioma: medico.idioma || "es" });
   }));
 
+  // ─── IDIOMA DE LA CUENTA ────────────────────────────────────────────────
+  // Cambiarlo cambia de acá en adelante: la pantalla, el idioma que se le
+  // pide al transcriptor, qué prompt clínico se usa y en qué idioma le
+  // escribe el bot a los pacientes de este médico.
+  //
+  // Lo que YA está escrito no se toca. Una nota clínica se lee como se
+  // escribió — retraducir una historia clínica vieja sería reescribir un
+  // documento que puede terminar en un juicio.
+  app.patch("/medico/idioma", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const idioma = req.body?.idioma;
+    if (!["es", "pt"].includes(idioma)) throw new ErrorHttp(400, "Idioma no válido");
+    const medico = await Medico.findOneAndUpdate(
+      { phone: req.adminUser.usuario, activo: true },
+      { idioma },
+      { new: true }
+    );
+    if (!medico) throw new ErrorHttp(404, "Médico no encontrado");
+    registrar({ req, medicoPhone: medico.phone, accion: "cambiar_idioma", recurso: idioma });
+    res.json({ ok: true, idioma: medico.idioma });
+  }));
+
   // ─── 2FA: estado, activar, confirmar, desactivar ────────────────────────
   app.get("/medico/2fa/estado", requireMedico, asyncRoute(async (req, res) => {
     const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("dosFA.activo").lean();

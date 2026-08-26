@@ -40,6 +40,17 @@ function pintarSeguridad(dosFAActivo, eventos) {
     <div id="backupsBox"></div>
 
     <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${t("config.idioma.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${t("config.idioma.ayuda")}</div>
+      <select id="segIdioma">
+        <option value="es" ${MEDICO_IDIOMA === "es" ? "selected" : ""}>Español</option>
+        <option value="pt" ${MEDICO_IDIOMA === "pt" ? "selected" : ""}>Português</option>
+      </select>
+      <div id="segIdiomaErr"></div>
+      <button class="secondary" id="btnGuardarIdioma">${t("config.idioma.guardar")}</button>
+    </div>
+
+    <div class="card">
       <div class="seccion-titulo" style="margin-top:0">🔐 Verificación en dos pasos (2FA)</div>
       ${dosFAActivo ? `
         <div class="hint" style="color:var(--success);margin-bottom:10px">✅ Activada — además de tu contraseña, se pide un código de tu app autenticadora al ingresar.</div>
@@ -67,6 +78,24 @@ function pintarSeguridad(dosFAActivo, eventos) {
     </div>`;
 
   document.getElementById("btnBack").onclick = renderDashboard;
+
+  document.getElementById("btnGuardarIdioma").onclick = async () => {
+    const errBox = document.getElementById("segIdiomaErr");
+    errBox.innerHTML = "";
+    const idioma = document.getElementById("segIdioma").value;
+    try {
+      await api("/medico/idioma", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idioma }),
+      });
+      // Se fija recién cuando el servidor confirmó: si guardáramos antes, la
+      // pantalla quedaría en un idioma que la cuenta no tiene.
+      fijarIdioma(idioma);
+      renderSeguridad();
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("config.idioma.errGuardar"))}</div>`;
+    }
+  };
   wireNotificaciones();
 
   const btnActivar = document.getElementById("btnActivar2FA");
