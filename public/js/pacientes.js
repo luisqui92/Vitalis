@@ -1,6 +1,45 @@
 // Vitalis — Dashboard (lista de pacientes) y el Kardex de cada paciente
 // (pestañas: Paciente, Consultas, Medicación, Antecedentes, Vacunas).
 
+// La barra de pestañas del celular — la pantalla que el médico ve primero y
+// desde la que llega a todo lo demás.
+//
+// Está afuera de renderPacientes() para poder probarla: es donde vivieron
+// dos errores que nadie vio porque esta pantalla no tenía ninguna prueba.
+//
+//   · La grilla tenía cinco columnas escritas a mano en el style. El día que
+//     apareció la pestaña de Clínica —que solo ve quien administra— el sexto
+//     botón se caía solo a una segunda fila.
+//   · La pestaña decía "Seguridad". Adentro están el idioma, las
+//     notificaciones y los respaldos, además del 2FA; nadie busca el idioma
+//     bajo un escudo que dice Seguridad. Lo reportó alguien que no encontraba
+//     cómo cambiar de idioma en el celular — y era el dueño del producto.
+//     La vista de escritorio ya llamaba "Configuración" a esta misma
+//     pantalla: el nombre engañoso era el del celular.
+function pestanasPacientes(pendientes) {
+  const pestanas = [
+    `<button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>${t("pacientes.tab.nuevo")}</button>`,
+    `<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`,
+    `<button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>`,
+    `<button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>`,
+    `<button class="tab" id="btnConfiguracion"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.configuracion")}</button>`,
+  ];
+  // El clipboard y no otro escudo: dos escudos idénticos uno al lado del
+  // otro no distinguen nada.
+  if (esAdministrador()) {
+    pestanas.push(`<button class="tab" id="btnClinica"><span class="tab-icono">${ICONOS.clipboard}</span>${t("clin.nav.clinica")}</button>`);
+  }
+  return pestanas;
+}
+
+function tabsPacientesHtml(pendientes) {
+  const pestanas = pestanasPacientes(pendientes);
+  return `
+    <div class="tabs" style="grid-template-columns:repeat(${pestanas.length},1fr);margin-bottom:16px">
+      ${pestanas.join("")}
+    </div>`;
+}
+
 function pacienteItemHtml(p) {
   const esVet = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
   const info = esVet
@@ -65,14 +104,7 @@ async function renderDashboard() {
             <span style="color:var(--primary);font-weight:600">${t("pacientes.bandeja.ver")}</span>
           </div>
         </div>` : ""}
-      <div class="tabs" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
-        <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>${t("pacientes.tab.nuevo")}</button>
-        <button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>
-        <button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>
-        <button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>
-        <button class="tab" id="btnSeguridad"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.seguridad")}</button>
-        ${esAdministrador() ? `<button class="tab" id="btnClinica"><span class="tab-icono">${ICONOS.escudo}</span>${t("clin.nav.clinica")}</button>` : ""}
-      </div>
+      ${tabsPacientesHtml(pendientes)}
       ${items.length === 0 ? `<div class="empty">${t("pacientes.vacio")}</div>` : `
         <input id="buscarPaciente" type="text" placeholder="${t("pacientes.buscar")}" style="margin:16px 0 12px">
         <div id="listaPacientes">
@@ -87,7 +119,7 @@ async function renderDashboard() {
     document.getElementById("btnAgenda").onclick = renderAgenda;
     document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
     document.getElementById("btnVincular").onclick = renderVincular;
-    document.getElementById("btnSeguridad").onclick = renderSeguridad;
+    document.getElementById("btnConfiguracion").onclick = renderSeguridad;
     // Solo existe para quien administra una clínica (ver clinica.js).
     const btnClinica = document.getElementById("btnClinica");
     if (btnClinica) btnClinica.onclick = renderClinica;

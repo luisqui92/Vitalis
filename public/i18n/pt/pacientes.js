@@ -17,7 +17,7 @@ Object.assign(I18N.pt, {
   "pacientes.tab.agenda": "Agenda",
   "pacientes.tab.recordatorios": "Lembretes",
   "pacientes.tab.vincular": "Vincular<br>celular",
-  "pacientes.tab.seguridad": "Segurança",
+  "pacientes.tab.configuracion": "Configuração",
   "pacientes.vacio": "Você ainda não cadastrou nenhum paciente.",
   "pacientes.buscar": "🔍 Buscar paciente...",
   "pacientes.buscarVacio": "Nenhum paciente corresponde à busca.",

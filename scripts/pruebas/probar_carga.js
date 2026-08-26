@@ -177,6 +177,7 @@ const pantallas = [
     { equipos: [{ nombre: "PC 1", conectado: true, subidas: 5 }] },
     agendaDemo
   )`],
+  ["pestañas del celular", `tabsPacientesHtml(3)`],
   ["agenda de la clínica", `agendaClinicaHtml(agendaDemo)`],
   // El día vacío y el error son ramas distintas del mismo cuadro, y las dos
   // se ven en producción: una clínica cerrada el domingo, un backend caído.
@@ -297,6 +298,46 @@ if (huerfanas.length) {
 } else {
   console.log(`✅ las ${declaradas.size - globalesConocidos.size} constantes declaradas cubren todos sus usos`);
 }
+
+// ── 4. La barra de pestañas del celular ───────────────────────────────────
+// Es la pantalla que el médico ve primero y desde la que llega a todo lo
+// demás, y no tenía ninguna prueba. Ahí vivieron dos errores que llegaron a
+// producción: la grilla con las columnas escritas a mano, y el idioma
+// escondido detrás de una pestaña llamada "Seguridad".
+console.log("");
+function verificar(descripcion, condicion) {
+  console.log(`${condicion ? "✅" : "❌"} ${descripcion}`);
+  if (!condicion) fallos++;
+}
+
+for (const idioma of ["es", "pt"]) {
+  for (const [rol, esperadas] of [["medico", 5], ["admin", 6], ["director", 6]]) {
+    vm.runInContext(`MEDICO_IDIOMA = ${JSON.stringify(idioma)}; MEDICO_ROL = ${JSON.stringify(rol)};`, sandbox);
+    const html = vm.runInContext(`tabsPacientesHtml(3)`, sandbox);
+    const botones = (html.match(/<button class="tab"/g) || []).length;
+    const columnas = Number((html.match(/repeat\((\d+),1fr\)/) || [])[1]);
+    verificar(`[${idioma}/${rol}] ${esperadas} pestañas`, botones === esperadas);
+    verificar(`[${idioma}/${rol}]   ...y la grilla tiene ${esperadas} columnas, no otro número`, columnas === botones);
+  }
+}
+
+// El nombre importa tanto como que exista: con "Seguridad" el idioma estaba
+// ahí y nadie lo encontraba.
+vm.runInContext(`MEDICO_IDIOMA = "es"; MEDICO_ROL = "medico";`, sandbox);
+const tabsEs = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+verificar('la pestaña de ajustes dice "Configuración"', tabsEs.includes("Configuración"));
+verificar('  ...y ya no dice "Seguridad"', !tabsEs.includes("Seguridad"));
+vm.runInContext(`MEDICO_IDIOMA = "pt";`, sandbox);
+const tabsPt = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+verificar('en portugués dice "Configuração"', tabsPt.includes("Configuração"));
+
+// Dos pestañas con el mismo ícono no distinguen nada: pasó con Clínica y
+// Configuración, las dos con el escudo.
+vm.runInContext(`MEDICO_ROL = "admin";`, sandbox);
+const tabsAdmin = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+const iconos = [...tabsAdmin.matchAll(/<span class="tab-icono">([\s\S]*?)<\/span>/g)]
+  .map(m => m[1].replace(/<b class="tab-globo">.*?<\/b>/g, "").trim());
+verificar("ninguna pestaña repite el ícono de otra", new Set(iconos).size === iconos.length);
 
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);
