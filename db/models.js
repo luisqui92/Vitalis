@@ -150,9 +150,14 @@ const personaClinicaSchema = new mongoose.Schema({
   // existen, un documento repetido casi nunca.
   documento: { type: String, default: "", index: true },
   alergias: { type: [String], default: [] },
-  // Quién y cuándo tocó las alergias por última vez. Es un dato que cruza
-  // consultorios: si aparece una alergia nueva en la ficha de otro médico,
-  // hay que poder preguntarle a alguien de dónde salió.
+  // Quién y cuándo tocó las alergias por última vez.
+  //
+  // El teléfono NO sale de acá: a otro médico de la clínica se le manda solo
+  // si fue él mismo o no (ver personaParaElMedico en routes/personas.js).
+  // Mandarlo le diría QUIÉN MÁS atiende a esta persona, que es justo lo que
+  // el resto del diseño evita — la ficha dice "la ven en 3 consultorios",
+  // nunca en cuáles. Para rastrear una alergia de verdad está el registro de
+  // auditoría, que es donde corresponde ese dato.
   alergiasActualizadasPor: { type: String, default: "" },
   alergiasActualizadasEn: { type: Date, default: null },
 }, { timestamps: true });

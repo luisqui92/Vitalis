@@ -56,9 +56,13 @@ function pintarConPersona(caja, paciente, persona, fichas) {
       <input id="personaAlergias" type="text" value="${esc(alergias.join(", "))}" placeholder="${t("persona.alergiasPlaceholder")}">
       <div class="hint" style="margin:6px 0 0">${t("persona.alergiasAyuda")}</div>
       ${persona.alergiasActualizadasEn ? `
-        <div class="hint" style="margin:4px 0 0">${t("persona.alergiasActualizadas", {
-          fecha: new Date(persona.alergiasActualizadasEn).toLocaleDateString(localeActual()),
-        })}</div>` : ""}
+        <div class="hint" style="margin:4px 0 0">${t(
+          // De quién fueron se dice solo como "vos" o "otro consultorio": el
+          // servidor no manda el teléfono del colega a propósito, porque eso
+          // sería decir quién más atiende a esta persona.
+          persona.alergiasActualizadasPorMi ? "persona.alergiasActualizadasVos" : "persona.alergiasActualizadasOtro",
+          { fecha: new Date(persona.alergiasActualizadasEn).toLocaleDateString(localeActual()) }
+        )}</div>` : ""}
       <div id="personaErr"></div>
       <button class="secondary" id="btnGuardarAlergias">${t("persona.guardarAlergias")}</button>
       <button class="link" id="btnDesvincularPersona" style="width:auto;color:var(--danger)">${t("persona.desvincular")}</button>

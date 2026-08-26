@@ -11,6 +11,10 @@
 // devolviera "atendida por el Dr. X en oncología", buscar un paciente sería
 // una forma de averiguar quién trata a quién.
 //
+// Eso se hace en UN lugar —personaParaElMedico(), acá abajo— y con una lista
+// de campos permitidos, no de campos prohibidos: mandar el documento entero
+// de Mongo es cómo se filtró alergiasActualizadasPor la primera vez.
+//
 // ═══ POR QUÉ NADA SE VINCULA SOLO ══════════════════════════════════════════
 //
 // Vincular dos fichas que en realidad son de dos personas distintas fusiona
@@ -35,6 +39,36 @@ const requireMedico = requireAuth(["medico"]);
 async function clinicaDelMedico(medicoPhone) {
   const medico = await Medico.findOne({ phone: medicoPhone }).select("clinicaId").lean();
   return medico?.clinicaId || null;
+}
+
+// Qué se le manda de una persona a un médico. Whitelist, no blacklist: si
+// mañana el modelo suma un campo, no se filtra solo por descuido.
+//
+// El que NO va es alergiasActualizadasPor. Guarda el teléfono del colega que
+// cargó la alergia, y mandarlo le dice al que abre la ficha QUIÉN MÁS atiende
+// a esa persona — exactamente lo que el resto de estas rutas evita con
+// cuidado (la ficha dice "la ven en 3 consultorios", nunca en cuáles).
+//
+// En su lugar va si fue uno mismo o no. Si un médico duda de una alergia que
+// no cargó él, lo que corresponde es preguntarle al paciente, que está
+// sentado ahí; y si hace falta rastrearla de verdad, el registro de auditoría
+// lo tiene, que es donde va ese dato.
+//
+// Lo encontró probar_clinica_integracion.js: ninguna prueba de permisos lo
+// veía, porque el campo viajaba adentro del documento entero.
+function personaParaElMedico(persona, medicoPhone) {
+  const p = persona.toObject ? persona.toObject() : persona;
+  return {
+    _id: p._id,
+    nombre: p.nombre,
+    fechaNacimiento: p.fechaNacimiento,
+    sexo: p.sexo,
+    telefono: p.telefono,
+    documento: p.documento,
+    alergias: p.alergias || [],
+    alergiasActualizadasEn: p.alergiasActualizadasEn,
+    alergiasActualizadasPorMi: Boolean(p.alergiasActualizadasPor) && p.alergiasActualizadasPor === medicoPhone,
+  };
 }
 
 // Para comparar nombres sin que "José Pérez" y "jose perez" parezcan dos
@@ -115,7 +149,7 @@ module.exports = function (app) {
     paciente.personaId = persona._id;
     await paciente.save();
     registrar({ req, medicoPhone, accion: "vincular_persona", recurso: `Paciente:${paciente._id}→Persona:${persona._id}` });
-    res.json({ ok: true, persona });
+    res.json({ ok: true, persona: personaParaElMedico(persona, medicoPhone) });
   }));
 
   // ─── DESVINCULAR ────────────────────────────────────────────────────────
@@ -158,7 +192,7 @@ module.exports = function (app) {
     await persona.save();
 
     registrar({ req, medicoPhone, accion: "editar_alergias_persona", recurso: `Persona:${persona._id}` });
-    res.json({ ok: true, persona });
+    res.json({ ok: true, persona: personaParaElMedico(persona, medicoPhone) });
   }));
 
   // ─── QUÉ SABE LA CLÍNICA DE ESTA PERSONA ────────────────────────────────
@@ -176,6 +210,6 @@ module.exports = function (app) {
     if (!persona) return res.json({ persona: null });
 
     const fichas = await Paciente.countDocuments({ personaId: persona._id });
-    res.json({ persona, fichasEnLaClinica: fichas });
+    res.json({ persona: personaParaElMedico(persona, medicoPhone), fichasEnLaClinica: fichas });
   }));
 };

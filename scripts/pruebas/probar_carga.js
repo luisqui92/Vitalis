@@ -179,7 +179,8 @@ const pantallas = [
   // se ven en producción: una clínica cerrada el domingo, un backend caído.
   ["agenda vacía", `agendaClinicaHtml({ fecha: "2026-08-26", salas: [], total: 0, salasSinNombre: 0 })`],
   ["agenda que no cargó", `agendaClinicaHtml(null)`],
-  ["persona con alergias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: ["penicilina", "látex"], alergiasActualizadasEn: new Date().toISOString() }, 3)`],
+  ["persona con alergias de otro consultorio", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: ["penicilina", "látex"], alergiasActualizadasEn: new Date().toISOString(), alergiasActualizadasPorMi: false }, 3)`],
+  ["persona con alergias propias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: ["penicilina"], alergiasActualizadasEn: new Date().toISOString(), alergiasActualizadasPorMi: true }, 1)`],
   ["persona sin alergias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: [] }, 1)`],
   ["ficha sin persona", `pintarSinPersona(document.getElementById("x"), { _id: "p1", nombre: "María" })`],
   ["candidato a persona", `candidatoHtml({ _id: "per1", nombre: "María", fechaNacimiento: "1985-04-12", documento: "1234567", telefono: "70000000", alergias: ["penicilina"] })`],
