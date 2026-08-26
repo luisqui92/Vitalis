@@ -41,20 +41,20 @@ async function suscripcionActual() {
 
 async function activarNotificaciones() {
   if (!soportaNotificaciones()) {
-    throw new Error("Este navegador no soporta notificaciones.");
+    throw new Error(t("notif.sinSoporte"));
   }
   if (esIOS() && !instaladaEnPantallaInicio()) {
-    throw new Error("En iPhone hay que agregar Vitalis a la pantalla de inicio primero: tocá Compartir → 'Agregar a inicio', abrilo desde ahí y volvé a intentar.");
+    throw new Error(t("notif.iosError"));
   }
 
   const cfg = await api("/medico/push/config");
   if (!cfg.configurado || !cfg.clavePublica) {
-    throw new Error("Las notificaciones no están configuradas en el servidor.");
+    throw new Error(t("notif.sinConfigurar"));
   }
 
   const permiso = await Notification.requestPermission();
   if (permiso !== "granted") {
-    throw new Error("No diste permiso para las notificaciones. Podés habilitarlo desde la configuración del navegador.");
+    throw new Error(t("notif.sinPermiso"));
   }
 
   const reg = await registrarServiceWorker();
@@ -93,16 +93,13 @@ async function desactivarNotificaciones() {
 function notificacionesHtml() {
   return `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">🔔 Avisos de reservas</div>
-      <div class="hint" style="margin-bottom:10px">
-        Recibí un aviso en este dispositivo cuando un paciente reserva por WhatsApp
-        o por el link de reservas, aunque tengas Vitalis cerrado.
-      </div>
-      <div id="notifEstado" class="hint">Verificando...</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("notif.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${t("notif.ayuda")}</div>
+      <div id="notifEstado" class="hint">${t("notif.verificando")}</div>
       <div id="notifErr"></div>
-      <button class="secondary" id="btnNotifActivar" style="display:none">Activar en este dispositivo</button>
-      <button class="link" id="btnNotifProbar" style="display:none">Enviarme una de prueba</button>
-      <button class="link" id="btnNotifDesactivar" style="display:none;color:var(--danger)">Desactivar en este dispositivo</button>
+      <button class="secondary" id="btnNotifActivar" style="display:none">${t("notif.activar")}</button>
+      <button class="link" id="btnNotifProbar" style="display:none">${t("notif.probar")}</button>
+      <button class="link" id="btnNotifDesactivar" style="display:none;color:var(--danger)">${t("notif.desactivar")}</button>
     </div>`;
 }
 
@@ -121,25 +118,25 @@ async function wireNotificaciones() {
     btnDesactivar.style.display = "none";
 
     if (!soportaNotificaciones()) {
-      estado.textContent = "Este navegador no soporta notificaciones.";
+      estado.textContent = t("notif.sinSoporte");
       return;
     }
     if (esIOS() && !instaladaEnPantallaInicio()) {
-      estado.innerHTML = "En iPhone, primero agregá Vitalis a la pantalla de inicio: tocá <b>Compartir</b> → <b>Agregar a inicio</b>, y abrilo desde ahí.";
+      estado.innerHTML = t("notif.iosEstado");
       return;
     }
     if (Notification.permission === "denied") {
-      estado.textContent = "Bloqueaste las notificaciones para este sitio. Habilitalas desde la configuración del navegador y recargá.";
+      estado.textContent = t("notif.bloqueadas");
       return;
     }
 
     const sub = await suscripcionActual();
     if (sub) {
-      estado.innerHTML = "✅ Activadas en este dispositivo.";
+      estado.innerHTML = t("notif.activadas");
       btnProbar.style.display = "block";
       btnDesactivar.style.display = "block";
     } else {
-      estado.textContent = "No están activadas en este dispositivo.";
+      estado.textContent = t("notif.noActivadas");
       btnActivar.style.display = "block";
     }
   }
@@ -147,28 +144,28 @@ async function wireNotificaciones() {
   btnActivar.onclick = async () => {
     err.innerHTML = "";
     btnActivar.disabled = true;
-    btnActivar.textContent = "Activando...";
+    btnActivar.textContent = t("notif.activando");
     try {
       await activarNotificaciones();
       await pintar();
     } catch (e) {
-      err.innerHTML = `<div class="error">${esc(e.error || e.message || "No se pudo activar")}</div>`;
+      err.innerHTML = `<div class="error">${esc(e.error || e.message || t("notif.errActivar"))}</div>`;
     } finally {
       btnActivar.disabled = false;
-      btnActivar.textContent = "Activar en este dispositivo";
+      btnActivar.textContent = t("notif.activar");
     }
   };
 
   btnProbar.onclick = async () => {
     err.innerHTML = "";
-    btnProbar.textContent = "Enviando...";
+    btnProbar.textContent = t("notif.enviando");
     try {
       await api("/medico/push/probar", { method: "POST" });
-      btnProbar.textContent = "Enviada — mirá tus notificaciones";
-      setTimeout(() => { btnProbar.textContent = "Enviarme una de prueba"; }, 4000);
+      btnProbar.textContent = t("notif.enviada");
+      setTimeout(() => { btnProbar.textContent = t("notif.probar"); }, 4000);
     } catch (e) {
-      err.innerHTML = `<div class="error">${esc(e.error || "No se pudo enviar")}</div>`;
-      btnProbar.textContent = "Enviarme una de prueba";
+      err.innerHTML = `<div class="error">${esc(e.error || t("notif.errEnviar"))}</div>`;
+      btnProbar.textContent = t("notif.probar");
     }
   };
 

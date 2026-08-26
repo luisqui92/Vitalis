@@ -1,0 +1,22 @@
+// Vitalis — Português · notificações do navegador (Web Push).
+Object.assign(I18N.pt, {
+  "notif.titulo": "🔔 Avisos de agendamentos",
+  "notif.ayuda": "Receba um aviso neste aparelho quando um paciente agendar, mesmo com o Vitalis fechado.",
+  "notif.verificando": "Verificando...",
+  "notif.activar": "Ativar neste aparelho",
+  "notif.probar": "Enviar um teste para mim",
+  "notif.desactivar": "Desativar neste aparelho",
+  "notif.sinSoporte": "Este navegador não suporta notificações.",
+  "notif.iosEstado": "No iPhone, primeiro adicione o Vitalis à tela de início: toque em <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>, e abra por ali.",
+  "notif.iosError": "No iPhone é preciso adicionar o Vitalis à tela de início primeiro: toque em Compartilhar → 'Adicionar à Tela de Início', abra por ali e tente de novo.",
+  "notif.bloqueadas": "Você bloqueou as notificações para este site. Habilite nas configurações do navegador e recarregue.",
+  "notif.activadas": "✅ Ativadas neste aparelho.",
+  "notif.noActivadas": "Não estão ativadas neste aparelho.",
+  "notif.activando": "Ativando...",
+  "notif.enviando": "Enviando...",
+  "notif.enviada": "Enviada — veja suas notificações",
+  "notif.sinConfigurar": "As notificações não estão configuradas no servidor.",
+  "notif.sinPermiso": "Você não deu permissão para as notificações. Pode habilitar nas configurações do navegador.",
+  "notif.errActivar": "Não foi possível ativar",
+  "notif.errEnviar": "Não foi possível enviar",
+});

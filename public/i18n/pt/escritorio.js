@@ -38,3 +38,46 @@ Object.assign(I18N.pt, {
   "escr.consulta.error": "Com erro",
   "escr.consulta.procesando": "Processando",
 });
+
+// ─── As 4 telas próprias do desktop (escritorioExtra.js) ────────────────
+Object.assign(I18N.pt, {
+  "voz.cargando": "Carregando ligações...",
+  "voz.error": "Erro ao carregar o Vitalis Voice",
+  "voz.titulo": "📞 Vitalis Voice",
+  "voz.ayuda": "Consultas agendadas ou canceladas pelo atendente de voz (ligações), últimos 60 dias e próximos 30.",
+  "voz.vacio": "Ainda não há nenhuma ligação atendida pelo assistente de voz.",
+  "cita.estado.confirmada": "Confirmada",
+  "cita.estado.cancelada": "Cancelada",
+  "cita.estado.completada": "Concluída",
+
+  "indic.cargando": "Carregando orientações...",
+  "indic.error": "Erro ao carregar orientações",
+  "indic.titulo": "📄 Orientações",
+  "indic.vacio": "Ainda não foi gerada nenhuma receita.",
+  "pacienteEliminado": "Paciente excluído",
+
+  "escrEst.cargando": "Carregando exames...",
+  "escrEst.error": "Erro ao carregar exames",
+  "escrEst.titulo": "🩻 Exames e imagens",
+  "escrEst.vacio": "Ainda não foi carregado nenhum exame.",
+
+  "rep.cargando": "Carregando relatórios...",
+  "rep.error": "Erro ao carregar relatórios",
+  "rep.consultas6m": "Consultas (6 meses)",
+  "rep.completadas": "Consultas concluídas",
+  "rep.citas6m": "Agendamentos (6 meses)",
+  "rep.canceladas": "Agendamentos cancelados",
+  "rep.consultasPorMes": "🎙️ Consultas por mês",
+  "rep.citasPorMes": "📅 Agendamentos por mês",
+  "rep.pacientesNuevos": "👤 Pacientes novos por mês",
+
+  "fin.cargando": "Carregando financeiro...",
+  "fin.error": "Erro ao carregar financeiro",
+  "fin.sinPlanes": "O Financeiro só acompanha os planos de tratamento (Odontologia, Vitalis Face e Vitalis Visão) — sua especialidade não os usa, então estes números vão ficar em zero.",
+  "fin.facturado": "Faturado",
+  "fin.cobrado": "Recebido",
+  "fin.saldo": "Saldo pendente",
+  "fin.planes": "Planos de tratamento",
+  "fin.pagosRecientes": "💵 Pagamentos recentes",
+  "fin.sinPagos": "Ainda não foi registrado nenhum pagamento.",
+});

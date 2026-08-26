@@ -2,11 +2,20 @@
 // (nombre + precio) y, por paciente, una lista de ítems opcionalmente
 // ligados a una pieza del odontograma, con pagos registrados contra cada
 // uno. Saldo = precio - suma de pagos, siempre calculado al vuelo.
-const ESTADO_TRATAMIENTO_INFO = {
-  pendiente: { label: "Pendiente", clase: "badge-procesando" },
-  en_proceso: { label: "En proceso", clase: "badge-procesando" },
-  realizado: { label: "Realizado", clase: "badge-completado" },
+// La clave ("pendiente", "realizado") es lo que se guarda; la etiqueta se
+// resuelve en cada llamada porque este archivo se carga antes del login.
+const ESTADO_TRATAMIENTO_CLASE = {
+  pendiente: "badge-procesando",
+  en_proceso: "badge-procesando",
+  realizado: "badge-completado",
 };
+function estadoTratamientoInfo() {
+  const salida = {};
+  for (const k of Object.keys(ESTADO_TRATAMIENTO_CLASE)) {
+    salida[k] = { label: t("trat.estado." + k), clase: ESTADO_TRATAMIENTO_CLASE[k] };
+  }
+  return salida;
+}
 
 // Vitalis Face: en vez de pieza FDI (odontología), un tratamiento se
 // ubica en una región del rostro — mismas etiquetas que el mapa anatómico
@@ -17,7 +26,23 @@ const REGIONES_FACIALES = [
   "Oreja derecha", "Oreja izquierda", "Mandíbula", "Mentón", "Cuello", "Otra",
 ];
 
-function money(n) { return "Bs " + Number(n || 0).toFixed(2).replace(/\.00$/, ""); }
+// El símbolo y el separador decimal salen del diccionario: Bolivia escribe
+// "Bs 1234.50" y Brasil "R$ 1234,50". El número se arma igual que siempre,
+// así que en español el resultado no cambia ni un carácter.
+// El valor guardado en regionFacial es el texto en español (así está en
+// todas las fichas que ya existen). Se traduce solo al mostrarlo, y si no
+// hay traducción se muestra tal cual: puede ser una región escrita a mano.
+function regionFacialLabel(valor) {
+  if (!valor) return "";
+  const traducido = t("region." + valor);
+  return traducido === "region." + valor ? valor : traducido;
+}
+
+function money(n) {
+  const crudo = Number(n || 0).toFixed(2).replace(/\.00$/, "");
+  const monto = t("moneda.decimal") === "," ? crudo.replace(".", ",") : crudo;
+  return t("moneda.formato", { monto });
+}
 function totalPagado(item) { return (item.pagos || []).reduce((s, p) => s + p.monto, 0); }
 
 let CATALOGO_CACHE = null;
@@ -25,7 +50,7 @@ let CATALOGO_CACHE = null;
 async function renderTabPlanTratamiento(pacienteId) {
   const box = document.getElementById("planBox");
   if (!box) return;
-  box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando plan de tratamiento...</div>`;
+  box.innerHTML = `<div class="loading"><div class="spinner"></div>${t("plan.cargando")}</div>`;
   try {
     const [dataTrat, dataCat] = await Promise.all([
       api(`/medico/pacientes/${pacienteId}/tratamientos`),
@@ -35,7 +60,7 @@ async function renderTabPlanTratamiento(pacienteId) {
     pintarPlan(pacienteId, dataTrat.tratamientos || []);
   } catch (e) {
     if (e.status === 401) return logout();
-    box.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar el plan de tratamiento")}</div>`;
+    box.innerHTML = `<div class="error">${esc(e.error || t("plan.errCargar"))}</div>`;
   }
 }
 
@@ -80,11 +105,12 @@ function pintarPlan(pacienteId, items) {
 function itemPlanHtml(item) {
   const pagado = totalPagado(item);
   const saldo = item.precio - pagado;
-  const info = ESTADO_TRATAMIENTO_INFO[item.estado] || ESTADO_TRATAMIENTO_INFO.pendiente;
+  const estados = estadoTratamientoInfo();
+  const info = estados[item.estado] || estados.pendiente;
   return `
     <div class="item" data-toggle-item="${item._id}" style="cursor:pointer">
       <div class="top">
-        <div class="nombre">${esc(item.nombre)}${item.piezaFdi ? ` — pieza ${item.piezaFdi}` : item.regionFacial ? ` — ${esc(item.regionFacial)}` : ""}</div>
+        <div class="nombre">${esc(item.nombre)}${item.piezaFdi ? ` — pieza ${item.piezaFdi}` : item.regionFacial ? ` — ${esc(regionFacialLabel(item.regionFacial))}` : ""}</div>
         <span class="badge ${info.clase}">${info.label}</span>
       </div>
       <div class="paciente-info">${money(item.precio)}${pagado > 0 ? ` · pagado ${money(pagado)} · ${saldo < 0 ? `<span style="color:var(--warning)">pagó de más: ${money(-saldo)}</span>` : `saldo ${money(saldo)}`}` : ""}</div>
@@ -93,7 +119,7 @@ function itemPlanHtml(item) {
     <div id="det_${item._id}" class="card" style="display:none;margin-top:-4px">
       <label>Estado</label>
       <select id="estado_${item._id}">
-        ${Object.entries(ESTADO_TRATAMIENTO_INFO).map(([k, v]) => `<option value="${k}" ${k === item.estado ? "selected" : ""}>${v.label}</option>`).join("")}
+        ${Object.entries(estadoTratamientoInfo()).map(([k, v]) => `<option value="${k}" ${k === item.estado ? "selected" : ""}>${v.label}</option>`).join("")}
       </select>
       <div id="errEstado_${item._id}"></div>
       <button class="link" id="btnBorrar_${item._id}" style="color:var(--danger)">Eliminar tratamiento</button>
@@ -126,13 +152,13 @@ function wireItemPlan(pacienteId, item) {
       await api(`/medico/tratamientos/${item._id}`, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ estado: selEstado.value }) });
       renderTabPlanTratamiento(pacienteId);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo actualizar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("plan.errActualizar"))}</div>`;
     }
   };
 
   const btnBorrar = document.getElementById(`btnBorrar_${item._id}`);
   if (btnBorrar) btnBorrar.onclick = async () => {
-    if (!confirm("¿Eliminar este tratamiento del plan?")) return;
+    if (!confirm(t("plan.confirmarBorrarItem"))) return;
     await api(`/medico/tratamientos/${item._id}`, { method: "DELETE" });
     renderTabPlanTratamiento(pacienteId);
   };
@@ -146,7 +172,7 @@ function wireItemPlan(pacienteId, item) {
       await api(`/medico/tratamientos/${item._id}/pagos`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ monto }) });
       renderTabPlanTratamiento(pacienteId);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo registrar el pago")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("plan.errPago"))}</div>`;
     }
   };
 
@@ -154,7 +180,7 @@ function wireItemPlan(pacienteId, item) {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
       const [, pagoId] = btn.dataset.borrarPago.split(":");
-      if (!confirm("¿Eliminar este pago?")) return;
+      if (!confirm(t("plan.confirmarBorrarPago"))) return;
       await api(`/medico/tratamientos/${item._id}/pagos/${pagoId}`, { method: "DELETE" });
       renderTabPlanTratamiento(pacienteId);
     };
@@ -181,7 +207,7 @@ function pintarFormNuevoTratamiento(pacienteId) {
         <label>Región del rostro (opcional)</label>
         <select id="ntRegion">
           <option value="">— Sin región —</option>
-          ${REGIONES_FACIALES.map(r => `<option value="${r}">${r}</option>`).join("")}
+          ${REGIONES_FACIALES.map(r => `<option value="${r}">${esc(regionFacialLabel(r))}</option>`).join("")}
         </select>
       ` : `
         <label>Pieza (FDI, opcional)</label>
@@ -215,7 +241,7 @@ function pintarFormNuevoTratamiento(pacienteId) {
       });
       renderTabPlanTratamiento(pacienteId);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("plan.errGuardar"))}</div>`;
     }
   };
 }
@@ -253,13 +279,13 @@ function pintarCatalogo(pacienteId) {
       CATALOGO_CACHE = data.catalogo || [];
       pintarCatalogo(pacienteId);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("plan.errGuardar"))}</div>`;
     }
   };
 
   document.querySelectorAll("[data-borrar-catalogo]").forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm("¿Eliminar este ítem del catálogo?")) return;
+      if (!confirm(t("plan.confirmarBorrarCatalogo"))) return;
       await api(`/medico/catalogo-tratamientos/${btn.dataset.borrarCatalogo}`, { method: "DELETE" });
       const data = await api("/medico/catalogo-tratamientos");
       CATALOGO_CACHE = data.catalogo || [];

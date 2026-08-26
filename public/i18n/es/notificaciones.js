@@ -1,0 +1,22 @@
+// Vitalis — Español · notificaciones del navegador (Web Push).
+Object.assign(I18N.es, {
+  "notif.titulo": "🔔 Avisos de reservas",
+  "notif.ayuda": "Recibí un aviso en este dispositivo cuando un paciente reserva por WhatsApp\n        o por el link de reservas, aunque tengas Vitalis cerrado.",
+  "notif.verificando": "Verificando...",
+  "notif.activar": "Activar en este dispositivo",
+  "notif.probar": "Enviarme una de prueba",
+  "notif.desactivar": "Desactivar en este dispositivo",
+  "notif.sinSoporte": "Este navegador no soporta notificaciones.",
+  "notif.iosEstado": "En iPhone, primero agregá Vitalis a la pantalla de inicio: tocá <b>Compartir</b> → <b>Agregar a inicio</b>, y abrilo desde ahí.",
+  "notif.iosError": "En iPhone hay que agregar Vitalis a la pantalla de inicio primero: tocá Compartir → 'Agregar a inicio', abrilo desde ahí y volvé a intentar.",
+  "notif.bloqueadas": "Bloqueaste las notificaciones para este sitio. Habilitalas desde la configuración del navegador y recargá.",
+  "notif.activadas": "✅ Activadas en este dispositivo.",
+  "notif.noActivadas": "No están activadas en este dispositivo.",
+  "notif.activando": "Activando...",
+  "notif.enviando": "Enviando...",
+  "notif.enviada": "Enviada — mirá tus notificaciones",
+  "notif.sinConfigurar": "Las notificaciones no están configuradas en el servidor.",
+  "notif.sinPermiso": "No diste permiso para las notificaciones. Podés habilitarlo desde la configuración del navegador.",
+  "notif.errActivar": "No se pudo activar",
+  "notif.errEnviar": "No se pudo enviar",
+});

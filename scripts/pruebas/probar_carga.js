@@ -132,6 +132,14 @@ const pantallas = [
   ["pestañas del Kardex", `tabsKardexPara("odontologia")`],
   ["tipos de recordatorio", `tiposRecordatorio()`],
   ["sugerencias del asistente", `sugerenciasAsistente()`],
+  ["Vitalis Voice", `pintarVozEscritorio([{ _id: "c1", pacienteNombre: "Juan", fecha: new Date().toISOString(), estado: "confirmada", motivo: "Control" }])`],
+  ["indicaciones", `pintarIndicacionesEscritorio([{ _id: "r1", fecha: new Date().toISOString(), pacienteId: { _id: "p1", nombre: "Juan" }, medicamentos: [{ nombre: "Amoxicilina" }], indicaciones: "Reposo" }])`],
+  ["estudios (escritorio)", `pintarEstudiosEscritorio([{ _id: "e1", nombre: "Radiografía", tipo: "radiografia", fecha: new Date().toISOString(), pacienteId: { _id: "p1", nombre: "Juan" } }])`],
+  ["reportes", `pintarReportesEscritorio({ totalConsultas: 10, porcentajeConsultasCompletadas: 80, totalCitas: 12, citasCanceladas: 1, consultasPorMes: {}, citasPorMes: {}, pacientesNuevosPorMes: {} })`],
+  ["finanzas", `pintarFinanzasEscritorio({ totalFacturado: 1500, totalCobrado: 900.5, saldoPendiente: 599.5, cantidadPlanes: 3, pagosRecientes: [{ pacienteNombre: "Juan", tratamiento: "Corona", fecha: new Date().toISOString(), monto: 300 }] })`],
+  ["notificaciones", `app.innerHTML = notificacionesHtml()`],
+  ["moneda", `money(1234.5)`],
+  ["estados de tratamiento", `estadoTratamientoInfo()`],
 ];
 
 for (const idioma of ["es", "pt"]) {
