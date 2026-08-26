@@ -46,6 +46,9 @@ const PRECIO_CONSULTA = Number(process.env.PRECIO_CONSULTA_CENTAVOS || 1200);
 const LIMITE_NEGATIVO = -5 * PRECIO_CONSULTA;
 // Desde cuántas consultas restantes se le empieza a avisar.
 const AVISAR_DESDE = 5;
+// Recarga mínima. Es una regla comercial —no tiene sentido procesar a mano
+// una transferencia de Bs 20— pero NO es un bloqueo absoluto: ver cargar().
+const RECARGA_MINIMA = Number(process.env.RECARGA_MINIMA_CENTAVOS || 10000);
 
 function bolivianos(centavos) {
   return (centavos / 100).toFixed(2);
@@ -69,6 +72,7 @@ async function estadoDe(medicoPhone) {
     // Si ya no puede ni empezar otra consulta.
     bloqueado: saldoCentavos <= LIMITE_NEGATIVO,
     limiteNegativoCentavos: LIMITE_NEGATIVO,
+    recargaMinimaCentavos: RECARGA_MINIMA,
   };
 }
 
@@ -142,10 +146,25 @@ function claveDeReferencia(referencia) {
 // editor de imágenes, y el operador que la mira no tiene cómo notarlo. Lo
 // único que prueba que el dinero entró es verlo en el extracto o en la app
 // del banco. Esto el código no lo puede garantizar: es del procedimiento.
-async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, concepto }) {
+async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, concepto, permitirMenorAlMinimo }) {
   const monto = Math.round(Number(montoCentavos));
   if (!Number.isFinite(monto) || monto <= 0) throw new Error("El monto a cargar tiene que ser un número positivo");
   if (!acreditadoPor) throw new Error("Falta quién acredita la carga");
+
+  // El mínimo frena, pero no es absoluto, y la diferencia importa: si el
+  // médico transfirió menos igual, LA PLATA YA ESTÁ EN LA CUENTA DEL BANCO.
+  // Negarse a acreditarla no le enseña la regla — es quedarse con su dinero.
+  // Por eso el operador puede pasar por encima a propósito, y queda escrito
+  // en el concepto del movimiento que fue una excepción.
+  if (monto < RECARGA_MINIMA && !permitirMenorAlMinimo) {
+    const e = new Error(
+      `La recarga mínima es Bs ${bolivianos(RECARGA_MINIMA)} y esta es de Bs ${bolivianos(monto)}.`
+    );
+    e.codigo = "menor_al_minimo";
+    e.minimoCentavos = RECARGA_MINIMA;
+    throw e;
+  }
+
   // Sin referencia no hay contra qué comparar, y el índice único no puede
   // atajar nada: una carga sin comprobante se puede repetir infinitas veces
   // sin que el sistema lo note. Por eso es obligatoria, incluso en efectivo
@@ -171,9 +190,10 @@ async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, c
     }
   }
 
+  const bajoMinimo = monto < RECARGA_MINIMA;
   const mov = await aplicar({
     medicoPhone, tipo: "carga", montoCentavos: monto,
-    concepto: concepto || `Carga de Bs ${bolivianos(monto)}`,
+    concepto: concepto || `Carga de Bs ${bolivianos(monto)}${bajoMinimo ? " (bajo el mínimo, autorizada)" : ""}`,
     acreditadoPor, referencia, referenciaClave,
   });
   log.info(`[SALDO] carga de Bs ${bolivianos(monto)} a ${medicoPhone} por ${acreditadoPor} [${referencia || "sin referencia"}] — queda Bs ${bolivianos(mov.saldoDespuesCentavos)}`);
@@ -247,5 +267,5 @@ async function reconciliar(medicoPhone, { corregir = false } = {}) {
 
 module.exports = {
   estadoDe, movimientosDe, cargar, cobrarConsulta, ajustar, reconciliar, claveDeReferencia,
-  bolivianos, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE,
+  bolivianos, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE, RECARGA_MINIMA,
 };

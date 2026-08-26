@@ -53,7 +53,7 @@ async function pintarSaldo() {
           ${s.enNegativo ? t("saldo.avisoNegativo") : t("saldo.avisoBajo", { n: s.consultasRestantes })}
         </div>` : ""}
 
-      <div class="hint" style="margin:12px 0 0">${t("saldo.comoCargar")}</div>
+      <div class="hint" style="margin:12px 0 0">${t("saldo.comoCargar", { minimo: ((s.recargaMinimaCentavos || 0) / 100).toFixed(2) })}</div>
 
       ${(s.movimientos || []).length ? `
         <button class="link" id="btnVerMovimientos" style="width:auto;margin-top:10px">${t("saldo.verMovimientos")}</button>

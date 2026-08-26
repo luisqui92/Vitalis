@@ -8,6 +8,10 @@
 //   node scripts/cargar_saldo.js <telefono> <bolivianos> "<referencia>"
 //   node scripts/cargar_saldo.js 76660555 200 "QR BCP 4471-2290"
 //
+//   Con --igual acredita un monto menor al mínimo. Es a propósito: si el
+//   médico transfirió menos igual, la plata YA está en la cuenta del banco y
+//   negarse a acreditarla es quedársela.
+//
 //   node scripts/cargar_saldo.js <telefono>              (ver saldo y últimos movimientos)
 //   node scripts/cargar_saldo.js --revisar               (buscar descuadres en todas)
 //
@@ -121,6 +125,11 @@ async function main() {
   console.log("");
   console.log("   ⚠️  ¿Viste este pago en el BANCO, no solo en la captura que te mandaron?");
   console.log("      Una captura de pantalla se falsifica en dos minutos.");
+  if (Math.round(monto * 100) < saldos.RECARGA_MINIMA && process.argv.includes("--igual")) {
+    console.log("");
+    console.log(`   ℹ️  Está bajo el mínimo de Bs ${saldos.bolivianos(saldos.RECARGA_MINIMA)} — va como excepción,`);
+    console.log("      y así queda anotado en el movimiento.");
+  }
   const ok = await preguntar('\nEscribí SI para confirmar: ');
   if (ok !== "SI") {
     console.log("Cancelado. No se movió nada.");
@@ -135,8 +144,23 @@ async function main() {
       montoCentavos: Math.round(monto * 100),
       acreditadoPor: quien,
       referencia,
+      permitirMenorAlMinimo: process.argv.includes("--igual"),
     });
   } catch (e) {
+    if (e.codigo === "menor_al_minimo") {
+      console.error(`\n⚠️  ${e.message}`);
+      console.error("");
+      console.error("   No se acreditó nada todavía. Pero pensá esto antes de rechazarlo:");
+      console.error("   si el médico ya transfirió, esa plata está en tu cuenta del banco.");
+      console.error("   No acreditársela no le enseña la regla — es quedarte con su dinero.");
+      console.error("");
+      console.error("   Si el pago entró y lo vas a acreditar igual:");
+      console.error(`     node scripts/cargar_saldo.js ${phone} ${monto} "${referencia}" --igual`);
+      console.error("");
+      console.error("   Si todavía no transfirió, decile que el mínimo es Bs " + saldos.bolivianos(e.minimoCentavos) + ".");
+      await mongoose.disconnect();
+      process.exit(1);
+    }
     if (e.codigo === "referencia_repetida") {
       console.error(`\n❌ ${e.message}`);
       console.error("");

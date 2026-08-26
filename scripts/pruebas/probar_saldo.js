@@ -11,6 +11,7 @@
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
 process.env.PRECIO_CONSULTA_CENTAVOS = "1200";
+process.env.RECARGA_MINIMA_CENTAVOS = "10000";
 
 const path = require("path");
 const RAIZ = path.join(__dirname, "..", "..");
@@ -81,7 +82,7 @@ async function main() {
   verificar("la carga guarda quién la acreditó", carga.acreditadoPor === "luis");
   verificar("  ...y contra qué comprobante", carga.referencia === "QR BCP 4471");
   let rechazada = false;
-  try { await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, referencia: "x" }); } catch { rechazada = true; }
+  try { await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, referencia: "x", permitirMenorAlMinimo: true }); } catch { rechazada = true; }
   verificar("una carga sin quién la acredita se rechaza", rechazada);
   rechazada = false;
   try { await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: -5000, acreditadoPor: "luis" }); } catch { rechazada = true; }
@@ -130,7 +131,7 @@ async function main() {
 
   console.log("\n── 7. Aviso de saldo bajo, antes de que se acabe ──");
   const beto = "70000002";
-  await saldos.cargar({ medicoPhone: beto, montoCentavos: 6000, acreditadoPor: "luis", referencia: "EFECTIVO 2026-08-26 recibido por Luis" });
+  await saldos.cargar({ medicoPhone: beto, montoCentavos: 6000, acreditadoPor: "luis", referencia: "EFECTIVO 2026-08-26 recibido por Luis", permitirMenorAlMinimo: true });
   e = await saldos.estadoDe(beto);
   verificar("con Bs 60 le quedan 5 consultas", e.consultasRestantes === 5);
   verificar("  ...y ya se le avisa", e.bajo === true);
@@ -174,6 +175,31 @@ async function main() {
   await saldos.ajustar({ medicoPhone: beto, montoCentavos: 1200, concepto: "Consulta 4471 no se transcribió, se devuelve", acreditadoPor: "luis" });
   verificar("con motivo sí se aplica", (await saldos.estadoDe(beto)).saldoCentavos === 5200);
 
+  console.log("\n── 11b. La recarga mínima ──");
+  let bajoMinimo = null;
+  try {
+    await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "QR chico 001" });
+  } catch (err) { bajoMinimo = err; }
+  verificar("una recarga de Bs 50 se frena", bajoMinimo?.codigo === "menor_al_minimo");
+  verificar("  ...diciendo cuál es el mínimo", /Bs 100\.00/.test(bajoMinimo?.message || ""));
+  verificar("  ...y no se acreditó nada", await MovimientoSaldo.countDocuments({ referenciaClave: "QR CHICO 001" }) === 0);
+
+  // Pero el operador puede acreditarla igual, y ésa es la parte que importa:
+  // si el médico ya transfirió, la plata está en el banco y no acreditarla es
+  // quedársela.
+  const antesExcepcion = (await saldos.estadoDe(ana.phone)).saldoCentavos;
+  const excepcion = await saldos.cargar({
+    medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis",
+    referencia: "QR chico 001", permitirMenorAlMinimo: true,
+  });
+  verificar("con la excepción sí se acredita", (await saldos.estadoDe(ana.phone)).saldoCentavos === antesExcepcion + 5000);
+  verificar("  ...y queda escrito que fue bajo el mínimo", /bajo el mínimo/.test(excepcion.concepto));
+
+  verificar("una recarga de exactamente Bs 100 pasa sin excepción",
+    Boolean(await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 10000, acreditadoPor: "luis", referencia: "QR justo 100" })));
+  verificar("el estado le dice al médico cuál es el mínimo",
+    (await saldos.estadoDe(ana.phone)).recargaMinimaCentavos === 10000);
+
   console.log("\n── 12b. La misma transferencia NO se acredita dos veces ──");
   // El caso más probable de todos: el médico manda el mismo comprobante otra
   // vez porque no le llegó la confirmación, y el operador —que ve dos
@@ -206,11 +232,11 @@ async function main() {
 
   // Y una carga sin referencia no se acepta: sin ella el índice no ataja nada.
   let sinRef = false;
-  try { await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "  " }); } catch { sinRef = true; }
+  try { await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "  ", permitirMenorAlMinimo: true }); } catch { sinRef = true; }
   verificar("una carga sin referencia se rechaza", sinRef);
 
   // Una transferencia distinta sí entra.
-  await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "QR BCP 9988-1123" });
+  await saldos.cargar({ medicoPhone: ana.phone, montoCentavos: 5000, acreditadoPor: "luis", referencia: "QR BCP 9988-1123", permitirMenorAlMinimo: true });
   verificar("otra referencia sí se acredita", (await saldos.estadoDe(ana.phone)).saldoCentavos === antesDelIntento + 5000);
 
   console.log("\n── 12. Los movimientos cuadran con el saldo ──");

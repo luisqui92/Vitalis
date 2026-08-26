@@ -7,7 +7,7 @@ Object.assign(I18N.pt, {
   "saldo.precio": "Cada consulta transcrita desconta R$ {monto}. Só é cobrada se a transcrição deu certo.",
   "saldo.avisoBajo": "Restam {n} consulta(s). Vale recarregar antes que acabe.",
   "saldo.avisoNegativo": "Seu saldo está negativo. As consultas continuam sendo transcritas, mas convém regularizar.",
-  "saldo.comoCargar": "Para recarregar, faça a transferência ou pague por QR e nos envie o comprovante. O saldo entra assim que recebermos.",
+  "saldo.comoCargar": "Para recarregar, faça a transferência ou pague por QR e nos envie o comprovante. A recarga mínima é R$ {minimo}. O saldo entra assim que recebermos.",
   "saldo.verMovimientos": "Ver movimentações",
   "saldo.ocultarMovimientos": "Ocultar movimentações",
   "saldo.sinMovimientos": "Ainda não há movimentações na sua conta.",
