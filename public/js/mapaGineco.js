@@ -4,41 +4,46 @@
 // y el mapa ocular: se toca, se carga qué se encontró, y queda la línea de
 // tiempo de cómo fue cambiando.
 
-const HALLAZGOS_GINECO_INFO = {
-  normal:        { label: "Normal",         icono: "🟢", color: "#15803d" },
-  mioma:         { label: "Mioma",          icono: "🔴", color: "#b91c1c" },
-  quiste:        { label: "Quiste",         icono: "🔵", color: "#2563eb" },
-  polipo:        { label: "Pólipo",         icono: "🟣", color: "#7c3aed" },
-  endometriosis: { label: "Endometriosis",  icono: "🟤", color: "#9a3412" },
-  inflamacion:   { label: "Inflamación",    icono: "🟠", color: "#ea580c" },
-  engrosamiento: { label: "Engrosamiento",  icono: "🟡", color: "#ca8a04" },
-  nodulo:        { label: "Nódulo",         icono: "🟥", color: "#be123c" },
-  lesion:        { label: "Lesión",         icono: "⚠️", color: "#a16207" },
-  ausente:       { label: "Ausente",        icono: "⚪", color: "#5b7480" },
+// Ícono y color no cambian con el idioma; el nombre sí, y se resuelve al
+// llamar porque este archivo se carga antes del login.
+const HALLAZGOS_GINECO_ESTILO = {
+  normal:        { icono: "🟢", color: "#15803d" },
+  mioma:         { icono: "🔴", color: "#b91c1c" },
+  quiste:        { icono: "🔵", color: "#2563eb" },
+  polipo:        { icono: "🟣", color: "#7c3aed" },
+  endometriosis: { icono: "🟤", color: "#9a3412" },
+  inflamacion:   { icono: "🟠", color: "#ea580c" },
+  engrosamiento: { icono: "🟡", color: "#ca8a04" },
+  nodulo:        { icono: "🟥", color: "#be123c" },
+  lesion:        { icono: "⚠️", color: "#a16207" },
+  ausente:       { icono: "⚪", color: "#5b7480" },
 };
+function hallazgosGinecoInfo() {
+  const salida = {};
+  for (const k of Object.keys(HALLAZGOS_GINECO_ESTILO)) salida[k] = { ...HALLAZGOS_GINECO_ESTILO[k], label: t("hall." + k) };
+  return salida;
+}
 
-const ORGANOS_GINECO_INFO = {
-  utero:           "Útero",
-  endometrio:      "Endometrio",
-  cuello_uterino:  "Cuello uterino",
-  ovario_derecho:  "Ovario derecho",
-  ovario_izquierdo:"Ovario izquierdo",
-  trompa_derecha:  "Trompa derecha",
-  trompa_izquierda:"Trompa izquierda",
-  mama_derecha:    "Mama derecha",
-  mama_izquierda:  "Mama izquierda",
-};
+const ORGANOS_GINECO_CLAVES = [
+  "utero", "endometrio", "cuello_uterino", "ovario_derecho", "ovario_izquierdo",
+  "trompa_derecha", "trompa_izquierda", "mama_derecha", "mama_izquierda",
+];
+function organosGineco() {
+  const salida = {};
+  for (const k of ORGANOS_GINECO_CLAVES) salida[k] = t("organo." + k);
+  return salida;
+}
 
 async function renderTabMapaGineco(pacienteId) {
   const box = document.getElementById("mapaGinecoBox");
   if (!box) return;
-  box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando mapa ginecológico...</div>`;
+  box.innerHTML = `<div class="loading"><div class="spinner"></div>${t("gin.cargando")}</div>`;
   try {
     const data = await api(`/medico/pacientes/${pacienteId}/examen-ginecologico`);
     pintarMapaGineco(pacienteId, data.examen);
   } catch (e) {
     if (e.status === 401) return logout();
-    box.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar el mapa ginecológico")}</div>`;
+    box.innerHTML = `<div class="error">${esc(e.error || t("gin.errCargar"))}</div>`;
   }
 }
 
@@ -46,7 +51,8 @@ async function renderTabMapaGineco(pacienteId) {
 // centro, el endometrio como su cavidad interna, el cuello colgando abajo,
 // y las trompas saliendo de los cuernos hacia cada ovario.
 function aparatoSvgHtml(porOrgano) {
-  const color = (o) => (HALLAZGOS_GINECO_INFO[porOrgano[o]?.hallazgo || "normal"] || HALLAZGOS_GINECO_INFO.normal).color;
+  // Solo el color: para pintar el esquema no hace falta el nombre traducido.
+  const color = (o) => HALLAZGOS_GINECO_ESTILO[porOrgano[o]?.hallazgo || "normal"]?.color || HALLAZGOS_GINECO_ESTILO.normal.color;
   const marcado = (o) => (porOrgano[o]?.hallazgo || "normal") !== "normal";
   const g = (o, contenido) => `<g class="organo-gineco" data-organo="${o}" style="cursor:pointer">${contenido}</g>`;
   // Un anillo alrededor de lo que no está normal, para que salte a la vista
@@ -89,12 +95,12 @@ function aparatoSvgHtml(porOrgano) {
         ${halo("cuello_uterino", 170, 218, 26)}`)}
 
       <!-- etiquetas -->
-      <text x="56" y="146" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Ovario izq.</text>
-      <text x="284" y="146" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Ovario der.</text>
-      <text x="170" y="152" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Útero</text>
-      <text x="170" y="256" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Cuello</text>
-      <text x="97" y="64" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Trompa izq.</text>
-      <text x="243" y="64" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Trompa der.</text>
+      <text x="56" y="146" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.ovarioIzq")}</text>
+      <text x="284" y="146" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.ovarioDer")}</text>
+      <text x="170" y="152" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.utero")}</text>
+      <text x="170" y="256" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.cuello")}</text>
+      <text x="97" y="64" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.trompaIzq")}</text>
+      <text x="243" y="64" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.trompaDer")}</text>
     </svg>`;
 }
 
@@ -102,18 +108,19 @@ function aparatoSvgHtml(porOrgano) {
 // tendría sentido anatómico, pero el examen mamario sí es parte del control
 // ginecológico, así que viven en el mismo mapa.
 function mamasSvgHtml(porOrgano) {
-  const color = (o) => (HALLAZGOS_GINECO_INFO[porOrgano[o]?.hallazgo || "normal"] || HALLAZGOS_GINECO_INFO.normal).color;
+  // Solo el color: para pintar el esquema no hace falta el nombre traducido.
+  const color = (o) => HALLAZGOS_GINECO_ESTILO[porOrgano[o]?.hallazgo || "normal"]?.color || HALLAZGOS_GINECO_ESTILO.normal.color;
   const g = (o, contenido) => `<g class="organo-gineco" data-organo="${o}" style="cursor:pointer">${contenido}</g>`;
   return `
     <svg viewBox="0 0 220 130" style="width:100%;max-width:230px;height:auto">
       ${g("mama_izquierda", `
         <circle cx="62" cy="62" r="42" fill="${color("mama_izquierda")}" fill-opacity="0.35" stroke="${color("mama_izquierda")}" stroke-width="3"/>
         <circle cx="62" cy="62" r="7" fill="${color("mama_izquierda")}"/>
-        <text x="62" y="120" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Mama izq.</text>`)}
+        <text x="62" y="120" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.mamaIzq")}</text>`)}
       ${g("mama_derecha", `
         <circle cx="158" cy="62" r="42" fill="${color("mama_derecha")}" fill-opacity="0.35" stroke="${color("mama_derecha")}" stroke-width="3"/>
         <circle cx="158" cy="62" r="7" fill="${color("mama_derecha")}"/>
-        <text x="158" y="120" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">Mama der.</text>`)}
+        <text x="158" y="120" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.mamaDer")}</text>`)}
     </svg>`;
 }
 
@@ -131,25 +138,25 @@ function pintarMapaGineco(pacienteId, examen) {
 
   box.innerHTML = `
     <div class="card" style="text-align:center">
-      <div class="seccion-titulo" style="margin-top:0;text-align:left">🩺 Mapa ginecológico</div>
+      <div class="seccion-titulo" style="margin-top:0;text-align:left">${t("gin.titulo")}</div>
       <div class="hint" style="text-align:left;margin-bottom:10px">
         Tocá cualquier órgano para cargar el hallazgo y ver su historial. Lo que aparece
         "🎙️ por voz" viene de una consulta grabada — revisalo y corregilo si hace falta.
       </div>
       ${aparatoSvgHtml(porOrgano)}
-      <div class="seccion-titulo" style="text-align:left;margin-top:16px">Mamas</div>
+      <div class="seccion-titulo" style="text-align:left;margin-top:16px">${t("gin.mamas")}</div>
       ${mamasSvgHtml(porOrgano)}
       <div class="odonto-leyenda">
         ${usados.map(k => {
-          const v = HALLAZGOS_GINECO_INFO[k];
-          return `<span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.color}"></i>${v.label}</span>`;
+          const v = hallazgosGinecoInfo()[k];
+          return `<span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.color}"></i>${esc(v.label)}</span>`;
         }).join("")}
       </div>
       ${conHallazgo.length ? `
         <div class="hint" style="text-align:left;margin-top:10px">
-          <b>Hallazgos:</b> ${conHallazgo.map(o => esc(`${ORGANOS_GINECO_INFO[o.organo]}: ${HALLAZGOS_GINECO_INFO[o.hallazgo].label}`)).join(" · ")}
+          <b>${t("gin.hallazgosTitulo")}</b> ${conHallazgo.map(o => esc(`${organosGineco()[o.organo]}: ${hallazgosGinecoInfo()[o.hallazgo].label}`)).join(" · ")}
         </div>` : `
-        <div class="hint" style="text-align:left;margin-top:10px">Sin hallazgos cargados — todo normal.</div>`}
+        <div class="hint" style="text-align:left;margin-top:10px">${t("gin.sinHallazgos")}</div>`}
     </div>
     <div id="organoDetalleBox"></div>`;
 
@@ -160,30 +167,31 @@ function pintarMapaGineco(pacienteId, examen) {
 
 function pintarDetalleOrgano(pacienteId, item) {
   const box = document.getElementById("organoDetalleBox");
-  const nombre = ORGANOS_GINECO_INFO[item.organo] || item.organo;
+  const nombre = organosGineco()[item.organo] || item.organo;
 
   box.innerHTML = `
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${esc(nombre)}</div>
-      <label>Hallazgo</label>
+      <label>${t("gin.hallazgo")}</label>
       <select id="ginHallazgo">
-        ${Object.entries(HALLAZGOS_GINECO_INFO).map(([k, v]) => `<option value="${k}" ${k === item.hallazgo ? "selected" : ""}>${v.icono} ${v.label}</option>`).join("")}
+        ${Object.entries(hallazgosGinecoInfo()).map(([k, v]) => `<option value="${k}" ${k === item.hallazgo ? "selected" : ""}>${v.icono} ${esc(v.label)}</option>`).join("")}
       </select>
-      <label>Notas / detalle</label>
-      <textarea id="ginNotas" rows="2" placeholder="Tamaño, ubicación, características...">${esc(item.notas || "")}</textarea>
+      <label>${t("gin.notas")}</label>
+      <textarea id="ginNotas" rows="2" placeholder="${t("gin.notasPlaceholder")}">${esc(item.notas || "")}</textarea>
       <div id="ginErr"></div>
-      <button class="primary" id="btnGuardarOrgano">Guardar</button>
+      <button class="primary" id="btnGuardarOrgano">${t("gin.guardar")}</button>
 
       ${item.historial?.length ? `
-        <div class="seccion-titulo" style="margin-top:18px">Historial</div>
+        <div class="seccion-titulo" style="margin-top:18px">${t("gin.historial")}</div>
         <div class="odonto-timeline">
           ${[...item.historial].reverse().map(h => {
-            const info = HALLAZGOS_GINECO_INFO[h.hallazgo] || HALLAZGOS_GINECO_INFO.normal;
+            const hallazgos = hallazgosGinecoInfo();
+            const info = hallazgos[h.hallazgo] || hallazgos.normal;
             return `
               <div class="odonto-timeline-item">
                 <div class="odonto-timeline-icono" style="background:${info.color}">${info.icono}</div>
                 <div class="odonto-timeline-contenido">
-                  <div class="odonto-timeline-fecha">${new Date(h.fecha).toLocaleDateString("es-BO")}${h.fuente === "voz" ? " · 🎙️ por voz" : ""}</div>
+                  <div class="odonto-timeline-fecha">${new Date(h.fecha).toLocaleDateString(localeActual())}${h.fuente === "voz" ? t("porVoz") : ""}</div>
                   <div class="odonto-timeline-titulo">${esc(info.label)}</div>
                   ${h.notas ? `<div class="odonto-timeline-notas">${esc(h.notas)}</div>` : ""}
                 </div>
@@ -209,7 +217,7 @@ function pintarDetalleOrgano(pacienteId, item) {
       renderTabMapaGineco(pacienteId);
     } catch (e) {
       btn.disabled = false;
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("gin.errGuardar"))}</div>`;
     }
   };
 }

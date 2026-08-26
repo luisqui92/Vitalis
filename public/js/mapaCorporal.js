@@ -7,18 +7,29 @@
 // Pero cada marca se autoetiqueta con la región anatómica en la que cayó,
 // así el dato tiene además un nombre clínico con el que buscar y dictar.
 
-const ESTADOS_LESION_INFO = {
-  activa:         { label: "Activa",          color: "#c0392b" },
-  en_tratamiento: { label: "En tratamiento",  color: "#c9944f" },
-  resuelta:       { label: "Resuelta",        color: "#4a7d54" },
+const ESTADOS_LESION_COLOR = {
+  activa:         "#c0392b",
+  en_tratamiento: "#c9944f",
+  resuelta:       "#4a7d54",
 };
+function estadosLesionInfo() {
+  const salida = {};
+  for (const k of Object.keys(ESTADOS_LESION_COLOR)) salida[k] = { color: ESTADOS_LESION_COLOR[k], label: t("lesion." + k) };
+  return salida;
+}
 
-const REGIONES_CORPORALES_INFO = {
-  hocico: "Hocico", cabeza: "Cabeza", cuello: "Cuello", dorso: "Dorso",
-  torax: "Tórax", abdomen: "Abdomen", grupa: "Grupa", cola: "Cola",
-  miembro_anterior: "Miembro anterior", miembro_posterior: "Miembro posterior",
-  otra: "Otra zona",
-};
+// Las claves son las que se guardan en la base; el nombre se traduce al
+// mostrarlo. Prefijo "regionCorp." para no confundirlas con las regiones
+// FACIALES de tratamientos.js, que usan "region.".
+const REGIONES_CORPORALES_CLAVES = [
+  "hocico", "cabeza", "cuello", "dorso", "torax", "abdomen", "grupa", "cola",
+  "miembro_anterior", "miembro_posterior", "otra",
+];
+function regionesCorporales() {
+  const salida = {};
+  for (const k of REGIONES_CORPORALES_CLAVES) salida[k] = t("regionCorp." + k);
+  return salida;
+}
 
 // Regiones como rectángulos sobre el lienzo de 400x260 de la silueta, en
 // porcentaje. Gana la primera que contiene al punto, así que el orden
@@ -80,13 +91,13 @@ function siluetaAnimalSvg() {
 async function renderTabMapaCorporal(pacienteId) {
   const box = document.getElementById("mapaCorporalBox");
   if (!box) return;
-  box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando mapa corporal...</div>`;
+  box.innerHTML = `<div class="loading"><div class="spinner"></div>${t("cor.cargando")}</div>`;
   try {
     const data = await api(`/medico/pacientes/${pacienteId}/mapa-corporal`);
     pintarMapaCorporal(pacienteId, data.mapa);
   } catch (e) {
     if (e.status === 401) return logout();
-    box.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar el mapa corporal")}</div>`;
+    box.innerHTML = `<div class="error">${esc(e.error || t("cor.errCargar"))}</div>`;
   }
 }
 
@@ -99,21 +110,22 @@ function pintarMapaCorporal(pacienteId, mapa) {
 
   box.innerHTML = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">🐾 Mapa corporal</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("cor.titulo")}</div>
       <div class="hint" style="margin-bottom:10px">
         Tocá la silueta donde está la lesión para marcarla. Tocá una marca existente para ver su evolución.
       </div>
 
       <div class="tabs" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
-        <button class="tab ${mapaLadoActivo === "izquierdo" ? "activo" : ""}" data-lado="izquierdo">Lado izquierdo</button>
-        <button class="tab ${mapaLadoActivo === "derecho" ? "activo" : ""}" data-lado="derecho">Lado derecho</button>
+        <button class="tab ${mapaLadoActivo === "izquierdo" ? "activo" : ""}" data-lado="izquierdo">${t("cor.ladoIzq")}</button>
+        <button class="tab ${mapaLadoActivo === "derecho" ? "activo" : ""}" data-lado="derecho">${t("cor.ladoDer")}</button>
       </div>
 
       <svg id="mapaCorporalSvg" viewBox="0 0 400 260"
            style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto;cursor:crosshair;touch-action:manipulation${mapaLadoActivo === "derecho" ? ";transform:scaleX(-1)" : ""}">
         ${siluetaAnimalSvg()}
         ${deEsteLado.map(l => {
-          const info = ESTADOS_LESION_INFO[l.estado] || ESTADOS_LESION_INFO.activa;
+          // Solo el color: para pintar el punto no hace falta el nombre.
+          const info = { color: ESTADOS_LESION_COLOR[l.estado] || ESTADOS_LESION_COLOR.activa };
           const cx = (l.x / 100) * 400, cy = (l.y / 100) * 260;
           return `
             <g class="lesion-marca" data-id="${l._id}" style="cursor:pointer">
@@ -124,8 +136,8 @@ function pintarMapaCorporal(pacienteId, mapa) {
       </svg>
 
       <div class="odonto-leyenda">
-        ${Object.entries(ESTADOS_LESION_INFO).map(([k, v]) => `
-          <span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.color}"></i>${v.label}</span>`).join("")}
+        ${Object.entries(estadosLesionInfo()).map(([k, v]) => `
+          <span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.color}"></i>${esc(v.label)}</span>`).join("")}
       </div>
       <div class="hint" style="margin-top:8px">
         ${mapa.lesiones.length === 0
@@ -176,37 +188,37 @@ function pintarFormularioLesion(pacienteId, x, y) {
   const box = document.getElementById("lesionDetalleBox");
   box.innerHTML = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Nueva lesión</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("cor.nuevaLesion")}</div>
       <div class="hint" style="margin-bottom:10px">
-        Zona detectada: <b>${esc(REGIONES_CORPORALES_INFO[region])}</b> · lado ${esc(mapaLadoActivo)}
+        ${t("cor.zonaDetectada", { zona: esc(regionesCorporales()[region]), lado: esc(mapaLadoActivo) })}
       </div>
-      <label>Qué es</label>
-      <input id="lesTitulo" type="text" placeholder="Ej: nódulo, herida, zona de alopecia">
-      <label>Descripción</label>
-      <textarea id="lesDesc" rows="2" placeholder="Aspecto, color, si duele, desde cuándo..."></textarea>
+      <label>${t("cor.queEs")}</label>
+      <input id="lesTitulo" type="text" placeholder="${t("cor.queEsPlaceholder")}">
+      <label>${t("cor.descripcion")}</label>
+      <textarea id="lesDesc" rows="2" placeholder="${t("cor.descripcionPlaceholder")}"></textarea>
       <div style="display:flex;gap:10px">
         <div style="flex:1">
-          <label>Tamaño (cm)</label>
-          <input id="lesTamano" type="number" step="0.1" min="0" placeholder="2.5">
+          <label>${t("cor.tamano")}</label>
+          <input id="lesTamano" type="number" step="0.1" min="0" placeholder="${t("cor.tamanoPlaceholder")}">
         </div>
         <div style="flex:1">
-          <label>Estado</label>
+          <label>${t("cor.estado")}</label>
           <select id="lesEstado">
-            ${Object.entries(ESTADOS_LESION_INFO).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}
+            ${Object.entries(estadosLesionInfo()).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("")}
           </select>
         </div>
       </div>
-      <label class="file-label" for="lesFoto">📷 Agregar foto (opcional)</label>
+      <label class="file-label" for="lesFoto">${t("cor.agregarFoto")}</label>
       <input type="file" id="lesFoto" accept="image/*" style="display:none">
       <div class="hint" id="lesFotoNombre"></div>
       <div id="lesErr"></div>
-      <button class="primary" id="btnGuardarLesion">Marcar lesión</button>
-      <button class="link" id="btnCancelarLesion">Cancelar</button>
+      <button class="primary" id="btnGuardarLesion">${t("cor.marcar")}</button>
+      <button class="link" id="btnCancelarLesion">${t("cor.cancelar")}</button>
     </div>`;
 
   document.getElementById("lesFoto").onchange = (e) => {
     const f = e.target.files[0];
-    document.getElementById("lesFotoNombre").textContent = f ? "Foto elegida: " + f.name : "";
+    document.getElementById("lesFotoNombre").textContent = f ? t("cor.fotoElegida", { nombre: f.name }) : "";
   };
   document.getElementById("btnCancelarLesion").onclick = () => { box.innerHTML = ""; };
 
@@ -215,9 +227,9 @@ function pintarFormularioLesion(pacienteId, x, y) {
     const btn = document.getElementById("btnGuardarLesion");
     errBox.innerHTML = "";
     const titulo = document.getElementById("lesTitulo").value.trim();
-    if (!titulo) { errBox.innerHTML = `<div class="error">Poné al menos qué es</div>`; return; }
+    if (!titulo) { errBox.innerHTML = `<div class="error">${t("cor.errFaltaTitulo")}</div>`; return; }
     btn.disabled = true;
-    btn.textContent = "Guardando...";
+    btn.textContent = t("cor.guardando");
     try {
       const estudioId = await subirFotoLesionSiHay(pacienteId, titulo);
       await api(`/medico/pacientes/${pacienteId}/mapa-corporal`, {
@@ -232,9 +244,9 @@ function pintarFormularioLesion(pacienteId, x, y) {
       });
       renderTabMapaCorporal(pacienteId);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("cor.errGuardar"))}</div>`;
       btn.disabled = false;
-      btn.textContent = "Marcar lesión";
+      btn.textContent = t("cor.marcar");
     }
   };
 }
@@ -249,7 +261,7 @@ async function subirFotoLesionSiHay(pacienteId, titulo) {
   // El Centro de Estudios exige nombre y fecha; sin la fecha responde 400.
   const hoy = new Date();
   const fecha = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  const data = await api(`/medico/pacientes/${pacienteId}/estudios?tipo=foto&fecha=${fecha}&nombre=${encodeURIComponent("Lesión: " + titulo)}`, {
+  const data = await api(`/medico/pacientes/${pacienteId}/estudios?tipo=foto&fecha=${fecha}&nombre=${encodeURIComponent(t("cor.tituloFoto", { titulo }))}`, {
     method: "POST", headers: { "Content-Type": archivo.type }, body: archivo,
   });
   return data.estudio?._id || null;
@@ -259,7 +271,8 @@ function pintarDetalleLesion(pacienteId, lesion) {
   if (!lesion) return;
   mapaLesionAbierta = String(lesion._id);
   const box = document.getElementById("lesionDetalleBox");
-  const info = ESTADOS_LESION_INFO[lesion.estado] || ESTADOS_LESION_INFO.activa;
+  const estadosLesion = estadosLesionInfo();
+  const info = estadosLesion[lesion.estado] || estadosLesion.activa;
   const historial = [...(lesion.historial || [])].reverse();
 
   // Si hay al menos dos controles con medida, se muestra cuánto cambió:
@@ -273,66 +286,68 @@ function pintarDetalleLesion(pacienteId, lesion) {
     const color = delta === 0 ? "var(--text-muted)" : delta > 0 ? "#c0392b" : "#4a7d54";
     evolucion = `
       <div class="hint" style="margin:8px 0 0">
-        Tamaño: ${primero.tamanoCm} cm (${new Date(primero.fecha).toLocaleDateString("es-BO")})
-        → <b style="color:${color}">${ultimo.tamanoCm} cm</b> (${new Date(ultimo.fecha).toLocaleDateString("es-BO")})
-        · <b style="color:${color}">${signo}${Math.round(delta * 10) / 10} cm</b>
+        ${t("cor.evolucionTamano", {
+          antes: primero.tamanoCm, fechaAntes: new Date(primero.fecha).toLocaleDateString(localeActual()),
+          ahora: ultimo.tamanoCm, fechaAhora: new Date(ultimo.fecha).toLocaleDateString(localeActual()),
+          delta: signo + (Math.round(delta * 10) / 10), color,
+        })}
       </div>`;
   }
 
   box.innerHTML = `
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">
-        ${esc(lesion.titulo || "Lesión")} · ${esc(REGIONES_CORPORALES_INFO[lesion.region] || lesion.region)}
+        ${esc(lesion.titulo || t("cor.lesion"))} · ${esc(regionesCorporales()[lesion.region] || lesion.region)}
       </div>
       <div class="hint">
-        <span style="color:${info.color};font-weight:700">${info.label}</span> · lado ${esc(lesion.lado)}
+        <span style="color:${info.color};font-weight:700">${esc(info.label)}</span>${t("cor.lado", { lado: esc(lesion.lado) })}
       </div>
       ${evolucion}
 
-      <div class="seccion-titulo" style="margin-top:16px">Agregar control</div>
-      <textarea id="ctrlDesc" rows="2" placeholder="Cómo está hoy..."></textarea>
+      <div class="seccion-titulo" style="margin-top:16px">${t("cor.agregarControl")}</div>
+      <textarea id="ctrlDesc" rows="2" placeholder="${t("cor.comoEsta")}"></textarea>
       <div style="display:flex;gap:10px">
         <div style="flex:1">
-          <label>Tamaño (cm)</label>
+          <label>${t("cor.tamano")}</label>
           <input id="ctrlTamano" type="number" step="0.1" min="0">
         </div>
         <div style="flex:1">
-          <label>Estado</label>
+          <label>${t("cor.estado")}</label>
           <select id="ctrlEstado">
-            ${Object.entries(ESTADOS_LESION_INFO).map(([k, v]) => `<option value="${k}" ${k === lesion.estado ? "selected" : ""}>${v.label}</option>`).join("")}
+            ${Object.entries(estadosLesion).map(([k, v]) => `<option value="${k}" ${k === lesion.estado ? "selected" : ""}>${esc(v.label)}</option>`).join("")}
           </select>
         </div>
       </div>
-      <label class="file-label" for="ctrlFoto">📷 Foto de este control (opcional)</label>
+      <label class="file-label" for="ctrlFoto">${t("cor.fotoControl")}</label>
       <input type="file" id="ctrlFoto" accept="image/*" style="display:none">
       <div class="hint" id="ctrlFotoNombre"></div>
       <div id="ctrlErr"></div>
-      <button class="secondary" id="btnGuardarControl">Guardar control</button>
+      <button class="secondary" id="btnGuardarControl">${t("cor.guardarControl")}</button>
 
-      <div class="seccion-titulo" style="margin-top:18px">Evolución</div>
+      <div class="seccion-titulo" style="margin-top:18px">${t("cor.evolucion")}</div>
       <div class="odonto-timeline">
         ${historial.map(h => `
           <div class="odonto-timeline-item">
-            <div class="odonto-timeline-icono" style="background:${(ESTADOS_LESION_INFO[h.estado] || info).color}">🐾</div>
+            <div class="odonto-timeline-icono" style="background:${(estadosLesion[h.estado] || info).color}">🐾</div>
             <div class="odonto-timeline-contenido">
               <div class="odonto-timeline-fecha">
-                ${new Date(h.fecha).toLocaleDateString("es-BO")}${h.fuente === "voz" ? " · 🎙️ por voz" : ""}
+                ${new Date(h.fecha).toLocaleDateString(localeActual())}${h.fuente === "voz" ? t("porVoz") : ""}
               </div>
               <div class="odonto-timeline-titulo">
-                ${esc((ESTADOS_LESION_INFO[h.estado] || info).label)}${h.tamanoCm != null ? ` · ${h.tamanoCm} cm` : ""}
+                ${esc((estadosLesion[h.estado] || info).label)}${h.tamanoCm != null ? ` · ${h.tamanoCm} cm` : ""}
               </div>
               ${h.descripcion ? `<div class="odonto-timeline-notas">${esc(h.descripcion)}</div>` : ""}
-              ${h.estudioId ? `<button class="link" data-foto-lesion="${h.estudioId}" style="margin:4px 0 0;width:auto">📷 Ver foto</button>` : ""}
+              ${h.estudioId ? `<button class="link" data-foto-lesion="${h.estudioId}" style="margin:4px 0 0;width:auto">${t("cor.verFoto")}</button>` : ""}
             </div>
           </div>`).join("")}
       </div>
 
-      <button class="link" id="btnBorrarLesion" style="color:var(--danger);margin-top:10px">Eliminar esta lesión</button>
+      <button class="link" id="btnBorrarLesion" style="color:var(--danger);margin-top:10px">${t("cor.eliminar")}</button>
     </div>`;
 
   document.getElementById("ctrlFoto").onchange = (e) => {
     const f = e.target.files[0];
-    document.getElementById("ctrlFotoNombre").textContent = f ? "Foto elegida: " + f.name : "";
+    document.getElementById("ctrlFotoNombre").textContent = f ? t("cor.fotoElegida", { nombre: f.name }) : "";
   };
 
   document.getElementById("btnGuardarControl").onclick = async () => {
@@ -340,9 +355,9 @@ function pintarDetalleLesion(pacienteId, lesion) {
     const btn = document.getElementById("btnGuardarControl");
     errBox.innerHTML = "";
     btn.disabled = true;
-    btn.textContent = "Guardando...";
+    btn.textContent = t("cor.guardando");
     try {
-      const estudioId = await subirFotoLesionSiHay(pacienteId, lesion.titulo || "control");
+      const estudioId = await subirFotoLesionSiHay(pacienteId, lesion.titulo || t("cor.control"));
       await api(`/medico/pacientes/${pacienteId}/mapa-corporal/${lesion._id}/control`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -354,9 +369,9 @@ function pintarDetalleLesion(pacienteId, lesion) {
       });
       renderTabMapaCorporal(pacienteId);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("cor.errGuardar"))}</div>`;
       btn.disabled = false;
-      btn.textContent = "Guardar control";
+      btn.textContent = t("cor.guardarControl");
     }
   };
 
@@ -365,7 +380,7 @@ function pintarDetalleLesion(pacienteId, lesion) {
   });
 
   document.getElementById("btnBorrarLesion").onclick = async () => {
-    if (!confirm("¿Eliminar esta lesión y todo su historial?")) return;
+    if (!confirm(t("cor.confirmarBorrar"))) return;
     await api(`/medico/pacientes/${pacienteId}/mapa-corporal/${lesion._id}`, { method: "DELETE" });
     mapaLesionAbierta = null;
     renderTabMapaCorporal(pacienteId);

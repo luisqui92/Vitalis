@@ -6,23 +6,31 @@
 // INDICADO pero todavía no se hizo. Las indicadas van con el mismo tono
 // que su tratamiento, en versión clara y con el borde punteado, para que
 // se distinga de un vistazo lo planificado de lo hecho.
-const ESTADOS_PIEZA_INFO = {
-  sano:                 { label: "Sano",                icono: "✅", color: "#ffffff", texto: "#0f2733", borde: "#c7d3da" },
-  caries:                { label: "Caries",               icono: "🦠", color: "#b91c1c", texto: "#fff" },
-  fractura:              { label: "Fractura",              icono: "💥", color: "#7c2d12", texto: "#fff" },
-  obturado:              { label: "Obturado",             icono: "🩹", color: "#2563eb", texto: "#fff" },
-  corona:                { label: "Corona",                icono: "👑", color: "#ca8a04", texto: "#fff" },
-  endodoncia:            { label: "Endodoncia",           icono: "💉", color: "#7c3aed", texto: "#fff" },
-  implante:              { label: "Implante",             icono: "🔩", color: "#15803d", texto: "#fff" },
-  sellante:              { label: "Sellante",             icono: "🛡️", color: "#06b6d4", texto: "#fff" },
-  ausente:               { label: "Ausente",              icono: "❌", color: "#5b7480", texto: "#fff" },
+// El color, el ícono y el borde NO cambian con el idioma: un rojo es un
+// rojo. Lo único que cambia es el nombre, y por eso sale de
+// estadosPiezaInfo() al llamar — este archivo se carga antes del login.
+const ESTADOS_PIEZA_ESTILO = {
+  sano:                 { icono: "✅", color: "#ffffff", texto: "#0f2733", borde: "#c7d3da" },
+  caries:                { icono: "🦠", color: "#b91c1c", texto: "#fff" },
+  fractura:              { icono: "💥", color: "#7c2d12", texto: "#fff" },
+  obturado:              { icono: "🩹", color: "#2563eb", texto: "#fff" },
+  corona:                { icono: "👑", color: "#ca8a04", texto: "#fff" },
+  endodoncia:            { icono: "💉", color: "#7c3aed", texto: "#fff" },
+  implante:              { icono: "🔩", color: "#15803d", texto: "#fff" },
+  sellante:              { icono: "🛡️", color: "#06b6d4", texto: "#fff" },
+  ausente:               { icono: "❌", color: "#5b7480", texto: "#fff" },
 
-  obturacion_indicada:   { label: "Obturación indicada",  icono: "🩹", color: "#93c5fd", texto: "#0b2559", borde: "#2563eb", punteado: true },
-  corona_indicada:       { label: "Corona indicada",      icono: "👑", color: "#fcd34d", texto: "#3d2900", borde: "#ca8a04", punteado: true },
-  endodoncia_indicada:   { label: "Endodoncia indicada",  icono: "💉", color: "#c4b5fd", texto: "#2a1065", borde: "#7c3aed", punteado: true },
-  implante_indicado:     { label: "Implante indicado",    icono: "🔩", color: "#86efac", texto: "#052e16", borde: "#15803d", punteado: true },
-  extraccion_indicada:   { label: "Extracción indicada",  icono: "⚠️", color: "#fdba74", texto: "#431407", borde: "#b45309", punteado: true },
+  obturacion_indicada:   { icono: "🩹", color: "#93c5fd", texto: "#0b2559", borde: "#2563eb", punteado: true },
+  corona_indicada:       { icono: "👑", color: "#fcd34d", texto: "#3d2900", borde: "#ca8a04", punteado: true },
+  endodoncia_indicada:   { icono: "💉", color: "#c4b5fd", texto: "#2a1065", borde: "#7c3aed", punteado: true },
+  implante_indicado:     { icono: "🔩", color: "#86efac", texto: "#052e16", borde: "#15803d", punteado: true },
+  extraccion_indicada:   { icono: "⚠️", color: "#fdba74", texto: "#431407", borde: "#b45309", punteado: true },
 };
+function estadosPiezaInfo() {
+  const salida = {};
+  for (const k of Object.keys(ESTADOS_PIEZA_ESTILO)) salida[k] = { ...ESTADOS_PIEZA_ESTILO[k], label: t("pieza." + k) };
+  return salida;
+}
 
 const FILA_SUPERIOR = [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28];
 const FILA_INFERIOR = [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38];
@@ -77,18 +85,20 @@ async function renderTabOdontograma(pacienteId) {
   destruirVista3DSiExiste();
   const box = document.getElementById("odontogramaBox");
   if (!box) return;
-  box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando odontograma...</div>`;
+  box.innerHTML = `<div class="loading"><div class="spinner"></div>${t("odo.cargando")}</div>`;
   try {
     const data = await api(`/medico/pacientes/${pacienteId}/odontograma`);
     pintarOdontograma(pacienteId, data.odontograma);
   } catch (e) {
     if (e.status === 401) return logout();
-    box.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar el odontograma")}</div>`;
+    box.innerHTML = `<div class="error">${esc(e.error || t("odo.errCargar"))}</div>`;
   }
 }
 
 function piezaSvgHtml(pieza, pos) {
-  const info = ESTADOS_PIEZA_INFO[pieza.estado] || ESTADOS_PIEZA_INFO.sano;
+  // Solo se usan color/borde/texto acá, así que alcanza el estilo: no hace
+  // falta resolver el nombre traducido para dibujar el diente.
+  const info = ESTADOS_PIEZA_ESTILO[pieza.estado] || ESTADOS_PIEZA_ESTILO.sano;
   // Lo más grande que entra en el arco sin que dos piezas se toquen.
   const w = 26, h = 30;
   return `
@@ -121,18 +131,18 @@ function pintarOdontograma(pacienteId, odontograma) {
 
   box.innerHTML = `
     <div class="card" style="text-align:center">
-      <div class="seccion-titulo" style="margin-top:0;text-align:left">🦷 Odontograma</div>
+      <div class="seccion-titulo" style="margin-top:0;text-align:left">${t("odo.titulo")}</div>
       <div class="tabs" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px">
-        <button class="tab ${vistaOdontograma === "2d" ? "activo" : ""}" id="btnVista2D">Vista 2D</button>
-        <button class="tab ${vistaOdontograma === "3d" ? "activo" : ""}" id="btnVista3D">Vista 3D</button>
+        <button class="tab ${vistaOdontograma === "2d" ? "activo" : ""}" id="btnVista2D">${t("odo.vista2d")}</button>
+        <button class="tab ${vistaOdontograma === "3d" ? "activo" : ""}" id="btnVista3D">${t("odo.vista3d")}</button>
       </div>
       <div id="odontograma2dBox" style="display:${vistaOdontograma === "2d" ? "block" : "none"}">
         <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto">${svgPiezas}</svg>
       </div>
       <div id="odontograma3dBox" style="display:${vistaOdontograma === "3d" ? "block" : "none"};min-height:220px"></div>
       <div class="odonto-leyenda">
-        ${Object.entries(ESTADOS_PIEZA_INFO).map(([k, v]) => `
-          <span class="odonto-leyenda-item"><i style="background:${v.color};border:${v.punteado ? "1.5px dashed" : "1px solid"} ${v.borde || v.color}"></i>${v.label}</span>`).join("")}
+        ${Object.entries(estadosPiezaInfo()).map(([k, v]) => `
+          <span class="odonto-leyenda-item"><i style="background:${v.color};border:${v.punteado ? "1.5px dashed" : "1px solid"} ${v.borde || v.color}"></i>${esc(v.label)}</span>`).join("")}
       </div>
     </div>
     <div id="piezaDetalleBox"></div>`;
@@ -158,16 +168,16 @@ function pintarOdontograma(pacienteId, odontograma) {
 async function montarVista3D(pacienteId, porNumero) {
   const contenedor = document.getElementById("odontograma3dBox");
   if (!contenedor) return;
-  contenedor.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando modelo 3D...</div>`;
+  contenedor.innerHTML = `<div class="loading"><div class="spinner"></div>${t("odo.cargando3d")}</div>`;
   try {
     const { montarOdontograma3D } = await import("/js/odontograma3d.js");
     contenedor.innerHTML = "";
-    const coloresPorEstado = Object.fromEntries(Object.entries(ESTADOS_PIEZA_INFO).map(([k, v]) => [k, v.color]));
+    const coloresPorEstado = Object.fromEntries(Object.entries(ESTADOS_PIEZA_ESTILO).map(([k, v]) => [k, v.color]));
     vista3DActual = montarOdontograma3D(contenedor, porNumero, coloresPorEstado, (numero) => {
       pintarDetallePieza(pacienteId, porNumero[numero]);
     });
   } catch (e) {
-    contenedor.innerHTML = `<div class="error">No se pudo cargar la vista 3D.</div>`;
+    contenedor.innerHTML = `<div class="error">${t("odo.err3d")}</div>`;
   }
 }
 
@@ -175,26 +185,27 @@ function pintarDetallePieza(pacienteId, pieza) {
   const box = document.getElementById("piezaDetalleBox");
   box.innerHTML = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Pieza ${pieza.numero}</div>
-      <label>Estado</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("odo.pieza", { numero: pieza.numero })}</div>
+      <label>${t("odo.estado")}</label>
       <select id="piezaEstado">
-        ${Object.entries(ESTADOS_PIEZA_INFO).map(([k, v]) => `<option value="${k}" ${k === pieza.estado ? "selected" : ""}>${v.icono} ${v.label}</option>`).join("")}
+        ${Object.entries(estadosPiezaInfo()).map(([k, v]) => `<option value="${k}" ${k === pieza.estado ? "selected" : ""}>${v.icono} ${esc(v.label)}</option>`).join("")}
       </select>
-      <label>Notas</label>
-      <textarea id="piezaNotas" rows="2" placeholder="Detalle del hallazgo o tratamiento...">${esc(pieza.notas || "")}</textarea>
+      <label>${t("odo.notas")}</label>
+      <textarea id="piezaNotas" rows="2" placeholder="${t("odo.notasPlaceholder")}">${esc(pieza.notas || "")}</textarea>
       <div id="piezaErr"></div>
-      <button class="primary" id="btnGuardarPieza">Guardar</button>
+      <button class="primary" id="btnGuardarPieza">${t("odo.guardar")}</button>
 
       ${pieza.historial?.length ? `
-        <div class="seccion-titulo" style="margin-top:18px">Historial de la pieza</div>
+        <div class="seccion-titulo" style="margin-top:18px">${t("odo.historial")}</div>
         <div class="odonto-timeline">
           ${[...pieza.historial].reverse().map(h => {
-            const info = ESTADOS_PIEZA_INFO[h.estado] || ESTADOS_PIEZA_INFO.sano;
+            const estados = estadosPiezaInfo();
+            const info = estados[h.estado] || estados.sano;
             return `
               <div class="odonto-timeline-item">
                 <div class="odonto-timeline-icono" style="background:${info.color}">${info.icono}</div>
                 <div class="odonto-timeline-contenido">
-                  <div class="odonto-timeline-fecha">${new Date(h.fecha).toLocaleDateString("es-BO")}</div>
+                  <div class="odonto-timeline-fecha">${new Date(h.fecha).toLocaleDateString(localeActual())}</div>
                   <div class="odonto-timeline-titulo">${esc(info.label)}</div>
                   ${h.notas ? `<div class="odonto-timeline-notas">${esc(h.notas)}</div>` : ""}
                 </div>
@@ -222,7 +233,7 @@ function pintarDetallePieza(pacienteId, pieza) {
       renderTabOdontograma(pacienteId);
     } catch (e) {
       btn.disabled = false;
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("odo.errGuardar"))}</div>`;
     }
   };
 }

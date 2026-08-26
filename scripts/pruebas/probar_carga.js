@@ -152,6 +152,17 @@ const pantallas = [
   ["pistas del visor", `pistaDelModo("mover") + pistaDelModo("distancia") + pistaDelModo("angulo") + pistaDelModo("calibrar")`],
   ["equipos de rayos", `pintarEquiposRayos([{ _id: "eq1", nombre: "PC 1", conectado: true, subidas: 3, ultimaSubida: new Date().toISOString(), ultimoContacto: new Date().toISOString() }], null)`],
   ["equipos de rayos (vacío)", `pintarEquiposRayos([], null)`],
+  ["estados de pieza dental", `estadosPiezaInfo()`],
+  ["estados de estructura ocular", `estadosEstructuraInfo()`],
+  ["estructuras oculares", `estructurasOculares()`],
+  ["hallazgos ginecológicos", `hallazgosGinecoInfo()`],
+  ["órganos ginecológicos", `organosGineco()`],
+  ["estados de lesión", `estadosLesionInfo()`],
+  ["regiones corporales", `regionesCorporales()`],
+  ["detalle de pieza dental", `document.getElementById("piezaDetalleBox"); pintarDetallePieza("p1", { numero: 36, estado: "caries", notas: "", historial: [{ estado: "sano", fecha: new Date().toISOString() }] })`],
+  ["detalle de órgano", `pintarDetalleOrgano("p1", { organo: "utero", hallazgo: "mioma", notas: "", historial: [{ hallazgo: "normal", fecha: new Date().toISOString() }] })`],
+  ["detalle de estructura ocular", `pintarDetalleEstructura("p1", "OD", { estructura: "retina", estado: "leve", notas: "", historial: [] })`],
+  ["detalle de lesión", `pintarDetalleLesion("p1", { _id: "l1", titulo: "Nódulo", region: "dorso", lado: "izquierdo", estado: "activa", historial: [{ estado: "activa", fecha: new Date().toISOString(), tamanoCm: 2 }, { estado: "resuelta", fecha: new Date().toISOString(), tamanoCm: 1 }] })`],
 ];
 
 for (const idioma of ["es", "pt"]) {
@@ -166,6 +177,71 @@ for (const idioma of ["es", "pt"]) {
   }
 }
 if (fallos === 0) console.log(`✅ las ${pantallas.length} pantallas se pintan en español y en portugués sin explotar`);
+
+// ── 3. Constantes referenciadas que ya no existen ─────────────────────────
+// La parte 2 solo encuentra un ReferenceError si el test abre esa pantalla,
+// y no hay test para todas. Esta pasada es estática: junta todo lo que se
+// DECLARA en mayúsculas y comprueba que todo lo que se USA esté declarado.
+//
+// No se puede preguntarle al sandbox: un `const` de nivel superior en un
+// contexto de vm vive en el scope léxico y NO queda como propiedad del
+// objeto global, así que estarían todos "indefinidos".
+//
+// Convertir una constante en función y olvidar un uso es el error que más
+// veces apareció traduciendo, y casi siempre en una rama que ningún test
+// tocaba.
+console.log("");
+const globalesConocidos = new Set([
+  "NaN", "Infinity", "JSON", "Math", "Date", "Object", "Array", "String", "Number",
+  "Boolean", "RegExp", "Error", "Promise", "Map", "Set", "URL", "Image", "Blob",
+  "FileReader", "FormData", "MediaRecorder", "AudioContext", "ResizeObserver",
+  "WebSocket", "EventSource", "Notification",
+]);
+
+// Se quitan comentarios y textos: un "PDF" adentro de una plantilla no es
+// una referencia a nada.
+function sinComentariosNiTextos(codigo) {
+  return codigo
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ")
+    .replace(/`(?:\\.|[^`\\])*`/g, " ")
+    .replace(/"(?:\\.|[^"\\])*"/g, " ")
+    .replace(/'(?:\\.|[^'\\])*'/g, " ");
+}
+
+// Solo NOMBRES_CON_GUION_BAJO: "OD" o "PDF" sueltos dan demasiado ruido, y
+// las constantes de este código siempre llevan guion bajo.
+//
+// El (?<![.\w$]) es lo que separa una constante propia de un acceso a
+// propiedad: gl.ARRAY_BUFFER y FaceLandmarker.FACE_LANDMARKS_LIPS vienen de
+// WebGL y de MediaPipe, no de este código, y sin esto los 25 aparecían como
+// "usados pero nunca declarados".
+const PATRON = /(?<![.\w$])[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g;
+const fuentes = new Map();
+for (const ruta of scripts) {
+  try { fuentes.set(ruta, sinComentariosNiTextos(fs.readFileSync(path.join(RAIZ, "public" + ruta), "utf8"))); } catch {}
+}
+
+const declaradas = new Set(globalesConocidos);
+for (const limpio of fuentes.values()) {
+  for (const m of limpio.matchAll(/\b(?:const|let|var|function)\s+([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/g)) declaradas.add(m[1]);
+  // También las que se declaran en un destructuring o como parámetro.
+  for (const m of limpio.matchAll(/\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\s*[,}]?\s*=[^=]/g)) declaradas.add(m[1]);
+}
+
+const huerfanas = [];
+for (const [ruta, limpio] of fuentes) {
+  for (const nombre of new Set(limpio.match(PATRON) || [])) {
+    if (!declaradas.has(nombre)) huerfanas.push(`${ruta} → ${nombre}`);
+  }
+}
+if (huerfanas.length) {
+  fallos += huerfanas.length;
+  console.log(`❌ ${huerfanas.length} constante(s) usadas pero nunca declaradas:`);
+  for (const h of huerfanas) console.log(`   ${h}`);
+} else {
+  console.log(`✅ las ${declaradas.size - globalesConocidos.size} constantes declaradas cubren todos sus usos`);
+}
 
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

@@ -3,46 +3,48 @@
 // separadas, mismo criterio que se usó para el odontograma). Cada ojo (OD/OI)
 // se dibuja aparte, con sus 12 estructuras clickeables y su propio timeline.
 
-const ESTADOS_ESTRUCTURA_INFO = {
-  normal:     { label: "Normal",              icono: "🟢", color: "#15803d" },
-  leve:       { label: "Alteración leve",     icono: "🟡", color: "#ca8a04" },
-  moderado:   { label: "Alteración moderada", icono: "🟠", color: "#c2410c" },
-  importante: { label: "Alteración importante", icono: "🔴", color: "#b91c1c" },
+// Solo el ícono y el color quedan fijos: no cambian con el idioma.
+const ESTADOS_ESTRUCTURA_ESTILO = {
+  normal:     { icono: "🟢", color: "#15803d" },
+  leve:       { icono: "🟡", color: "#ca8a04" },
+  moderado:   { icono: "🟠", color: "#c2410c" },
+  importante: { icono: "🔴", color: "#b91c1c" },
 };
+function estadosEstructuraInfo() {
+  const salida = {};
+  for (const k of Object.keys(ESTADOS_ESTRUCTURA_ESTILO)) salida[k] = { ...ESTADOS_ESTRUCTURA_ESTILO[k], label: t("estOcu." + k) };
+  return salida;
+}
 
-const ESTRUCTURAS_OCULARES_INFO = {
-  cornea:            "Córnea",
-  iris:              "Iris",
-  pupila:            "Pupila",
-  cristalino:        "Cristalino",
-  esclerotica:       "Esclerótica",
-  conjuntiva:        "Conjuntiva",
-  camara_anterior:   "Cámara anterior",
-  retina:            "Retina",
-  macula:            "Mácula",
-  nervio_optico:     "Nervio óptico",
-  vasos_sanguineos:  "Vasos sanguíneos",
-  vitreo:            "Vítreo",
-};
-const ORDEN_ESTRUCTURAS = Object.keys(ESTRUCTURAS_OCULARES_INFO);
+const ESTRUCTURAS_OCULARES_CLAVES = [
+  "cornea", "iris", "pupila", "cristalino", "esclerotica", "conjuntiva",
+  "camara_anterior", "retina", "macula", "nervio_optico", "vasos_sanguineos", "vitreo",
+];
+function estructurasOculares() {
+  const salida = {};
+  for (const k of ESTRUCTURAS_OCULARES_CLAVES) salida[k] = t("estruct." + k);
+  return salida;
+}
+const ORDEN_ESTRUCTURAS = ESTRUCTURAS_OCULARES_CLAVES;
 
 async function renderTabExamenOcular(pacienteId) {
   const box = document.getElementById("examenOcularBox");
   if (!box) return;
-  box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando mapa ocular...</div>`;
+  box.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ocu.cargando")}</div>`;
   try {
     const data = await api(`/medico/pacientes/${pacienteId}/examen-ocular`);
     pintarExamenOcular(pacienteId, data.examen);
   } catch (e) {
     if (e.status === 401) return logout();
-    box.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar el mapa ocular")}</div>`;
+    box.innerHTML = `<div class="error">${esc(e.error || t("ocu.errCargar"))}</div>`;
   }
 }
 
 // Diagrama de corte esquemático de UN ojo (frente a la izquierda, fondo del
 // ojo a la derecha). porEstructura: { [estructura]: item }.
 function ojoSvgHtml(ojo, porEstructura) {
-  const color = (estructura) => (ESTADOS_ESTRUCTURA_INFO[porEstructura[estructura]?.estado || "normal"] || ESTADOS_ESTRUCTURA_INFO.normal).color;
+  // Solo el color: el nombre traducido no hace falta para pintar el ojo.
+  const color = (estructura) => (ESTADOS_ESTRUCTURA_ESTILO[porEstructura[estructura]?.estado || "normal"] || ESTADOS_ESTRUCTURA_ESTILO.normal).color;
   const g = (estructura, contenido) => `<g class="estructura-ocular" data-ojo="${ojo}" data-estructura="${estructura}" style="cursor:pointer">${contenido}</g>`;
 
   return `
@@ -75,21 +77,21 @@ function pintarExamenOcular(pacienteId, examen) {
 
   box.innerHTML = `
     <div class="card" style="text-align:center">
-      <div class="seccion-titulo" style="margin-top:0;text-align:left">👁️ Mapa ocular</div>
+      <div class="seccion-titulo" style="margin-top:0;text-align:left">${t("ocu.titulo")}</div>
       <div class="hint" style="text-align:left;margin-bottom:10px">Tocá cualquier estructura para ver el detalle y el historial. Lo que se marca "🎙️ por voz" viene de una consulta grabada — revisalo y corregilo si hace falta.</div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center">
         <div>
-          <div style="font-weight:700;margin-bottom:6px">OD — Ojo derecho</div>
+          <div style="font-weight:700;margin-bottom:6px">${t("ocu.od")}</div>
           ${ojoSvgHtml("OD", porOjo.OD)}
         </div>
         <div>
-          <div style="font-weight:700;margin-bottom:6px">OI — Ojo izquierdo</div>
+          <div style="font-weight:700;margin-bottom:6px">${t("ocu.oi")}</div>
           ${ojoSvgHtml("OI", porOjo.OI)}
         </div>
       </div>
       <div class="odonto-leyenda">
-        ${Object.entries(ESTADOS_ESTRUCTURA_INFO).map(([k, v]) => `
-          <span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.color}"></i>${v.icono} ${v.label}</span>`).join("")}
+        ${Object.entries(estadosEstructuraInfo()).map(([k, v]) => `
+          <span class="odonto-leyenda-item"><i style="background:${v.color};border:1px solid ${v.color}"></i>${v.icono} ${esc(v.label)}</span>`).join("")}
       </div>
     </div>
     <div id="estructuraDetalleBox"></div>`;
@@ -101,18 +103,18 @@ function pintarExamenOcular(pacienteId, examen) {
 
 function pintarDetalleEstructura(pacienteId, ojo, item) {
   const box = document.getElementById("estructuraDetalleBox");
-  const nombreEstructura = ESTRUCTURAS_OCULARES_INFO[item.estructura] || item.estructura;
+  const nombreEstructura = estructurasOculares()[item.estructura] || item.estructura;
   const nombreOjo = ojo === "OD" ? "Ojo derecho (OD)" : "Ojo izquierdo (OI)";
 
   box.innerHTML = `
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${esc(nombreEstructura)} — ${esc(nombreOjo)}</div>
-      <label>Estado</label>
+      <label>${t("ocu.estado")}</label>
       <select id="estrEstado">
-        ${Object.entries(ESTADOS_ESTRUCTURA_INFO).map(([k, v]) => `<option value="${k}" ${k === item.estado ? "selected" : ""}>${v.icono} ${v.label}</option>`).join("")}
+        ${Object.entries(estadosEstructuraInfo()).map(([k, v]) => `<option value="${k}" ${k === item.estado ? "selected" : ""}>${v.icono} ${esc(v.label)}</option>`).join("")}
       </select>
-      <label>Notas / hallazgo</label>
-      <textarea id="estrNotas" rows="2" placeholder="Detalle del hallazgo...">${esc(item.notas || "")}</textarea>
+      <label>${t("ocu.notas")}</label>
+      <textarea id="estrNotas" rows="2" placeholder="${t("ocu.notasPlaceholder")}">${esc(item.notas || "")}</textarea>
       <div id="estrErr"></div>
       <button class="primary" id="btnGuardarEstructura">Guardar</button>
 
@@ -120,7 +122,8 @@ function pintarDetalleEstructura(pacienteId, ojo, item) {
         <div class="seccion-titulo" style="margin-top:18px">Historial</div>
         <div class="odonto-timeline">
           ${[...item.historial].reverse().map(h => {
-            const info = ESTADOS_ESTRUCTURA_INFO[h.estado] || ESTADOS_ESTRUCTURA_INFO.normal;
+            const estados = estadosEstructuraInfo();
+            const info = estados[h.estado] || estados.normal;
             return `
               <div class="odonto-timeline-item">
                 <div class="odonto-timeline-icono" style="background:${info.color}">${info.icono}</div>
@@ -152,7 +155,7 @@ function pintarDetalleEstructura(pacienteId, ojo, item) {
       renderTabExamenOcular(pacienteId);
     } catch (e) {
       btn.disabled = false;
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("ocu.errGuardar"))}</div>`;
     }
   };
 }
