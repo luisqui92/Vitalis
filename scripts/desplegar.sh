@@ -57,16 +57,30 @@ RAMA_ANTES="$(git branch --show-current || echo '(detached)')"
 } | tee "$ARCHIVO_RETORNO"
 verde "Guardado en $ARCHIVO_RETORNO"
 
-SUCIO="$(git status --porcelain)"
+# Este script llega al servidor con:
+#   git checkout origin/<rama> -- scripts/desplegar.sh
+# y eso, además de escribir el archivo, lo deja EN EL ÍNDICE. O sea que el
+# script aparece como cambio pendiente en su propia comprobación y se planta
+# a sí mismo. Pasó la primera vez que se usó.
+#
+# Se excluye entonces su propia ruta. No se pierde nada: el checkout de la
+# rama lo va a reemplazar por la versión de la rama de todos modos. Lo que
+# esta comprobación tiene que atajar son los OTROS archivos, los que alguien
+# editó a mano en el servidor y un checkout pisaría sin avisar.
+YO="${BASH_SOURCE[0]#./}"
+SUCIO="$(git status --porcelain | grep -v "[[:space:]]scripts/desplegar\.sh$" || true)"
 if [ -n "$SUCIO" ]; then
   rojo "❌ Hay cambios sin guardar en el servidor:"
   echo "$SUCIO"
   echo
   echo "   Alguien editó archivos acá a mano. Hacer checkout encima los pisa."
   echo "   Averiguá qué son ANTES de seguir. No los borres sin mirar."
+  echo
+  echo "   Si estás seguro de que se pueden descartar:"
+  echo "     git stash push --include-untracked   # los guarda por si acaso"
   exit 1
 fi
-verde "✅ El árbol está limpio"
+verde "✅ El árbol está limpio (sin contar $YO, que llega así por diseño)"
 
 paso "2. Respaldo"
 echo "¿Ya hiciste el respaldo desde Panel → Seguridad y verificaste que quedó?"
