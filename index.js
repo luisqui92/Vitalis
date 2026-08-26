@@ -6,6 +6,7 @@ const http = require("http");
 const express = require("express");
 const helmet = require("helmet");
 const { servirComprimidos, prepararEnSegundoPlano } = require("./services/estaticosComprimidos");
+const { prepararIdiomas } = require("./services/i18nBundle");
 const app = express();
 
 const { CONFIG, log, validateConfig } = require("./config");
@@ -122,6 +123,11 @@ app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
 // precomprimido, se manda ese. El detector facial de Vitalis Face son 13 MB
 // —9 de WebAssembly— y sin esto son 45 segundos de spinner en la primera
 // carga; comprimido son 5,4 MB. Ver services/estaticosComprimidos.js.
+// Los textos de cada idioma viven partidos por módulo (public/i18n/es/…);
+// acá se arma un archivo por idioma para no mandarle 39 <script> al
+// navegador. Va antes de los estáticos porque genera archivos que se sirven.
+prepararIdiomas();
+
 const PUBLICO = path.join(__dirname, "public");
 app.use(servirComprimidos(PUBLICO, { inmutables: ["/vendor/", "/fonts/"] }));
 app.use(express.static(PUBLICO, {

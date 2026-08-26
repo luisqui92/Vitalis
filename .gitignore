@@ -15,3 +15,7 @@ caja-dicom/config.json
 
 # Estáticos precomprimidos: se generan solos al arrancar el servidor.
 *.br
+
+# Paquetes de idioma: se arman solos al arrancar, a partir de public/i18n/<idioma>/.
+# Tener el generado en git garantiza que algún día quede desincronizado del original.
+/public/i18n/*.js
