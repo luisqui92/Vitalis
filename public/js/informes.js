@@ -17,45 +17,45 @@ let informeActual = null;
 
 function estadoInformeHtml(i) {
   return i.estado === "firmado"
-    ? `<span style="color:var(--success);font-weight:600">✅ Firmado</span>`
-    : `<span style="color:var(--warning);font-weight:600">✏️ Borrador</span>`;
+    ? `<span style="color:var(--success);font-weight:600">${t("inf.firmado")}</span>`
+    : `<span style="color:var(--warning);font-weight:600">${t("inf.borrador")}</span>`;
 }
 
 // ─── LISTA ────────────────────────────────────────────────────────────────
 async function renderTabInformes(pacienteId) {
   const caja = document.getElementById("informesBox");
   if (!caja) return;
-  caja.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando informes...</div>`;
+  caja.innerHTML = `<div class="loading"><div class="spinner"></div>${t("inf.cargando")}</div>`;
   let data;
   try {
     data = await api(`/medico/pacientes/${pacienteId}/informes`);
   } catch (e) {
-    caja.innerHTML = `<div class="error">${esc(e.error || "No se pudieron cargar")}</div>`;
+    caja.innerHTML = `<div class="error">${esc(e.error || t("inf.errCargar"))}</div>`;
     return;
   }
   const informes = data.informes || [];
 
   caja.innerHTML = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Nuevo informe</div>
-      <input id="infTitulo" type="text" placeholder="Ej: Radiografía periapical — molar 36">
-      <label>Fecha del estudio</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("inf.nuevo")}</div>
+      <input id="infTitulo" type="text" placeholder="${t("inf.tituloPlaceholder")}">
+      <label>${t("inf.fechaEstudio")}</label>
       <input id="infFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
       <div id="infErr"></div>
-      <button class="secondary" id="btnNuevoInforme">➕ Crear informe</button>
-      <button class="link" id="btnMembrete" style="width:auto">Configurar membrete y firma</button>
+      <button class="secondary" id="btnNuevoInforme">${t("inf.crear")}</button>
+      <button class="link" id="btnMembrete" style="width:auto">${t("inf.configurarMembrete")}</button>
     </div>
 
-    ${informes.length === 0 ? `<div class="empty">Todavía no hay informes de este paciente.</div>` : ""}
+    ${informes.length === 0 ? `<div class="empty">${t("inf.vacio")}</div>` : ""}
     ${informes.map(i => `
       <div class="item" data-abrir-informe="${i._id}">
         <div class="top">
-          <div class="nombre">${esc(i.codigo)} — ${esc(i.titulo || i.tipoEstudio || "Sin título")}</div>
+          <div class="nombre">${esc(i.codigo)} — ${esc(i.titulo || i.tipoEstudio || t("inf.sinTitulo"))}</div>
           ${i.estado === "borrador" ? `<button class="link" data-borrar-informe="${i._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>` : ""}
         </div>
-        <div class="fecha">${new Date(i.fechaEstudio).toLocaleDateString("es-BO")} · ${estadoInformeHtml(i)}</div>
+        <div class="fecha">${new Date(i.fechaEstudio).toLocaleDateString(localeActual())} · ${estadoInformeHtml(i)}</div>
         ${i.conclusion ? `<div class="paciente-info">${esc(i.conclusion.slice(0, 110))}${i.conclusion.length > 110 ? "…" : ""}</div>` : ""}
-        ${i.compartidoEn ? `<div class="paciente-info">📤 Enviado al paciente${i.vistoEn ? ` · 👁️ lo abrió el ${new Date(i.vistoEn).toLocaleDateString("es-BO")}` : " · todavía no lo abrió"}</div>` : ""}
+        ${i.compartidoEn ? `<div class="paciente-info">${t("inf.enviadoAlPaciente")}${i.vistoEn ? t("inf.loAbrio", { fecha: new Date(i.vistoEn).toLocaleDateString(localeActual()) }) : t("inf.noLoAbrio")}</div>` : ""}
       </div>`).join("")}`;
 
   caja.querySelector("#btnMembrete").onclick = () => renderMembrete(pacienteId);
@@ -74,7 +74,7 @@ async function renderTabInformes(pacienteId) {
       renderEditorInforme(pacienteId, r.informe._id);
     } catch (e) {
       btn.disabled = false;
-      caja.querySelector("#infErr").innerHTML = `<div class="error">${esc(e.error || "No se pudo crear")}</div>`;
+      caja.querySelector("#infErr").innerHTML = `<div class="error">${esc(e.error || t("inf.errCrear"))}</div>`;
     }
   };
 
@@ -87,11 +87,11 @@ async function renderTabInformes(pacienteId) {
   caja.querySelectorAll("[data-borrar-informe]").forEach(b => {
     b.onclick = async (ev) => {
       ev.stopPropagation();
-      if (!confirm("¿Borrar este borrador?")) return;
+      if (!confirm(t("inf.confirmarBorrar"))) return;
       try {
         await api(`/medico/informes/${b.dataset.borrarInforme}`, { method: "DELETE" });
         renderTabInformes(pacienteId);
-      } catch (e) { alert(e.error || "No se pudo borrar"); }
+      } catch (e) { alert(e.error || t("inf.errBorrar")); }
     };
   });
 }
@@ -100,7 +100,7 @@ async function renderTabInformes(pacienteId) {
 async function renderEditorInforme(pacienteId, informeId) {
   detenerPolling();
   const serie = nuevaSeriePantalla();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Abriendo informe...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("inf.abriendo")}</div>`;
   let datos, ficha;
   try {
     [datos, ficha] = await Promise.all([
@@ -108,7 +108,7 @@ async function renderEditorInforme(pacienteId, informeId) {
       api(`/medico/pacientes/${pacienteId}`),
     ]);
   } catch (e) {
-    if (seriePantallaVigente(serie)) app.innerHTML = `<div class="error">${esc(e.error || "No se pudo abrir")}</div>`;
+    if (seriePantallaVigente(serie)) app.innerHTML = `<div class="error">${esc(e.error || t("inf.errAbrir"))}</div>`;
     return;
   }
   if (!seriePantallaVigente(serie)) return;
@@ -127,27 +127,25 @@ function pintarEditorInforme() {
   const incluidos = new Set((i.estudiosIncluidos || []).map(String));
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← Informes</button>
+    <button class="back" id="btnBack">${t("inf.volver")}</button>
 
     <div class="card" style="border-color:var(--primary)">
       <div class="seccion-titulo" style="margin-top:0">${esc(i.codigo)} · ${estadoInformeHtml(i)}</div>
       <div class="hint">
-        <b>${esc(p.nombre || "")}</b>${p.codigo ? ` · ${esc(p.codigo)}` : ""}${p.edad != null ? ` · ${p.edad} años` : ""}${p.sexo ? ` · ${esc(p.sexo)}` : ""}
-        <br>Médico tratante: ${esc(datos.membrete.profesionalNombre || MEDICO_NOMBRE || "")}
+        <b>${esc(p.nombre || "")}</b>${p.codigo ? ` · ${esc(p.codigo)}` : ""}${p.edad != null ? ` · ${t("pacientes.anos", { n: p.edad })}` : ""}${p.sexo ? ` · ${esc(p.sexo)}` : ""}
+        <br>${t("inf.medicoTratante")} ${esc(datos.membrete.profesionalNombre || MEDICO_NOMBRE || "")}
       </div>
       ${firmado ? `
         <div class="hint" style="color:var(--success);margin-top:8px">
-          Firmado el ${new Date(i.firmadoEn).toLocaleString("es-BO")}. Un informe firmado no se edita:
-          si tiene un error, se hace uno nuevo que lo corrija.
+          ${t("inf.firmadoEl", { fecha: new Date(i.firmadoEn).toLocaleString(localeActual()) })}
         </div>` : ""}
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Imágenes del informe</div>
-      ${imagenes.length === 0 ? `<div class="hint">Este paciente no tiene imágenes cargadas todavía. Subilas desde la pestaña Estudios.</div>` : `
+      <div class="seccion-titulo" style="margin-top:0">${t("inf.imagenes")}</div>
+      ${imagenes.length === 0 ? `<div class="hint">${t("inf.sinImagenes")}</div>` : `
         <div class="hint" style="margin-bottom:10px">
-          Elegí cuáles van en el informe. Las que no elijas quedan en la ficha del paciente
-          igual — no se borran, solo no salen impresas.
+          ${t("inf.elegirImagenes")}
         </div>
         <div id="infImagenes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">
           ${imagenes.map(e => `
@@ -155,38 +153,38 @@ function pintarEditorInforme() {
               <img data-mini="${e._id}" alt="${esc(e.nombre)}" style="width:100%;height:78px;object-fit:cover;display:block;opacity:${incluidos.has(String(e._id)) ? 1 : 0.45}">
               <div style="position:absolute;top:3px;right:3px;font-size:15px">${incluidos.has(String(e._id)) ? "✅" : "⬜"}</div>
               <div style="font-size:10px;padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.nombre)}</div>
-              <button class="link" data-ver-imagen="${e._id}" style="width:100%;margin:0;padding:3px;font-size:11px">🔍 Abrir y medir</button>
+              <button class="link" data-ver-imagen="${e._id}" style="width:100%;margin:0;padding:3px;font-size:11px">${t("inf.abrirMedir")}</button>
             </div>`).join("")}
         </div>`}
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Informe</div>
-      <label>Título</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("inf.informe")}</div>
+      <label>${t("inf.titulo")}</label>
       <input id="edTitulo" type="text" value="${esc(i.titulo || "")}"${firmado ? " disabled" : ""}>
-      <label>Técnica</label>
-      <textarea id="edTecnica" rows="2" placeholder="Ej: Radiografía periapical, técnica de paralelismo."${firmado ? " disabled" : ""}>${esc(i.tecnica || "")}</textarea>
-      <label>Hallazgos</label>
-      <textarea id="edHallazgos" rows="6" placeholder="Lo que se observa."${firmado ? " disabled" : ""}>${esc(i.hallazgos || "")}</textarea>
-      <label>Conclusión</label>
-      <textarea id="edConclusion" rows="3" placeholder="El diagnóstico. Es lo único obligatorio para firmar."${firmado ? " disabled" : ""}>${esc(i.conclusion || "")}</textarea>
-      <label>Recomendaciones</label>
+      <label>${t("inf.tecnica")}</label>
+      <textarea id="edTecnica" rows="2" placeholder="${t("inf.tecnicaPlaceholder")}"${firmado ? " disabled" : ""}>${esc(i.tecnica || "")}</textarea>
+      <label>${t("inf.hallazgos")}</label>
+      <textarea id="edHallazgos" rows="6" placeholder="${t("inf.hallazgosPlaceholder")}"${firmado ? " disabled" : ""}>${esc(i.hallazgos || "")}</textarea>
+      <label>${t("inf.conclusion")}</label>
+      <textarea id="edConclusion" rows="3" placeholder="${t("inf.conclusionPlaceholder")}"${firmado ? " disabled" : ""}>${esc(i.conclusion || "")}</textarea>
+      <label>${t("inf.recomendaciones")}</label>
       <textarea id="edRecomendaciones" rows="2"${firmado ? " disabled" : ""}>${esc(i.recomendaciones || "")}</textarea>
       <div id="edErr"></div>
       ${firmado ? "" : `
-        <button class="secondary" id="btnGuardarInforme">Guardar borrador</button>
-        <button class="primary" id="btnFirmar">🔒 Firmar informe</button>`}
+        <button class="secondary" id="btnGuardarInforme">${t("inf.guardarBorrador")}</button>
+        <button class="primary" id="btnFirmar">${t("inf.firmar")}</button>`}
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Entregar</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("inf.entregar")}</div>
       ${firmado ? `
-        <button class="secondary" id="btnVerHoja">📄 Ver hoja membretada e imprimir</button>
-        <button class="secondary" id="btnEnviarWA">📲 Enviar al paciente por WhatsApp</button>
-        <button class="link" id="btnCopiarEnlace" style="width:auto">Copiar el enlace</button>
+        <button class="secondary" id="btnVerHoja">${t("inf.verHoja")}</button>
+        <button class="secondary" id="btnEnviarWA">${t("inf.enviarWA")}</button>
+        <button class="link" id="btnCopiarEnlace" style="width:auto">${t("inf.copiarEnlace")}</button>
         <div id="edEnvioErr"></div>
-      ` : `<div class="hint">Firmá el informe para poder imprimirlo o enviarlo.</div>
-           <button class="secondary" id="btnVerHoja">👁️ Ver cómo va a quedar</button>`}
+      ` : `<div class="hint">${t("inf.firmaParaEnviar")}</div>
+           <button class="secondary" id="btnVerHoja">${t("inf.previsualizar")}</button>`}
     </div>`;
 
   document.getElementById("btnBack").onclick = () => renderPacienteDetalle(pacienteId, "informes");
@@ -237,8 +235,8 @@ function pintarEditorInforme() {
   if (enviar) enviar.onclick = enviarInformeWhatsApp;
   const copiar = document.getElementById("btnCopiarEnlace");
   if (copiar) copiar.onclick = async () => {
-    try { await navigator.clipboard.writeText(informeActual.datos.enlace); copiar.textContent = "✅ Copiado"; }
-    catch { prompt("Copiá el enlace:", informeActual.datos.enlace); }
+    try { await navigator.clipboard.writeText(informeActual.datos.enlace); copiar.textContent = t("inf.copiado"); }
+    catch { prompt(t("inf.copiaEnlace"), informeActual.datos.enlace); }
   };
 }
 
@@ -260,21 +258,21 @@ async function guardarInforme({ silencioso = false, siFirmadoIgnorar = false } =
     informeActual.datos.informe = r.informe;
     if (!silencioso) {
       const btn = document.getElementById("btnGuardarInforme");
-      if (btn) { btn.textContent = "✅ Guardado"; setTimeout(() => { if (btn.isConnected) btn.textContent = "Guardar borrador"; }, 2000); }
+      if (btn) { btn.textContent = t("inf.guardado"); setTimeout(() => { if (btn.isConnected) btn.textContent = t("inf.guardarBorrador"); }, 2000); }
     }
   } catch (e) {
     const caja = document.getElementById("edErr");
-    if (caja) caja.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+    if (caja) caja.innerHTML = `<div class="error">${esc(e.error || t("inf.errGuardar"))}</div>`;
     throw e;
   }
 }
 
 async function firmarInforme() {
   if (!document.getElementById("edConclusion").value.trim()) {
-    document.getElementById("edErr").innerHTML = `<div class="error">Escribí la conclusión antes de firmar.</div>`;
+    document.getElementById("edErr").innerHTML = `<div class="error">${t("inf.errSinConclusion")}</div>`;
     return;
   }
-  if (!confirm("Al firmar, el informe queda cerrado y no se puede editar más.\n\n¿Confirmás que está listo?")) return;
+  if (!confirm(t("inf.confirmarFirmar"))) return;
 
   const btn = document.getElementById("btnFirmar");
   btn.disabled = true;
@@ -286,23 +284,23 @@ async function firmarInforme() {
     pintarEditorInforme();
   } catch (e) {
     btn.disabled = false;
-    document.getElementById("edErr").innerHTML = `<div class="error">${esc(e.error || "No se pudo firmar")}</div>`;
+    document.getElementById("edErr").innerHTML = `<div class="error">${esc(e.error || t("inf.errFirmar"))}</div>`;
   }
 }
 
 async function enviarInformeWhatsApp() {
   const p = informeActual.datos.paciente || {};
-  if (!confirm(`¿Enviar el informe a ${p.nombre || "el paciente"}?\n\nRecibe un enlace, no el informe adentro del mensaje.`)) return;
+  if (!confirm(t("inf.confirmarEnviar", { paciente: p.nombre || t("inf.elPaciente") }))) return;
   const btn = document.getElementById("btnEnviarWA");
   btn.disabled = true;
-  btn.textContent = "Enviando...";
+  btn.textContent = t("inf.enviando");
   try {
     await api(`/medico/informes/${informeActual.informeId}/enviar`, { method: "POST" });
-    btn.textContent = "✅ Enviado";
+    btn.textContent = t("inf.enviado");
   } catch (e) {
     btn.disabled = false;
-    btn.textContent = "📲 Enviar al paciente por WhatsApp";
-    document.getElementById("edEnvioErr").innerHTML = `<div class="error">${esc(e.error || "No se pudo enviar")}</div>`;
+    btn.textContent = t("inf.enviarWA");
+    document.getElementById("edEnvioErr").innerHTML = `<div class="error">${esc(e.error || t("inf.errEnviar"))}</div>`;
   }
 }
 
@@ -327,36 +325,36 @@ function hojaInformeHtml(d, urlsImagenes) {
           <div class="inf-nombre-centro">${esc(m.nombreCentro || "")}</div>
           <div class="inf-datos-centro">
             ${[m.direccion, m.ciudad].filter(Boolean).map(esc).join(" · ")}
-            ${m.telefono ? `<br>Tel. ${esc(m.telefono)}` : ""}
+            ${m.telefono ? `<br>${t("hoja.tel")}${esc(m.telefono)}` : ""}
           </div>
         </div>
       </header>
 
-      <div class="inf-titulo">${esc(i.titulo || i.tipoEstudio || "Informe")}</div>
+      <div class="inf-titulo">${esc(i.titulo || i.tipoEstudio || t("hoja.informe"))}</div>
 
       <table class="inf-datos">
         <tr>
-          <td><b>Paciente</b><br>${esc(p.nombre || "")}</td>
-          <td><b>Código</b><br>${esc(p.codigo || "—")}</td>
+          <td><b>${t("hoja.paciente")}</b><br>${esc(p.nombre || "")}</td>
+          <td><b>${t("hoja.codigo")}</b><br>${esc(p.codigo || "—")}</td>
         </tr>
         <tr>
-          <td><b>Edad</b><br>${p.edad != null ? p.edad + " años" : "—"}${p.sexo ? " · " + esc(p.sexo) : ""}</td>
-          <td><b>Fecha del estudio</b><br>${fecha(i.fechaEstudio)}</td>
+          <td><b>${t("hoja.edad")}</b><br>${p.edad != null ? t("pacientes.anos", { n: p.edad }) : "—"}${p.sexo ? " · " + esc(p.sexo) : ""}</td>
+          <td><b>${t("hoja.fechaEstudio")}</b><br>${fecha(i.fechaEstudio)}</td>
         </tr>
         <tr>
-          <td><b>Médico tratante</b><br>${esc(m.profesionalNombre || "")}</td>
-          <td><b>Informe N.º</b><br>${esc(i.codigo)}</td>
+          <td><b>${t("hoja.medicoTratante")}</b><br>${esc(m.profesionalNombre || "")}</td>
+          <td><b>${t("hoja.numero")}</b><br>${esc(i.codigo)}</td>
         </tr>
       </table>
 
-      ${bloque("Técnica", i.tecnica)}
-      ${bloque("Hallazgos", i.hallazgos)}
-      ${bloque("Conclusión", i.conclusion)}
-      ${bloque("Recomendaciones", i.recomendaciones)}
+      ${bloque(t("hoja.tecnica"), i.tecnica)}
+      ${bloque(t("hoja.hallazgos"), i.hallazgos)}
+      ${bloque(t("hoja.conclusion"), i.conclusion)}
+      ${bloque(t("hoja.recomendaciones"), i.recomendaciones)}
 
       ${urlsImagenes.length ? `
         <div class="inf-bloque">
-          <h3>Imágenes</h3>
+          <h3>${t("hoja.imagenes")}</h3>
           <div class="inf-imagenes">
             ${urlsImagenes.map(u => `
               <figure>
@@ -371,15 +369,15 @@ function hojaInformeHtml(d, urlsImagenes) {
         <div class="inf-linea"></div>
         <div class="inf-profesional">
           ${esc(m.profesionalNombre || "")}<br>
-          ${esc(m.profesionalTitulo || "")}${m.profesionalRegistro ? `<br>Reg. ${esc(m.profesionalRegistro)}` : ""}
+          ${esc(m.profesionalTitulo || "")}${m.profesionalRegistro ? `<br>${t("hoja.reg")}${esc(m.profesionalRegistro)}` : ""}
         </div>
-        ${i.firmadoEn ? `<div class="inf-pie-firma">Firmado el ${new Date(i.firmadoEn).toLocaleString("es-BO")}</div>` : ""}
+        ${i.firmadoEn ? `<div class="inf-pie-firma">${t("hoja.firmadoEl", { fecha: new Date(i.firmadoEn).toLocaleString(localeActual()) })}</div>` : ""}
       </div>
 
       <footer class="inf-pie">
         ${esc(m.piePagina || "")}
         ${d.enlace ? `<div class="inf-verificacion">
-          Informe ${esc(i.codigo)} · verificable en ${esc((d.enlace || "").replace(/^https?:\/\//, ""))}
+          ${t("hoja.verificable", { codigo: esc(i.codigo), enlace: esc((d.enlace || "").replace(/^https?:\/\//, "")) })}
         </div>` : ""}
       </footer>
     </div>`;
@@ -404,7 +402,7 @@ async function abrirHojaInforme(informeId) {
   const capa = document.createElement("div");
   capa.id = "hojaInforme";
   capa.style.cssText = "position:fixed;inset:0;z-index:9500;background:#3a3a42;overflow:auto";
-  capa.innerHTML = `<div class="loading" style="margin:60px auto;color:#eee"><div class="spinner"></div>Armando el informe...</div>`;
+  capa.innerHTML = `<div class="loading" style="margin:60px auto;color:#eee"><div class="spinner"></div>${t("hoja.armando")}</div>`;
   document.body.appendChild(capa);
   document.body.style.overflow = "hidden";
 
@@ -412,7 +410,7 @@ async function abrirHojaInforme(informeId) {
   try {
     d = await api(`/medico/informes/${informeId}/completo`);
   } catch (e) {
-    capa.innerHTML = `<div style="color:#eee;text-align:center;margin-top:60px">${esc(e.error || "No se pudo abrir")}<br><br><button class="secondary" onclick="cerrarHojaInforme()">Cerrar</button></div>`;
+    capa.innerHTML = `<div style="color:#eee;text-align:center;margin-top:60px">${esc(e.error || t("inf.errAbrir"))}<br><br><button class="secondary" onclick="cerrarHojaInforme()">${t("hoja.cerrar")}</button></div>`;
     return;
   }
 
@@ -450,12 +448,12 @@ function cerrarHojaInforme() {
 async function renderMembrete(volverAPaciente) {
   detenerPolling();
   const serie = nuevaSeriePantalla();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("mb.cargando")}</div>`;
   let m;
   try {
     m = (await api("/medico/membrete")).membrete;
   } catch (e) {
-    if (seriePantallaVigente(serie)) app.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar")}</div>`;
+    if (seriePantallaVigente(serie)) app.innerHTML = `<div class="error">${esc(e.error || t("mb.errCargar"))}</div>`;
     return;
   }
   if (!seriePantallaVigente(serie)) return;
@@ -464,35 +462,35 @@ async function renderMembrete(volverAPaciente) {
     `<label>${etiqueta}</label><input id="${id}" type="text" value="${esc(valor || "")}" placeholder="${esc(ph)}">`;
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← Volver</button>
+    <button class="back" id="btnBack">${t("mb.volver")}</button>
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Membrete del centro</div>
-      <div class="hint" style="margin-bottom:10px">Esto es lo que aparece arriba de cada informe impreso.</div>
-      ${campo("mbCentro", "Nombre del centro", m.nombreCentro, "Ej: Centro de Imagenología Aranjuez")}
-      ${campo("mbDireccion", "Dirección", m.direccion)}
-      ${campo("mbCiudad", "Ciudad", m.ciudad)}
-      ${campo("mbTelefono", "Teléfono", m.telefono)}
-      <label>Logo</label>
-      <div id="mbLogoPreview">${m.logo ? `<img src="${m.logo}" style="max-height:60px;background:#fff;padding:4px;border-radius:6px">` : `<div class="hint">Sin logo</div>`}</div>
-      <label class="file-label" for="mbLogoArchivo" style="margin-top:6px">📎 Elegir logo</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("mb.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${t("mb.ayuda")}</div>
+      ${campo("mbCentro", t("mb.centro"), m.nombreCentro, t("mb.centroPlaceholder"))}
+      ${campo("mbDireccion", t("mb.direccion"), m.direccion)}
+      ${campo("mbCiudad", t("mb.ciudad"), m.ciudad)}
+      ${campo("mbTelefono", t("mb.telefono"), m.telefono)}
+      <label>${t("mb.logo")}</label>
+      <div id="mbLogoPreview">${m.logo ? `<img src="${m.logo}" style="max-height:60px;background:#fff;padding:4px;border-radius:6px">` : `<div class="hint">${t("mb.sinLogo")}</div>`}</div>
+      <label class="file-label" for="mbLogoArchivo" style="margin-top:6px">${t("mb.elegirLogo")}</label>
       <input type="file" id="mbLogoArchivo" accept="image/png,image/jpeg,image/webp" style="display:none">
     </div>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Quién firma</div>
-      ${campo("mbProfNombre", "Nombre del profesional", m.profesionalNombre)}
-      ${campo("mbProfTitulo", "Título", m.profesionalTitulo, "Ej: Médico radiólogo")}
-      ${campo("mbProfRegistro", "Matrícula / registro", m.profesionalRegistro)}
-      <label>Firma</label>
-      <div id="mbFirmaPreview">${m.firma ? `<img src="${m.firma}" style="max-height:60px;background:#fff;padding:4px;border-radius:6px">` : `<div class="hint">Sin firma cargada</div>`}</div>
-      <label class="file-label" for="mbFirmaArchivo" style="margin-top:6px">📎 Elegir firma</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("mb.quienFirma")}</div>
+      ${campo("mbProfNombre", t("mb.profNombre"), m.profesionalNombre)}
+      ${campo("mbProfTitulo", t("mb.profTitulo"), m.profesionalTitulo, t("mb.profTituloPlaceholder"))}
+      ${campo("mbProfRegistro", t("mb.profRegistro"), m.profesionalRegistro)}
+      <label>${t("mb.firma")}</label>
+      <div id="mbFirmaPreview">${m.firma ? `<img src="${m.firma}" style="max-height:60px;background:#fff;padding:4px;border-radius:6px">` : `<div class="hint">${t("mb.sinFirma")}</div>`}</div>
+      <label class="file-label" for="mbFirmaArchivo" style="margin-top:6px">${t("mb.elegirFirma")}</label>
       <input type="file" id="mbFirmaArchivo" accept="image/png,image/jpeg,image/webp" style="display:none">
       <div class="hint" style="margin-top:6px">
-        Firmá en una hoja blanca, sacale una foto y recortala. Sale mejor si el fondo es claro.
+        ${t("mb.ayudaFirma")}
       </div>
-      ${campo("mbPie", "Texto del pie de página", m.piePagina, "Ej: Este informe es un complemento del examen clínico.")}
+      ${campo("mbPie", t("mb.pie"), m.piePagina, t("mb.piePlaceholder"))}
       <div id="mbErr"></div>
-      <button class="secondary" id="btnGuardarMembrete">Guardar</button>
+      <button class="secondary" id="btnGuardarMembrete">${t("mb.guardar")}</button>
     </div>`;
 
   document.getElementById("btnBack").onclick = () =>
@@ -511,7 +509,7 @@ async function renderMembrete(volverAPaciente) {
         document.getElementById(previewId).innerHTML = `<img src="${dataUri}" style="max-height:60px;background:#fff;padding:4px;border-radius:6px">`;
         document.getElementById(previewId).dataset.valor = dataUri;
       } catch {
-        document.getElementById("mbErr").innerHTML = `<div class="error">No se pudo leer esa imagen.</div>`;
+        document.getElementById("mbErr").innerHTML = `<div class="error">${t("mb.errImagen")}</div>`;
       }
     };
   }
@@ -533,11 +531,11 @@ async function renderMembrete(volverAPaciente) {
 
     try {
       await api("/medico/membrete", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
-      btn.textContent = "✅ Guardado";
-      setTimeout(() => { if (btn.isConnected) { btn.textContent = "Guardar"; btn.disabled = false; } }, 1800);
+      btn.textContent = t("mb.guardado");
+      setTimeout(() => { if (btn.isConnected) { btn.textContent = t("mb.guardar"); btn.disabled = false; } }, 1800);
     } catch (e) {
       btn.disabled = false;
-      document.getElementById("mbErr").innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar")}</div>`;
+      document.getElementById("mbErr").innerHTML = `<div class="error">${esc(e.error || t("inf.errGuardar"))}</div>`;
     }
   };
 }

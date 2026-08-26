@@ -140,6 +140,12 @@ const pantallas = [
   ["notificaciones", `app.innerHTML = notificacionesHtml()`],
   ["moneda", `money(1234.5)`],
   ["estados de tratamiento", `estadoTratamientoInfo()`],
+  ["tipos de estudio", `tiposEstudioTodos()`],
+  ["ángulos de foto", `angulosFotoTodos()`],
+  ["lados del ojo", `ladosOjo()`],
+  ["estudios (pestaña)", `app.innerHTML = tabEstudiosHtml([{ _id: "e1", tipo: "foto", anguloFoto: "frontal", nombre: "Frontal", fecha: new Date().toISOString(), anotaciones: [] }])`],
+  ["estudios (vacío)", `app.innerHTML = tabEstudiosHtml([])`],
+  ["estado del informe", `estadoInformeHtml({ estado: "firmado" }) + estadoInformeHtml({ estado: "borrador" })`],
 ];
 
 for (const idioma of ["es", "pt"]) {

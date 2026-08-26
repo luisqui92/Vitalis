@@ -6,46 +6,43 @@
 // 3/4), y un comparador de antes/después con slider entre dos fechas del
 // mismo ángulo.
 
-const TIPOS_ESTUDIO = {
-  laboratorio: "🧪 Laboratorio",
-  radiografia: "🦴 Radiografía",
-  ecografia: "🔊 Ecografía",
-  tomografia: "🌀 Tomografía",
-  resonancia: "🧲 Resonancia",
-  ecg: "💓 ECG",
-  foto: "📷 Foto clínica",
-  otro: "📄 Otro",
-};
+// Estas listas guardan solo las CLAVES: el valor ("laboratorio", "frontal",
+// "OD") es lo que va a la base y no se traduce nunca. La etiqueta se resuelve
+// al llamar, porque este archivo se carga antes del login.
+const TIPOS_ESTUDIO_CLAVES = ["laboratorio", "radiografia", "ecografia", "tomografia", "resonancia", "ecg", "foto", "otro"];
 // Vitalis Visión: tipos de estudio propios de oftalmología, se suman a la
 // lista general solo para esa especialidad.
-const TIPOS_ESTUDIO_OFTALMOLOGIA = {
-  oct: "🩻 OCT",
-  fondo_ojo: "👁️ Fondo de ojo",
-  campimetria: "🗺️ Campimetría",
-  biometria: "📏 Biometría",
-};
-function tiposEstudioActivos() {
-  return MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? { ...TIPOS_ESTUDIO, ...TIPOS_ESTUDIO_OFTALMOLOGIA } : TIPOS_ESTUDIO;
+const TIPOS_ESTUDIO_OFTALMOLOGIA_CLAVES = ["oct", "fondo_ojo", "campimetria", "biometria"];
+
+function etiquetasDe(claves, prefijo) {
+  const salida = {};
+  for (const k of claves) salida[k] = t(prefijo + k);
+  return salida;
 }
-const LADOS_OJO = { OD: "Ojo derecho (OD)", OI: "Ojo izquierdo (OI)", ambos: "Ambos ojos" };
+function tiposEstudioActivos() {
+  const claves = MEDICO_TIPO_ESPECIALIDAD === "oftalmologia"
+    ? [...TIPOS_ESTUDIO_CLAVES, ...TIPOS_ESTUDIO_OFTALMOLOGIA_CLAVES]
+    : TIPOS_ESTUDIO_CLAVES;
+  return etiquetasDe(claves, "est.tipo.");
+}
+// Todos los tipos, incluso los que esta especialidad no ofrece: un estudio
+// cargado antes de cambiar de especialidad tiene que seguir mostrando su
+// nombre y no la clave cruda.
+function tiposEstudioTodos() {
+  return etiquetasDe([...TIPOS_ESTUDIO_CLAVES, ...TIPOS_ESTUDIO_OFTALMOLOGIA_CLAVES], "est.tipo.");
+}
+function ladosOjo() { return etiquetasDe(["OD", "OI", "ambos"], "ojo."); }
 
 // Odontología/medicina general: 3 ángulos alcanza. Vitalis Face (estética/
 // plástica/dermatología) usa 5, para un seguimiento más fino de un
 // procedimiento (nariz, mentón, etc.) — ver angulosFotoActivos().
-const ANGULOS_FOTO_3 = {
-  frontal: "Frontal",
-  perfil: "Perfil",
-  tres_cuartos: "3/4",
-};
-const ANGULOS_FOTO_5 = {
-  frontal: "Frontal",
-  angulo45_derecha: "45° derecha",
-  perfil_derecho: "Perfil derecho",
-  angulo45_izquierda: "45° izquierda",
-  perfil_izquierdo: "Perfil izquierdo",
-};
-const ANGULOS_FOTO_TODOS = { ...ANGULOS_FOTO_3, ...ANGULOS_FOTO_5 };
-function angulosFotoActivos() { return MEDICO_TIPO_ESPECIALIDAD === "estetica" ? ANGULOS_FOTO_5 : ANGULOS_FOTO_3; }
+const ANGULOS_FOTO_3_CLAVES = ["frontal", "perfil", "tres_cuartos"];
+const ANGULOS_FOTO_5_CLAVES = ["frontal", "angulo45_derecha", "perfil_derecho", "angulo45_izquierda", "perfil_izquierdo"];
+const ANGULOS_FOTO_TODOS_CLAVES = [...new Set([...ANGULOS_FOTO_3_CLAVES, ...ANGULOS_FOTO_5_CLAVES])];
+function angulosFotoTodos() { return etiquetasDe(ANGULOS_FOTO_TODOS_CLAVES, "angulo."); }
+function angulosFotoActivos() {
+  return etiquetasDe(MEDICO_TIPO_ESPECIALIDAD === "estetica" ? ANGULOS_FOTO_5_CLAVES : ANGULOS_FOTO_3_CLAVES, "angulo.");
+}
 
 function tabEstudiosHtml(estudios) {
   const hayFotos = estudios.some(e => e.tipo === "foto" && e.anguloFoto);
@@ -57,66 +54,65 @@ function tabEstudiosHtml(estudios) {
   return `
     ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && angulos25d.size >= 2 ? `
     <div class="card" style="margin-bottom:12px">
-      <div class="seccion-titulo" style="margin-top:0">Simulación 2.5D</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("est.25d.titulo")}</div>
       <div class="hint" style="margin:0 0 10px">
-        ${angulos25d.size} vistas cargadas. Girá entre ellas y mirá la misma
-        cirugía desde cada ángulo — cada posición es una foto real del paciente.
+        ${t("est.25d.ayuda", { n: angulos25d.size })}
       </div>
-      <button class="item-action" id="btn25d">🔄 Girar las ${angulos25d.size} vistas</button>
-      <button class="item-action" id="btnFaceConsola" style="margin-top:8px">🧠 Abrir Vitalis Face — análisis completo</button>
+      <button class="item-action" id="btn25d">${t("est.25d.girar", { n: angulos25d.size })}</button>
+      <button class="item-action" id="btnFaceConsola" style="margin-top:8px">${t("est.face")}</button>
     </div>` : ""}
     ${bloqueCapturaHtml()}
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Subir estudio</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("est.subir.titulo")}</div>
       <select id="estTipo">
         ${Object.entries(tiposEstudioActivos()).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}
       </select>
-      <input id="estNombre" type="text" placeholder="Título (ej: Hemograma completo)" style="margin-top:8px">
-      <label>Fecha</label>
+      <input id="estNombre" type="text" placeholder="${t("est.subir.nombre")}" style="margin-top:8px">
+      <label>${t("est.fecha")}</label>
       <input id="estFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
 
       ${MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? `
-        <label>Ojo</label>
+        <label>${t("est.ojo")}</label>
         <div class="chip-row" id="estLadoOjoChips">
-          ${Object.entries(LADOS_OJO).map(([k, l]) => `<button type="button" class="chip" data-lado-ojo="${k}">${l}</button>`).join("")}
+          ${Object.entries(ladosOjo()).map(([k, l]) => `<button type="button" class="chip" data-lado-ojo="${k}">${l}</button>`).join("")}
         </div>
       ` : ""}
 
       <div id="estAnguloBox" style="display:none;margin-top:8px">
-        <label>Ángulo de la foto</label>
+        <label>${t("est.angulo")}</label>
         <div class="chip-row" id="estAnguloChips">
           ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<button type="button" class="chip" data-angulo="${k}">${l}</button>`).join("")}
         </div>
-        <button type="button" class="secondary" id="btnFotoGuiada" style="margin-top:6px">📸 Tomar foto guiada</button>
-        ${MEDICO_TIPO_ESPECIALIDAD === "estetica" ? `<button type="button" class="secondary" id="btnSesionFacial" style="margin-top:6px">🎥 Sesión guiada (los 5 ángulos)</button>` : ""}
+        <button type="button" class="secondary" id="btnFotoGuiada" style="margin-top:6px">${t("est.fotoGuiada")}</button>
+        ${MEDICO_TIPO_ESPECIALIDAD === "estetica" ? `<button type="button" class="secondary" id="btnSesionFacial" style="margin-top:6px">${t("est.sesionGuiada")}</button>` : ""}
       </div>
 
-      <label class="file-label" for="estArchivo" style="margin-top:10px">📎 Elegir imagen(es) o PDF</label>
+      <label class="file-label" for="estArchivo" style="margin-top:10px">${t("est.elegirArchivo")}</label>
       <input type="file" id="estArchivo" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" multiple style="display:none">
       <div id="estArchivoNombre" class="hint"></div>
       <div id="estArchivoPreview" style="display:none;margin-top:8px"></div>
       <div id="estArchivoMultiple" style="display:none;margin-top:10px"></div>
       <div id="estErr"></div>
-      <button class="secondary" id="btnSubirEstudio">⬆️ Subir</button>
+      <button class="secondary" id="btnSubirEstudio">${t("est.subir")}</button>
     </div>
-    ${hayFotos ? `<button class="secondary" id="btnCompararFotos">🔀 Comparar antes / después</button>` : ""}
-    ${estudios.length === 0 ? `<div class="empty">Todavía no hay estudios cargados.</div>` : ""}
+    ${hayFotos ? `<button class="secondary" id="btnCompararFotos">${t("est.comparar")}</button>` : ""}
+    ${estudios.length === 0 ? `<div class="empty">${t("est.vacio")}</div>` : ""}
     ${estudios.map(e => `
       <div class="item" data-ver-estudio="${e._id}">
         <div class="top">
-          <div class="nombre">${esc(tiposEstudioActivos()[e.tipo] || TIPOS_ESTUDIO_OFTALMOLOGIA[e.tipo] || e.tipo)}${e.anguloFoto ? " · " + esc(ANGULOS_FOTO_TODOS[e.anguloFoto] || e.anguloFoto) : ""}${e.ladoOjo ? " · " + esc(LADOS_OJO[e.ladoOjo] || e.ladoOjo) : ""} — ${esc(e.nombre)}</div>
+          <div class="nombre">${esc(tiposEstudioTodos()[e.tipo] || e.tipo)}${e.anguloFoto ? " · " + esc(angulosFotoTodos()[e.anguloFoto] || e.anguloFoto) : ""}${e.ladoOjo ? " · " + esc(ladosOjo()[e.ladoOjo] || e.ladoOjo) : ""} — ${esc(e.nombre)}</div>
           <button class="link" data-borrar-estudio="${e._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(e.fecha).toLocaleDateString("es-BO")}</div>
+        <div class="fecha">${new Date(e.fecha).toLocaleDateString(localeActual())}</div>
         ${e.notas ? `<div class="paciente-info">📝 ${esc(e.notas)}</div>` : ""}
         ${(e.anotaciones || []).length ? `
         <div class="paciente-info" style="margin-top:6px">
           ✎ ${(e.anotaciones || []).map(a => esc(a.texto)).join(" · ")}
         </div>` : ""}
         ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" && e.anguloFoto === "frontal" ? `
-        <button class="item-action" data-mapa-facial="${e._id}" style="margin-top:10px">🧭 Ver mapa anatómico y simetría</button>` : ""}
+        <button class="item-action" data-mapa-facial="${e._id}" style="margin-top:10px">${t("est.mapaFacial")}</button>` : ""}
         ${MEDICO_TIPO_ESPECIALIDAD === "estetica" && e.tipo === "foto" ? `
-        <button class="item-action" data-simular="${e._id}" data-simular-nombre="${esc(e.nombre || "")}" style="margin-top:8px">✨ Simular cirugía sobre esta foto</button>` : ""}
+        <button class="item-action" data-simular="${e._id}" data-simular-nombre="${esc(e.nombre || "")}" style="margin-top:8px">${t("est.simular")}</button>` : ""}
       </div>`).join("")}
   `;
 }
@@ -185,7 +181,7 @@ function wireTabEstudios(p, estudios) {
     const necesitaAngulo = tipoSelect.value === "foto";
     multipleEl.style.display = "block";
     multipleEl.innerHTML = `
-      <div class="hint">${archivosMultiples.length} archivos elegidos${necesitaAngulo ? " — asignale un ángulo a cada uno" : ""}</div>
+      <div class="hint">${t("est.archivosElegidos", { n: archivosMultiples.length })}${necesitaAngulo ? t("est.asignaAngulo") : ""}</div>
       ${archivosMultiples.map((a, i) => `
         <div class="item" style="display:flex;gap:10px;align-items:center;padding:8px 10px;margin-top:6px">
           ${a.url
@@ -195,12 +191,12 @@ function wireTabEstudios(p, estudios) {
             <div style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.file.name)}</div>
             ${necesitaAngulo ? `
             <select data-multi-angulo="${i}" style="margin-top:4px">
-              <option value="">— Elegí el ángulo —</option>
+              <option value="">${t("est.elegirAngulo")}</option>
               ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<option value="${k}" ${a.angulo === k ? "selected" : ""}>${l}</option>`).join("")}
             </select>` : ""}
           </div>
         </div>`).join("")}
-      <button type="button" class="primary" id="btnSubirMultiples" style="margin-top:10px">⬆️ Subir las ${archivosMultiples.length} fotos</button>`;
+      <button type="button" class="primary" id="btnSubirMultiples" style="margin-top:10px">${t("est.subirVarias", { n: archivosMultiples.length })}</button>`;
     multipleEl.querySelectorAll("[data-multi-angulo]").forEach(sel => {
       sel.onchange = () => { archivosMultiples[Number(sel.dataset.multiAngulo)].angulo = sel.value || null; };
     });
@@ -214,9 +210,9 @@ function wireTabEstudios(p, estudios) {
     errBox.innerHTML = "";
     const tipo = tipoSelect.value;
     const fecha = document.getElementById("estFecha").value;
-    if (!fecha) { errBox.innerHTML = `<div class="error">La fecha es obligatoria</div>`; return; }
+    if (!fecha) { errBox.innerHTML = `<div class="error">${t("est.errFechaObligatoria")}</div>`; return; }
     if (tipo === "foto" && archivosMultiples.some(a => !a.angulo)) {
-      errBox.innerHTML = `<div class="error">Elegí el ángulo de cada foto antes de subir</div>`;
+      errBox.innerHTML = `<div class="error">${t("est.errFaltanAngulos")}</div>`;
       return;
     }
     const nombreBase = document.getElementById("estNombre").value.trim();
@@ -226,7 +222,7 @@ function wireTabEstudios(p, estudios) {
     let ok = 0;
     for (const { file, angulo } of archivosMultiples) {
       try {
-        const nombre = nombreBase || (tipo === "foto" ? "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo) : file.name);
+        const nombre = nombreBase || (tipo === "foto" ? t("est.nombreFotoAngulo", { angulo: angulosFotoTodos()[angulo] || angulo }) : file.name);
         let qs = "?tipo=" + encodeURIComponent(tipo) + "&nombre=" + encodeURIComponent(nombre) + "&fecha=" + encodeURIComponent(fecha);
         if (tipo === "foto" && angulo) qs += "&anguloFoto=" + encodeURIComponent(angulo);
         if (ladoOjoElegido) qs += "&ladoOjo=" + encodeURIComponent(ladoOjoElegido);
@@ -275,9 +271,9 @@ function wireTabEstudios(p, estudios) {
     const nombre = document.getElementById("estNombre").value.trim();
     const fecha = document.getElementById("estFecha").value;
     const tipo = tipoSelect.value;
-    if (!nombre || !fecha) { errBox.innerHTML = `<div class="error">Título y fecha son obligatorios</div>`; return; }
-    if (!archivoSeleccionado) { errBox.innerHTML = `<div class="error">Elegí una imagen o PDF</div>`; return; }
-    if (tipo === "foto" && !anguloElegido) { errBox.innerHTML = `<div class="error">Elegí el ángulo de la foto</div>`; return; }
+    if (!nombre || !fecha) { errBox.innerHTML = `<div class="error">${t("est.errTituloFecha")}</div>`; return; }
+    if (!archivoSeleccionado) { errBox.innerHTML = `<div class="error">${t("est.errSinArchivo")}</div>`; return; }
+    if (tipo === "foto" && !anguloElegido) { errBox.innerHTML = `<div class="error">${t("est.errSinAngulo")}</div>`; return; }
 
     btnSubir.disabled = true;
     btnSubir.textContent = "Subiendo...";
@@ -290,12 +286,12 @@ function wireTabEstudios(p, estudios) {
         headers: { "Content-Type": archivoSeleccionado.type || "application/octet-stream" },
         body: archivoSeleccionado,
       });
-      errBox.innerHTML = `<div class="exito">✅ Estudio guardado</div>`;
+      errBox.innerHTML = `<div class="exito">${t("est.guardado")}</div>`;
       setTimeout(() => renderPacienteDetalle(p._id, "estudios"), 800);
     } catch (e) {
       btnSubir.disabled = false;
       btnSubir.textContent = "⬆️ Subir";
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo subir el archivo")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("est.errSubir"))}</div>`;
     }
   }
   btnSubir.onclick = subirEstudioActual;
@@ -308,7 +304,7 @@ function wireTabEstudios(p, estudios) {
         document.querySelectorAll("#estAnguloChips [data-angulo]").forEach(b => b.classList.toggle("activo", b.dataset.angulo === angulo));
         setArchivoSeleccionado(new File([blob], "foto-" + angulo + ".jpg", { type: "image/jpeg" }), "foto tomada ahora");
         if (!document.getElementById("estNombre").value.trim()) {
-          document.getElementById("estNombre").value = "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo);
+          document.getElementById("estNombre").value = t("est.nombreFotoAngulo", { angulo: angulosFotoTodos()[angulo] || angulo });
         }
         subirEstudioActual();
       });
@@ -324,7 +320,7 @@ function wireTabEstudios(p, estudios) {
     let ok = 0;
     for (const { angulo, blob } of fotos) {
       try {
-        const nombre = "Foto clínica — " + (ANGULOS_FOTO_TODOS[angulo] || angulo);
+        const nombre = t("est.nombreFotoAngulo", { angulo: angulosFotoTodos()[angulo] || angulo });
         const qs = "?tipo=foto&nombre=" + encodeURIComponent(nombre) + "&fecha=" + encodeURIComponent(fecha) + "&anguloFoto=" + encodeURIComponent(angulo);
         await api("/medico/pacientes/" + p._id + "/estudios" + qs, {
           method: "POST",
@@ -358,7 +354,7 @@ function wireTabEstudios(p, estudios) {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
       const blob = await traerBlobEstudio(btn.dataset.simular);
-      if (!blob) { alert("No se pudo cargar la foto"); return; }
+      if (!blob) { alert(t("est.errFoto")); return; }
       abrirSimuladorFacial(blob, {
         estudioId: btn.dataset.simular,
         pacienteId: p._id,
@@ -370,7 +366,7 @@ function wireTabEstudios(p, estudios) {
   if (btn25d) btn25d.onclick = async () => {
     btn25d.disabled = true;
     const antes = btn25d.textContent;
-    btn25d.textContent = "Cargando las vistas...";
+    btn25d.textContent = t("est.cargandoVistas");
     try { await abrirSimulador25D(p._id, estudios); }
     finally { btn25d.disabled = false; btn25d.textContent = antes; }
   };
@@ -389,14 +385,14 @@ function wireTabEstudios(p, estudios) {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
       const blob = await traerBlobEstudio(btn.dataset.mapaFacial);
-      if (!blob) { alert("No se pudo cargar la foto"); return; }
+      if (!blob) { alert(t("est.errFoto")); return; }
       abrirAnalisisFacial(blob);
     };
   });
   document.querySelectorAll("[data-borrar-estudio]").forEach(btn => {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
-      if (!confirm("¿Eliminar este estudio?")) return;
+      if (!confirm(t("est.confirmarBorrar"))) return;
       await api("/medico/estudios/" + btn.dataset.borrarEstudio, { method: "DELETE" });
       renderPacienteDetalle(p._id, "estudios");
     };
@@ -413,10 +409,10 @@ function wireTabEstudios(p, estudios) {
 async function abrirArchivoEstudio(id) {
   try {
     const blob = await traerBlobEstudio(id);
-    if (!blob) { alert("No se pudo abrir el archivo"); return; }
+    if (!blob) { alert(t("est.errAbrir")); return; }
     window.open(URL.createObjectURL(blob), "_blank");
   } catch (e) {
-    alert("No se pudo abrir el archivo");
+    alert(t("est.errAbrir"));
   }
 }
 
@@ -478,23 +474,23 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
     <div id="camVista" style="flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
       <video id="camVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
       <div id="camGuia" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${guiaSvgPara(angulo)}</div>
-      <div id="camEstado" class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">Alineá la cara con la guía</div>
+      <div id="camEstado" class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">${t("cam.alinea")}</div>
     </div>
     <div id="camRevision" style="flex:1;position:relative;overflow:hidden;display:none;align-items:center;justify-content:center;background:#000">
       <img id="camFotoTomada" style="max-width:100%;max-height:100%;object-fit:contain">
-      <div class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">¿Quedó bien la foto?</div>
+      <div class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600">${t("cam.quedoBien")}</div>
     </div>
     <div style="padding:14px;background:#111">
       <div class="chip-row" id="camAnguloChips" style="justify-content:center;margin-bottom:10px">
         ${Object.entries(angulosFotoActivos()).map(([k, l]) => `<button type="button" class="chip ${k === angulo ? "activo" : ""}" data-cam-angulo="${k}">${l}</button>`).join("")}
       </div>
       <div style="display:flex;gap:10px" id="camBotonesCaptura">
-        <button class="secondary" id="btnCamCancelar" style="flex:1">Cancelar</button>
-        <button class="primary" id="btnCamCapturar" style="flex:1">📸 Capturar</button>
+        <button class="secondary" id="btnCamCancelar" style="flex:1">${t("cam.cancelar")}</button>
+        <button class="primary" id="btnCamCapturar" style="flex:1">${t("cam.capturar")}</button>
       </div>
       <div style="display:none;gap:10px" id="camBotonesRevision">
-        <button class="secondary" id="btnCamRepetir" style="flex:1">🔄 Repetir</button>
-        <button class="primary" id="btnCamUsar" style="flex:1">✅ Usar esta foto</button>
+        <button class="secondary" id="btnCamRepetir" style="flex:1">${t("cam.repetir")}</button>
+        <button class="primary" id="btnCamUsar" style="flex:1">${t("cam.usar")}</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -515,7 +511,7 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
     video.srcObject = stream;
   } catch (e) {
     overlay.remove();
-    alert("No se pudo acceder a la cámara. Podés elegir un archivo con el botón de abajo en su lugar.");
+    alert(t("cam.errCamara"));
     return;
   }
 
@@ -586,17 +582,17 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
         if (!resultado) {
           cuadrosAlineado = 0;
           actualizarGuia(false);
-          estadoEl.textContent = "Buscando cara...";
+          estadoEl.textContent = t("cam.buscando");
           return;
         }
         actualizarGuia(resultado.alineado);
         if (resultado.alineado) {
           cuadrosAlineado++;
-          estadoEl.textContent = cuadrosAlineado >= CUADROS_PARA_CAPTURAR ? "📸 ¡Listo!" : "¡Alineado! Manteniendo...";
+          estadoEl.textContent = cuadrosAlineado >= CUADROS_PARA_CAPTURAR ? t("cam.listo") : t("cam.manteniendo");
           if (cuadrosAlineado >= CUADROS_PARA_CAPTURAR) capturarCuadro();
         } else {
           cuadrosAlineado = 0;
-          estadoEl.textContent = "Alineá la cara con la guía";
+          estadoEl.textContent = t("cam.alinea");
         }
       }, 150);
     }).catch(() => { /* sin detección automática disponible — igual queda el botón manual */ });
@@ -646,12 +642,12 @@ async function abrirSesionGuiadaFacial(onListo) {
     <div style="flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
       <video id="camVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
       <div id="camGuia" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"></div>
-      <div id="camEstado" class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600;font-size:15px;padding:0 14px">Cargando...</div>
+      <div id="camEstado" class="hint" style="position:absolute;top:10px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 1px 3px #000;font-weight:600;font-size:15px;padding:0 14px">${t("cam.cargando")}</div>
       <div id="camMiniaturas" style="position:absolute;bottom:10px;left:0;right:0;display:flex;gap:6px;justify-content:center"></div>
     </div>
     <div style="padding:14px;background:#111;display:flex;gap:10px">
-      <button class="secondary" id="btnSesionCancelar" style="flex:1">Cancelar</button>
-      <button class="primary" id="btnSesionCapturarAhora" style="flex:1">📸 Capturar ahora</button>
+      <button class="secondary" id="btnSesionCancelar" style="flex:1">${t("cam.cancelar")}</button>
+      <button class="primary" id="btnSesionCapturarAhora" style="flex:1">${t("cam.capturarAhora")}</button>
     </div>`;
   document.body.appendChild(overlay);
 
@@ -666,7 +662,7 @@ async function abrirSesionGuiadaFacial(onListo) {
     video.srcObject = stream;
   } catch (e) {
     overlay.remove();
-    alert("No se pudo acceder a la cámara. Podés elegir un archivo con el botón de abajo en su lugar.");
+    alert(t("cam.errCamara"));
     return;
   }
 
@@ -707,11 +703,11 @@ async function abrirSesionGuiadaFacial(onListo) {
 
       cuadrosEnRango = 0;
       guiaEl.innerHTML = guiaSvgPara(angulo, true);
-      estadoEl.textContent = "📸 ¡Tomada! (" + capturas.length + "/" + SECUENCIA_SESION_FACIAL.length + ")";
+      estadoEl.textContent = t("cam.tomada", { n: capturas.length, total: SECUENCIA_SESION_FACIAL.length });
       pasoActual++;
 
       if (pasoActual >= SECUENCIA_SESION_FACIAL.length) {
-        estadoEl.textContent = "¡Listo! Se tomaron las " + SECUENCIA_SESION_FACIAL.length + " fotos";
+        estadoEl.textContent = t("cam.sesionLista", { n: SECUENCIA_SESION_FACIAL.length });
         const resultado = capturas.map(({ angulo, blob }) => ({ angulo, blob }));
         setTimeout(() => { cerrar(); onListo(resultado); }, 700);
         return;
@@ -771,17 +767,17 @@ async function abrirComparadorFotos(fotos) {
   function pintar() {
     const lista = porAngulo[anguloElegido] || [];
     overlay.innerHTML = `
-      <button class="back" id="cmpVolver">← Volver</button>
+      <button class="back" id="cmpVolver">${t("cmp.volver")}</button>
       <div class="card">
-        <div class="seccion-titulo" style="margin-top:0">🔀 Comparar antes / después</div>
+        <div class="seccion-titulo" style="margin-top:0">${t("cmp.titulo")}</div>
         <div class="chip-row">
-          ${angulosDisponibles.map(a => `<button type="button" class="chip ${a === anguloElegido ? "activo" : ""}" data-cmp-angulo="${a}">${ANGULOS_FOTO_TODOS[a] || a}</button>`).join("")}
+          ${angulosDisponibles.map(a => `<button type="button" class="chip ${a === anguloElegido ? "activo" : ""}" data-cmp-angulo="${a}">${esc(angulosFotoTodos()[a] || a)}</button>`).join("")}
         </div>
         <div style="display:flex;gap:10px;margin-top:10px">
-          <div style="flex:1"><label>Antes</label><select id="cmpAntes">${opcionesFecha(lista)}</select></div>
-          <div style="flex:1"><label>Después</label><select id="cmpDespues">${opcionesFecha(lista)}</select></div>
+          <div style="flex:1"><label>${t("cmp.antes")}</label><select id="cmpAntes">${opcionesFecha(lista)}</select></div>
+          <div style="flex:1"><label>${t("cmp.despues")}</label><select id="cmpDespues">${opcionesFecha(lista)}</select></div>
         </div>
-        ${lista.length < 2 ? `<div class="hint" style="margin-top:8px">Necesitás al menos 2 fotos de este mismo ángulo para comparar.</div>` : `<div id="cmpSliderBox" style="margin-top:14px"></div>`}
+        ${lista.length < 2 ? `<div class="hint" style="margin-top:8px">${t("cmp.faltanFotos")}</div>` : `<div id="cmpSliderBox" style="margin-top:14px"></div>`}
       </div>`;
     overlay.querySelector("#cmpVolver").onclick = () => overlay.remove();
     overlay.querySelectorAll("[data-cmp-angulo]").forEach(btn => {
@@ -802,11 +798,11 @@ async function abrirComparadorFotos(fotos) {
 }
 
 async function pintarSlider(box, lista, idAntes, idDespues) {
-  box.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando fotos...</div>`;
+  box.innerHTML = `<div class="loading"><div class="spinner"></div>${t("cmp.cargando")}</div>`;
   const antes = lista.find(f => f._id === idAntes);
   const despues = lista.find(f => f._id === idDespues);
   const [blobAntes, blobDespues] = await Promise.all([traerBlobEstudio(idAntes), traerBlobEstudio(idDespues)]);
-  if (!blobAntes || !blobDespues) { box.innerHTML = `<div class="error">No se pudieron cargar las fotos</div>`; return; }
+  if (!blobAntes || !blobDespues) { box.innerHTML = `<div class="error">${t("cmp.errFotos")}</div>`; return; }
   const urlAntes = URL.createObjectURL(blobAntes);
   const urlDespues = URL.createObjectURL(blobDespues);
 
