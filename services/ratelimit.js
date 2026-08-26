@@ -1,5 +1,8 @@
 // Vitalis — Rate Limiting en memoria (sin dependencias externas)
 const { log } = require("../config");
+// Solo para saber DE QUIÉN es el pedido antes de contarlo — ver
+// claveDeMedico(). auth.js no importa nada de acá, así que no hay ciclo.
+const { verificarToken } = require("./auth");
 
 // Los "store" se crean solos la primera vez que alguien pide un limitador
 // con ese nombre (ver almacen()). Antes había que acordarse de agregarlo
@@ -12,12 +15,12 @@ function almacen(nombre) {
   return stores[nombre];
 }
 
-// Limpieza periódica para no acumular IPs
+// Limpieza periódica para no acumular claves (IPs, cuentas, sesiones)
 setInterval(() => {
   const now = Date.now();
   for (const store of Object.values(stores)) {
-    for (const [ip, data] of store.entries()) {
-      if (data.resetAt < now) store.delete(ip);
+    for (const [clave, data] of store.entries()) {
+      if (data.resetAt < now) store.delete(clave);
     }
   }
 }, 5 * 60 * 1000); // cada 5 min
@@ -56,12 +59,46 @@ function rateLimit(storeName, max, windowMs, message) {
   };
 }
 
-const limitMedico = rateLimit("medico", 30, 60 * 1000, "Demasiadas peticiones. Esperá un momento.");
+// La cuota de las rutas de médico es de CADA MÉDICO, no de la IP.
+//
+// Una clínica de siete consultorios sale a internet con una sola IP: la del
+// router de la clínica. Con la cuota por IP, esos siete médicos se repartían
+// treinta pedidos por minuto entre todos, y al tercero que abría un Kardex
+// al mismo tiempo le salía un 429 sin haber hecho nada raro. Peor todavía,
+// era invisible en las pruebas: cada uno probando desde su casa nunca lo veía.
+//
+// La firma del token se verifica antes de usar el usuario como clave. Si la
+// clave saliera de un token sin verificar, cualquiera podría mandar pedidos
+// a nombre de otro médico y dejarlo sin cuota — un ataque barato y difícil
+// de diagnosticar desde el lado del médico bloqueado.
+function claveDeMedico(req) {
+  const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
+  const payload = verificarToken(token);
+  if (payload?.usuario) return `medico:${payload.usuario}`;
+  // Sin token válido no hay a quién cobrarle el pedido. Se cae a la IP, que
+  // además es lo único que frena a quien pega sin haber iniciado sesión —
+  // esos pedidos igual terminan en 401, pero cuestan.
+  return `ip:${getIP(req)}`;
+}
+
+// 60/min por médico. Abrir un Kardex con sus pestañas dispara del orden de
+// diez pedidos, así que treinta —que era el número de antes, pero repartido
+// entre todos— daban tres pantallas por minuto. Sigue siendo un freno firme
+// para bajarse la base de pacientes de a poco.
+const limitMedico = rateLimitPorClave(
+  "medico", 60, 60 * 1000,
+  "Demasiadas peticiones. Esperá un momento.",
+  claveDeMedico
+);
 
 // Login/registro/2FA necesitan un límite mucho más estricto que el resto de
-// la API: 30/min (limitMedico) es razonable para uso normal, pero deja
+// la API: 60/min (limitMedico) es razonable para uso normal, pero deja
 // margen de sobra para adivinar contraseñas o códigos de 2FA por fuerza
 // bruta. Acá: 8 intentos cada 10 minutos por IP.
+//
+// Y acá SÍ va por IP: en el login todavía no hay token, así que no existe
+// el médico al que cobrarle el intento. Es justo el caso que claveDeMedico
+// resuelve cayéndose a la IP.
 const limitAuth = rateLimit("auth", 8, 10 * 60 * 1000, "Demasiados intentos. Esperá unos minutos antes de volver a intentar.");
 
 // Página pública de reserva (sin login) — la usa cualquiera que abra el

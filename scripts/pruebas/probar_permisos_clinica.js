@@ -100,5 +100,50 @@ verificar("los números salen de agregaciones ($group), que no devuelven conteni
 const filtraInquilinos = /vinculo\s*===\s*"empleado"/.test(codigoAdmin);
 verificar("finanzas excluye a los que alquilan el consultorio", filtraInquilinos);
 
+console.log("\n── 7. La cuota es de cada médico, no del router de la clínica ──");
+// Los siete consultorios salen a internet con una sola IP. Con la cuota por
+// IP se la repartían entre todos y el tercero que abría un Kardex al mismo
+// tiempo se comía un 429 sin haber hecho nada. Y no se veía en las pruebas,
+// porque cada médico probando desde su casa nunca compartía la IP con nadie.
+const { limitMedico } = require(path.join(RAIZ, "services", "ratelimit"));
+
+const IP_CLINICA = "200.10.20.30";
+function pedir(token, ip) {
+  const req = {
+    headers: { "x-forwarded-for": ip, ...(token ? { authorization: "Bearer " + token } : {}) },
+    query: {}, socket: {},
+  };
+  let siguio = false;
+  const res = { setHeader() {}, status() { return this; }, json() { return this; } };
+  limitMedico(req, res, () => { siguio = true; });
+  return siguio;
+}
+
+// Tres médicos de la misma clínica, 40 pedidos cada uno, misma IP. Por IP
+// eso eran 120 pedidos contra un tope de 30.
+const tokensClinica = ["70000010", "70000011", "70000012"].map(u => generarToken(u, "medico", 3600e3));
+let rebotados = 0;
+for (let i = 0; i < 40; i++) for (const tk of tokensClinica) if (!pedir(tk, IP_CLINICA)) rebotados++;
+verificar(
+  rebotados === 0
+    ? "tres médicos detrás de la misma IP no se pisan la cuota"
+    : `se pisan la cuota: ${rebotados} pedidos rebotados desde la IP de la clínica`,
+  rebotados === 0
+);
+
+// Pero el tope sigue existiendo: uno solo que se pase, se frena.
+const tokenGoloso = generarToken("70000013", "medico", 3600e3);
+let frenados = 0;
+for (let i = 0; i < 65; i++) if (!pedir(tokenGoloso, "9.9.9.9")) frenados++;
+verificar("un médico solo que se pasa del tope sí se frena", frenados > 0);
+
+// La firma se verifica antes de usar el usuario como clave. Si no, mandar
+// pedidos con un token armado a mano a nombre de otro médico le vaciaba la
+// cuota, y del lado del médico bloqueado era indiagnosticable.
+const tokenVictima = generarToken("70000014", "medico", 3600e3);
+const tokenFalsificado = tokenVictima.split(".")[0] + "." + "0".repeat(32);
+for (let i = 0; i < 70; i++) pedir(tokenFalsificado, "6.6.6.6");
+verificar("un token falsificado no gasta la cuota del médico que dice ser", pedir(tokenVictima, "1.2.3.4"));
+
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);
