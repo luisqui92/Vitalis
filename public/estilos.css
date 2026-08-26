@@ -864,6 +864,25 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    facturación, y conviene que se note en la fila. */
 .clin-chip-alquila { background: var(--border); color: var(--text-muted); }
 
+/* Agenda unificada: el día de los siete consultorios en una sola lista.
+   Las flechas quedan a los costados de la fecha, que es lo que se mira. */
+.clin-agenda-dias {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 12px;
+}
+.clin-agenda-dias button {
+  width: auto; margin: 0; padding: 7px 12px; font-size: 12px; white-space: nowrap;
+}
+.clin-agenda-fecha { text-align: center; font-size: 13px; line-height: 1.3; }
+.clin-agenda-fecha > div:first-child { text-transform: capitalize; }
+/* Ya pasó: se atenúa para que la próxima cita sea la primera fila que el
+   ojo encuentra, sin tener que buscar la hora actual. */
+.clin-fila-atendida { opacity: .55; }
+
+@media (max-width: 420px) {
+  .clin-agenda-dias button { padding: 7px 9px; font-size: 11px; }
+}
+
 /* ─── Aviso de alergias (persona compartida en una clínica) ──────────────
    Va arriba de las pestañas del Kardex y con el color de peligro: una
    alergia que hay que buscar no protege a nadie. El odontólogo que va a

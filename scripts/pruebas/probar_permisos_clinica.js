@@ -82,6 +82,9 @@ console.log("\n── 6. El panel cuenta, no lee ──");
 // La garantía estructural: ninguna consulta a una colección clínica puede
 // devolver contenido. Si alguna vez hace falta un .find(), que sea a
 // propósito y con una razón escrita, no por descuido.
+// Cita NO está en la lista a propósito: una cita es una reserva —quién
+// viene y cuándo—, no una nota clínica. La agenda del día la lee con find(),
+// y lo que hace segura esa lectura es el select, que se prueba abajo en 8.
 const COLECCIONES_CLINICAS = ["ConsultaMedica", "Paciente", "Receta", "Estudio", "Informe", "Odontograma", "ExamenOcular"];
 const finds = [...codigoAdmin.matchAll(/\b([A-Z][A-Za-z]+)\.(find|findOne)\s*\(/g)]
   .filter(m => COLECCIONES_CLINICAS.includes(m[1]));
@@ -144,6 +147,53 @@ const tokenVictima = generarToken("70000014", "medico", 3600e3);
 const tokenFalsificado = tokenVictima.split(".")[0] + "." + "0".repeat(32);
 for (let i = 0; i < 70; i++) pedir(tokenFalsificado, "6.6.6.6");
 verificar("un token falsificado no gasta la cuota del médico que dice ser", pedir(tokenVictima, "1.2.3.4"));
+
+console.log("\n── 8. La agenda del día: qué sale y qué no ──");
+// La agenda es lo único del panel que muestra el nombre de un paciente, y
+// solo de los médicos empleados. Se prueba la función de verdad, no el
+// código con una expresión regular: si mañana alguien agrega un campo a la
+// respuesta, esto lo ve.
+const { citaParaElPanel } = require(path.join(RAIZ, "routes", "admin"));
+
+const citaCruda = {
+  medicoPhone: "70000001",
+  fecha: new Date("2026-08-26T15:30:00Z"),
+  duracionMinutos: 45,
+  estado: "confirmada",
+  pacienteNombre: "María Fernández",
+  pacienteTelefono: "59170000000",
+  motivo: "dolor en el pecho desde ayer",
+};
+
+const deEmpleado = citaParaElPanel(citaCruda, "empleado");
+const deInquilino = citaParaElPanel(citaCruda, "alquila");
+
+verificar("del médico empleado sale el nombre del paciente", deEmpleado.paciente === "María Fernández");
+verificar("del que alquila el consultorio NO sale el nombre", deInquilino.paciente === null);
+verificar("  ...y sí sale la hora, para que la sala figure ocupada", Boolean(deInquilino.fecha && deInquilino.duracionMinutos));
+
+// El motivo lo escribe el paciente al reservar y suele ser clínico. No sale
+// para nadie, ni siquiera del médico empleado.
+const campos = new Set([...Object.keys(deEmpleado), ...Object.keys(deInquilino)]);
+const prohibidos = ["motivo", "pacienteTelefono", "telefono", "pacienteId", "googleEventId"];
+const filtrados = prohibidos.filter(c => campos.has(c));
+verificar(
+  filtrados.length === 0
+    ? "el motivo y el teléfono no viajan para ningún vínculo"
+    : `VIAJAN campos que no deberían: ${filtrados.join(", ")}`,
+  filtrados.length === 0
+);
+
+// Un vínculo desconocido —una cuenta vieja, un valor que alguien escribió a
+// mano en la base— no puede caer del lado permisivo.
+verificar("un vínculo desconocido oculta el nombre, no lo muestra", citaParaElPanel(citaCruda, "otra_cosa").paciente === null);
+verificar("un vínculo vacío también", citaParaElPanel(citaCruda, undefined).paciente === null);
+
+// Y que la consulta a la base no traiga de más: el select está cerrado a
+// mano justamente para que agregar un campo al modelo no lo cuele solo.
+const selectAgenda = codigoAdmin.match(/\.select\("([^"]*pacienteNombre[^"]*)"\)/);
+verificar("la agenda pide a la base solo los campos que muestra",
+  Boolean(selectAgenda) && !/motivo|Telefono/.test(selectAgenda[1]));
 
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

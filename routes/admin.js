@@ -3,8 +3,14 @@
 // ═══ LO QUE ESTE ARCHIVO NO HACE ═══════════════════════════════════════════
 //
 // No devuelve una sola línea de historia clínica. Ni transcripciones, ni
-// notas, ni diagnósticos, ni recetas, ni fotos, ni nombres de pacientes.
+// notas, ni diagnósticos, ni recetas, ni fotos, ni motivos de consulta.
 // Cuenta consultas; no las lee.
+//
+// La única excepción es el nombre del paciente en la agenda del día, y solo
+// de los médicos EMPLEADOS: quien recibe en la puerta necesita saber a quién
+// espera. Un nombre y una hora son identidad y asistencia, no historia
+// clínica — el POR QUÉ viene no aparece para nadie. Ver /admin/agenda, donde
+// está escrita la regla completa.
 //
 // No es una limitación que no tuvimos ganas de resolver: un administrativo no
 // es médico y no tiene por qué leer la consulta de un paciente. Si mañana
@@ -39,6 +45,24 @@ async function medicosDeLaClinica(clinicaId) {
     .select("phone nombre especialidad tipoEspecialidad rol vinculo consultorio idioma createdAt")
     .sort({ nombre: 1 })
     .lean();
+}
+
+// Qué se manda de una cita al panel, según el vínculo del médico. Es UNA
+// decisión y vive en UN lugar, aparte de la ruta, para poder probarla de
+// verdad en vez de mirar el código y confiar: si mañana alguien agrega un
+// campo a la respuesta, la prueba lo ve. Ver probar_permisos_clinica.js.
+//
+// El motivo y el teléfono no están acá ni condicionados: no existen en la
+// salida, para nadie.
+function citaParaElPanel(cita, vinculo) {
+  return {
+    fecha: cita.fecha,
+    duracionMinutos: cita.duracionMinutos || 30,
+    estado: cita.estado,
+    // null, no "" — que quede claro en la respuesta que se oculta a
+    // propósito, y no que la cita vino sin nombre.
+    paciente: vinculo === "empleado" ? cita.pacienteNombre : null,
+  };
 }
 
 function inicioDeMes(mesesAtras = 0) {
@@ -151,6 +175,82 @@ module.exports = function (app) {
     });
   }));
 
+  // ─── AGENDA DEL DÍA, LOS SIETE CONSULTORIOS JUNTOS ──────────────────────
+  //
+  // Lo que /admin/ocupacion da en números —cuántas citas por sala por día—
+  // acá se abre a las horas. Es la pantalla que mira quien atiende la puerta.
+  //
+  // QUÉ SE VE Y QUÉ NO, y por qué está partido así:
+  //
+  //   • El MOTIVO no viaja nunca, para ningún médico. Es texto que escribe el
+  //     paciente al reservar y suele ser clínico ("dolor de pecho"). El select
+  //     de abajo lo deja afuera a propósito, para que agregar un campo al
+  //     modelo mañana no lo cuele solo.
+  //   • El TELÉFONO tampoco: llamar al paciente de otro médico no es tarea de
+  //     la administración.
+  //   • El NOMBRE viaja solo si el médico es EMPLEADO. La clínica lo recibe en
+  //     la puerta, le abre la ficha, le cobra: ya sabe quién es.
+  //   • Si el médico ALQUILA, la hora aparece ocupada y sin nombre. Sus
+  //     pacientes son suyos; la clínica le alquila una sala, no le administra
+  //     la consulta. Es la misma línea que ya separa /admin/finanzas.
+  //
+  // La hora se manda en ISO y la formatea el navegador en su propia zona. Para
+  // un mostrador que está físicamente en la clínica eso da la hora correcta
+  // sin que haya que configurar nada. (El resto del sistema todavía tiene
+  // America/La_Paz escrito a mano en public/js/agenda.js — eso sigue pendiente
+  // y es un problema aparte, más grande, que aparece en cuanto la clínica esté
+  // en Brasil.)
+  app.get("/admin/agenda", limitMedico, requireAdmin, asyncRoute(async (req, res) => {
+    const medicos = await medicosDeLaClinica(req.clinicaId);
+    const telefonos = medicos.map(m => m.phone);
+
+    // La fecha llega como YYYY-MM-DD y se interpreta en la zona del servidor,
+    // igual que el resto de la agenda. Cualquier cosa que no tenga esa forma
+    // exacta es hoy: un query manoseado no puede hacer que la consulta
+    // devuelva un rango raro.
+    const pedida = String(req.query.fecha || "");
+    const desde = /^\d{4}-\d{2}-\d{2}$/.test(pedida)
+      ? new Date(`${pedida}T00:00:00`)
+      : new Date();
+    if (Number.isNaN(desde.getTime())) throw new ErrorHttp(400, "Fecha inválida");
+    desde.setHours(0, 0, 0, 0);
+    const hasta = new Date(desde); hasta.setDate(hasta.getDate() + 1);
+
+    // Este .find() es sobre Cita, que es una reserva —quién viene y cuándo—,
+    // no una consulta. La regla de "acá no se lee contenido clínico" sigue en
+    // pie: lo que la haría cierta o falsa es el select, y el select está
+    // cerrado a mano.
+    const citas = telefonos.length ? await Cita.find({
+      medicoPhone: { $in: telefonos },
+      estado: { $in: ["confirmada", "completada"] },
+      fecha: { $gte: desde, $lt: hasta },
+    })
+      .select("medicoPhone fecha duracionMinutos estado pacienteNombre")
+      .sort({ fecha: 1 })
+      .lean() : [];
+
+    const porMedico = {};
+    for (const c of citas) (porMedico[c.medicoPhone] = porMedico[c.medicoPhone] || []).push(c);
+
+    const salas = medicos.map(m => ({
+      phone: m.phone, nombre: m.nombre,
+      consultorio: m.consultorio || "", vinculo: m.vinculo,
+      especialidad: m.especialidad, tipoEspecialidad: m.tipoEspecialidad,
+      citas: (porMedico[m.phone] || []).map(c => citaParaElPanel(c, m.vinculo)),
+    }));
+
+    registrar({ req, medicoPhone: req.adminUser.usuario, accion: "admin_agenda_clinica", recurso: `Clinica:${req.clinicaId}` });
+
+    res.json({
+      fecha: `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-${String(desde.getDate()).padStart(2, "0")}`,
+      salas,
+      total: citas.length,
+      // Para poder decirlo en pantalla en vez de que el administrador crea
+      // que faltan citas: son horas ocupadas sin nombre, no huecos.
+      salasSinNombre: salas.filter(s => s.vinculo === "alquila" && s.citas.length).length,
+    });
+  }));
+
   // ─── FACTURACIÓN ────────────────────────────────────────────────────────
   // Solo de los médicos EMPLEADOS. El que alquila factura por su cuenta y
   // esa plata no es de la clínica: mostrarla sería enseñarle al dueño del
@@ -253,3 +353,7 @@ module.exports = function (app) {
     res.json({ ok: true });
   }));
 };
+
+// Expuesta solo para las pruebas: es la regla de qué ve el panel de una
+// cita, y conviene poder ejecutarla sin levantar Express ni Mongo.
+module.exports.citaParaElPanel = citaParaElPanel;

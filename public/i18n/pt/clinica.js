@@ -15,6 +15,8 @@ Object.assign(I18N.pt, {
   "clin.col.vinculo": "Vínculo",
   "clin.col.consultasMes": "Consultas no mês",
   "clin.col.pacientes": "Pacientes",
+  "clin.col.hora": "Horário",
+  "clin.col.paciente": "Paciente",
   "clin.col.hoy": "Hoje",
 
   "clin.ocupacion": "Ocupação das salas",
@@ -39,6 +41,18 @@ Object.assign(I18N.pt, {
   "clin.vincular": "Adicionar à clínica",
   "clin.errFaltaTelefono": "Informe o telefone do médico",
   "clin.errVincular": "Não foi possível adicionar à clínica",
+
+  "clin.agenda": "Agenda do dia",
+  "clin.agendaAyuda": "Os consultórios da clínica em uma só lista, por horário.",
+  "clin.agendaVacia": "Não há consultas marcadas para este dia.",
+  "clin.agendaError": "Não foi possível carregar a agenda",
+  "clin.agendaHoy": "Hoje",
+  "clin.agendaAnterior": "◀ Dia anterior",
+  "clin.agendaSiguiente": "Próximo dia ▶",
+  "clin.agendaTotal": "{n} consulta(s)",
+  "clin.agendaReservado": "Reservado",
+  "clin.agendaSinNombre": "{n} consultório(s) alugados: os horários aparecem ocupados, sem o nome do paciente. Esses pacientes são do médico que aluga, não da clínica.",
+  "clin.agendaCompletada": "Atendido",
 
   "clin.nav.clinica": "Clínica",
   "clin.nav.misPacientes": "Meus pacientes",

@@ -1,16 +1,24 @@
 // Vitalis — Panel de clínica: varios consultorios vistos desde arriba.
 //
 // Lo que esta pantalla NO muestra es tan parte del diseño como lo que sí:
-// no hay un solo nombre de paciente, ni una consulta, ni un diagnóstico.
-// Un administrativo no es médico. El backend ya lo garantiza (ver el
-// comentario de arriba de routes/admin.js); acá simplemente no hay dónde
-// pedirlo.
+// no hay una consulta, ni un diagnóstico, ni un motivo de consulta. Un
+// administrativo no es médico. El backend ya lo garantiza (ver el comentario
+// de arriba de routes/admin.js); acá simplemente no hay dónde pedirlo.
+//
+// Lo único que se ve de un paciente es su nombre en la agenda del día, y
+// solo si el médico es empleado de la clínica: alguien tiene que saber a
+// quién recibe en la puerta. De los consultorios que se alquilan, la hora
+// aparece ocupada y sin nombre.
 //
 // Quien administra puede ser una de dos cosas:
 //   admin    — solo esto. Sus rutas de médico están cerradas.
 //   director — atiende Y administra. Ve las dos, y cambia con un botón.
 
 let MEDICO_ROL = localStorage.getItem("salud_rol") || "medico";
+
+// Día que está mirando la agenda unificada. Vive acá afuera para que las
+// flechas de día no tengan que repintar el panel entero.
+let clinAgendaFecha = null;
 
 function esAdministrador() { return MEDICO_ROL === "admin" || MEDICO_ROL === "director"; }
 function esSoloAdministrador() { return MEDICO_ROL === "admin"; }
@@ -21,15 +29,19 @@ async function renderClinica() {
   const serie = nuevaSeriePantalla();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("clin.cargando")}</div>`;
   try {
-    const [datos, resumen, ocupacion, finanzas, equipos] = await Promise.all([
+    clinAgendaFecha = null;
+    const [datos, resumen, ocupacion, finanzas, equipos, agenda] = await Promise.all([
       api("/admin/clinica"),
       api("/admin/resumen"),
       api("/admin/ocupacion?dias=7"),
       api("/admin/finanzas"),
       api("/admin/equipos").catch(() => ({ equipos: [] })),
+      // Que falle la agenda no puede dejar sin panel al administrador: el
+      // resto de la pantalla no depende de ella.
+      api("/admin/agenda").catch(() => null),
     ]);
     if (!seriePantallaVigente(serie)) return;
-    pintarClinica(datos, resumen, ocupacion, finanzas, equipos);
+    pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda);
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
@@ -37,7 +49,7 @@ async function renderClinica() {
   }
 }
 
-function pintarClinica(datos, resumen, ocupacion, finanzas, equipos) {
+function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
   const dias = [...new Set(ocupacion.salas.flatMap(s => Object.keys(s.porDia)))].sort();
   const proximosDias = [];
   for (let i = 0; i < ocupacion.dias; i++) {
@@ -56,6 +68,17 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos) {
       ${escrStatCardHtml(resumen.totales.citasHoy, t("clin.stat.citasHoy"))}
       ${escrStatCardHtml(resumen.totales.pacientes, t("clin.stat.pacientes"))}
       ${escrStatCardHtml(datos.medicos.length, t("clin.stat.medicos"))}
+    </div>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${t("clin.agenda")}</div>
+      <div class="hint" style="margin:0 0 10px">${t("clin.agendaAyuda")}</div>
+      <div class="clin-agenda-dias">
+        <button class="secondary" id="clinDiaAnterior">${t("clin.agendaAnterior")}</button>
+        <div id="clinAgendaFecha" class="clin-agenda-fecha"></div>
+        <button class="secondary" id="clinDiaSiguiente">${t("clin.agendaSiguiente")}</button>
+      </div>
+      <div id="clinAgenda">${agendaClinicaHtml(agenda)}</div>
     </div>
 
     <div class="card">
@@ -146,6 +169,11 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos) {
       <button class="secondary" id="btnVincularMedico">${t("clin.vincular")}</button>
     </div>`;
 
+  clinAgendaFecha = agenda?.fecha || null;
+  clinPintarFecha();
+  document.getElementById("clinDiaAnterior").onclick = () => clinMoverDia(-1);
+  document.getElementById("clinDiaSiguiente").onclick = () => clinMoverDia(1);
+
   const selVinculo = document.getElementById("clinVinculo");
   selVinculo.onchange = () => {
     document.getElementById("clinVinculoAyuda").textContent =
@@ -173,6 +201,96 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos) {
       errBox.innerHTML = `<div class="error">${esc(e.error || t("clin.errVincular"))}</div>`;
     }
   };
+}
+
+// ─── AGENDA UNIFICADA ─────────────────────────────────────────────────────
+//
+// Los siete consultorios en una sola lista, ordenada por hora. Es cómo lee
+// el día quien atiende la puerta: no le importa de qué sala es la próxima
+// cita, le importa cuál es.
+//
+// De los médicos que ALQUILAN aparece la hora ocupada y no el nombre — el
+// servidor directamente no lo manda, ver /admin/agenda. Acá se dice en
+// pantalla, porque una fila sin nombre parece un error si nadie explica que
+// es a propósito.
+function agendaClinicaHtml(agenda) {
+  if (!agenda) return `<div class="error">${t("clin.agendaError")}</div>`;
+
+  // Aplanar las salas en una sola línea de tiempo. La sala pasa a ser una
+  // columna de cada fila, no el criterio de agrupación.
+  const filas = [];
+  for (const sala of agenda.salas) {
+    for (const cita of sala.citas) filas.push({ ...cita, sala });
+  }
+  filas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+  if (filas.length === 0) return `<div class="hint">${t("clin.agendaVacia")}</div>`;
+
+  return `
+    <div class="hint" style="margin:0 0 10px">${t("clin.agendaTotal", { n: agenda.total })}</div>
+    ${agenda.salasSinNombre ? `
+      <div class="hint" style="margin:0 0 10px">${t("clin.agendaSinNombre", { n: agenda.salasSinNombre })}</div>` : ""}
+    <div class="clin-tabla-caja">
+      <table class="clin-tabla">
+        <thead><tr>
+          <th>${t("clin.col.hora")}</th><th>${t("clin.col.consultorio")}</th>
+          <th>${t("clin.col.medico")}</th><th>${t("clin.col.paciente")}</th>
+        </tr></thead>
+        <tbody>
+          ${filas.map(f => `
+            <tr${f.estado === "completada" ? ` class="clin-fila-atendida"` : ""}>
+              <td style="white-space:nowrap;font-weight:600">${esc(clinHoraCorta(f.fecha))}</td>
+              <td>${esc(f.sala.consultorio || "—")}</td>
+              <td>${esc(f.sala.nombre)}</td>
+              <td>
+                ${f.paciente
+                  ? esc(f.paciente)
+                  : `<span class="hint">${t("clin.agendaReservado")}</span>`}
+                ${f.estado === "completada" ? ` <span class="clin-chip">${t("clin.agendaCompletada")}</span>` : ""}
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// La hora se formatea en la zona del navegador a propósito: el mostrador
+// está adentro de la clínica, así que su reloj ES el reloj de la clínica.
+function clinHoraCorta(iso) {
+  return new Date(iso).toLocaleTimeString(localeActual(), { hour: "2-digit", minute: "2-digit" });
+}
+
+function clinPintarFecha() {
+  const caja = document.getElementById("clinAgendaFecha");
+  if (!caja || !clinAgendaFecha) return;
+  const d = new Date(clinAgendaFecha + "T00:00:00");
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const esHoy = d.getTime() === hoy.getTime();
+  caja.innerHTML = `
+    <div style="font-weight:600">${d.toLocaleDateString(localeActual(), { weekday: "long", day: "numeric", month: "long" })}</div>
+    ${esHoy ? `<div class="hint" style="margin:0">${t("clin.agendaHoy")}</div>` : ""}`;
+}
+
+async function clinMoverDia(delta) {
+  if (!clinAgendaFecha) return;
+  const d = new Date(clinAgendaFecha + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const destino = document.getElementById("clinAgenda");
+  if (!destino) return;
+  destino.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  let agenda = null;
+  try {
+    agenda = await api(`/admin/agenda?fecha=${fecha}`);
+  } catch (e) {
+    if (e.status === 401) return logout();
+  }
+  // El administrador pudo haberse ido a otra pantalla mientras cargaba.
+  if (!destino.isConnected) return;
+  clinAgendaFecha = agenda?.fecha || fecha;
+  destino.innerHTML = agendaClinicaHtml(agenda);
+  clinPintarFecha();
 }
 
 // La facturación solo existe para los médicos en relación de dependencia.

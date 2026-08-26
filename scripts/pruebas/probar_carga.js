@@ -171,8 +171,14 @@ const pantallas = [
       ], consultasPorMes: {}, totales: { consultasMes: 62, pacientes: 185, citasHoy: 9 } },
     { dias: 7, salas: [{ phone: "1", nombre: "Dra. A", consultorio: "Consultorio 1", vinculo: "empleado", porDia: {} }] },
     { porMedico: [{ phone: "1", nombre: "Dra. A", consultorio: "Consultorio 1", facturado: 1500, cobrado: 900, pendiente: 600, items: 3 }], totales: { facturado: 1500, cobrado: 900, pendiente: 600 }, inquilinosExcluidos: 1 },
-    { equipos: [{ nombre: "PC 1", conectado: true, subidas: 5 }] }
+    { equipos: [{ nombre: "PC 1", conectado: true, subidas: 5 }] },
+    agendaDemo
   )`],
+  ["agenda de la clínica", `agendaClinicaHtml(agendaDemo)`],
+  // El día vacío y el error son ramas distintas del mismo cuadro, y las dos
+  // se ven en producción: una clínica cerrada el domingo, un backend caído.
+  ["agenda vacía", `agendaClinicaHtml({ fecha: "2026-08-26", salas: [], total: 0, salasSinNombre: 0 })`],
+  ["agenda que no cargó", `agendaClinicaHtml(null)`],
   ["persona con alergias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: ["penicilina", "látex"], alergiasActualizadasEn: new Date().toISOString() }, 3)`],
   ["persona sin alergias", `pintarConPersona(document.getElementById("x"), { _id: "p1", nombre: "María" }, { _id: "per1", nombre: "María", alergias: [] }, 1)`],
   ["ficha sin persona", `pintarSinPersona(document.getElementById("x"), { _id: "p1", nombre: "María" })`],
@@ -182,9 +188,33 @@ const pantallas = [
     { medicos: [], consultasPorMes: {}, totales: { consultasMes: 0, pacientes: 0, citasHoy: 0 } },
     { dias: 7, salas: [] },
     { porMedico: [], totales: { facturado: 0, cobrado: 0, pendiente: 0 }, inquilinosExcluidos: 2 },
-    { equipos: [] }
+    { equipos: [] },
+    null
   )`],
 ];
+
+// Un día de clínica con las dos mitades que importan: un consultorio de un
+// médico EMPLEADO —donde el nombre del paciente sí viaja— y uno ALQUILADO,
+// donde el servidor manda paciente:null a propósito. Si alguna vez el panel
+// se pusiera a inventar un nombre para esa fila, es acá donde se ve.
+vm.runInContext(`var agendaDemo = ${JSON.stringify({
+  fecha: "2026-08-26",
+  total: 3,
+  salasSinNombre: 1,
+  salas: [
+    { phone: "1", nombre: "Dra. A", consultorio: "Consultorio 1", vinculo: "empleado",
+      especialidad: "Cardiología", tipoEspecialidad: "medicina_general",
+      citas: [
+        { fecha: "2026-08-26T13:00:00.000Z", duracionMinutos: 30, estado: "completada", paciente: "Juan Pérez" },
+        { fecha: "2026-08-26T15:30:00.000Z", duracionMinutos: 45, estado: "confirmada", paciente: "María Fernández" },
+      ] },
+    { phone: "2", nombre: "Dr. B", consultorio: "Consultorio 2", vinculo: "alquila",
+      especialidad: "", tipoEspecialidad: "odontologia",
+      citas: [
+        { fecha: "2026-08-26T14:00:00.000Z", duracionMinutos: 30, estado: "confirmada", paciente: null },
+      ] },
+  ],
+})};`, sandbox);
 
 for (const idioma of ["es", "pt"]) {
   vm.runInContext(`MEDICO_IDIOMA = ${JSON.stringify(idioma)};`, sandbox);
