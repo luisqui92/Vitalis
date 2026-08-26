@@ -1,0 +1,97 @@
+// Vitalis — Español · grabar una consulta y ver su detalle (public/js/consultas.js).
+Object.assign(I18N.es, {
+  // ─── Grabar ───────────────────────────────────────────────────────────
+  "consulta.volver": "← Volver",
+  "consulta.paciente": "Paciente:",
+  "consulta.escuchando": "🎙️ Escuchando la consulta...",
+  "consulta.tocarGrabar": "Tocá para grabar",
+  "consulta.grabando": "Grabando... tocá para detener",
+  "consulta.grabacionLista": "Grabación lista ({tiempo})",
+  "consulta.subirArchivo": "📁 O subí un archivo de audio ya grabado",
+  "consulta.archivoListo": "Archivo listo: {nombre}",
+  "consulta.subirTranscribir": "Subir y transcribir",
+  "consulta.subiendo": "Subiendo audio...",
+  "consulta.reintentar": "Reintentar subir",
+  "consulta.errMicrofono": "No se pudo acceder al micrófono: {mensaje}",
+  "consulta.errSubir": "No se pudo subir. Revisá tu conexión y volvé a intentar.",
+  "consulta.linkRemota": "💻📱 ¿Esta compu no tiene micrófono? Grabar con el celular vinculado",
+
+  // ─── Grabar desde el celular vinculado ────────────────────────────────
+  "consulta.cargando": "Cargando...",
+  "consulta.errVinculacion": "Error cargando la vinculación",
+  "consulta.remota.sinVincular": "Todavía no vinculaste tu celular hoy. Abrí Vitalis en el celular, tocá \"Vincular como micrófono\" e ingresá este código:",
+  "consulta.remota.esperando": "Esta pantalla se actualiza sola apenas lo vincules.",
+  "consulta.remota.listo": "📱 Celular vinculado y listo, apoyado con la pantalla prendida.",
+  "consulta.remota.iniciar": "🎙️ Iniciar grabación remota",
+  "consulta.remota.grabando": "⏺ Grabando en el celular vinculado...",
+  "consulta.remota.detener": "⏹️ Detener grabación",
+  "consulta.remota.errOrden": "No se pudo mandar la orden",
+
+  // ─── Nota clínica (confirmada) ────────────────────────────────────────
+  "nota.generando": "🧠 Generando nota clínica...",
+  "nota.error": "⚠️ No se pudo generar la nota clínica automática. La transcripción completa queda más abajo.",
+  "nota.titulo": "🧠 Nota clínica",
+  "nota.corregida": " (corregida por vos)",
+  "nota.confirmada": "✅ Consulta confirmada el {fecha}",
+  "nota.motivo": "Motivo:",
+  "nota.sintomas": "Síntomas:",
+  "nota.antecedentes": "Antecedentes:",
+  "nota.diagnostico": "Diagnóstico:",
+  "nota.diferenciales": "Diferenciales:",
+  "nota.plan": "Plan:",
+  "nota.medicamentos": "Medicamentos:",
+  "nota.examenes": "Exámenes:",
+  "nota.proximoControl": "Próximo control:",
+
+  // ─── Nota clínica (editable, antes de confirmar) ──────────────────────
+  "nota.tituloIA": "🧠 Nota clínica generada por IA",
+  "nota.revisar": "Revisá y corregí lo que haga falta. Se guarda cuando confirmás.",
+  "nota.separadosComa": "(separados por coma)",
+  "nota.campo.motivo": "Motivo de consulta",
+  "nota.campo.sintomas": "Síntomas",
+  "nota.campo.antecedentes": "Antecedentes relevantes",
+  "nota.campo.diagnostico": "Diagnóstico",
+  "nota.campo.diferenciales": "Diagnósticos diferenciales",
+  "nota.campo.plan": "Plan",
+  "nota.campo.medicamentos": "Medicamentos",
+  "nota.campo.examenes": "Exámenes solicitados",
+  "nota.campo.proximoControl": "Próximo control",
+  "nota.med.nombre": "Medicamento",
+  "nota.med.dosis": "Dosis",
+  "nota.med.frecuencia": "Frecuencia",
+  "nota.med.quitar": "Quitar",
+  "nota.med.agregar": "➕ Agregar medicamento",
+
+  // ─── Qué aplicar al confirmar ─────────────────────────────────────────
+  // Estas llevan el <b> adentro a propósito: son frases enteras, y en otro
+  // idioma la palabra en negrita puede caer en otro lugar de la oración.
+  // Partirlas en "Agregar" + "vacuna" obligaría al portugués a usar el orden
+  // del español.
+  "confirmar.titulo": "✅ Qué aplicar al confirmar",
+  "confirmar.ayuda": "Desmarcá lo que no corresponda. Nada se carga hasta que confirmes.",
+  "confirmar.nada": "No detecté nada para cargar al Kardex en esta consulta.",
+  "confirmar.boton": "Confirmar consulta",
+  "confirmar.confirmando": "Confirmando...",
+  "confirmar.reconsulta": "<b>Agendar reconsulta</b> y avisarle al paciente por WhatsApp",
+  "confirmar.dijiste": "Dijiste: \"{texto}\"",
+  "confirmar.presupuesto": "<b>Agregar al presupuesto</b>",
+  "confirmar.pieza": "Pieza (FDI)",
+  "confirmar.precio": "Precio (Bs.)",
+  "confirmar.receta": "<b>Generar receta</b> con los medicamentos de la nota",
+  "confirmar.medicacion": "Cargar a <b>Medicación</b>: {item}",
+  "confirmar.antecedente": "Agregar <b>antecedente</b>: {item}",
+  "confirmar.antecedenteFamiliar": "Agregar <b>antecedente familiar</b>: {item}",
+  "confirmar.vacuna": "Agregar <b>vacuna</b>: {item}",
+  "confirmar.parcial": "Se confirmó la consulta, pero esto no se pudo aplicar:",
+  "confirmar.errConfirmar": "No se pudo confirmar",
+
+  // ─── Transcripción ────────────────────────────────────────────────────
+  "consulta.procesando": "⏳ Transcribiendo tu consulta... para audios largos puede tardar varios minutos. Esta pantalla se actualiza sola, no hace falta que hagas nada.",
+  "consulta.errTranscribir": "Ocurrió un error al transcribir",
+  "consulta.transcripcion": "Transcripción",
+  "consulta.hablante": "Hablante {n}",
+  "consulta.sinTranscripcion": "Sin transcripción",
+  "consulta.sinNombre": "Sin nombre de paciente",
+  "consulta.min": " min",
+  "consulta.errCargar": "Error cargando la consulta",
+});

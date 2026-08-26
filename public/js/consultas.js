@@ -10,9 +10,9 @@ const ICONO_STOP = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="
 function renderNuevaConsulta(pacienteId, pacienteNombre) {
   detenerPolling();
   app.innerHTML = `
-    <button class="back" id="btnBack">← Volver</button>
+    <button class="back" id="btnBack">${t("consulta.volver")}</button>
     <div class="card">
-      <div class="hint" style="margin-bottom:14px">Paciente: <b>${esc(pacienteNombre)}</b></div>
+      <div class="hint" style="margin-bottom:14px">${t("consulta.paciente")} <b>${esc(pacienteNombre)}</b></div>
 
       <div class="listen-panel" id="listenPanel">
         <div class="listen-orb" id="audioOrb">
@@ -21,19 +21,19 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
           <img src="/logo.png" alt="" class="listen-logo">
         </div>
         <div class="listen-time" id="recTime">00:00</div>
-        <div class="listen-label">🎙️ Escuchando la consulta...</div>
+        <div class="listen-label">${t("consulta.escuchando")}</div>
         <div class="live-caption" id="liveCaption"></div>
       </div>
 
       <div class="rec-box">
         <button class="rec-btn" id="recBtn">${ICONO_MIC}</button>
-        <div class="rec-status" id="recStatus">Tocá para grabar</div>
+        <div class="rec-status" id="recStatus">${t("consulta.tocarGrabar")}</div>
       </div>
-      <label class="file-label" for="ncFile">📁 O subí un archivo de audio ya grabado</label>
+      <label class="file-label" for="ncFile">${t("consulta.subirArchivo")}</label>
       <input type="file" id="ncFile" accept="audio/*" style="display:none">
       <div id="ncErr"></div>
-      <button class="primary" id="ncSubir" style="display:none">Subir y transcribir</button>
-      <button class="link" id="btnRemota">💻📱 ¿Esta compu no tiene micrófono? Grabar con el celular vinculado</button>
+      <button class="primary" id="ncSubir" style="display:none">${t("consulta.subirTranscribir")}</button>
+      <button class="link" id="btnRemota">${t("consulta.linkRemota")}</button>
     </div>`;
   document.getElementById("btnBack").onclick = () => renderPacienteDetalle(pacienteId, "consultas");
   document.getElementById("btnRemota").onclick = () => renderNuevaConsultaRemota(pacienteId, pacienteNombre);
@@ -65,7 +65,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
           onda.detener();
           transcriptorVivo.detener();
           listenPanel.style.display = "none";
-          recStatus.textContent = "Grabación lista (" + fmt(seconds) + ")";
+          recStatus.textContent = t("consulta.grabacionLista", { tiempo: fmt(seconds) });
           ncSubir.style.display = "block";
         };
         mediaRecorder.start();
@@ -76,10 +76,10 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         timerId = setInterval(() => { seconds++; recTime.textContent = fmt(seconds); }, 1000);
         recBtn.classList.add("recording");
         recBtn.innerHTML = ICONO_STOP;
-        recStatus.textContent = "Grabando... tocá para detener";
+        recStatus.textContent = t("consulta.grabando");
         ncSubir.style.display = "none";
       } catch (e) {
-        ncErr.innerHTML = `<div class="error">No se pudo acceder al micrófono: ${esc(e.message)}</div>`;
+        ncErr.innerHTML = `<div class="error">${t("consulta.errMicrofono", { mensaje: esc(e.message) })}</div>`;
       }
     } else {
       mediaRecorder.stop();
@@ -93,7 +93,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
     const f = e.target.files[0];
     if (!f) return;
     blob = f; mimeType = f.type || "audio/mpeg";
-    recStatus.textContent = "Archivo listo: " + f.name;
+    recStatus.textContent = t("consulta.archivoListo", { nombre: f.name });
     ncSubir.style.display = "block";
   };
 
@@ -101,15 +101,15 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
     if (!blob) return;
     ncErr.innerHTML = "";
     ncSubir.disabled = true;
-    ncSubir.textContent = "Subiendo audio...";
+    ncSubir.textContent = t("consulta.subiendo");
     try {
       const data = await subirConsulta(pacienteId, blob, mimeType);
       renderDetalle(data.consulta._id);
     } catch (e) {
       // no se pierde la grabación: se puede reintentar sin volver a grabar
       ncSubir.disabled = false;
-      ncSubir.textContent = "Reintentar subir";
-      ncErr.innerHTML = `<div class="error">${esc(e.error || "No se pudo subir. Revisá tu conexión y volvé a intentar.")}</div>`;
+      ncSubir.textContent = t("consulta.reintentar");
+      ncErr.innerHTML = `<div class="error">${esc(e.error || t("consulta.errSubir"))}</div>`;
     }
   };
 }
@@ -118,13 +118,13 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
 // Requiere que el médico ya haya vinculado su celular hoy (ver vinculacion.js).
 async function renderNuevaConsultaRemota(pacienteId, pacienteNombre) {
   detenerPolling();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.cargando")}</div>`;
   try {
     const data = await api("/medico/vinculacion");
     pintarControlRemoto(data.vinculacion, pacienteId, pacienteNombre);
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando la vinculación")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("consulta.errVinculacion"))}</div>`;
   }
 }
 
@@ -132,25 +132,25 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
   let cuerpo = "";
   if (!v.vinculado) {
     cuerpo = `
-      <div class="hint" style="margin-bottom:14px">Todavía no vinculaste tu celular hoy. Abrí Vitalis en el celular, tocá "Vincular como micrófono" e ingresá este código:</div>
+      <div class="hint" style="margin-bottom:14px">${t("consulta.remota.sinVincular")}</div>
       <div style="text-align:center;font-size:38px;font-weight:700;letter-spacing:4px;color:var(--primary);padding:18px 0">${esc(v.codigo)}</div>
-      <div class="hint">Esta pantalla se actualiza sola apenas lo vincules.</div>`;
+      <div class="hint">${t("consulta.remota.esperando")}</div>`;
   } else if (v.estado === "armado") {
     cuerpo = `
-      <div class="hint" style="margin-bottom:14px">📱 Celular vinculado y listo, apoyado con la pantalla prendida.</div>
-      <button class="primary" id="btnIniciarRemoto" style="margin-top:0">🎙️ Iniciar grabación remota</button>`;
+      <div class="hint" style="margin-bottom:14px">${t("consulta.remota.listo")}</div>
+      <button class="primary" id="btnIniciarRemoto" style="margin-top:0">${t("consulta.remota.iniciar")}</button>`;
   } else if (v.estado === "grabando") {
     cuerpo = `
       <div class="listen-panel" style="display:block">
-        <div class="listen-label" style="margin-bottom:6px">⏺ Grabando en el celular vinculado...</div>
+        <div class="listen-label" style="margin-bottom:6px">${t("consulta.remota.grabando")}</div>
       </div>
-      <button class="primary" id="btnDetenerRemoto" style="margin-top:0;background:var(--danger)">⏹️ Detener grabación</button>`;
+      <button class="primary" id="btnDetenerRemoto" style="margin-top:0;background:var(--danger)">${t("consulta.remota.detener")}</button>`;
   }
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← Volver</button>
+    <button class="back" id="btnBack">${t("consulta.volver")}</button>
     <div class="card">
-      <div class="hint" style="margin-bottom:14px">Paciente: <b>${esc(pacienteNombre)}</b></div>
+      <div class="hint" style="margin-bottom:14px">${t("consulta.paciente")} <b>${esc(pacienteNombre)}</b></div>
       ${cuerpo}
       <div id="ncrErr"></div>
     </div>`;
@@ -165,7 +165,7 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
       });
       pollTimeout = setTimeout(() => renderNuevaConsultaRemota(pacienteId, pacienteNombre), 1500);
     } catch (e) {
-      document.getElementById("ncrErr").innerHTML = `<div class="error">${esc(e.error || "No se pudo mandar la orden")}</div>`;
+      document.getElementById("ncrErr").innerHTML = `<div class="error">${esc(e.error || t("consulta.remota.errOrden"))}</div>`;
     }
   };
 
@@ -201,7 +201,7 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
 // pantalla se refresca sola cada 8s hasta que ambas terminan.
 async function renderDetalle(id, esRefrescoAutomatico) {
   detenerPolling();
-  if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
+  if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.cargando")}</div>`;
   try {
     const data = await api("/medico/consultas/" + id);
     const c = data.consulta;
@@ -218,58 +218,58 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     let notaHtml = "";
     if (c.estado === "completado") {
       if (c.notaClinicaEstado === "pendiente") {
-        notaHtml = `<div class="card"><div class="hint">🧠 Generando nota clínica...</div></div>`;
+        notaHtml = `<div class="card"><div class="hint">${t("nota.generando")}</div></div>`;
       } else if (c.notaClinicaEstado === "error") {
-        notaHtml = `<div class="card"><div class="error">⚠️ No se pudo generar la nota clínica automática. La transcripción completa queda más abajo.</div></div>`;
+        notaHtml = `<div class="card"><div class="error">${t("nota.error")}</div></div>`;
       } else if (n && yaConfirmada) {
         const meds = (n.medicamentosRecetados || []).map(m =>
           esc(m.nombre + (m.dosis ? " " + m.dosis : "") + (m.frecuencia ? " — " + m.frecuencia : ""))
         ).join("; ");
         notaHtml = `
           <div class="card">
-            <div class="nota-titulo">🧠 Nota clínica${c.notaEditadaPorMedico ? " (corregida por vos)" : ""}</div>
-            <div class="hint" style="color:var(--success);margin-bottom:10px">✅ Consulta confirmada el ${new Date(c.confirmadaEn).toLocaleString("es-BO")}</div>
-            ${n.motivoConsulta ? `<div class="nota-campo"><b>Motivo:</b> ${esc(n.motivoConsulta)}</div>` : ""}
-            ${(n.sintomas||[]).length ? `<div class="nota-campo"><b>Síntomas:</b> ${esc(n.sintomas.join(", "))}</div>` : ""}
-            ${n.antecedentesRelevantes ? `<div class="nota-campo"><b>Antecedentes:</b> ${esc(n.antecedentesRelevantes)}</div>` : ""}
-            ${n.diagnostico ? `<div class="nota-campo"><b>Diagnóstico:</b> ${esc(n.diagnostico)}</div>` : ""}
-            ${(n.diagnosticosDiferenciales||[]).length ? `<div class="nota-campo"><b>Diferenciales:</b> ${esc(n.diagnosticosDiferenciales.join(", "))}</div>` : ""}
-            ${n.plan ? `<div class="nota-campo"><b>Plan:</b> ${esc(n.plan)}</div>` : ""}
-            ${meds ? `<div class="nota-campo"><b>Medicamentos:</b> ${meds}</div>` : ""}
-            ${(n.examenesSolicitados||[]).length ? `<div class="nota-campo"><b>Exámenes:</b> ${esc(n.examenesSolicitados.join(", "))}</div>` : ""}
-            ${n.proximoControl ? `<div class="nota-campo"><b>Próximo control:</b> ${esc(n.proximoControl)}</div>` : ""}
+            <div class="nota-titulo">${t("nota.titulo")}${c.notaEditadaPorMedico ? t("nota.corregida") : ""}</div>
+            <div class="hint" style="color:var(--success);margin-bottom:10px">${t("nota.confirmada", { fecha: new Date(c.confirmadaEn).toLocaleString(localeActual()) })}</div>
+            ${n.motivoConsulta ? `<div class="nota-campo"><b>${t("nota.motivo")}</b> ${esc(n.motivoConsulta)}</div>` : ""}
+            ${(n.sintomas||[]).length ? `<div class="nota-campo"><b>${t("nota.sintomas")}</b> ${esc(n.sintomas.join(", "))}</div>` : ""}
+            ${n.antecedentesRelevantes ? `<div class="nota-campo"><b>${t("nota.antecedentes")}</b> ${esc(n.antecedentesRelevantes)}</div>` : ""}
+            ${n.diagnostico ? `<div class="nota-campo"><b>${t("nota.diagnostico")}</b> ${esc(n.diagnostico)}</div>` : ""}
+            ${(n.diagnosticosDiferenciales||[]).length ? `<div class="nota-campo"><b>${t("nota.diferenciales")}</b> ${esc(n.diagnosticosDiferenciales.join(", "))}</div>` : ""}
+            ${n.plan ? `<div class="nota-campo"><b>${t("nota.plan")}</b> ${esc(n.plan)}</div>` : ""}
+            ${meds ? `<div class="nota-campo"><b>${t("nota.medicamentos")}</b> ${meds}</div>` : ""}
+            ${(n.examenesSolicitados||[]).length ? `<div class="nota-campo"><b>${t("nota.examenes")}</b> ${esc(n.examenesSolicitados.join(", "))}</div>` : ""}
+            ${n.proximoControl ? `<div class="nota-campo"><b>${t("nota.proximoControl")}</b> ${esc(n.proximoControl)}</div>` : ""}
           </div>`;
       } else if (n) {
         notaHtml = `
           <div class="card">
-            <div class="nota-titulo">🧠 Nota clínica generada por IA</div>
-            <div class="hint" style="margin-bottom:12px">Revisá y corregí lo que haga falta. Se guarda cuando confirmás.</div>
-            <label>Motivo de consulta</label>
+            <div class="nota-titulo">${t("nota.tituloIA")}</div>
+            <div class="hint" style="margin-bottom:12px">${t("nota.revisar")}</div>
+            <label>${t("nota.campo.motivo")}</label>
             <input id="nfMotivo" type="text" value="${esc(n.motivoConsulta || "")}">
-            <label>Síntomas <span class="hint">(separados por coma)</span></label>
+            <label>${t("nota.campo.sintomas")} <span class="hint">${t("nota.separadosComa")}</span></label>
             <input id="nfSintomas" type="text" value="${esc((n.sintomas || []).join(", "))}">
-            <label>Antecedentes relevantes</label>
+            <label>${t("nota.campo.antecedentes")}</label>
             <textarea id="nfAntecedentes" rows="2">${esc(n.antecedentesRelevantes || "")}</textarea>
-            <label>Diagnóstico</label>
+            <label>${t("nota.campo.diagnostico")}</label>
             <input id="nfDiagnostico" type="text" value="${esc(n.diagnostico || "")}">
-            <label>Diagnósticos diferenciales <span class="hint">(separados por coma)</span></label>
+            <label>${t("nota.campo.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
             <input id="nfDiferenciales" type="text" value="${esc((n.diagnosticosDiferenciales || []).join(", "))}">
-            <label>Plan</label>
+            <label>${t("nota.campo.plan")}</label>
             <textarea id="nfPlan" rows="3">${esc(n.plan || "")}</textarea>
-            <label>Medicamentos</label>
+            <label>${t("nota.campo.medicamentos")}</label>
             <div id="nfMeds">
               ${(n.medicamentosRecetados || []).map((m, i) => `
                 <div class="med-row" data-i="${i}" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
-                  <input class="nf-med-nombre" type="text" placeholder="Medicamento" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
-                  <input class="nf-med-dosis" type="text" placeholder="Dosis" value="${esc(m.dosis || "")}" style="flex:1;margin:0">
-                  <input class="nf-med-frec" type="text" placeholder="Frecuencia" value="${esc(m.frecuencia || "")}" style="flex:1;margin:0">
-                  <button class="link nf-med-quitar" title="Quitar" style="margin:0;width:auto">✕</button>
+                  <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
+                  <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" value="${esc(m.dosis || "")}" style="flex:1;margin:0">
+                  <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" value="${esc(m.frecuencia || "")}" style="flex:1;margin:0">
+                  <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>
                 </div>`).join("")}
             </div>
-            <button class="link" id="nfMedAgregar" style="margin:0 0 10px 0;width:auto">➕ Agregar medicamento</button>
-            <label>Exámenes solicitados <span class="hint">(separados por coma)</span></label>
+            <button class="link" id="nfMedAgregar" style="margin:0 0 10px 0;width:auto">${t("nota.med.agregar")}</button>
+            <label>${t("nota.campo.examenes")} <span class="hint">${t("nota.separadosComa")}</span></label>
             <input id="nfExamenes" type="text" value="${esc((n.examenesSolicitados || []).join(", "))}">
-            <label>Próximo control</label>
+            <label>${t("nota.campo.proximoControl")}</label>
             <input id="nfProximoControl" type="text" value="${esc(n.proximoControl || "")}">
           </div>`;
       }
@@ -290,24 +290,26 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         filas.push(`
           <div class="conf-fila">
             <label class="conf-check"><input type="checkbox" id="cfReconsulta" checked>
-              <span><b>Agendar reconsulta</b> y avisarle al paciente por WhatsApp</span></label>
-            ${reconsulta.textoOriginal ? `<div class="hint">Dijiste: "${esc(reconsulta.textoOriginal)}"</div>` : ""}
+              <span>${t("confirmar.reconsulta")}</span></label>
+            ${reconsulta.textoOriginal ? `<div class="hint">${t("confirmar.dijiste", { texto: esc(reconsulta.textoOriginal) })}</div>` : ""}
             <input id="cfReconsultaFecha" type="datetime-local" value="${valorInput}">
           </div>`);
       }
 
-      (n.tratamientosSugeridos || []).filter(t => t.estado === "pendiente").forEach(t => {
+      // El parámetro se llama "trat" y no "t": dentro de este bloque "t" es
+      // la función de traducción, y usarla de nombre de variable la taparía.
+      (n.tratamientosSugeridos || []).filter(trat => trat.estado === "pendiente").forEach(trat => {
         filas.push(`
-          <div class="conf-fila" data-tratsug="${t._id}">
+          <div class="conf-fila" data-tratsug="${trat._id}">
             <label class="conf-check"><input type="checkbox" class="cf-trat" checked>
-              <span><b>Agregar al presupuesto</b></span></label>
-            <div class="hint">Dijiste: "${esc(t.itemMencionado)}"</div>
-            <input class="ts-nombre" type="text" value="${esc(t.catalogoNombreSugerido || t.itemMencionado || "")}">
+              <span>${t("confirmar.presupuesto")}</span></label>
+            <div class="hint">${t("confirmar.dijiste", { texto: esc(trat.itemMencionado) })}</div>
+            <input class="ts-nombre" type="text" value="${esc(trat.catalogoNombreSugerido || trat.itemMencionado || "")}">
             <div style="display:flex;gap:10px">
-              <div style="flex:1"><label>Pieza (FDI)</label>
-                <input class="ts-pieza" type="number" min="11" max="48" value="${t.piezaFdi ?? ""}"></div>
-              <div style="flex:1"><label>Precio (Bs.)</label>
-                <input class="ts-precio" type="number" min="0" step="0.01" value="${t.precioCatalogo ?? ""}"></div>
+              <div style="flex:1"><label>${t("confirmar.pieza")}</label>
+                <input class="ts-pieza" type="number" min="11" max="48" value="${trat.piezaFdi ?? ""}"></div>
+              <div style="flex:1"><label>${t("confirmar.precio")}</label>
+                <input class="ts-precio" type="number" min="0" step="0.01" value="${trat.precioCatalogo ?? ""}"></div>
             </div>
           </div>`);
       });
@@ -316,66 +318,66 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         filas.push(`
           <div class="conf-fila">
             <label class="conf-check"><input type="checkbox" id="cfReceta" checked>
-              <span><b>Generar receta</b> con los medicamentos de la nota</span></label>
+              <span>${t("confirmar.receta")}</span></label>
           </div>`);
       }
 
       (n.medicamentosRecetados || []).forEach((m, i) => filas.push(`
         <div class="conf-fila">
           <label class="conf-check"><input type="checkbox" class="cf-med" data-i="${i}" checked>
-            <span>Cargar a <b>Medicación</b>: ${esc(m.nombre + (m.dosis ? " " + m.dosis : ""))}</span></label>
+            <span>${t("confirmar.medicacion", { item: esc(m.nombre + (m.dosis ? " " + m.dosis : "")) })}</span></label>
         </div>`));
 
       (n.antecedentesPersonalesNuevos || []).forEach((a, i) => filas.push(`
         <div class="conf-fila">
           <label class="conf-check"><input type="checkbox" class="cf-antp" data-i="${i}" checked>
-            <span>Agregar <b>antecedente</b>: ${esc(a)}</span></label>
+            <span>${t("confirmar.antecedente", { item: esc(a) })}</span></label>
         </div>`));
 
       (n.antecedentesFamiliaresNuevos || []).forEach((a, i) => filas.push(`
         <div class="conf-fila">
           <label class="conf-check"><input type="checkbox" class="cf-antf" data-i="${i}" checked>
-            <span>Agregar <b>antecedente familiar</b>: ${esc(a.parentesco + ": " + a.condicion)}</span></label>
+            <span>${t("confirmar.antecedenteFamiliar", { item: esc(a.parentesco + ": " + a.condicion) })}</span></label>
         </div>`));
 
       (n.vacunasMencionadas || []).forEach((v, i) => filas.push(`
         <div class="conf-fila">
           <label class="conf-check"><input type="checkbox" class="cf-vac" data-i="${i}" checked>
-            <span>Agregar <b>vacuna</b>: ${esc(v.nombre + (v.dosis ? " — " + v.dosis : ""))}</span></label>
+            <span>${t("confirmar.vacuna", { item: esc(v.nombre + (v.dosis ? " — " + v.dosis : "")) })}</span></label>
         </div>`));
 
       confirmarHtml = `
         <div class="card">
           ${filas.length ? `
-            <div class="nota-titulo">✅ Qué aplicar al confirmar</div>
-            <div class="hint" style="margin-bottom:10px">Desmarcá lo que no corresponda. Nada se carga hasta que confirmes.</div>
+            <div class="nota-titulo">${t("confirmar.titulo")}</div>
+            <div class="hint" style="margin-bottom:10px">${t("confirmar.ayuda")}</div>
             ${filas.join("")}` : `
-            <div class="hint">No detecté nada para cargar al Kardex en esta consulta.</div>`}
+            <div class="hint">${t("confirmar.nada")}</div>`}
           <div id="confirmarErr"></div>
-          <button class="primary" id="btnConfirmarConsulta" style="margin-top:14px">Confirmar consulta</button>
+          <button class="primary" id="btnConfirmarConsulta" style="margin-top:14px">${t("confirmar.boton")}</button>
         </div>`;
     }
 
     let body = "";
     if (c.estado === "procesando") {
-      body = `<div class="hint">⏳ Transcribiendo tu consulta... para audios largos puede tardar varios minutos. Esta pantalla se actualiza sola, no hace falta que hagas nada.</div>`;
+      body = `<div class="hint">${t("consulta.procesando")}</div>`;
     } else if (c.estado === "error") {
-      body = `<div class="error">⚠️ ${esc(c.error || "Ocurrió un error al transcribir")}</div>`;
+      body = `<div class="error">⚠️ ${esc(c.error || t("consulta.errTranscribir"))}</div>`;
     } else if (c.segmentos && c.segmentos.length) {
-      body = `<div class="seccion-titulo">Transcripción</div>` + c.segmentos.map(s => `
+      body = `<div class="seccion-titulo">${t("consulta.transcripcion")}</div>` + c.segmentos.map(s => `
         <div class="segmento h${s.hablante && s.hablante.charCodeAt(0) % 2}">
-          <div class="quien">Hablante ${esc(s.hablante)}</div>
+          <div class="quien">${t("consulta.hablante", { n: esc(s.hablante) })}</div>
           <div class="texto">${esc(s.texto)}</div>
         </div>`).join("");
     } else {
-      body = `<div class="hint">${esc(c.transcripcionCompleta || "Sin transcripción")}</div>`;
+      body = `<div class="hint">${esc(c.transcripcionCompleta || t("consulta.sinTranscripcion"))}</div>`;
     }
 
     app.innerHTML = `
-      <button class="back" id="btnBack">← Volver</button>
+      <button class="back" id="btnBack">${t("consulta.volver")}</button>
       <div class="card">
-        <div class="nombre" style="font-size:16px;font-weight:600">${esc(c.pacienteNombre || "Sin nombre de paciente")}</div>
-        <div class="fecha">${new Date(c.createdAt).toLocaleString("es-BO")}${c.duracionSegundos ? " · " + Math.round(c.duracionSegundos/60) + " min" : ""}</div>
+        <div class="nombre" style="font-size:16px;font-weight:600">${esc(c.pacienteNombre || t("consulta.sinNombre"))}</div>
+        <div class="fecha">${new Date(c.createdAt).toLocaleString(localeActual())}${c.duracionSegundos ? " · " + Math.round(c.duracionSegundos/60) + t("consulta.min") : ""}</div>
       </div>
       ${notaHtml}
       ${confirmarHtml}
@@ -398,10 +400,10 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         fila.className = "med-row";
         fila.style.cssText = "display:flex;gap:6px;margin-bottom:6px;align-items:center";
         fila.innerHTML = `
-          <input class="nf-med-nombre" type="text" placeholder="Medicamento" style="flex:2;margin:0">
-          <input class="nf-med-dosis" type="text" placeholder="Dosis" style="flex:1;margin:0">
-          <input class="nf-med-frec" type="text" placeholder="Frecuencia" style="flex:1;margin:0">
-          <button class="link nf-med-quitar" title="Quitar" style="margin:0;width:auto">✕</button>`;
+          <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" style="flex:2;margin:0">
+          <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" style="flex:1;margin:0">
+          <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" style="flex:1;margin:0">
+          <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>`;
         medsBox.appendChild(fila);
       };
     }
@@ -452,7 +454,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         };
 
         btnConfirmar.disabled = true;
-        btnConfirmar.textContent = "Confirmando...";
+        btnConfirmar.textContent = t("confirmar.confirmando");
         try {
           const r = await api(`/medico/consultas/${c._id}/confirmar`, {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -461,14 +463,14 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           // Si algo puntual falló (típico: el WhatsApp de la reconsulta), el
           // resto igual se aplicó — se avisa sin perder lo que ya se guardó.
           if (r.fallado?.length) {
-            alert("Se confirmó la consulta, pero esto no se pudo aplicar:\n\n• " + r.fallado.join("\n• "));
+            alert(t("confirmar.parcial") + "\n\n• " + r.fallado.join("\n• "));
           }
           if (r.recetaId) return renderReceta(r.recetaId);
           renderDetalle(id);
         } catch (e) {
-          errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo confirmar")}</div>`;
+          errBox.innerHTML = `<div class="error">${esc(e.error || t("confirmar.errConfirmar"))}</div>`;
           btnConfirmar.disabled = false;
-          btnConfirmar.textContent = "Confirmar consulta";
+          btnConfirmar.textContent = t("confirmar.boton");
         }
       };
     }
@@ -478,6 +480,6 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     }
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando la consulta")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("consulta.errCargar"))}</div>`;
   }
 }

@@ -10,7 +10,7 @@ function pacienteItemHtml(p) {
         // que importa; se muestra en días/meses hasta que deja de importar.
         const edad = MEDICO_TIPO_ESPECIALIDAD === "pediatria"
           ? edadPediatricaTexto(p.fechaNacimiento)
-          : (edadDesde(p.fechaNacimiento) != null ? edadDesde(p.fechaNacimiento) + " años" : "");
+          : (edadDesde(p.fechaNacimiento) != null ? t("pacientes.anos", { n: edadDesde(p.fechaNacimiento) }) : "");
         return `${edad}${edad && p.sexo ? " · " : ""}${p.sexo || ""}`;
       })();
   return `
@@ -27,10 +27,10 @@ function pacienteItemHtml(p) {
 async function renderDashboard() {
   detenerPolling();
   const serie = nuevaSeriePantalla();
-  headerSub.textContent = "Hola, " + (MEDICO_NOMBRE || "");
+  headerSub.textContent = t("pacientes.saludo", { nombre: MEDICO_NOMBRE || "" });
   btnLogout.style.display = "inline-block";
   btnAsistente.style.display = "inline-flex";
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando tus pacientes...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("pacientes.cargando")}</div>`;
   try {
     // Las tres en paralelo: la bandeja es una consulta más y el panel es lo
     // primero que ve el médico al entrar. En serie, cada una le suma su
@@ -59,25 +59,25 @@ async function renderDashboard() {
         <div class="card no-imprimir" style="border-color:var(--warning);cursor:pointer" id="avisoBandeja">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
             <div>
-              <div style="font-weight:600">📥 ${sinAsignar} estudio${sinAsignar > 1 ? "s" : ""} sin asignar</div>
-              <div class="hint" style="margin:2px 0 0">Llegaron de la caja y falta decir de quién son.</div>
+              <div style="font-weight:600">${t(sinAsignar > 1 ? "pacientes.bandeja.varios" : "pacientes.bandeja.uno", { n: sinAsignar })}</div>
+              <div class="hint" style="margin:2px 0 0">${t("pacientes.bandeja.detalle")}</div>
             </div>
-            <span style="color:var(--primary);font-weight:600">Ver →</span>
+            <span style="color:var(--primary);font-weight:600">${t("pacientes.bandeja.ver")}</span>
           </div>
         </div>` : ""}
       <div class="tabs" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
-        <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>Nuevo<br>paciente</button>
-        <button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>Agenda</button>
-        <button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>Recordatorios</button>
-        <button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>Vincular<br>celular</button>
-        <button class="tab" id="btnSeguridad"><span class="tab-icono">${ICONOS.escudo}</span>Seguridad</button>
+        <button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>${t("pacientes.tab.nuevo")}</button>
+        <button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>
+        <button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>
+        <button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>
+        <button class="tab" id="btnSeguridad"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.seguridad")}</button>
       </div>
-      ${items.length === 0 ? `<div class="empty">Todavía no registraste ningún paciente.</div>` : `
-        <input id="buscarPaciente" type="text" placeholder="🔍 Buscar paciente..." style="margin:16px 0 12px">
+      ${items.length === 0 ? `<div class="empty">${t("pacientes.vacio")}</div>` : `
+        <input id="buscarPaciente" type="text" placeholder="${t("pacientes.buscar")}" style="margin:16px 0 12px">
         <div id="listaPacientes">
           ${items.map(p => pacienteItemHtml(p)).join("")}
         </div>
-        <div class="empty" id="buscarVacio" style="display:none">Ningún paciente coincide con la búsqueda.</div>
+        <div class="empty" id="buscarVacio" style="display:none">${t("pacientes.buscarVacio")}</div>
       `}
     `;
     const avisoBandeja = document.getElementById("avisoBandeja");
@@ -106,7 +106,7 @@ async function renderDashboard() {
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando pacientes")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("pacientes.error"))}</div>`;
   }
 }
 
@@ -116,45 +116,45 @@ function renderNuevoPaciente() {
   const esVet = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
   const esPed = MEDICO_TIPO_ESPECIALIDAD === "pediatria";
   app.innerHTML = `
-    <button class="back" id="btnBack">← Volver</button>
+    <button class="back" id="btnBack">${t("pacientes.volver")}</button>
     <div class="card">
-      <label>${esVet ? "Nombre de la mascota" : "Nombre completo"}</label>
-      <input id="pNombre" type="text" placeholder="${esVet ? "Ej: Firulais" : "Ej: Juan Pérez"}">
+      <label>${esVet ? t("pacientes.nuevo.nombreMascota") : t("pacientes.nuevo.nombre")}</label>
+      <input id="pNombre" type="text" placeholder="${esVet ? t("pacientes.nuevo.nombrePlaceholderVet") : t("pacientes.nuevo.nombrePlaceholder")}">
       ${esVet ? `
-      <label>Especie</label>
-      <input id="pEspecie" type="text" placeholder="Ej: Perro, Gato...">
-      <label>Raza (opcional)</label>
-      <input id="pRaza" type="text" placeholder="Ej: Labrador">` : ""}
-      <label>Fecha de nacimiento${esPed ? "" : " (opcional)"}</label>
+      <label>${t("pacientes.nuevo.especie")}</label>
+      <input id="pEspecie" type="text" placeholder="${t("pacientes.nuevo.especiePlaceholder")}">
+      <label>${t("pacientes.nuevo.raza")}</label>
+      <input id="pRaza" type="text" placeholder="${t("pacientes.nuevo.razaPlaceholder")}">` : ""}
+      <label>${t("pacientes.nuevo.fechaNac")}${esPed ? "" : t("pacientes.nuevo.opcional")}</label>
       <input id="pFecha" type="date">
-      ${esPed ? `<div class="hint" style="margin:-4px 0 8px">Sin fecha de nacimiento y sexo no se pueden calcular los percentiles de crecimiento.</div>` : ""}
-      <label>Sexo${esPed ? "" : " (opcional)"}</label>
+      ${esPed ? `<div class="hint" style="margin:-4px 0 8px">${t("pacientes.nuevo.avisoPercentiles")}</div>` : ""}
+      <label>${t("pacientes.nuevo.sexo")}${esPed ? "" : t("pacientes.nuevo.opcional")}</label>
       <select id="pSexo">
-        <option value="">— Sin especificar —</option>
+        <option value="">${t("pacientes.nuevo.sinEspecificar")}</option>
         ${esVet ? `
-        <option value="Hembra">Hembra</option>
-        <option value="Macho">Macho</option>` : `
-        <option value="Femenino">Femenino</option>
-        <option value="Masculino">Masculino</option>
-        <option value="Otro">Otro</option>`}
+        <option value="Hembra">${t("sexo.hembra")}</option>
+        <option value="Macho">${t("sexo.macho")}</option>` : `
+        <option value="Femenino">${t("sexo.femenino")}</option>
+        <option value="Masculino">${t("sexo.masculino")}</option>
+        <option value="Otro">${t("sexo.otro")}</option>`}
       </select>
       ${esVet ? `
-      <label>Nombre del dueño (opcional)</label>
+      <label>${t("pacientes.nuevo.dueno")}</label>
       <input id="pDuenoNombre" type="text" placeholder="Ej: María Pérez">` : ""}
       ${esPed ? `
-      <label>Semanas de gestación al nacer (opcional)</label>
-      <input id="pSemanasGesta" type="number" min="20" max="44" step="1" inputmode="numeric" placeholder="Ej: 32 — dejalo vacío si nació a término">
-      <div class="hint" style="margin:-4px 0 8px">Si nació prematuro, Vitalis usa la edad corregida en las curvas hasta los 2 años.</div>
-      <label>Madre, padre o tutor (opcional)</label>
+      <label>${t("pacientes.nuevo.semanasGesta")}</label>
+      <input id="pSemanasGesta" type="number" min="20" max="44" step="1" inputmode="numeric" placeholder="${t("pacientes.nuevo.semanasGestaPlaceholder")}">
+      <div class="hint" style="margin:-4px 0 8px">${t("pacientes.nuevo.avisoPrematuro")}</div>
+      <label>${t("pacientes.nuevo.tutor")}</label>
       <input id="pTutorNombre" type="text" placeholder="Ej: María Pérez">
-      <label>Parentesco (opcional)</label>
-      <input id="pTutorParentesco" type="text" placeholder="Ej: Madre">` : ""}
-      <label>Teléfono${esVet ? " del dueño" : esPed ? " del tutor" : ""} (opcional)</label>
-      <input id="pTelefono" type="tel" placeholder="591XXXXXXXX">
-      <label>Notas (opcional)</label>
-      <input id="pNotas" type="text" placeholder="Alergias, observaciones generales...">
+      <label>${t("pacientes.nuevo.parentesco")}</label>
+      <input id="pTutorParentesco" type="text" placeholder="${t("pacientes.nuevo.parentescoPlaceholder")}">` : ""}
+      <label>${t("pacientes.nuevo.telefono")}${esVet ? t("pacientes.nuevo.telefonoDueno") : esPed ? t("pacientes.nuevo.telefonoTutor") : ""}${t("pacientes.nuevo.opcional")}</label>
+      <input id="pTelefono" type="tel" placeholder="${t("auth.telefonoPlaceholder")}">
+      <label>${t("pacientes.nuevo.notas")}</label>
+      <input id="pNotas" type="text" placeholder="${t("pacientes.nuevo.notasPlaceholder")}">
       <div id="pErr"></div>
-      <button class="primary" id="pBtn">Guardar paciente</button>
+      <button class="primary" id="pBtn">${t("pacientes.nuevo.guardar")}</button>
     </div>`;
   document.getElementById("btnBack").onclick = renderDashboard;
   document.getElementById("pBtn").onclick = async () => {
@@ -171,7 +171,7 @@ function renderNuevoPaciente() {
     const semanasGestacionAlNacer = esPed ? (document.getElementById("pSemanasGesta").value.trim() || null) : null;
     const errBox = document.getElementById("pErr");
     errBox.innerHTML = "";
-    if (!nombre) { errBox.innerHTML = `<div class="error">${esVet ? "El nombre de la mascota es obligatorio" : "El nombre es obligatorio"}</div>`; return; }
+    if (!nombre) { errBox.innerHTML = `<div class="error">${esVet ? t("pacientes.nuevo.errNombreMascota") : t("pacientes.nuevo.errNombre")}</div>`; return; }
     try {
       const data = await api("/medico/pacientes", {
         method: "POST", headers: {"Content-Type":"application/json"},
@@ -179,7 +179,7 @@ function renderNuevoPaciente() {
       });
       renderPacienteDetalle(data.paciente._id);
     } catch (e) {
-      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo guardar el paciente")}</div>`;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("pacientes.nuevo.errGuardar"))}</div>`;
     }
   };
 }
@@ -190,7 +190,7 @@ function renderNuevoPaciente() {
 async function renderPacienteDetalle(pacienteId, tabInicial) {
   detenerPolling();
   const serie = nuevaSeriePantalla();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando...</div>`;
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("kardex.cargando")}</div>`;
   try {
     const data = await api("/medico/pacientes/" + pacienteId);
     // Si el médico ya se fue a otra pantalla mientras esto viajaba, este
@@ -201,14 +201,14 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
-    app.innerHTML = `<div class="error">${esc(e.error || "Error cargando el paciente")}</div>`;
+    app.innerHTML = `<div class="error">${esc(e.error || t("kardex.error"))}</div>`;
   }
 }
 
 function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios, recetas, tabActiva) {
   detenerPolling();
   const edad = edadDesde(p.fechaNacimiento);
-  const estadoTxt = { procesando: "⏳ Transcribiendo", completado: "✅ Listo", error: "⚠️ Error" };
+  const estadoTxt = { procesando: t("kardex.estado.procesando"), completado: t("kardex.estado.completado"), error: t("kardex.estado.error") };
 
   const consultasCompletas = consultas.filter(c => c.estado === "completado");
   const ultima = consultas[0]; // ya viene ordenado por fecha descendente
@@ -216,26 +216,26 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   let briefHtml = "";
   if (p.briefClinicoEstado === "generando") {
-    briefHtml = `<div class="card"><div class="hint">🧠 Generando brief clínico...</div></div>`;
+    briefHtml = `<div class="card"><div class="hint">${t("kardex.brief.generando")}</div></div>`;
   } else if (p.briefClinicoEstado === "error") {
-    briefHtml = `<div class="card"><div class="error">⚠️ No se pudo generar el brief clínico automático.</div></div>`;
+    briefHtml = `<div class="card"><div class="error">${t("kardex.brief.error")}</div></div>`;
   } else if (p.briefClinicoEstado === "completado" && p.briefClinico) {
     const b = p.briefClinico;
     briefHtml = `
       <div class="card brief-card">
-        <div class="nota-titulo">🧠 Brief Clínico Inteligente</div>
-        ${b.estadoActual ? `<div class="nota-campo"><b>Estado actual:</b> ${esc(b.estadoActual)}</div>` : ""}
-        ${b.cambiosDesdeUltimaConsulta ? `<div class="nota-campo"><b>Cambios desde la última consulta:</b> ${esc(b.cambiosDesdeUltimaConsulta)}</div>` : ""}
-        ${(b.medicamentosActivos||[]).length ? `<div class="nota-campo"><b>Medicamentos activos:</b> ${esc(b.medicamentosActivos.join(", "))}</div>` : ""}
-        ${(b.examenesPendientes||[]).length ? `<div class="nota-campo"><b>Exámenes pendientes:</b> ${esc(b.examenesPendientes.join(", "))}</div>` : ""}
-        ${(b.alertas||[]).length ? `<div class="nota-campo brief-alerta"><b>⚠️ Alertas:</b> ${esc(b.alertas.join(", "))}</div>` : ""}
-        ${(b.factoresRiesgo||[]).length ? `<div class="nota-campo"><b>Factores de riesgo:</b> ${esc(b.factoresRiesgo.join(", "))}</div>` : ""}
-        ${(b.preguntasSugeridas||[]).length ? `<div class="nota-campo"><b>Preguntas sugeridas:</b> ${esc(b.preguntasSugeridas.join(" · "))}</div>` : ""}
-        ${(b.diagnosticosDiferenciales||[]).length ? `<div class="nota-campo"><b>Diferenciales a considerar:</b> ${esc(b.diagnosticosDiferenciales.join(", "))}</div>` : ""}
-        <div class="hint" style="margin-top:8px">Generado por IA como apoyo — no reemplaza el criterio profesional.</div>
+        <div class="nota-titulo">${t("kardex.brief.titulo")}</div>
+        ${b.estadoActual ? `<div class="nota-campo"><b>${t("kardex.brief.estadoActual")}</b> ${esc(b.estadoActual)}</div>` : ""}
+        ${b.cambiosDesdeUltimaConsulta ? `<div class="nota-campo"><b>${t("kardex.brief.cambios")}</b> ${esc(b.cambiosDesdeUltimaConsulta)}</div>` : ""}
+        ${(b.medicamentosActivos||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.medicamentos")}</b> ${esc(b.medicamentosActivos.join(", "))}</div>` : ""}
+        ${(b.examenesPendientes||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.examenes")}</b> ${esc(b.examenesPendientes.join(", "))}</div>` : ""}
+        ${(b.alertas||[]).length ? `<div class="nota-campo brief-alerta"><b>${t("kardex.brief.alertas")}</b> ${esc(b.alertas.join(", "))}</div>` : ""}
+        ${(b.factoresRiesgo||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.riesgo")}</b> ${esc(b.factoresRiesgo.join(", "))}</div>` : ""}
+        ${(b.preguntasSugeridas||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.preguntas")}</b> ${esc(b.preguntasSugeridas.join(" · "))}</div>` : ""}
+        ${(b.diagnosticosDiferenciales||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.diferenciales")}</b> ${esc(b.diagnosticosDiferenciales.join(", "))}</div>` : ""}
+        <div class="hint" style="margin-top:8px">${t("kardex.brief.aviso")}</div>
       </div>`;
   } else {
-    briefHtml = `<div class="card"><div class="hint">🧠 El brief clínico va a aparecer acá después de la primera consulta con nota clínica generada.</div></div>`;
+    briefHtml = `<div class="card"><div class="hint">${t("kardex.brief.vacio")}</div></div>`;
   }
 
   const tabPaciente = `
@@ -244,24 +244,24 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         <div class="avatar avatar-sm">${esc(iniciales(p.nombre))}</div>
         <div>
           <div class="nombre" style="font-size:16px;font-weight:700">${esc(p.nombre)}</div>
-          <div class="paciente-info">${edad != null ? edad + " años" : "Edad no registrada"}${p.sexo ? " · " + esc(p.sexo) : ""}</div>
+          <div class="paciente-info">${edad != null ? t("pacientes.anos", { n: edad }) : t("kardex.edadNoRegistrada")}${p.sexo ? " · " + esc(p.sexo) : ""}</div>
         </div>
       </div>
       <div class="ficha-datos">
         ${MEDICO_TIPO_ESPECIALIDAD === "veterinaria" ? `
-        <div class="dato-row">🐾 ${[p.especie, p.raza].filter(Boolean).map(esc).join(" · ") || "Especie no registrada"}</div>
-        <div class="dato-row">🧑 ${p.duenoNombre ? esc(p.duenoNombre) : "Dueño no registrado"}</div>
-        <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : "No registrado"}</div>
-        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : "Sin notas registradas"}</div>` : `
-        <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : "No registrado"}</div>
-        <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString("es-BO") : "No registrada"}</div>
-        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : "Sin notas registradas"}</div>`}
+        <div class="dato-row">🐾 ${[p.especie, p.raza].filter(Boolean).map(esc).join(" · ") || t("kardex.especieNoRegistrada")}</div>
+        <div class="dato-row">🧑 ${p.duenoNombre ? esc(p.duenoNombre) : t("kardex.duenoNoRegistrado")}</div>
+        <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : t("kardex.noRegistrado")}</div>
+        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : t("kardex.sinNotas")}</div>` : `
+        <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : t("kardex.noRegistrado")}</div>
+        <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString(localeActual()) : t("kardex.noRegistrada")}</div>
+        <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : t("kardex.sinNotas")}</div>`}
       </div>
     </div>
 
     <div class="stats-row">
-      <div class="stat"><div class="stat-num">${consultas.length}</div><div class="stat-lbl">Consultas</div></div>
-      <div class="stat"><div class="stat-num">${ultima ? new Date(ultima.createdAt).toLocaleDateString("es-BO", {day:"2-digit", month:"short"}) : "—"}</div><div class="stat-lbl">Última visita</div></div>
+      <div class="stat"><div class="stat-num">${consultas.length}</div><div class="stat-lbl">${t("kardex.stat.consultas")}</div></div>
+      <div class="stat"><div class="stat-num">${ultima ? new Date(ultima.createdAt).toLocaleDateString(localeActual(), {day:"2-digit", month:"short"}) : "—"}</div><div class="stat-lbl">${t("kardex.stat.ultimaVisita")}</div></div>
     </div>
 
     ${briefHtml}
@@ -269,23 +269,23 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
     ${ultimaConDx ? `
     <div class="card card-secundaria">
-      <div class="seccion-titulo" style="margin-top:0">Último diagnóstico registrado</div>
-      <div class="fecha" style="margin-bottom:6px">${new Date(ultimaConDx.createdAt).toLocaleDateString("es-BO")}</div>
-      ${ultimaConDx.notaClinica.motivoConsulta ? `<div class="nota-campo"><b>Motivo:</b> ${esc(ultimaConDx.notaClinica.motivoConsulta)}</div>` : ""}
-      ${ultimaConDx.notaClinica.diagnostico ? `<div class="nota-campo"><b>Diagnóstico:</b> ${esc(ultimaConDx.notaClinica.diagnostico)}</div>` : ""}
+      <div class="seccion-titulo" style="margin-top:0">${t("kardex.ultimoDx")}</div>
+      <div class="fecha" style="margin-bottom:6px">${new Date(ultimaConDx.createdAt).toLocaleDateString(localeActual())}</div>
+      ${ultimaConDx.notaClinica.motivoConsulta ? `<div class="nota-campo"><b>${t("kardex.motivo")}</b> ${esc(ultimaConDx.notaClinica.motivoConsulta)}</div>` : ""}
+      ${ultimaConDx.notaClinica.diagnostico ? `<div class="nota-campo"><b>${t("kardex.diagnostico")}</b> ${esc(ultimaConDx.notaClinica.diagnostico)}</div>` : ""}
     </div>` : ""}`;
 
   const tabConsultas = `
-    <button class="secondary" id="btnNuevaConsulta">🎙️ Nueva consulta</button>
-    ${consultas.length === 0 ? `<div class="empty">Todavía no hay consultas registradas.</div>` : ""}
+    <button class="secondary" id="btnNuevaConsulta">${t("kardex.nuevaConsulta")}</button>
+    ${consultas.length === 0 ? `<div class="empty">${t("kardex.sinConsultas")}</div>` : ""}
     ${consultas.map(c => `
       <div class="item" data-id="${c._id}">
         <div class="top">
-          <div class="fecha">${new Date(c.createdAt).toLocaleString("es-BO")}</div>
+          <div class="fecha">${new Date(c.createdAt).toLocaleString(localeActual())}</div>
           <span class="badge badge-${c.estado}">${estadoTxt[c.estado] || c.estado}</span>
         </div>
         ${c.notaClinica && c.notaClinica.motivoConsulta ? `<div class="preview">${esc(c.notaClinica.motivoConsulta)}</div>` : ""}
-        ${c.notaClinica && c.notaClinica.diagnostico ? `<div class="preview"><b>Dx:</b> ${esc(c.notaClinica.diagnostico)}</div>` : ""}
+        ${c.notaClinica && c.notaClinica.diagnostico ? `<div class="preview"><b>${t("kardex.dx")}</b> ${esc(c.notaClinica.diagnostico)}</div>` : ""}
       </div>`).join("")}`;
 
   const medActivos = medicamentos.filter(m => !m.fechaFin);
@@ -295,77 +295,77 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       <div class="item" style="cursor:default">
         <div class="top">
           <div class="nombre">${esc(m.nombre)}</div>
-          ${!m.fechaFin ? `<span class="badge badge-completado">Activo</span>` : `<span class="badge" style="background:var(--border);color:var(--text-muted)">Finalizado</span>`}
+          ${!m.fechaFin ? `<span class="badge badge-completado">${t("kardex.med.activo")}</span>` : `<span class="badge" style="background:var(--border);color:var(--text-muted)">${t("kardex.med.finalizado")}</span>`}
         </div>
         <div class="paciente-info">${[m.dosis, m.frecuencia].filter(Boolean).map(esc).join(" · ")}</div>
         ${m.notas ? `<div class="paciente-info">📝 ${esc(m.notas)}</div>` : ""}
         <div style="display:flex;gap:8px;margin-top:8px">
-          ${!m.fechaFin ? `<button class="link" data-dar-baja="${m._id}" style="margin:0;flex:1">Dar de baja</button>` : ""}
-          <button class="link" data-borrar-med="${m._id}" style="margin:0;flex:1;color:var(--danger)">Eliminar</button>
+          ${!m.fechaFin ? `<button class="link" data-dar-baja="${m._id}" style="margin:0;flex:1">${t("kardex.med.darBaja")}</button>` : ""}
+          <button class="link" data-borrar-med="${m._id}" style="margin:0;flex:1;color:var(--danger)">${t("kardex.med.eliminar")}</button>
         </div>
       </div>`;
   }
   const tabMedicamentos = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Agregar medicamento</div>
-      <input id="medNombre" type="text" placeholder="Nombre (ej: Losartán)">
-      <input id="medDosis" type="text" placeholder="Dosis (ej: 50mg)" style="margin-top:8px">
-      <input id="medFrecuencia" type="text" placeholder="Frecuencia (ej: 1 vez al día)" style="margin-top:8px">
-      <button class="secondary" id="btnAgregarMed">➕ Agregar</button>
+      <div class="seccion-titulo" style="margin-top:0">${t("kardex.med.titulo")}</div>
+      <input id="medNombre" type="text" placeholder="${t("kardex.med.nombrePlaceholder")}">
+      <input id="medDosis" type="text" placeholder="${t("kardex.med.dosisPlaceholder")}" style="margin-top:8px">
+      <input id="medFrecuencia" type="text" placeholder="${t("kardex.med.frecPlaceholder")}" style="margin-top:8px">
+      <button class="secondary" id="btnAgregarMed">${t("kardex.agregar")}</button>
     </div>
-    ${medActivos.length ? `<div class="seccion-titulo">Activos</div>${medActivos.map(medItemHtml).join("")}` : ""}
-    ${medPasados.length ? `<div class="seccion-titulo">Pasados</div>${medPasados.map(medItemHtml).join("")}` : ""}
-    ${medicamentos.length === 0 ? `<div class="empty">Todavía no hay medicamentos registrados.</div>` : ""}`;
+    ${medActivos.length ? `<div class="seccion-titulo">${t("kardex.med.activos")}</div>${medActivos.map(medItemHtml).join("")}` : ""}
+    ${medPasados.length ? `<div class="seccion-titulo">${t("kardex.med.pasados")}</div>${medPasados.map(medItemHtml).join("")}` : ""}
+    ${medicamentos.length === 0 ? `<div class="empty">${t("kardex.med.vacio")}</div>` : ""}`;
 
   const tabAntecedentes = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Antecedentes personales</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("kardex.ant.personales")}</div>
       ${(p.antecedentesPersonales||[]).map((a,i) => `
         <div class="dato-row" style="display:flex;justify-content:space-between;align-items:center">
           <span>${esc(a)}</span>
           <button class="link" data-borrar-antp="${i}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>`).join("")}
-      ${(p.antecedentesPersonales||[]).length === 0 ? `<div class="hint">Sin antecedentes personales cargados.</div>` : ""}
-      <input id="antpNuevo" type="text" placeholder="Ej: Hipertensión desde 2019" style="margin-top:10px">
-      <button class="secondary" id="btnAgregarAntP">➕ Agregar</button>
+      ${(p.antecedentesPersonales||[]).length === 0 ? `<div class="hint">${t("kardex.ant.sinPersonales")}</div>` : ""}
+      <input id="antpNuevo" type="text" placeholder="${t("kardex.ant.personalPlaceholder")}" style="margin-top:10px">
+      <button class="secondary" id="btnAgregarAntP">${t("kardex.agregar")}</button>
     </div>
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Antecedentes familiares</div>
+      <div class="seccion-titulo" style="margin-top:0">${t("kardex.ant.familiares")}</div>
       ${(p.antecedentesFamiliares||[]).map((a,i) => `
         <div class="dato-row" style="display:flex;justify-content:space-between;align-items:center">
           <span><b>${esc(a.parentesco)}:</b> ${esc(a.condicion)}</span>
           <button class="link" data-borrar-antf="${i}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>`).join("")}
-      ${(p.antecedentesFamiliares||[]).length === 0 ? `<div class="hint">Sin antecedentes familiares cargados.</div>` : ""}
-      <input id="antfParentesco" type="text" placeholder="Parentesco (ej: Madre)" style="margin-top:10px">
-      <input id="antfCondicion" type="text" placeholder="Condición (ej: Diabetes tipo 2)" style="margin-top:8px">
-      <button class="secondary" id="btnAgregarAntF">➕ Agregar</button>
+      ${(p.antecedentesFamiliares||[]).length === 0 ? `<div class="hint">${t("kardex.ant.sinFamiliares")}</div>` : ""}
+      <input id="antfParentesco" type="text" placeholder="${t("kardex.ant.parentescoPlaceholder")}" style="margin-top:10px">
+      <input id="antfCondicion" type="text" placeholder="${t("kardex.ant.condicionPlaceholder")}" style="margin-top:8px">
+      <button class="secondary" id="btnAgregarAntF">${t("kardex.agregar")}</button>
     </div>`;
 
   const tabVacunas = `
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">Agregar vacuna</div>
-      <input id="vacNombre" type="text" placeholder="Nombre (ej: Influenza)">
-      <input id="vacDosis" type="text" placeholder="Dosis (ej: 1ra dosis, Refuerzo)" style="margin-top:8px">
-      <label>Fecha</label>
+      <div class="seccion-titulo" style="margin-top:0">${t("kardex.vac.titulo")}</div>
+      <input id="vacNombre" type="text" placeholder="${t("kardex.vac.nombrePlaceholder")}">
+      <input id="vacDosis" type="text" placeholder="${t("kardex.vac.dosisPlaceholder")}" style="margin-top:8px">
+      <label>${t("kardex.vac.fecha")}</label>
       <input id="vacFecha" type="date">
-      <button class="secondary" id="btnAgregarVac">➕ Agregar</button>
+      <button class="secondary" id="btnAgregarVac">${t("kardex.agregar")}</button>
     </div>
-    ${vacunas.length === 0 ? `<div class="empty">Todavía no hay vacunas registradas.</div>` : ""}
+    ${vacunas.length === 0 ? `<div class="empty">${t("kardex.vac.vacio")}</div>` : ""}
     ${vacunas.map(v => `
       <div class="item" style="cursor:default">
         <div class="top">
           <div class="nombre">${esc(v.nombre)}${v.dosis ? " — " + esc(v.dosis) : ""}</div>
           <button class="link" data-borrar-vac="${v._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(v.fecha).toLocaleDateString("es-BO")}</div>
+        <div class="fecha">${new Date(v.fecha).toLocaleDateString(localeActual())}</div>
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
   const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: `<div id="objetivosNeuroBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, instrumentos: `<div id="instrumentosBox"></div>`, informes: `<div id="informesBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← Pacientes</button>
+    <button class="back" id="btnBack">${t("kardex.volver")}</button>
     <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
     <div class="tabs">
       ${Object.entries(tabsKardex).map(([key, t]) => `
@@ -463,7 +463,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     });
     document.querySelectorAll("[data-borrar-med]").forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm("¿Eliminar este medicamento?")) return;
+        if (!confirm(t("kardex.med.confirmarBorrar"))) return;
         await api("/medico/medicamentos/" + btn.dataset.borrarMed, { method: "DELETE" });
         renderPacienteDetalle(p._id, "medicamentos");
       };
@@ -537,7 +537,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     };
     document.querySelectorAll("[data-borrar-vac]").forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm("¿Eliminar esta vacuna?")) return;
+        if (!confirm(t("kardex.vac.confirmarBorrar"))) return;
         await api("/medico/vacunas/" + btn.dataset.borrarVac, { method: "DELETE" });
         renderPacienteDetalle(p._id, "vacunas");
       };
