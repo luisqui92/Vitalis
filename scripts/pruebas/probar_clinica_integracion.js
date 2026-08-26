@@ -354,8 +354,60 @@ async function main() {
   const pacientesDelSacado = await Paciente.countDocuments({ medicoPhone: solo.phone });
   verificar("  ...y no se le tocó una sola ficha", pacientesDelSacado === (await Paciente.countDocuments({ medicoPhone: solo.phone })));
 
+  // ── 9. Los médicos que YA EXISTEN el día del despliegue ────────────────
+  //
+  // Ésta es la prueba del despliegue, no de la clínica. Hoy, en producción,
+  // ni un solo médico tiene los campos nuevos: idioma, rol, vinculo y
+  // clinicaId no existen en sus documentos. Se agregaron al esquema con
+  // valores por defecto, pero un default de Mongoose se aplica al ESCRIBIR,
+  // no cambia lo que ya está guardado — y .lean() ni siquiera lo aplica al
+  // leer.
+  //
+  // Así que se inserta un médico con el driver crudo, sin pasar por el
+  // esquema: exactamente como están los documentos de producción ahora.
+  console.log("\n── 9. Un médico de antes del despliegue ──");
+  await mongoose.connection.collection("medicos").insertOne({
+    phone: "70000099",
+    nombre: "Dr. Antiguo",
+    especialidad: "Traumatología",
+    tipoEspecialidad: "medicina_general",
+    passwordHash: hash,
+    activo: true,
+    createdAt: new Date("2025-01-01"),
+    updatedAt: new Date("2025-01-01"),
+    // Sin idioma, sin rol, sin vinculo, sin clinicaId. Como los de verdad.
+  });
+
+  require(path.join(RAIZ, "routes", "medicoAuth"))(app);
+  const login = await pedir(puerto, "POST", "/medico/login", null, { phone: "70000099", password: "Prueba123." });
+  verificar("un médico de antes puede iniciar sesión", login.estado === 200 && Boolean(login.cuerpo?.token));
+  verificar("  ...y le toca español, no undefined", login.cuerpo?.idioma === "es");
+  verificar("  ...y rol de médico", login.cuerpo?.rol === "medico");
+  verificar("  ...y ninguna clínica", login.cuerpo?.clinica === null);
+
+  const tokenAntiguo = login.cuerpo?.token;
+  const susPacientes = await pedir(puerto, "GET", "/medico/pacientes", tokenAntiguo);
+  verificar("sus rutas de siempre siguen abiertas", susPacientes.estado === 200);
+  const suBusqueda = await pedir(puerto, "GET", "/medico/personas/buscar?q=maria", tokenAntiguo);
+  verificar("y lo nuevo no le explota: simplemente no está en ninguna clínica", suBusqueda.cuerpo?.enClinica === false);
+  verificar("  ...ni ve personas de nadie", (suBusqueda.cuerpo?.personas || []).length === 0);
+
+  // Y que el panel lo tome bien si mañana lo suman a la clínica sin que él
+  // haya tocado nada de su cuenta.
+  await POST(`/admin/medicos/70000099/vincular`, tk.carla, { vinculo: "empleado", consultorio: "Consultorio 5" });
+  const conElAntiguo = await GET("/admin/resumen", tk.carla);
+  const antiguoEnPanel = (conElAntiguo.cuerpo?.medicos || []).find(m => m.phone === "70000099");
+  verificar("sumado a la clínica, aparece en el panel sin romper nada", Boolean(antiguoEnPanel));
+  verificar("  ...con sus contadores en cero, no en undefined",
+    antiguoEnPanel?.consultasMes === 0 && antiguoEnPanel?.pacientes === 0 && antiguoEnPanel?.citasHoy === 0);
+
   // ─── LIMPIEZA ───────────────────────────────────────────────────────────
   await new Promise((r) => servidor.close(r));
+  // registrar() escribe la auditoría en segundo plano y no se espera (a
+  // propósito: auditar no puede demorar una respuesta). Si cerramos la
+  // conexión en el acto, esas escrituras sueltan un ERROR en la salida que
+  // parece un problema del producto y no lo es.
+  await new Promise((r) => setTimeout(r, 500));
   await mongoose.connection.dropDatabase();
   await mongoose.disconnect();
   await mongo.detener();
