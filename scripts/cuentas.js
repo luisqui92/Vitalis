@@ -1,19 +1,29 @@
-// Vitalis — Ver las cuentas de demostración, y ponerles contraseña nueva.
+// Vitalis — TODAS las cuentas que existen, y cómo ponerles contraseña nueva.
 //
-// Las contraseñas se guardan con bcrypt: no se pueden leer, ni siquiera
-// desde acá. Eso está bien y es a propósito. Cuando una se pierde, lo que
-// corresponde es ponerle otra, no recuperarla.
+// Lista todas, no solo las de demostración: las que se crearon con los
+// scripts de seed, las que se registró un médico solo, y las que alguien
+// hizo hace meses y ya nadie recuerda.
+//
+// ═══ LAS CONTRASEÑAS NO SE PUEDEN VER ══════════════════════════════════════
+//
+// Ni desde acá ni desde ningún lado. Se guardan con bcrypt, que es de una
+// sola vía: de la contraseña se llega al hash, del hash no se vuelve. Eso no
+// es una limitación de este script, es lo que hace que robarse la base de
+// datos no sea robarse las contraseñas de todos los médicos.
+//
+// Cuando una se pierde, lo que corresponde es poner otra.
 //
 // Uso:
-//   node scripts/cuentas_demo.js                        (lista las cuentas)
-//   node scripts/cuentas_demo.js <telefono> --clave     (le pone una nueva)
-//   node scripts/cuentas_demo.js <telefono> --clave "loquesea"
+//   node scripts/cuentas.js                          (lista todas)
+//   node scripts/cuentas.js <telefono>               (mira una)
+//   node scripts/cuentas.js <telefono> --clave       (le pone una nueva)
+//   node scripts/cuentas.js <telefono> --clave "la-que-quieras"
 //
 // Sin la contraseña escrita, genera una y la muestra UNA sola vez.
 //
-// ⚠️ Solo para cuentas de demostración. Si el teléfono corresponde a una
-// cuenta con pacientes reales, avisa y no hace nada: cambiarle la contraseña
-// a un médico que está atendiendo lo deja afuera de su propio consultorio.
+// ⚠️ Cambiarle la contraseña a un médico que está atendiendo lo deja afuera
+// de su propio consultorio. Por eso, si la cuenta tiene muchos pacientes y
+// no es una demo conocida, el script frena y hay que insistir con --igual.
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
@@ -38,14 +48,14 @@ async function main() {
   const ponerClave = process.argv.includes("--clave");
   const claveDada = process.argv[process.argv.indexOf("--clave") + 1];
   const clave = ponerClave
-    ? (claveDada && claveDada !== phone ? claveDada : crypto.randomBytes(9).toString("base64url"))
+    ? (claveDada && !claveDada.startsWith("--") && claveDada !== phone ? claveDada : crypto.randomBytes(9).toString("base64url"))
     : null;
 
   await mongoose.connect(CONFIG.MONGODB_URI);
 
   if (!phone) {
     const medicos = await Medico.find({}).select("phone nombre tipoEspecialidad rol activo createdAt").sort({ createdAt: 1 }).lean();
-    console.log(`\n${medicos.length} cuenta(s):\n`);
+    console.log(`\n${medicos.length} cuenta(s) en la base — todas, no solo las de demo:\n`);
     for (const m of medicos) {
       const pacientes = await Paciente.countDocuments({ medicoPhone: m.phone });
       const consultas = await ConsultaMedica.countDocuments({ medicoPhone: m.phone });
@@ -54,8 +64,9 @@ async function main() {
       console.log(`     ${m.tipoEspecialidad} · rol ${m.rol || "medico"}${m.activo === false ? " · INACTIVA" : ""}`);
       console.log(`     ${pacientes} paciente(s), ${consultas} consulta(s)${etiqueta}\n`);
     }
-    console.log("Para ponerle contraseña nueva a una:");
-    console.log("  node scripts/cuentas_demo.js <telefono> --clave\n");
+    console.log("Las contraseñas no aparecen porque no se pueden leer (bcrypt).");
+    console.log("Para ponerle una nueva a alguna:");
+    console.log("  node scripts/cuentas.js <telefono> --clave\n");
     await mongoose.disconnect();
     return;
   }
@@ -75,7 +86,7 @@ async function main() {
 
   if (!ponerClave) {
     console.log("\nLa contraseña no se puede leer: bcrypt es de una sola vía.");
-    console.log(`Para ponerle una nueva:  node scripts/cuentas_demo.js ${phone} --clave\n`);
+    console.log(`Para ponerle una nueva:  node scripts/cuentas.js ${phone} --clave\n`);
     await mongoose.disconnect();
     return;
   }
@@ -85,10 +96,14 @@ async function main() {
   // un médico de verdad — y dejarlo afuera de su consultorio en medio de una
   // jornada es un daño real.
   const esDemoConocida = Boolean(DEMOS_CONOCIDAS[phone]);
-  if (!esDemoConocida && pacientes > 12) {
-    console.error(`\n❌ Esta cuenta no está en la lista de demos y tiene ${pacientes} pacientes.`);
-    console.error("   Parece un médico de verdad. No le voy a cambiar la contraseña.");
-    console.error("   Si igual hay que hacerlo, que lo pida esa persona y hacelo a mano.");
+  const insistir = process.argv.includes("--igual");
+  if (!esDemoConocida && pacientes > 12 && !insistir) {
+    console.error(`\n⚠️  Esta cuenta no está en la lista de demos y tiene ${pacientes} pacientes.`);
+    console.error("   Puede ser un médico atendiendo de verdad, y cambiarle la contraseña");
+    console.error("   lo deja afuera de su consultorio hasta que alguien le pase la nueva.");
+    console.error("");
+    console.error("   Si la cuenta es tuya o ya lo hablaste con esa persona:");
+    console.error(`     node scripts/cuentas.js ${phone} --clave --igual`);
     await mongoose.disconnect();
     process.exit(1);
   }
