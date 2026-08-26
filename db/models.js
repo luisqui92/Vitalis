@@ -115,8 +115,59 @@ const Medico = mongoose.model("Medico", medicoSchema);
 
 // Paciente: la entidad central del Kardex. Todo lo demás (consultas,
 // medicamentos, antecedentes, signos vitales) cuelga de acá.
+// Persona de la clínica: el mismo señor que va al clínico y al odontólogo
+// es UNA persona, aunque tenga una ficha con cada uno.
+//
+// ═══ QUÉ SE COMPARTE Y QUÉ NO ═════════════════════════════════════════════
+//
+// Se comparte la IDENTIDAD (nombre, nacimiento, teléfono, documento) y las
+// ALERGIAS. Nada más. Ni consultas, ni diagnósticos, ni antecedentes, ni
+// medicación: eso sigue siendo de cada médico con su paciente, en el
+// Paciente de siempre, filtrado por medicoPhone como hasta ahora.
+//
+// Las alergias son la excepción a propósito, y por una razón concreta: un
+// odontólogo que receta amoxicilina a alguien alérgico a la penicilina es
+// exactamente el accidente que una clínica de varios consultorios existe
+// para evitar. Y una alergia no es un diagnóstico — no revela una condición
+// de la persona, es una advertencia sobre qué NO darle.
+//
+// Los antecedentes no se comparten aunque sea tentador: "en tratamiento
+// oncológico" o "VIH+" son diagnósticos, y que el odontólogo los vea porque
+// comparten edificio no es cuidado, es una filtración.
+//
+// Hasta hoy las alergias vivían como texto libre adentro de
+// antecedentesPersonales ("Alergia a penicilina") o de notas. Por eso el
+// campo estructurado nace acá: no se puede compartir de forma segura algo
+// que está escrito en prosa y de siete maneras distintas.
+const personaClinicaSchema = new mongoose.Schema({
+  clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", required: true, index: true },
+  nombre: { type: String, required: true },
+  fechaNacimiento: { type: Date, default: null },
+  sexo: { type: String, default: "" },
+  telefono: { type: String, default: "" },
+  // CI en Bolivia, CPF en Brasil. Es lo único que identifica a una persona
+  // sin ambigüedad: dos "Juan Pérez" con la misma fecha de nacimiento
+  // existen, un documento repetido casi nunca.
+  documento: { type: String, default: "", index: true },
+  alergias: { type: [String], default: [] },
+  // Quién y cuándo tocó las alergias por última vez. Es un dato que cruza
+  // consultorios: si aparece una alergia nueva en la ficha de otro médico,
+  // hay que poder preguntarle a alguien de dónde salió.
+  alergiasActualizadasPor: { type: String, default: "" },
+  alergiasActualizadasEn: { type: Date, default: null },
+}, { timestamps: true });
+personaClinicaSchema.index({ clinicaId: 1, nombre: 1 });
+const PersonaClinica = mongoose.model("PersonaClinica", personaClinicaSchema);
+
 const pacienteSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
+  // La persona de la clínica a la que corresponde esta ficha. Null para un
+  // médico que trabaja solo: no hay nada con qué compartir.
+  //
+  // NO se completa solo. Vincular dos fichas que en realidad son de dos
+  // personas distintas fusiona dos historias clínicas, y eso no tiene
+  // vuelta atrás: siempre lo confirma el médico (ver scripts/proponer_personas.js).
+  personaId: { type: mongoose.Schema.Types.ObjectId, ref: "PersonaClinica", default: null, index: true },
   nombre: { type: String, required: true },
   fechaNacimiento: { type: Date, default: null },
   sexo: { type: String, default: "" },
@@ -1232,7 +1283,7 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Clinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
