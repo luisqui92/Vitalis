@@ -7,4 +7,6 @@ Object.assign(I18N.pt, {
   "dia.corto.4": "Qui",
   "dia.corto.5": "Sex",
   "dia.corto.6": "Sáb",
+  "comun.volver": "Voltar",
+  "comun.salir": "Sair",
 });

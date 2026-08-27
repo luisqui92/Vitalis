@@ -3,6 +3,7 @@ Object.assign(I18N.es, {
   "op.titulo": "Acreditar recargas",
   "op.ayuda": "Buscá al médico, verificá el pago en el banco y acreditá. La recarga mínima es Bs {minimo}.",
   "op.falta2fa": "Para acreditar saldo necesitás la verificación en dos pasos activa. Activala más abajo y volvé a entrar.",
+  "op.faltaPermiso": "Esta cuenta todavía no tiene el permiso para aprobar pagos. Hay que agregar su teléfono a OPERADORES_SALDO en el servidor y reiniciar Vitalis. Avisale a quien administra el servidor.",
   "op.buscar": "Buscar médico",
   "op.buscarPlaceholder": "Nombre o teléfono",
   "op.buscando": "Buscando...",

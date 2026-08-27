@@ -95,7 +95,26 @@ async function renderPagos() {
   const e = await traerEstadoOperador();
   if (!seriePantallaVigente(serie)) return;
 
-  // Si esta cuenta no acredita, la pantalla no existe — se vuelve al panel en
+  // Una cuenta de pagos que todavía no está en OPERADORES_SALDO no tiene a
+  // dónde ir: no tiene pacientes y no tiene clínica. Mandarla al panel de
+  // clínica —que es lo que hacía— la dejaba en un "Tu cuenta no está
+  // asociada a ninguna clínica" que no explica nada y no se sale de ahí.
+  //
+  // Es exactamente el estado en que queda una cuenta recién creada, o sea
+  // el primer día de la persona que va a manejar los pagos. Merece que le
+  // digamos qué falta en vez de una pantalla en blanco.
+  if (!e.operador && esSoloPagos()) {
+    app.innerHTML = `
+      <div class="card" style="border-color:var(--warning)">
+        <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
+        <div class="saldo-aviso">${t("op.faltaPermiso")}</div>
+        <button class="secondary" id="btnSalirPagos">${t("comun.salir")}</button>
+      </div>`;
+    document.getElementById("btnSalirPagos").onclick = logout;
+    return;
+  }
+
+  // Para el resto, la pantalla simplemente no existe: se vuelve al panel en
   // vez de mostrar un cartel de "no tenés permiso" para algo que no debería
   // ni haber sido visible.
   //

@@ -28,7 +28,7 @@ let MEDICO_IDIOMA = IDIOMAS.includes(guardado) ? guardado : "es";
 const I18N = { es: {}, pt: {} };
 
 // t("agenda.cargando")                       → "Cargando agenda..."
-// t("agenda.dias", { n: 14 })                → "Próximos 14 días"
+// t("clin.consultorios", { n: 7 })           → "7 consultorios"
 function t(clave, vars) {
   const dic = I18N[MEDICO_IDIOMA] || I18N.es;
   let texto = dic[clave];

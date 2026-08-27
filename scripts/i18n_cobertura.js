@@ -86,4 +86,40 @@ for (const idioma of idiomas) {
   console.log("");
 }
 
+// ─── AL REVÉS: CLAVES QUE EL CÓDIGO PIDE Y NO EXISTEN ──────────────────────
+//
+// Lo de arriba compara un idioma contra otro. Esto compara el CÓDIGO contra
+// el diccionario, que es un agujero distinto y peor.
+//
+// t() no rompe cuando falta una clave: cae al español, y si tampoco está,
+// devuelve la clave cruda con un console.warn que nadie mira. O sea que un
+// botón puede decir "comun.volver" en producción y verse perfectamente
+// normal en el código. Pasó exactamente eso, en la pantalla de pagos, y se
+// descubrió mirando el celular.
+//
+// Solo se revisan las claves escritas como texto fijo. Las armadas al vuelo
+// —t("dia.corto." + n)— no se pueden saber sin ejecutar, y no se inventan.
+const DIR_JS = path.join(__dirname, "..", "public", "js");
+const existentes = new Set(clavesRef);
+const inventadas = [];
+for (const archivo of fs.readdirSync(DIR_JS).filter(f => f.endsWith(".js")).sort()) {
+  const texto = fs.readFileSync(path.join(DIR_JS, archivo), "utf8");
+  // El ")" o la "," del final es lo que distingue una clave completa de un
+  // prefijo: t("dia.corto." + n) empieza igual que t("dia.corto.0") y no se
+  // puede resolver sin ejecutar. Sin esa exigencia, el chequeo escupe veinte
+  // falsos positivos y se lo deja de mirar, que es peor que no tenerlo.
+  for (const m of texto.matchAll(/\bt\(\s*["']([^"']+)["']\s*[),]/g)) {
+    if (!existentes.has(m[1])) inventadas.push(`${archivo}: ${m[1]}`);
+  }
+}
+if (inventadas.length) {
+  console.log(`⚠️  ${inventadas.length} clave(s) que el código pide y no existen en ningún diccionario:`);
+  console.log("   (en pantalla se ven como el nombre de la clave, tal cual)\n");
+  for (const i of inventadas) console.log(`    ${i}`);
+  console.log("");
+  incompleto = true;
+} else {
+  console.log(`✅ Todas las claves que usa el código existen (${existentes.size} disponibles).\n`);
+}
+
 process.exit(incompleto ? 1 : 0);
