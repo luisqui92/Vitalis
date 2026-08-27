@@ -61,7 +61,7 @@ function paraElMedico(s) {
 module.exports = function (app) {
   // ─── DÓNDE PAGO ─────────────────────────────────────────────────────────
   app.get("/medico/recargas/datos-pago", limitMedico, requireMedico, asyncRoute(async (_req, res) => {
-    res.json({ ...datosDePago(), recargaMinimaCentavos: saldos.RECARGA_MINIMA });
+    res.json({ ...(await datosDePago()), recargaMinimaCentavos: saldos.RECARGA_MINIMA });
   }));
 
   // ─── AVISAR QUE PAGUÉ ───────────────────────────────────────────────────

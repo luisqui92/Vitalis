@@ -181,6 +181,7 @@ const pantallas = [
   ["ficha de operador", `OPERADOR_ELEGIDO = { phone: "79999999", nombre: "Dra. Destino" }; abrirFichaOperador`],
   ["panel de pagos", `pintarResumenPagos`],
   ["pantalla de pagos", `renderPagos`],
+  ["datos de pago", `pintarDatosDePago`],
   ["cartel de avisos pendientes", `OPERADOR_ESTADO = { operador: true, pendientes: 3 }; avisoOperadorHtml()`],
   ["cartel sin avisos", `OPERADOR_ESTADO = { operador: true, pendientes: 0 }; avisoOperadorHtml()`],
   ["cartel para quien no es operador", `OPERADOR_ESTADO = { operador: false }; avisoOperadorHtml()`],

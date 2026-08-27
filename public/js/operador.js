@@ -106,11 +106,14 @@ async function renderPagos() {
       <input id="opBuscar" type="text" placeholder="${t("op.buscarPlaceholder")}" autocomplete="off">
       <div id="opResultados"></div>
       <div id="opFicha"></div>
-    </div>`;
+    </div>
+
+    <div id="opDatosPago"></div>`;
 
   document.getElementById("btnBack").onclick = renderDashboard;
   pintarResumenPagos();
   pintarColaSolicitudes();
+  pintarDatosDePago();
 
   const campo = document.getElementById("opBuscar");
   let temporizador = null;
@@ -394,4 +397,77 @@ async function pintarResumenPagos() {
       t2.style.display = t2.style.display === "none" ? "" : "none";
     };
   }
+}
+
+// ─── DÓNDE NOS PAGAN ──────────────────────────────────────────────────────
+//
+// Se edita acá y no por SSH. Un número de cuenta cambia —se abre otra, cambia
+// el titular— y lo que hay que cambiar entrando al servidor y reiniciando es
+// lo que se queda viejo. Un número viejo son pagos que se pierden.
+//
+// Va al final de la pantalla, plegado: se toca una vez cada mucho tiempo, no
+// tiene por qué ocupar el lugar de lo que se usa todos los días.
+async function pintarDatosDePago() {
+  const caja = document.getElementById("opDatosPago");
+  if (!caja) return;
+  let d;
+  try { d = await api("/medico/operador/datos-pago"); } catch { caja.innerHTML = ""; return; }
+  if (!caja.isConnected) return;
+
+  const resumen = [d.banco, d.cuenta].filter(Boolean).join(" · ") || t("op.dp.sinCargar");
+  caja.innerHTML = `
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${t("op.dp.titulo")}</div>
+      <div class="hint" style="margin:0">${t("op.dp.actual", { datos: esc(resumen) })}</div>
+      <button class="link" id="btnEditarDatosPago" style="width:auto;margin-top:6px">${t("op.dp.editar")}</button>
+
+      <div id="opDatosPagoForm" style="display:none">
+        <div class="hint" style="margin:10px 0">${t("op.dp.ayuda")}</div>
+        <label>${t("recarga.banco")}</label>
+        <input id="dpBanco" type="text" value="${esc(d.banco || "")}">
+        <label>${t("recarga.cuenta")}</label>
+        <input id="dpCuenta" type="text" value="${esc(d.cuenta || "")}">
+        <label>${t("recarga.titular")}</label>
+        <input id="dpTitular" type="text" value="${esc(d.titular || "")}">
+        <label>${t("recarga.documento")}</label>
+        <input id="dpDocumento" type="text" value="${esc(d.documento || "")}">
+        <label>${t("op.dp.whatsapp")}</label>
+        <input id="dpWhatsapp" type="tel" value="${esc(d.whatsapp || "")}" placeholder="59162741818">
+        <div class="hint" style="margin:6px 0 0">${t("op.dp.whatsappAyuda")}</div>
+        <div id="dpErr"></div>
+        <button class="secondary" id="btnGuardarDatosPago">${t("op.dp.guardar")}</button>
+      </div>
+
+      ${d.qr ? `
+        <div class="hint" style="margin:12px 0 0">${t("op.dp.qrOk")}</div>`
+        : `<div class="saldo-aviso" style="margin-top:12px">${t("op.dp.sinQr")}</div>`}
+    </div>`;
+
+  document.getElementById("btnEditarDatosPago").onclick = () => {
+    const f = document.getElementById("opDatosPagoForm");
+    f.style.display = f.style.display === "none" ? "" : "none";
+  };
+
+  document.getElementById("btnGuardarDatosPago").onclick = async () => {
+    const btn = document.getElementById("btnGuardarDatosPago");
+    const err = document.getElementById("dpErr");
+    err.innerHTML = "";
+    btn.disabled = true;
+    try {
+      await api("/medico/operador/datos-pago", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          banco: document.getElementById("dpBanco").value,
+          cuenta: document.getElementById("dpCuenta").value,
+          titular: document.getElementById("dpTitular").value,
+          documento: document.getElementById("dpDocumento").value,
+          whatsapp: document.getElementById("dpWhatsapp").value,
+        }),
+      });
+      pintarDatosDePago();
+    } catch (e) {
+      btn.disabled = false;
+      err.innerHTML = `<div class="error">${esc(e.error || t("op.dp.errGuardar"))}</div>`;
+    }
+  };
 }

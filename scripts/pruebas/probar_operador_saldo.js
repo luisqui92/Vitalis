@@ -79,7 +79,7 @@ async function main() {
   process.env.MONGODB_URI = mongo.uri;
   const mongoose = require("mongoose");
   await mongoose.connect(mongo.uri);
-  const { Medico, MovimientoSaldo, Clinica, SolicitudRecarga } = require(path.join(RAIZ, "db", "models"));
+  const { Medico, MovimientoSaldo, Clinica, SolicitudRecarga, ConfigPago } = require(path.join(RAIZ, "db", "models"));
   const { hashPassword, generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
   await MovimientoSaldo.init();
@@ -299,6 +299,37 @@ async function main() {
   const conDeuda = await GET("/medico/operador/resumen", tk.operador);
   verificar("aparece quién está en negativo", conDeuda.cuerpo?.enNegativo?.some(m => m.phone === "70000003"));
   verificar("  ...y la deuda total se muestra en positivo", conDeuda.cuerpo?.deudaTotalBs === "36.00");
+
+  console.log("\n── 13. Dónde nos pagan, editable sin SSH ──");
+  const PUT = (ruta, token, cuerpo) => pedir(puerto, "PUT", ruta, token, cuerpo);
+  verificar("un médico común no puede ver los datos de pago",
+    (await GET("/medico/operador/datos-pago", tk.comun)).estado === 404);
+  // Y sobre todo: no puede CAMBIARLOS. Cambiar el número de cuenta es
+  // desviarse todos los pagos futuros sin tocar un solo saldo.
+  const intento = await PUT("/medico/operador/datos-pago", tk.comun, { banco: "Mi banco", cuenta: "123" });
+  verificar("ni cambiarlos — desviaría todos los pagos futuros", intento.estado === 404);
+
+  const guardado = await PUT("/medico/operador/datos-pago", tk.operador, {
+    banco: "Banco BCP", cuenta: "201-5012345-3-45", titular: "Luis Quiroga",
+    documento: "1234567 SC", whatsapp: "+591 6274-1818",
+  });
+  verificar("el operador sí puede guardarlos", guardado.estado === 200);
+  verificar("  ...y el WhatsApp queda solo con dígitos", guardado.cuerpo?.whatsapp === "59162741818");
+
+  // Lo que importa de verdad: que el MÉDICO vea lo que se guardó.
+  const loQueVeElMedico = await GET("/medico/recargas/datos-pago", tk.destino);
+  verificar("el médico ve la cuenta nueva al ir a recargar",
+    loQueVeElMedico.cuerpo?.cuenta === "201-5012345-3-45");
+  verificar("  ...y el titular", loQueVeElMedico.cuerpo?.titular === "Luis Quiroga");
+
+  const enBase = await ConfigPago.findOne({ clave: "unico" }).lean();
+  verificar("queda registrado quién los cambió", enBase.actualizadoPor === "70000001");
+
+  // Cambiarlos otra vez no crea un segundo documento: es la cuenta de la
+  // empresa, no una configuración por persona.
+  await PUT("/medico/operador/datos-pago", tk.operador, { banco: "Otro banco", cuenta: "999" });
+  verificar("editar de nuevo no duplica la configuración",
+    await ConfigPago.countDocuments({}) === 1);
 
   await new Promise((r) => servidor.close(r));
   await new Promise((r) => setTimeout(r, 400));

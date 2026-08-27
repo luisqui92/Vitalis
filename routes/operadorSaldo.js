@@ -36,6 +36,7 @@ const { registrar } = require("../services/auditoria");
 const { esOperador } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
+const { datosDePago, guardarDatosDePago } = require("../services/datosPago");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -131,6 +132,24 @@ module.exports = function (app) {
       saldos.movimientosDe(phone, 20),
     ]);
     res.json({ medico, ...estado, movimientos });
+  }));
+
+  // ─── DÓNDE NOS PAGAN ───────────────────────────────────────────────────
+  // Editable desde la pantalla y no por SSH: es un número de cuenta que
+  // cambia, y lo que se cambia con dificultad se queda desactualizado.
+  app.get("/medico/operador/datos-pago", limitOperador, requireMedico, requireOperador, asyncRoute(async (_req, res) => {
+    res.json(await datosDePago());
+  }));
+
+  app.put("/medico/operador/datos-pago", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+    const datos = await guardarDatosDePago(req.body || {}, req.adminUser.usuario);
+    // Se audita con el detalle: si un día los pagos empiezan a caer en una
+    // cuenta que no es la nuestra, esto dice quién la cambió y cuándo.
+    registrar({
+      req, medicoPhone: req.adminUser.usuario, accion: "cambiar_datos_pago",
+      recurso: `${datos.banco} ${datos.cuenta} (${datos.titular})`,
+    });
+    res.json({ ok: true, ...datos });
   }));
 
   // ─── EL PANEL DE PAGOS ─────────────────────────────────────────────────

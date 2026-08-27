@@ -1375,6 +1375,32 @@ solicitudRecargaSchema.index({ estado: 1, createdAt: 1 });
 solicitudRecargaSchema.index({ medicoPhone: 1, createdAt: -1 });
 const SolicitudRecarga = mongoose.model("SolicitudRecarga", solicitudRecargaSchema);
 
+// ─── DATOS DE PAGO ─────────────────────────────────────────────────────────
+//
+// Dónde le pagan a Vitalis: banco, cuenta, titular. Vive en la base y no en
+// el .env porque son datos que CAMBIAN —se abre otra cuenta, cambia el
+// titular— y pedirle a alguien que entre por SSH y reinicie el servidor para
+// corregir un número de cuenta es una forma de garantizar que ese número
+// quede desactualizado.
+//
+// Lo edita un operador desde la pantalla de Pagos. No es información
+// secreta: es exactamente lo que se le muestra a cada médico para que pague.
+//
+// Un solo documento para toda la instalación (clave "unico"): no es una
+// configuración por médico ni por clínica, es la cuenta de la empresa.
+const configPagoSchema = new mongoose.Schema({
+  clave: { type: String, default: "unico", unique: true, index: true },
+  banco: { type: String, default: "" },
+  cuenta: { type: String, default: "" },
+  titular: { type: String, default: "" },
+  documento: { type: String, default: "" },
+  whatsapp: { type: String, default: "" },
+  // Quién los tocó por última vez. Si un día los pagos empiezan a ir a una
+  // cuenta que no es la nuestra, esto es lo primero que hay que mirar.
+  actualizadoPor: { type: String, default: "" },
+}, { timestamps: true });
+const ConfigPago = mongoose.model("ConfigPago", configPagoSchema);
+
 // Registro de auditoría: quién accedió/hizo qué y cuándo — clave para el
 // secreto médico (poder responder "quién vio la historia de este paciente")
 // y para detectar accesos anómalos. Se escribe siempre, nunca se edita.
@@ -1407,7 +1433,7 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
