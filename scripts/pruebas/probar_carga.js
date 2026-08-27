@@ -178,6 +178,7 @@ const pantallas = [
     agendaDemo
   )`],
   ["pestañas del celular", `tabsPacientesHtml(3)`],
+  ["ficha de operador", `OPERADOR_ELEGIDO = { phone: "79999999", nombre: "Dra. Destino" }; abrirFichaOperador`],
   ["movimientos de saldo", `movimientosHtml([
     { tipo: "carga", montoCentavos: 20000, saldoDespuesCentavos: 20000, concepto: "Carga de Bs 200.00", referencia: "QR BCP 4471", createdAt: new Date().toISOString() },
     { tipo: "consumo", montoCentavos: -1200, saldoDespuesCentavos: 18800, concepto: "Consulta transcrita", createdAt: new Date().toISOString() },

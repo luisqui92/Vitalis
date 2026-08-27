@@ -115,6 +115,9 @@ require("./routes/backup")(app);
 require("./routes/admin")(app);
 // Persona compartida entre consultorios: identidad y alergias, nada más.
 require("./routes/personas")(app);
+// Acreditar recargas desde la pantalla. Es el endpoint que FABRICA DINERO:
+// leer el encabezado del archivo antes de tocarlo.
+require("./routes/operadorSaldo")(app);
 
 // Los .br se generan una vez, en segundo plano, para no demorar el arranque.
 // Mientras no estén se sirven los originales: nada se rompe.

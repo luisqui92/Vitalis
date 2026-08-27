@@ -26,6 +26,8 @@ async function renderSeguridad() {
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
     pintarSaldo();
+    // Solo hace algo si el servidor dice que esta cuenta es operadora.
+    pintarOperador();
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando seguridad")}</div>`;
@@ -35,6 +37,8 @@ async function renderSeguridad() {
 function pintarSeguridad(dosFAActivo, eventos) {
   app.innerHTML = `
     <button class="back" id="btnBack">← Panel</button>
+
+    <div id="operadorBox"></div>
 
     <div id="saldoBox"></div>
 
