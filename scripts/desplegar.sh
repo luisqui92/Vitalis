@@ -57,30 +57,67 @@ RAMA_ANTES="$(git branch --show-current || echo '(detached)')"
 } | tee "$ARCHIVO_RETORNO"
 verde "Guardado en $ARCHIVO_RETORNO"
 
-# Este script llega al servidor con:
-#   git checkout origin/<rama> -- scripts/desplegar.sh
-# y eso, además de escribir el archivo, lo deja EN EL ÍNDICE. O sea que el
-# script aparece como cambio pendiente en su propia comprobación y se planta
-# a sí mismo. Pasó la primera vez que se usó.
+# Hace falta conocer la rama de destino ANTES de revisar el árbol: la
+# comprobación de abajo compara contra ella.
+git fetch origin "$RAMA"
+
+# ─── ¿Hay algo que un checkout pisaría? ───────────────────────────────────
 #
-# Se excluye entonces su propia ruta. No se pierde nada: el checkout de la
-# rama lo va a reemplazar por la versión de la rama de todos modos. Lo que
-# esta comprobación tiene que atajar son los OTROS archivos, los que alguien
-# editó a mano en el servidor y un checkout pisaría sin avisar.
-YO="${BASH_SOURCE[0]#./}"
-SUCIO="$(git status --porcelain | grep -v "[[:space:]]scripts/desplegar\.sh$" || true)"
+# La pregunta correcta NO es "¿hay cambios sin guardar?" sino "¿hay algún
+# archivo cuyo contenido se PERDERÍA al pasar a la rama?".
+#
+# La diferencia importa. Para traer este script al servidor hay que hacer
+#   git checkout origin/<rama> -- scripts/desplegar.sh
+# y eso deja el archivo EN EL ÍNDICE, así que figura como cambio pendiente.
+# Igual con cualquier otro que se baje del mismo modo — cuentas.js,
+# cargar_saldo.js. Ninguno es un cambio hecho a mano: son exactamente lo que
+# el checkout iba a dejar.
+#
+# La primera versión de esto excluía solo su propia ruta, y volvió a frenar
+# el despliegue cuando alguien bajó cuentas.js del mismo modo. Excluir por
+# nombre es tapar el síntoma; lo que corresponde es comparar contenidos.
+#
+# Un archivo cuyo contenido ya es idéntico al de la rama no se pierde con el
+# checkout. Uno que difiere, sí — y ése es el que hay que mirar antes.
+igual_a_la_rama() {
+  local ruta="$1" enRama enDisco
+  enRama="$(git rev-parse --verify --quiet "origin/$RAMA:$ruta" 2>/dev/null)" || return 1
+  [ -f "$ruta" ] || return 1
+  enDisco="$(git hash-object "$ruta" 2>/dev/null)" || return 1
+  [ "$enRama" = "$enDisco" ]
+}
+
+SUCIO=""
+IDENTICOS=0
+while IFS= read -r linea; do
+  [ -z "$linea" ] && continue
+  # El formato de --porcelain son dos caracteres de estado, un espacio y la
+  # ruta. Se sacan las comillas que git pone cuando el nombre las necesita.
+  ruta="${linea:3}"
+  ruta="${ruta%\"}"; ruta="${ruta#\"}"
+  if igual_a_la_rama "$ruta"; then
+    IDENTICOS=$((IDENTICOS + 1))
+    continue
+  fi
+  SUCIO="${SUCIO}${linea}"$'\n'
+done < <(git status --porcelain)
+
 if [ -n "$SUCIO" ]; then
-  rojo "❌ Hay cambios sin guardar en el servidor:"
-  echo "$SUCIO"
+  rojo "❌ Estos archivos se perderían al pasar a $RAMA:"
+  printf '%s' "$SUCIO"
   echo
-  echo "   Alguien editó archivos acá a mano. Hacer checkout encima los pisa."
-  echo "   Averiguá qué son ANTES de seguir. No los borres sin mirar."
+  echo "   Su contenido NO es el de la rama, así que alguien los editó acá a"
+  echo "   mano. Averiguá qué son ANTES de seguir; no los borres sin mirar."
   echo
   echo "   Si estás seguro de que se pueden descartar:"
   echo "     git stash push --include-untracked   # los guarda por si acaso"
   exit 1
 fi
-verde "✅ El árbol está limpio (sin contar $YO, que llega así por diseño)"
+if [ "$IDENTICOS" -gt 0 ]; then
+  verde "✅ Nada que perder ($IDENTICOS archivo(s) ya idénticos a la rama)"
+else
+  verde "✅ El árbol está limpio"
+fi
 
 paso "2. Respaldo"
 echo "¿Ya hiciste el respaldo desde Panel → Seguridad y verificaste que quedó?"
@@ -89,7 +126,7 @@ read -r -p "Escribí SI para seguir: " RESPUESTA
 ls -lh backups/ 2>/dev/null | tail -3 || echo "(no hay carpeta backups/ acá)"
 
 paso "3. Traer el código"
-git fetch origin "$RAMA"
+# El fetch ya se hizo arriba, para poder comparar el árbol contra la rama.
 PENDIENTES="$(git log --oneline "HEAD..origin/$RAMA" | wc -l | tr -d ' ')"
 echo "Commits que entran: $PENDIENTES"
 git checkout "$RAMA"
