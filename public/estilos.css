@@ -886,6 +886,29 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .saldo-aviso-panel { border-color: var(--warning); }
 .saldo-aviso-panel.saldo-aviso-grave { border-color: var(--danger); }
 
+/* ─── Recarga: dónde pagar ───────────────────────────────────────────────
+   El QR grande y centrado porque se escanea desde otro teléfono: chico no
+   sirve para nada. */
+.recarga-qr {
+  display: block; width: 100%; max-width: 260px; margin: 0 auto 12px;
+  border-radius: var(--radius-sm); background: #fff; padding: 8px;
+}
+.recarga-datos { margin: 0 0 4px; }
+.recarga-fila {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.recarga-fila:last-child { border-bottom: none; }
+.recarga-fila span { color: var(--text-muted); }
+/* Los datos de la cuenta se copian a mano: que se puedan seleccionar y que
+   los dígitos no bailen. */
+.recarga-fila b { text-align: right; user-select: all; font-variant-numeric: tabular-nums; }
+
+/* Cada aviso de pago en la cola del operador. Separados a propósito: son
+   decisiones de una en una, no una lista para barrer. */
+.op-solicitud { margin-top: 10px; }
+.op-solicitud + .op-solicitud { margin-top: 14px; }
+
 /* Fila de edición de un médico: va escondida abajo de la suya, con un
    fondo distinto para que se lea como "esto es de la fila de arriba" y no
    como un médico más. */

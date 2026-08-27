@@ -118,6 +118,9 @@ require("./routes/personas")(app);
 // Acreditar recargas desde la pantalla. Es el endpoint que FABRICA DINERO:
 // leer el encabezado del archivo antes de tocarlo.
 require("./routes/operadorSaldo")(app);
+// El circuito de recarga visto por el médico: dónde pagar y avisar que pagó.
+// Avisar NO acredita — ver el encabezado del archivo.
+require("./routes/recargas")(app);
 
 // Los .br se generan una vez, en segundo plano, para no demorar el arranque.
 // Mientras no estén se sirven los originales: nada se rompe.

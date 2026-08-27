@@ -79,7 +79,7 @@ async function main() {
   process.env.MONGODB_URI = mongo.uri;
   const mongoose = require("mongoose");
   await mongoose.connect(mongo.uri);
-  const { Medico, MovimientoSaldo, Clinica } = require(path.join(RAIZ, "db", "models"));
+  const { Medico, MovimientoSaldo, Clinica, SolicitudRecarga } = require(path.join(RAIZ, "db", "models"));
   const { hashPassword, generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
   await MovimientoSaldo.init();
@@ -112,6 +112,7 @@ async function main() {
   const app = express();
   app.use(express.json());
   require(path.join(RAIZ, "routes", "operadorSaldo"))(app);
+  require(path.join(RAIZ, "routes", "recargas"))(app);
   const servidor = http.createServer(app);
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
   const puerto = servidor.address().port;
@@ -119,6 +120,7 @@ async function main() {
   const POST = (ruta, token, cuerpo) => pedir(puerto, "POST", ruta, token, cuerpo);
 
   const acreditar = (token, cuerpo) => POST("/medico/operador/acreditar", token, cuerpo);
+  const DELETE = (ruta, token) => pedir(puerto, "DELETE", ruta, token);
 
   console.log("── 1. Quién NO puede emitir saldo ──");
   // El administrativo de clínica no llega ni al chequeo de operador: lo frena
@@ -203,6 +205,80 @@ async function main() {
     filtrados.length === 0
   );
   verificar("ni el hash de la contraseña aparece en el JSON crudo", !busca.texto.includes("passwordHash"));
+
+  console.log("\n── 7. Avisar que pagué NO acredita nada ──");
+  // La garantía central del circuito. Si una solicitud pudiera acreditarse
+  // sola, cualquier médico se cargaría saldo escribiendo un número en un
+  // formulario.
+  const saldoAntes = (await Medico.findOne({ phone: "79999999" }).lean()).saldoCentavos;
+  const aviso = await POST("/medico/recargas", tk.destino, { bolivianos: 300, referencia: "QR mio 777" });
+  verificar("el médico puede avisar que pagó", aviso.estado === 201);
+  verificar("  ...y queda PENDIENTE", aviso.cuerpo?.solicitud?.estado === "pendiente");
+  verificar("  ...sin mover un centavo", (await Medico.findOne({ phone: "79999999" }).lean()).saldoCentavos === saldoAntes);
+  verificar("  ...y sin generar ningún movimiento",
+    await MovimientoSaldo.countDocuments({ referenciaClave: "QR MIO 777" }) === 0);
+
+  // Un aviso pendiente por vez: cinco avisos del mismo pago es cómo el
+  // operador termina acreditando dos veces la misma transferencia.
+  const duplicado = await POST("/medico/recargas", tk.destino, { bolivianos: 300, referencia: "QR mio 778" });
+  verificar("no puede avisar dos veces mientras uno esté pendiente", duplicado.estado === 409);
+
+  const sinRefAviso = await POST("/medico/recargas", tk.comun, { bolivianos: 200, referencia: "" });
+  verificar("un aviso sin referencia se rechaza", sinRefAviso.estado === 400);
+
+  console.log("\n── 8. La cola es solo del operador ──");
+  verificar("un médico común no ve la cola",
+    (await GET("/medico/operador/solicitudes", tk.comun)).estado === 404);
+  const cola = await GET("/medico/operador/solicitudes", tk.operador);
+  verificar("el operador sí, y ve 1 pendiente", cola.estado === 200 && cola.cuerpo?.pendientes === 1);
+  verificar("  ...con el saldo actual del médico al lado",
+    typeof cola.cuerpo?.solicitudes?.[0]?.saldo?.saldoBs === "string");
+
+  // Y que nadie pueda aprobar el suyo propio.
+  const solId = cola.cuerpo.solicitudes[0]._id;
+  const autoAprobar = await POST(`/medico/operador/solicitudes/${solId}/aprobar`, tk.destino, {});
+  verificar("el propio médico no puede aprobar su aviso", autoAprobar.estado === 404 || autoAprobar.estado === 403);
+  verificar("  ...y su saldo sigue igual", (await Medico.findOne({ phone: "79999999" }).lean()).saldoCentavos === saldoAntes);
+
+  console.log("\n── 9. Aprobar acredita lo que vio el OPERADOR ──");
+  // El médico declaró Bs 300 pero en el banco entraron Bs 250. Se acredita lo
+  // del banco: confiar en el número declarado sería dejar que el médico se
+  // ponga su propio saldo con un paso extra.
+  const aprobada = await POST(`/medico/operador/solicitudes/${solId}/aprobar`, tk.operador, { bolivianos: 250 });
+  verificar("se aprueba", aprobada.estado === 200);
+  verificar("  ...y se acreditaron 250, no los 300 declarados",
+    (await Medico.findOne({ phone: "79999999" }).lean()).saldoCentavos === saldoAntes + 25000);
+  const solAprobada = await SolicitudRecarga.findById(solId).lean();
+  verificar("  ...la solicitud queda acreditada", solAprobada.estado === "acreditada");
+  verificar("  ...guardando lo declarado Y lo acreditado",
+    solAprobada.montoCentavos === 30000 && solAprobada.montoAcreditadoCentavos === 25000);
+  verificar("  ...y quién la revisó", solAprobada.revisadaPor === "70000001");
+  const yaNo = await POST(`/medico/operador/solicitudes/${solId}/aprobar`, tk.operador, { bolivianos: 250 });
+  verificar("no se puede aprobar dos veces", yaNo.estado === 404);
+
+  console.log("\n── 10. Rechazar exige motivo ──");
+  await POST("/medico/recargas", tk.destino, { bolivianos: 100, referencia: "QR mio 999" });
+  const cola2 = await GET("/medico/operador/solicitudes", tk.operador);
+  const solId2 = cola2.cuerpo.solicitudes[0]._id;
+  const sinMotivo = await POST(`/medico/operador/solicitudes/${solId2}/rechazar`, tk.operador, {});
+  verificar("sin motivo no se rechaza", sinMotivo.estado === 400);
+  const rechazo = await POST(`/medico/operador/solicitudes/${solId2}/rechazar`, tk.operador, { motivo: "No encontramos ese pago en el banco" });
+  verificar("con motivo sí", rechazo.estado === 200);
+  const mias = await GET("/medico/recargas", tk.destino);
+  const rechazada = mias.cuerpo.solicitudes.find(x => x.estado === "rechazada");
+  verificar("el médico ve el rechazo con su motivo", /no encontramos/i.test(rechazada?.motivoRechazo || ""));
+  verificar("  ...y no ve quién lo rechazó", !("revisadaPor" in rechazada));
+
+  console.log("\n── 11. Cancelar el propio aviso ──");
+  await POST("/medico/recargas", tk.destino, { bolivianos: 150, referencia: "QR mio 1000" });
+  const mias2 = await GET("/medico/recargas", tk.destino);
+  const pendienteId = mias2.cuerpo.solicitudes.find(x => x.estado === "pendiente")._id;
+  const ajena = await DELETE(`/medico/recargas/${pendienteId}`, tk.comun);
+  verificar("nadie puede cancelar el aviso de otro", ajena.estado === 404);
+  const propia = await DELETE(`/medico/recargas/${pendienteId}`, tk.destino);
+  verificar("el dueño sí puede cancelarlo", propia.estado === 200);
+  verificar("  ...y puede volver a avisar",
+    (await POST("/medico/recargas", tk.destino, { bolivianos: 150, referencia: "QR mio 1001" })).estado === 201);
 
   await new Promise((r) => servidor.close(r));
   await new Promise((r) => setTimeout(r, 400));

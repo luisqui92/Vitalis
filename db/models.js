@@ -1338,6 +1338,43 @@ movimientoSaldoSchema.index(
 );
 const MovimientoSaldo = mongoose.model("MovimientoSaldo", movimientoSaldoSchema);
 
+// ─── SOLICITUD DE RECARGA ──────────────────────────────────────────────────
+//
+// El médico avisa "ya pagué". Eso es todo lo que es: un AVISO, no un pago.
+//
+// ═══ ESTA COLECCIÓN NO MUEVE UN CENTAVO ════════════════════════════════════
+//
+// Nada de acá toca el saldo. Lo único que acredita es que un operador mire el
+// banco y apruebe, y cuando lo hace la plata sale por services/saldo.js igual
+// que siempre. La separación es a propósito y es la garantía central del
+// modelo: si una solicitud pudiera acreditarse sola, cualquier médico se
+// cargaría saldo escribiendo un número.
+//
+// El monto de acá es lo que el MÉDICO DICE haber pagado. El que se acredita
+// es el que el operador ve en el extracto, y pueden no coincidir — por eso al
+// aprobar se puede corregir, y queda registrado que se corrigió.
+const solicitudRecargaSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  medicoNombre: { type: String, default: "" },
+  // Lo que el médico declara. Sin valor probatorio: es su palabra.
+  montoCentavos: { type: Number, required: true },
+  referencia: { type: String, default: "" },
+  metodo: { type: String, enum: ["qr", "transferencia", "efectivo", "otro"], default: "qr" },
+  nota: { type: String, default: "" },
+
+  estado: { type: String, enum: ["pendiente", "acreditada", "rechazada"], default: "pendiente", index: true },
+  // Cuando se aprueba: el movimiento real que se generó, y cuánto se acreditó
+  // de verdad (puede diferir de lo declarado).
+  movimientoId: { type: mongoose.Schema.Types.ObjectId, ref: "MovimientoSaldo", default: null },
+  montoAcreditadoCentavos: { type: Number, default: null },
+  revisadaPor: { type: String, default: "" },
+  revisadaEn: { type: Date, default: null },
+  motivoRechazo: { type: String, default: "" },
+}, { timestamps: true });
+solicitudRecargaSchema.index({ estado: 1, createdAt: 1 });
+solicitudRecargaSchema.index({ medicoPhone: 1, createdAt: -1 });
+const SolicitudRecarga = mongoose.model("SolicitudRecarga", solicitudRecargaSchema);
+
 // Registro de auditoría: quién accedió/hizo qué y cuándo — clave para el
 // secreto médico (poder responder "quién vio la historia de este paciente")
 // y para detectar accesos anómalos. Se escribe siempre, nunca se edita.
@@ -1370,7 +1407,7 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

@@ -179,6 +179,15 @@ const pantallas = [
   )`],
   ["pestañas del celular", `tabsPacientesHtml(3)`],
   ["ficha de operador", `OPERADOR_ELEGIDO = { phone: "79999999", nombre: "Dra. Destino" }; abrirFichaOperador`],
+  ["dónde pagar", `dondePagarHtml({ configurado: true, qr: "/pago-qr.png", banco: "BCP", cuenta: "201-5012345", titular: "Luis Quiroga", documento: "1234567 SC", whatsapp: "59162741818" })`],
+  ["dónde pagar sin configurar", `dondePagarHtml({ configurado: false })`],
+  ["aviso pendiente", `pendienteHtml({ _id: "s1", montoBs: "200.00", referencia: "QR BCP 4471" })`],
+  ["aviso rechazado", `rechazadaHtml({ montoBs: "200.00", motivoRechazo: "No encontramos ese pago en el banco" })`],
+  ["historial de avisos", `historialHtml([
+    { _id: "s1", montoBs: "200.00", estado: "acreditada", createdAt: new Date().toISOString() },
+    { _id: "s2", montoBs: "100.00", estado: "rechazada", motivoRechazo: "Monto no coincide", createdAt: new Date().toISOString() },
+    { _id: "s3", montoBs: "150.00", estado: "pendiente", createdAt: new Date().toISOString() },
+  ])`],
   ["movimientos de saldo", `movimientosHtml([
     { tipo: "carga", montoCentavos: 20000, saldoDespuesCentavos: 20000, concepto: "Carga de Bs 200.00", referencia: "QR BCP 4471", createdAt: new Date().toISOString() },
     { tipo: "consumo", montoCentavos: -1200, saldoDespuesCentavos: 18800, concepto: "Consulta transcrita", createdAt: new Date().toISOString() },

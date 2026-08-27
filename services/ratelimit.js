@@ -160,4 +160,4 @@ const limit2faPorSesion = rateLimitPorClave(
   }
 );
 
-module.exports = { rateLimit, limitMedico, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };
+module.exports = { rateLimit, rateLimitPorClave, claveDeMedico, limitMedico, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };

@@ -42,11 +42,15 @@ async function pintarOperador() {
     <div class="card" style="border-color:var(--primary)">
       <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
       <div class="hint" style="margin:0 0 10px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
-      <label>${t("op.buscar")}</label>
+      <div id="opCola"></div>
+
+      <div class="seccion-titulo">${t("op.buscar")}</div>
       <input id="opBuscar" type="text" placeholder="${t("op.buscarPlaceholder")}" autocomplete="off">
       <div id="opResultados"></div>
       <div id="opFicha"></div>
     </div>`;
+
+  pintarColaSolicitudes();
 
   const campo = document.getElementById("opBuscar");
   let temporizador = null;
@@ -172,4 +176,94 @@ async function acreditar(igual) {
     }
     err.innerHTML = `<div class="error">${esc(e.error || t("op.errAcreditar"))}</div>`;
   }
+}
+
+// ─── LA COLA DE AVISOS DE PAGO ────────────────────────────────────────────
+//
+// Es lo primero de la pantalla porque es lo que hay que hacer HOY: cada fila
+// es un médico que ya pagó y todavía no puede trabajar. Los más viejos
+// arriba — el que avisó ayer viene esperando más que el de recién.
+//
+// Cada fila muestra el saldo actual del médico, no solo lo que pidió: uno en
+// negativo no está pidiendo una recarga, está pidiendo poder seguir
+// atendiendo, y eso cambia con qué apuro se mira.
+async function pintarColaSolicitudes() {
+  const caja = document.getElementById("opCola");
+  if (!caja) return;
+  let d;
+  try { d = await api("/medico/operador/solicitudes"); } catch { caja.innerHTML = ""; return; }
+  if (!caja.isConnected) return;
+
+  if (!d.solicitudes.length) {
+    caja.innerHTML = `<div class="hint" style="margin:0 0 12px">${t("op.colaVacia")}</div>`;
+    return;
+  }
+
+  caja.innerHTML = `
+    <div class="saldo-aviso" style="margin:0 0 12px">
+      <div style="font-weight:600">${t("op.colaTitulo", { n: d.pendientes })}</div>
+    </div>
+    ${d.solicitudes.map(s => `
+      <div class="card card-secundaria op-solicitud" data-sol="${esc(s._id)}">
+        <div style="font-weight:600">${esc(s.medicoNombre || s.medicoPhone)}</div>
+        <div class="hint" style="margin:2px 0 0">
+          +${esc(s.medicoPhone)} · ${new Date(s.createdAt).toLocaleString(localeActual(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+        </div>
+        <div class="saldo-monto" style="font-size:22px">${t("saldo.monto", { monto: esc(s.montoBs) })}</div>
+        <div class="hint" style="margin:0">${t("recarga.referencia")}: <b>${esc(s.referencia)}</b></div>
+        <div class="hint" style="margin:4px 0 0;${s.saldo.enNegativo ? "color:var(--danger);font-weight:600" : ""}">
+          ${t("op.saldoActual", { monto: esc(s.saldo.saldoBs) })}${s.saldo.enNegativo ? ` — ${t("op.enNegativo")}` : ""}
+        </div>
+
+        <label>${t("op.montoReal")}</label>
+        <input type="number" inputmode="decimal" min="1" step="1" data-monto="${esc(s._id)}" value="${(s.montoCentavos / 100).toFixed(0)}">
+        <div class="hint" style="margin:4px 0 0">${t("op.montoRealAyuda")}</div>
+
+        <div data-err="${esc(s._id)}"></div>
+        <button class="secondary" data-aprobar="${esc(s._id)}">${t("op.aprobar")}</button>
+        <button class="link" data-rechazar="${esc(s._id)}" style="width:auto;color:var(--danger)">${t("op.rechazar")}</button>
+      </div>`).join("")}`;
+
+  const errDe = (id) => document.querySelector(`[data-err="${id}"]`);
+
+  caja.querySelectorAll("[data-aprobar]").forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.aprobar;
+      const monto = Number(document.querySelector(`[data-monto="${id}"]`).value);
+      const nombre = btn.closest(".op-solicitud").querySelector("div").textContent.trim();
+      // La confirmación dice el monto QUE SE VA A ACREDITAR, que puede no ser
+      // el que el médico declaró — es justo el número que hay que releer.
+      if (!confirm(t("op.confirmarAprobar", { monto: monto.toFixed(2), nombre }))) return;
+      btn.disabled = true;
+      try {
+        await api(`/medico/operador/solicitudes/${id}/aprobar`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bolivianos: monto }),
+        });
+        pintarColaSolicitudes();
+      } catch (e) {
+        btn.disabled = false;
+        errDe(id).innerHTML = `<div class="error">${esc(e.error || t("op.errAcreditar"))}</div>`;
+      }
+    };
+  });
+
+  caja.querySelectorAll("[data-rechazar]").forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.rechazar;
+      const motivo = prompt(t("op.motivoRechazo"));
+      if (!motivo || !motivo.trim()) return;
+      btn.disabled = true;
+      try {
+        await api(`/medico/operador/solicitudes/${id}/rechazar`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ motivo: motivo.trim() }),
+        });
+        pintarColaSolicitudes();
+      } catch (e) {
+        btn.disabled = false;
+        errDe(id).innerHTML = `<div class="error">${esc(e.error || t("op.errRechazar"))}</div>`;
+      }
+    };
+  });
 }

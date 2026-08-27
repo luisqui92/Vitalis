@@ -28,9 +28,9 @@
 //
 // Lo que este archivo NO hace: crear cuentas, cambiar contraseñas, ver
 // historias clínicas. Un operador de recargas administra plata y nada más.
-const { Medico } = require("../db/models");
+const { Medico, SolicitudRecarga } = require("../db/models");
 const { requireAuth } = require("../services/auth");
-const { rateLimit } = require("../services/ratelimit");
+const { rateLimitPorClave, claveDeMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const saldos = require("../services/saldo");
@@ -44,11 +44,18 @@ const requireMedico = requireAuth(["medico"]);
 const OPERADORES = String(process.env.OPERADORES_SALDO || "")
   .split(",").map(s => s.trim()).filter(Boolean);
 
-// Más estricto que el resto de la API a propósito: un operador legítimo hace
-// unas pocas recargas por día. Cientos de intentos por minuto no son un
-// operador apurado, son otra cosa.
-const limitOperador = rateLimit("operadorSaldo", 20, 60 * 1000,
-  "Demasiadas operaciones seguidas. Esperá un momento.");
+// Por OPERADOR, no por IP. Con la cuota por IP, dos personas acreditando
+// desde la misma oficina se la reparten, y un solo operador procesando diez
+// avisos seguidos —que son varias llamadas cada uno— se bloquea a sí mismo a
+// mitad de la tarea. Es el mismo error que ya había en limitMedico y que se
+// arregló ahí; acá lo repetí y lo encontró la prueba, quedándose sin cuota
+// contra 127.0.0.1.
+//
+// La firma del token se verifica antes de usarlo como clave (ver
+// claveDeMedico): si no, cualquiera podría gastarle la cuota a un operador
+// mandando pedidos a su nombre.
+const limitOperador = rateLimitPorClave("operadorSaldo", 60, 60 * 1000,
+  "Demasiadas operaciones seguidas. Esperá un momento.", claveDeMedico);
 
 function esOperador(phone) {
   return OPERADORES.includes(String(phone));
@@ -131,6 +138,105 @@ module.exports = function (app) {
       saldos.movimientosDe(phone, 20),
     ]);
     res.json({ medico, ...estado, movimientos });
+  }));
+
+  // ─── LA COLA DE AVISOS DE PAGO ─────────────────────────────────────────
+  // Lo que el operador mira apenas entra: quién dice haber pagado y todavía
+  // no se le acreditó. Los más viejos primero — el que avisó ayer viene
+  // esperando más que el de recién.
+  app.get("/medico/operador/solicitudes", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+    const estado = ["pendiente", "acreditada", "rechazada"].includes(req.query.estado) ? req.query.estado : "pendiente";
+    const solicitudes = await SolicitudRecarga.find({ estado })
+      .sort(estado === "pendiente" ? { createdAt: 1 } : { revisadaEn: -1 })
+      .limit(50).lean();
+
+    // El saldo actual de cada uno, para que el operador vea de una si el
+    // médico está trabajando en negativo y conviene apurarse.
+    const conSaldo = await Promise.all(solicitudes.map(async (s) => ({
+      ...s,
+      montoBs: saldos.bolivianos(s.montoCentavos),
+      saldo: await saldos.estadoDe(s.medicoPhone),
+    })));
+
+    res.json({
+      estado, solicitudes: conSaldo,
+      pendientes: await SolicitudRecarga.countDocuments({ estado: "pendiente" }),
+    });
+  }));
+
+  // ─── APROBAR UN AVISO ──────────────────────────────────────────────────
+  //
+  // El monto que se acredita es el que el OPERADOR vio en el banco, no el que
+  // el médico declaró. Por eso viene como parámetro y no se toma de la
+  // solicitud: si el médico dijo Bs 200 y entraron Bs 150, se acreditan 150 y
+  // queda registrada la diferencia. Confiar en el número declarado sería
+  // dejar que el médico se ponga su propio saldo con un paso extra.
+  app.post("/medico/operador/solicitudes/:id/aprobar", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+    const solicitud = await SolicitudRecarga.findOne({ _id: req.params.id, estado: "pendiente" });
+    if (!solicitud) throw new ErrorHttp(404, "Ese aviso ya no está pendiente");
+
+    // Si no se aclara otra cosa, se acredita lo declarado — pero el operador
+    // puede corregirlo, que es el caso que importa.
+    const bolivianos = req.body?.bolivianos === undefined
+      ? solicitud.montoCentavos / 100
+      : Number(req.body.bolivianos);
+    const referencia = String(req.body?.referencia || solicitud.referencia || "").trim();
+    if (!Number.isFinite(bolivianos) || bolivianos <= 0) throw new ErrorHttp(400, "El monto tiene que ser un número positivo");
+    if (bolivianos > 5000) throw new ErrorHttp(400, "Más de Bs 5.000 en una sola carga: si es correcto, hacelo desde el servidor.");
+    if (!referencia) throw new ErrorHttp(400, "Falta la referencia del comprobante");
+
+    let mov;
+    try {
+      mov = await saldos.cargar({
+        medicoPhone: solicitud.medicoPhone,
+        montoCentavos: Math.round(bolivianos * 100),
+        acreditadoPor: req.adminUser.usuario,
+        referencia,
+        permitirMenorAlMinimo: Boolean(req.body?.igual),
+      });
+    } catch (e) {
+      // La solicitud queda PENDIENTE: no se acreditó nada, así que marcarla
+      // como resuelta sería mentir y dejar al médico esperando para siempre.
+      if (e.codigo === "referencia_repetida") throw new ErrorHttp(409, e.message);
+      if (e.codigo === "menor_al_minimo") throw new ErrorHttp(422, e.message);
+      throw e;
+    }
+
+    solicitud.estado = "acreditada";
+    solicitud.movimientoId = mov._id;
+    solicitud.montoAcreditadoCentavos = Math.round(bolivianos * 100);
+    solicitud.revisadaPor = req.adminUser.usuario;
+    solicitud.revisadaEn = new Date();
+    await solicitud.save();
+
+    registrar({
+      req, medicoPhone: req.adminUser.usuario, accion: "aprobar_recarga",
+      recurso: `Solicitud:${solicitud._id} Medico:${solicitud.medicoPhone} Bs${bolivianos}`,
+    });
+    res.json({ ok: true, ...(await saldos.estadoDe(solicitud.medicoPhone)) });
+  }));
+
+  // ─── RECHAZAR ──────────────────────────────────────────────────────────
+  // Con motivo obligatorio. Un rechazo sin explicación deja al médico sin
+  // saber si tiene que volver a pagar, mandar otro comprobante o llamar.
+  app.post("/medico/operador/solicitudes/:id/rechazar", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+    const motivo = String(req.body?.motivo || "").trim().slice(0, 300);
+    if (!motivo) throw new ErrorHttp(400, "Escribí por qué se rechaza: el médico tiene que saber qué hacer ahora.");
+
+    const solicitud = await SolicitudRecarga.findOne({ _id: req.params.id, estado: "pendiente" });
+    if (!solicitud) throw new ErrorHttp(404, "Ese aviso ya no está pendiente");
+
+    solicitud.estado = "rechazada";
+    solicitud.motivoRechazo = motivo;
+    solicitud.revisadaPor = req.adminUser.usuario;
+    solicitud.revisadaEn = new Date();
+    await solicitud.save();
+
+    registrar({
+      req, medicoPhone: req.adminUser.usuario, accion: "rechazar_recarga",
+      recurso: `Solicitud:${solicitud._id} Medico:${solicitud.medicoPhone}`,
+    });
+    res.json({ ok: true });
   }));
 
   // ─── ACREDITAR ─────────────────────────────────────────────────────────
