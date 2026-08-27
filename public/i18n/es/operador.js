@@ -44,4 +44,7 @@ Object.assign(I18N.es, {
   "op.res.deudaAyuda": "Atendieron con el saldo agotado. Se descuenta solo en su próxima recarga.",
   "op.res.verCargas": "Ver últimas recargas",
   "op.res.por": "acreditó {quien}",
+  "op.nav.pagos": "Pagos",
+  "op.irAConfig": "Ir a Configuración",
+  "op.buscarAyuda": "Para acreditar a alguien que no avisó por la app, o para revisar su historial.",
 });

@@ -5,6 +5,7 @@ const { Medico, AuditLog } = require("../db/models");
 const { generarToken, verificarToken, hashPassword, verificarPassword, requireAuth } = require("../services/auth");
 const { generarSecreto, generarUriOtpAuth, verificarCodigo } = require("../services/totp");
 const { registrar } = require("../services/auditoria");
+const { esOperador } = require("../services/operadores");
 const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 
@@ -33,6 +34,11 @@ function datosDeSesion(medico) {
     idioma: medico.idioma || "es",
     rol: medico.rol || "medico",
     clinica: medico.clinicaId ? String(medico.clinicaId) : null,
+    // Solo para que la pantalla sepa si dibujar la sección de pagos. NO es
+    // un permiso: el permiso lo revisa el servidor en cada pedido contra
+    // OPERADORES_SALDO, y quien mienta acá se encuentra con un 404. Igual
+    // que rol, que también viaja así.
+    operador: esOperador(medico.phone),
   };
 }
 

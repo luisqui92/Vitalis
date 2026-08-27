@@ -29,6 +29,14 @@ function pestanasPacientes(pendientes) {
   if (esAdministrador()) {
     pestanas.push(`<button class="tab" id="btnClinica"><span class="tab-icono">${ICONOS.clipboard}</span>${t("clin.nav.clinica")}</button>`);
   }
+  // Los pagos son el trabajo diario de quien acredita, no un ajuste que se
+  // toca una vez: tienen su pestaña y no viven adentro de Configuración.
+  // El globo con los pendientes es lo mismo que hace la campana de
+  // recordatorios — el número que hay que atender, visible sin entrar.
+  if (ES_OPERADOR) {
+    const esperando = OPERADOR_ESTADO.pendientes || 0;
+    pestanas.push(`<button class="tab" id="btnPagos"><span class="tab-icono">${ICONOS.tendencia}${esperando ? `<b class="tab-globo">${esperando}</b>` : ""}</span>${t("op.nav.pagos")}</button>`);
+  }
   return pestanas;
 }
 
@@ -133,6 +141,8 @@ async function renderDashboard() {
     // Solo existe para quien administra una clínica (ver clinica.js).
     const btnClinica = document.getElementById("btnClinica");
     if (btnClinica) btnClinica.onclick = renderClinica;
+    const btnPagos = document.getElementById("btnPagos");
+    if (btnPagos) btnPagos.onclick = renderPagos;
     document.querySelectorAll(".item[data-id]").forEach(el => {
       el.onclick = () => renderPacienteDetalle(el.dataset.id);
     });

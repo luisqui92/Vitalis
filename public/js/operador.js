@@ -9,6 +9,14 @@
 // busca, se elige de una lista con nombre y saldo, y se confirma leyendo el
 // nombre otra vez. Un teléfono mal tipeado no se nota; un nombre sí.
 
+// Si esta cuenta acredita pagos. Viene del login y se guarda como el rol,
+// porque el menú de escritorio se arma al CARGAR la página —antes de que
+// haya podido preguntarle nada al servidor— y si no estuviera acá la sección
+// de pagos no aparecería nunca en esa vista.
+//
+// Es solo para dibujar. El permiso lo revisa el servidor en cada pedido.
+let ES_OPERADOR = Boolean(localStorage.getItem("salud_operador"));
+
 let OPERADOR_ESTADO = null;
 let OPERADOR_ELEGIDO = null;
 
@@ -48,39 +56,59 @@ function avisoOperadorHtml() {
 
 function engancharAvisoOperador() {
   const aviso = document.getElementById("avisoOperador");
-  if (aviso) aviso.onclick = renderSeguridad;
+  if (aviso) aviso.onclick = renderPagos;
 }
 
-async function pintarOperador() {
-  const caja = document.getElementById("operadorBox");
-  if (!caja) return;
+// ─── PANTALLA PROPIA ──────────────────────────────────────────────────────
+//
+// Los pagos tienen su lugar y no están escondidos adentro de Configuración,
+// entre el 2FA, los respaldos y el idioma. Para quien administra pagos eso es
+// su trabajo diario, no un ajuste que se toca una vez.
+//
+// Tres bloques, en el orden en que se usan: cómo va el mes, qué hay que
+// aprobar hoy, y buscar a alguien puntual.
+async function renderPagos() {
+  detenerPolling();
+  const serie = nuevaSeriePantalla();
+  app.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
   const e = await traerEstadoOperador();
-  if (!caja.isConnected || !e.operador) { if (caja) caja.innerHTML = ""; return; }
+  if (!seriePantallaVigente(serie)) return;
 
-  // Sin segundo factor no se acredita nada, y conviene decirlo acá y no
-  // cuando ya escribió el monto y le rebota.
+  // Si esta cuenta no acredita, la pantalla no existe — se vuelve al panel en
+  // vez de mostrar un cartel de "no tenés permiso" para algo que no debería
+  // ni haber sido visible.
+  if (!e.operador) return renderDashboard();
+
   if (!e.dosFAActivo) {
-    caja.innerHTML = `
+    app.innerHTML = `
+      <button class="back" id="btnBack">← ${t("comun.volver")}</button>
       <div class="card" style="border-color:var(--danger)">
         <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
         <div class="saldo-aviso saldo-aviso-grave">${t("op.falta2fa")}</div>
+        <button class="secondary" id="btnIrConfig">${t("op.irAConfig")}</button>
       </div>`;
+    document.getElementById("btnBack").onclick = renderDashboard;
+    document.getElementById("btnIrConfig").onclick = renderSeguridad;
     return;
   }
 
-  caja.innerHTML = `
-    <div class="card" style="border-color:var(--primary)">
-      <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
-      <div class="hint" style="margin:0 0 10px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
-      <div id="opResumen"></div>
-      <div id="opCola"></div>
+  app.innerHTML = `
+    <button class="back" id="btnBack">← ${t("comun.volver")}</button>
+    <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
+    <div class="hint" style="margin:0 0 12px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
 
-      <div class="seccion-titulo">${t("op.buscar")}</div>
+    <div id="opResumen"></div>
+    <div id="opCola"></div>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${t("op.buscar")}</div>
+      <div class="hint" style="margin:0 0 10px">${t("op.buscarAyuda")}</div>
       <input id="opBuscar" type="text" placeholder="${t("op.buscarPlaceholder")}" autocomplete="off">
       <div id="opResultados"></div>
       <div id="opFicha"></div>
     </div>`;
 
+  document.getElementById("btnBack").onclick = renderDashboard;
   pintarResumenPagos();
   pintarColaSolicitudes();
 

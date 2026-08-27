@@ -44,4 +44,7 @@ Object.assign(I18N.pt, {
   "op.res.deudaAyuda": "Atenderam com o saldo zerado. É descontado sozinho na próxima recarga.",
   "op.res.verCargas": "Ver últimas recargas",
   "op.res.por": "creditado por {quien}",
+  "op.nav.pagos": "Pagamentos",
+  "op.irAConfig": "Ir para Configuração",
+  "op.buscarAyuda": "Para creditar alguém que não avisou pelo app, ou para ver o histórico dele.",
 });

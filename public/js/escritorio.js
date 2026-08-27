@@ -33,6 +33,12 @@ const ESCR_NAV_ITEMS = [
 if (typeof esAdministrador === "function" && esAdministrador()) {
   ESCR_NAV_ITEMS.unshift({ id: "clinica", claveLabel: "clin.nav.clinica", icono: ICONOS.escudo, fn: "renderClinica" });
 }
+// Los pagos también, para quien acredita. Va aparte del bloque de clínica
+// porque son permisos distintos: administrar siete consultorios no da
+// ninguna facultad sobre la plata, y al revés tampoco.
+if (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR) {
+  ESCR_NAV_ITEMS.unshift({ id: "pagos", claveLabel: "op.nav.pagos", icono: ICONOS.tendencia, fn: "renderPagos" });
+}
 
 function escritorioShellActivo() {
   return ES_ESCRITORIO && document.getElementById("escritorioShell").style.display !== "none";

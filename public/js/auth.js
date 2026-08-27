@@ -76,6 +76,11 @@ function completarLogin(data) {
   fijarIdioma(data.idioma || "es");
   MEDICO_ROL = data.rol || "medico";
   localStorage.setItem("salud_rol", MEDICO_ROL);
+  // Igual que el rol: solo decide qué se DIBUJA. El permiso de verdad lo
+  // revisa el servidor en cada pedido, así que alguien que se ponga esto en
+  // true a mano ve una pestaña que le contesta 404.
+  ES_OPERADOR = Boolean(data.operador);
+  localStorage.setItem("salud_operador", ES_OPERADOR ? "1" : "");
   aplicarTemaSegunEspecialidad();
   if (typeof conectarTiempoReal === "function") conectarTiempoReal();
   irAPantallaInicial();

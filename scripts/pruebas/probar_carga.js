@@ -180,6 +180,7 @@ const pantallas = [
   ["pestañas del celular", `tabsPacientesHtml(3)`],
   ["ficha de operador", `OPERADOR_ELEGIDO = { phone: "79999999", nombre: "Dra. Destino" }; abrirFichaOperador`],
   ["panel de pagos", `pintarResumenPagos`],
+  ["pantalla de pagos", `renderPagos`],
   ["cartel de avisos pendientes", `OPERADOR_ESTADO = { operador: true, pendientes: 3 }; avisoOperadorHtml()`],
   ["cartel sin avisos", `OPERADOR_ESTADO = { operador: true, pendientes: 0 }; avisoOperadorHtml()`],
   ["cartel para quien no es operador", `OPERADOR_ESTADO = { operador: false }; avisoOperadorHtml()`],
@@ -343,7 +344,7 @@ function verificar(descripcion, condicion) {
 
 for (const idioma of ["es", "pt"]) {
   for (const [rol, esperadas] of [["medico", 5], ["admin", 6], ["director", 6]]) {
-    vm.runInContext(`MEDICO_IDIOMA = ${JSON.stringify(idioma)}; MEDICO_ROL = ${JSON.stringify(rol)};`, sandbox);
+    vm.runInContext(`MEDICO_IDIOMA = ${JSON.stringify(idioma)}; MEDICO_ROL = ${JSON.stringify(rol)}; ES_OPERADOR = false;`, sandbox);
     const html = vm.runInContext(`tabsPacientesHtml(3)`, sandbox);
     const botones = (html.match(/<button class="tab"/g) || []).length;
     const columnas = Number((html.match(/repeat\((\d+),1fr\)/) || [])[1]);
@@ -354,13 +355,32 @@ for (const idioma of ["es", "pt"]) {
 
 // El nombre importa tanto como que exista: con "Seguridad" el idioma estaba
 // ahí y nadie lo encontraba.
-vm.runInContext(`MEDICO_IDIOMA = "es"; MEDICO_ROL = "medico";`, sandbox);
+vm.runInContext(`MEDICO_IDIOMA = "es"; MEDICO_ROL = "medico"; ES_OPERADOR = false;`, sandbox);
 const tabsEs = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
 verificar('la pestaña de ajustes dice "Configuración"', tabsEs.includes("Configuración"));
 verificar('  ...y ya no dice "Seguridad"', !tabsEs.includes("Seguridad"));
 vm.runInContext(`MEDICO_IDIOMA = "pt";`, sandbox);
 const tabsPt = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
 verificar('en portugués dice "Configuração"', tabsPt.includes("Configuração"));
+
+// La pestaña de Pagos es de quien acredita, no de quien administra una
+// clínica: son permisos distintos y no tienen por qué ir juntos.
+vm.runInContext(`MEDICO_ROL = "medico"; ES_OPERADOR = true;`, sandbox);
+const tabsOperador = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+verificar("el operador tiene pestaña de Pagos", tabsOperador.includes('id="btnPagos"'));
+verificar("  ...y son 6 pestañas con la grilla acorde",
+  (tabsOperador.match(/<button class="tab"/g) || []).length === 6
+  && /repeat\(6,1fr\)/.test(tabsOperador));
+vm.runInContext(`ES_OPERADOR = false; MEDICO_ROL = "admin";`, sandbox);
+const tabsAdminNoOp = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+verificar("un admin de clínica que no acredita NO tiene pestaña de Pagos",
+  !tabsAdminNoOp.includes('id="btnPagos"'));
+vm.runInContext(`ES_OPERADOR = true;`, sandbox);
+const tabsAmbos = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+verificar("quien es las dos cosas tiene las dos pestañas, y la grilla da 7",
+  tabsAmbos.includes('id="btnPagos"') && tabsAmbos.includes('id="btnClinica"')
+  && /repeat\(7,1fr\)/.test(tabsAmbos));
+vm.runInContext(`ES_OPERADOR = false; MEDICO_ROL = "medico";`, sandbox);
 
 // Dos pestañas con el mismo ícono no distinguen nada: pasó con Clínica y
 // Configuración, las dos con el escudo.
