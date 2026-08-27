@@ -61,7 +61,11 @@ async function main() {
       const consultas = await ConsultaMedica.countDocuments({ medicoPhone: m.phone });
       const etiqueta = DEMOS_CONOCIDAS[m.phone] ? `  ← demo: ${DEMOS_CONOCIDAS[m.phone]}` : "";
       console.log(`  +${m.phone}  ${m.nombre}`);
-      console.log(`     ${m.tipoEspecialidad} · rol ${m.rol || "medico"}${m.activo === false ? " · INACTIVA" : ""}`);
+      // Las cuentas viejas no tienen tipoEspecialidad: son de antes de que
+      // existiera el campo. Imprimir "undefined" hace pensar que algo está
+      // roto cuando lo único que pasa es que ese dato no existe.
+      const area = m.tipoEspecialidad || "sin especialidad definida";
+      console.log(`     ${area} · rol ${m.rol || "medico"}${m.activo === false ? " · INACTIVA" : ""}`);
       console.log(`     ${pacientes} paciente(s), ${consultas} consulta(s)${etiqueta}\n`);
     }
     console.log("Las contraseñas no aparecen porque no se pueden leer (bcrypt).");
