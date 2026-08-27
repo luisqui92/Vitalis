@@ -231,13 +231,23 @@ async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma) {
       audio_url: audioUrl,
       language_code: lang,
       speaker_labels: true,
-      // Sin esto, el modelo tiene que adivinar cuántas voces distintas hay
-      // y en grabaciones donde una voz domina (médico más cerca del micrófono
-      // que el paciente) suele terminar atribuyendo todo a un solo hablante.
-      // Una consulta es médico + paciente casi siempre — si en algún caso
-      // hay una tercera persona (acompañante), el modelo igual puede
-      // detectarla, este número es solo una ayuda, no un límite estricto.
-      speakers_expected: 2,
+      // Un RANGO, no un número exacto. Antes iba speakers_expected: 2, con el
+      // comentario de que era "solo una ayuda, no un límite estricto". Eso
+      // era falso: la documentación dice que speakers_expected se use SOLO
+      // cuando uno está seguro, porque un valor incorrecto empeora la
+      // precisión, y lista precisamente "speakers_expected mal puesto" entre
+      // las causas de que la transcripción salga con un solo hablante.
+      //   https://www.assemblyai.com/docs/speech-to-text/speaker-diarization
+      //
+      // Y una consulta no siempre son dos personas: en pediatría siempre hay
+      // madre o padre, en geriatría suele haber acompañante, y a veces el
+      // médico dicta solo. Afirmarle "acá hay exactamente dos" cuando hay
+      // tres es pedirle que se equivoque.
+      //
+      // El mínimo en 1 y no en 2 a propósito: forzar dos voces en una
+      // grabación donde solo habla el médico lo parte en dos hablantes
+      // inventados, que es peor que no separar nada.
+      speaker_options: { min_speakers_expected: 1, max_speakers_expected: 4 },
       // Solo donde existe. Mandarlo igual no rompe (la API lo ignora), pero
       // así la petición dice la verdad de lo que va a pasar.
       ...(conMedicalMode ? { domain: "medical-v1" } : {}),
