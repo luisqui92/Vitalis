@@ -80,7 +80,10 @@ function pintarSeguridad(dosFAActivo, eventos) {
         </div>`).join("")}
     </div>`;
 
-  document.getElementById("btnBack").onclick = renderDashboard;
+  // No siempre "el panel" es el de pacientes: ver volverAlPanel(). Una cuenta
+  // administrativa que llegó acá a activar su 2FA tiene que poder salir a su
+  // propia pantalla y no a una que le va a contestar 403.
+  document.getElementById("btnBack").onclick = volverAlPanel;
 
   document.getElementById("btnGuardarIdioma").onclick = async () => {
     const errBox = document.getElementById("segIdiomaErr");

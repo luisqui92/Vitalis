@@ -16,12 +16,50 @@
 
 let MEDICO_ROL = localStorage.getItem("salud_rol") || "medico";
 
+// A qué clínica pertenece esta cuenta, o vacío. Se guarda porque distingue
+// dos administrativos que no se parecen en nada: el que administra siete
+// consultorios, y el que solo aprueba pagos y no tiene clínica ninguna.
+let MEDICO_CLINICA = localStorage.getItem("salud_clinica") || "";
+
 // Día que está mirando la agenda unificada. Vive acá afuera para que las
 // flechas de día no tengan que repintar el panel entero.
 let clinAgendaFecha = null;
 
 function esAdministrador() { return MEDICO_ROL === "admin" || MEDICO_ROL === "director"; }
 function esSoloAdministrador() { return MEDICO_ROL === "admin"; }
+
+// La cuenta que existe únicamente para aprobar pagos: administrativa, sin
+// clínica, sin pacientes. Mandarla a renderClinica() sería mandarla a pedir
+// una clínica que no tiene y mostrarle un error.
+function esSoloPagos() { return esSoloAdministrador() && !MEDICO_CLINICA; }
+
+// ─── A DÓNDE MÁS PUEDE IR ─────────────────────────────────────────────────
+//
+// Solo para el administrativo puro. Un director llega acá desde su menú y
+// vuelve por donde vino; un administrativo NO tiene menú —esta pantalla es
+// todo lo que ve— y hasta ahora era un callejón sin salida: no había forma
+// de entrar a Configuración desde acá.
+//
+// Dejó de ser un detalle cuando el operador de pagos pasó a poder ser una
+// cuenta administrativa: el segundo factor es obligatorio para acreditar, y
+// se activa en Configuración. Sin este botón, la cuenta quedaba trabada
+// mirando "activá el 2FA" sin ninguna puerta que la llevara ahí.
+function clinAccesosHtml() {
+  if (!esSoloAdministrador()) return "";
+  const pagos = (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR)
+    ? `<button class="secondary" id="clinIrPagos">${t("op.nav.pagos")}</button>` : "";
+  return `<div class="clin-accesos" style="display:flex;gap:8px;margin-top:12px">
+    ${pagos}
+    <button class="secondary" id="clinIrConfig">${t("escr.nav.configuracion")}</button>
+  </div>`;
+}
+
+function engancharClinAccesos() {
+  const pagos = document.getElementById("clinIrPagos");
+  if (pagos) pagos.onclick = renderPagos;
+  const config = document.getElementById("clinIrConfig");
+  if (config) config.onclick = renderSeguridad;
+}
 
 // ─── PANEL ────────────────────────────────────────────────────────────────
 async function renderClinica() {
@@ -61,6 +99,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
     <div class="card" style="border-color:var(--primary)">
       <div class="seccion-titulo" style="margin-top:0">🏥 ${esc(datos.clinica.nombre)}</div>
       <div class="hint" style="margin:0">${t("clin.consultorios", { n: datos.medicos.length })}</div>
+      ${clinAccesosHtml()}
     </div>
 
     <div class="escr-stats">
@@ -160,6 +199,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
     </div>`;
 
   engancharFilasDeMedicos();
+  engancharClinAccesos();
 
   clinAgendaFecha = agenda?.fecha || null;
   clinPintarFecha();

@@ -9,7 +9,16 @@ const { esOperador } = require("../services/operadores");
 const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 
-const requireMedico = requireAuth(["medico"]);
+// Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
+// propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
+// paciente. Por eso acá entra también el administrativo.
+//
+// No es un detalle de comodidad. El operador de pagos tiene el segundo factor
+// OBLIGATORIO (candado 2 de routes/operadorSaldo.js), y mientras esto decía
+// solo ["medico"] una cuenta admin no podía activarlo ni aunque quisiera:
+// /medico/2fa/iniciar le contestaba 403. Quedaba trabada para siempre en
+// "activá el 2FA" sin ninguna pantalla que se lo permitiera.
+const requireMedico = requireAuth(["medico", "admin"]);
 
 // El rol del TOKEN no es el mismo campo que el rol de la cuenta, y la
 // diferencia es la que sostiene el permiso: un director es médico para todo

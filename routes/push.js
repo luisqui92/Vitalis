@@ -9,7 +9,13 @@ const { pushConfigurado, notificarMedico } = require("../services/push");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { CONFIG } = require("../config");
 
-const requireMedico = requireAuth(["medico"]);
+// También el administrativo. Estas rutas no tocan nada clínico: registran el
+// navegador de QUIEN LLAMA para poder avisarle, y nada más. Dejarlas en
+// ["medico"] tenía una consecuencia concreta y silenciosa: el operador de
+// pagos —que es una cuenta admin— no podía suscribirse, así que nunca le
+// llegaba el aviso de que un médico había declarado un pago. La cola con el
+// pago esperando existía; el que tenía que aprobarla no se enteraba.
+const requireMedico = requireAuth(["medico", "admin"]);
 
 module.exports = function (app) {
   // La clave pública es justamente para entregársela al navegador: sin ella

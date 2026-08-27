@@ -39,7 +39,25 @@ const saldos = require("../services/saldo");
 const { datosDePago, guardarDatosDePago } = require("../services/datosPago");
 const { log } = require("../config");
 
-const requireMedico = requireAuth(["medico"]);
+// ═══ POR QUÉ ACÁ DICE "admin" Y EN LAS RUTAS CLÍNICAS NO ═══════════════════
+//
+// Quien administra la plata no debería ser el mismo que la gasta. Mientras
+// esto exigía rol "medico", un operador de recargas tenía que ser además una
+// cuenta de médico: consumía Bs 12 por consulta Y podía aprobar sus propias
+// recargas. La separación que uno querría al contratar a alguien para
+// manejar cobranzas no se podía ni configurar.
+//
+// Una cuenta con rol "admin" es exactamente lo contrario: es la cuenta
+// administrativa que ya existe en Vitalis y que las 30 rutas clínicas
+// rechazan solas (ver el comentario de tokenDeMedico en medicoAuth.js). No
+// tiene pacientes, no puede abrir una ficha, no consume saldo. Es la cuenta
+// correcta para esto.
+//
+// Esto NO afloja el permiso: no deja entrar a nadie nuevo. El portero de
+// verdad sigue siendo requireOperador —lista en el .env + 2FA— y un admin
+// que no esté en OPERADORES_SALDO se lleva el mismo 404 que cualquiera.
+// Lo único que cambia es que ahora el operador PUEDE no ser médico.
+const requireSesion = requireAuth(["medico", "admin"]);
 
 
 // Por OPERADOR, no por IP. Con la cuota por IP, dos personas acreditando
@@ -84,7 +102,7 @@ module.exports = function (app) {
   // La pantalla pregunta esto para saber si mostrar la sección. Contesta
   // false sin ruido para todo el mundo: no es un permiso que se pida, es uno
   // que se tiene o no.
-  app.get("/medico/operador/estado", limitOperador, requireMedico, asyncRoute(async (req, res) => {
+  app.get("/medico/operador/estado", limitOperador, requireSesion, asyncRoute(async (req, res) => {
     const phone = req.adminUser.usuario;
     if (!esOperador(phone)) return res.json({ operador: false });
     const medico = await Medico.findOne({ phone }).select("dosFA").lean();
@@ -101,7 +119,7 @@ module.exports = function (app) {
   // ─── BUSCAR AL MÉDICO A QUIEN ACREDITAR ────────────────────────────────
   // Devuelve identidad y saldo, nada clínico: un operador de recargas no
   // tiene por qué ver cuántos pacientes tiene nadie.
-  app.get("/medico/operador/buscar", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.get("/medico/operador/buscar", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const q = String(req.query.q || "").trim();
     if (q.length < 3) return res.json({ medicos: [] });
 
@@ -123,7 +141,7 @@ module.exports = function (app) {
   }));
 
   // ─── VER UNA CUENTA ANTES DE ACREDITARLE ───────────────────────────────
-  app.get("/medico/operador/cuenta/:phone", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.get("/medico/operador/cuenta/:phone", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const phone = String(req.params.phone).trim();
     const medico = await Medico.findOne({ phone }).select("phone nombre tipoEspecialidad activo").lean();
     if (!medico) throw new ErrorHttp(404, "No hay ninguna cuenta con ese teléfono");
@@ -137,11 +155,11 @@ module.exports = function (app) {
   // ─── DÓNDE NOS PAGAN ───────────────────────────────────────────────────
   // Editable desde la pantalla y no por SSH: es un número de cuenta que
   // cambia, y lo que se cambia con dificultad se queda desactualizado.
-  app.get("/medico/operador/datos-pago", limitOperador, requireMedico, requireOperador, asyncRoute(async (_req, res) => {
+  app.get("/medico/operador/datos-pago", limitOperador, requireSesion, requireOperador, asyncRoute(async (_req, res) => {
     res.json(await datosDePago());
   }));
 
-  app.put("/medico/operador/datos-pago", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.put("/medico/operador/datos-pago", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const datos = await guardarDatosDePago(req.body || {}, req.adminUser.usuario);
     // Se audita con el detalle: si un día los pagos empiezan a caer en una
     // cuenta que no es la nuestra, esto dice quién la cambió y cuándo.
@@ -160,7 +178,7 @@ module.exports = function (app) {
   //
   // Todo sale de MovimientoSaldo, que es el libro. No hay un contador aparte
   // que se pueda desincronizar — ver el comentario del modelo en db/models.js.
-  app.get("/medico/operador/resumen", limitOperador, requireMedico, requireOperador, asyncRoute(async (_req, res) => {
+  app.get("/medico/operador/resumen", limitOperador, requireSesion, requireOperador, asyncRoute(async (_req, res) => {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     const mes = new Date(); mes.setDate(1); mes.setHours(0, 0, 0, 0);
 
@@ -217,7 +235,7 @@ module.exports = function (app) {
   // Lo que el operador mira apenas entra: quién dice haber pagado y todavía
   // no se le acreditó. Los más viejos primero — el que avisó ayer viene
   // esperando más que el de recién.
-  app.get("/medico/operador/solicitudes", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.get("/medico/operador/solicitudes", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const estado = ["pendiente", "acreditada", "rechazada"].includes(req.query.estado) ? req.query.estado : "pendiente";
     const solicitudes = await SolicitudRecarga.find({ estado })
       .sort(estado === "pendiente" ? { createdAt: 1 } : { revisadaEn: -1 })
@@ -244,7 +262,7 @@ module.exports = function (app) {
   // solicitud: si el médico dijo Bs 200 y entraron Bs 150, se acreditan 150 y
   // queda registrada la diferencia. Confiar en el número declarado sería
   // dejar que el médico se ponga su propio saldo con un paso extra.
-  app.post("/medico/operador/solicitudes/:id/aprobar", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.post("/medico/operador/solicitudes/:id/aprobar", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const solicitud = await SolicitudRecarga.findOne({ _id: req.params.id, estado: "pendiente" });
     if (!solicitud) throw new ErrorHttp(404, "Ese aviso ya no está pendiente");
 
@@ -301,7 +319,7 @@ module.exports = function (app) {
   // ─── RECHAZAR ──────────────────────────────────────────────────────────
   // Con motivo obligatorio. Un rechazo sin explicación deja al médico sin
   // saber si tiene que volver a pagar, mandar otro comprobante o llamar.
-  app.post("/medico/operador/solicitudes/:id/rechazar", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.post("/medico/operador/solicitudes/:id/rechazar", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const motivo = String(req.body?.motivo || "").trim().slice(0, 300);
     if (!motivo) throw new ErrorHttp(400, "Escribí por qué se rechaza: el médico tiene que saber qué hacer ahora.");
 
@@ -335,7 +353,7 @@ module.exports = function (app) {
   // mínimo, el rechazo de referencias repetidas y el libro de movimientos son
   // los mismos que usa el script. Dos caminos distintos para crear plata, con
   // reglas distintas, es cómo aparecen los agujeros.
-  app.post("/medico/operador/acreditar", limitOperador, requireMedico, requireOperador, asyncRoute(async (req, res) => {
+  app.post("/medico/operador/acreditar", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const destino = String(req.body?.phone || "").trim();
     const bolivianos = Number(req.body?.bolivianos);
     const referencia = String(req.body?.referencia || "").trim();

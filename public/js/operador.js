@@ -59,6 +59,27 @@ function engancharAvisoOperador() {
   if (aviso) aviso.onclick = renderPagos;
 }
 
+// ─── ENCABEZADO ───────────────────────────────────────────────────────────
+//
+// Cambia según de quién sea la pantalla. Para un médico o un director, Pagos
+// es una sección más y arriba va "← volver". Para la cuenta que existe SOLO
+// para aprobar pagos, esta ES su casa: no hay a dónde volver, y un botón que
+// la trajera de vuelta acá sería un botón que no hace nada. Lo que sí
+// necesita a mano es Configuración, porque ahí activa el segundo factor, y
+// sin segundo factor no puede acreditar un centavo.
+function encabezadoPagosHtml() {
+  return esSoloPagos()
+    ? `<button class="secondary" id="btnPagosConfig">${t("escr.nav.configuracion")}</button>`
+    : `<button class="back" id="btnBack">← ${t("comun.volver")}</button>`;
+}
+
+function engancharEncabezadoPagos() {
+  const config = document.getElementById("btnPagosConfig");
+  if (config) config.onclick = renderSeguridad;
+  const volver = document.getElementById("btnBack");
+  if (volver) volver.onclick = volverAlPanel;
+}
+
 // ─── PANTALLA PROPIA ──────────────────────────────────────────────────────
 //
 // Los pagos tienen su lugar y no están escondidos adentro de Configuración,
@@ -77,23 +98,27 @@ async function renderPagos() {
   // Si esta cuenta no acredita, la pantalla no existe — se vuelve al panel en
   // vez de mostrar un cartel de "no tenés permiso" para algo que no debería
   // ni haber sido visible.
-  if (!e.operador) return renderDashboard();
+  //
+  // Acá no se usa volverAlPanel(): para una cuenta de pagos ESTA es su
+  // pantalla, así que volverAlPanel() la traería de vuelta y quedaría dando
+  // vueltas. Si perdió el permiso, el destino es el otro.
+  if (!e.operador) return esSoloAdministrador() ? renderClinica() : renderDashboard();
 
   if (!e.dosFAActivo) {
     app.innerHTML = `
-      <button class="back" id="btnBack">← ${t("comun.volver")}</button>
+      ${encabezadoPagosHtml()}
       <div class="card" style="border-color:var(--danger)">
         <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
         <div class="saldo-aviso saldo-aviso-grave">${t("op.falta2fa")}</div>
         <button class="secondary" id="btnIrConfig">${t("op.irAConfig")}</button>
       </div>`;
-    document.getElementById("btnBack").onclick = renderDashboard;
+    engancharEncabezadoPagos();
     document.getElementById("btnIrConfig").onclick = renderSeguridad;
     return;
   }
 
   app.innerHTML = `
-    <button class="back" id="btnBack">← ${t("comun.volver")}</button>
+    ${encabezadoPagosHtml()}
     <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
     <div class="hint" style="margin:0 0 12px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
 
@@ -110,7 +135,7 @@ async function renderPagos() {
 
     <div id="opDatosPago"></div>`;
 
-  document.getElementById("btnBack").onclick = renderDashboard;
+  engancharEncabezadoPagos();
   pintarResumenPagos();
   pintarColaSolicitudes();
   pintarDatosDePago();

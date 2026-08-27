@@ -76,6 +76,8 @@ function completarLogin(data) {
   fijarIdioma(data.idioma || "es");
   MEDICO_ROL = data.rol || "medico";
   localStorage.setItem("salud_rol", MEDICO_ROL);
+  MEDICO_CLINICA = data.clinica || "";
+  localStorage.setItem("salud_clinica", MEDICO_CLINICA);
   // Igual que el rol: solo decide qué se DIBUJA. El permiso de verdad lo
   // revisa el servidor en cada pedido, así que alguien que se ponga esto en
   // true a mano ve una pestaña que le contesta 404.
@@ -92,10 +94,24 @@ function completarLogin(data) {
 //
 // Un director sí es médico, y arranca donde arranca cualquiera: en sus
 // pacientes. La clínica está a un clic, en el menú.
+// Y una cuenta que solo aprueba pagos no tiene ni pacientes ni clínica: su
+// panel son los pagos. Va primero porque también es administrativa, y si
+// preguntáramos al revés terminaría en una clínica que no existe.
 function irAPantallaInicial() {
+  if (typeof esSoloPagos === "function" && esSoloPagos()) return renderPagos();
   if (typeof esSoloAdministrador === "function" && esSoloAdministrador()) return renderClinica();
   if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) return renderInicioEscritorio();
   renderDashboard();
+}
+
+// A dónde vuelve el botón "← Panel". No es siempre el panel de pacientes: el
+// administrativo no tiene, y el de pagos tampoco tiene clínica. Cada cuenta
+// vuelve a la suya. Vive acá, al lado de irAPantallaInicial, porque es la
+// misma pregunta hecha en otro momento.
+function volverAlPanel() {
+  if (typeof esSoloPagos === "function" && esSoloPagos()) return renderPagos();
+  if (typeof esSoloAdministrador === "function" && esSoloAdministrador()) return renderClinica();
+  return renderDashboard();
 }
 
 // ─── LOGIN, paso 2: código de la app autenticadora (si el médico tiene 2FA) ──

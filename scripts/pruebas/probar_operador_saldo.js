@@ -13,7 +13,8 @@ process.env.PRECIO_CONSULTA_CENTAVOS = "1200";
 process.env.RECARGA_MINIMA_CENTAVOS = "10000";
 // Los dos que pueden acreditar. Todo el resto del sistema no debería poder,
 // por más admin de clínica o director que sea.
-process.env.OPERADORES_SALDO = "70000001, 70000002";
+// 70000005 es la cuenta de pagos que NO atiende pacientes: ver la sección 14.
+process.env.OPERADORES_SALDO = "70000001, 70000002, 70000005";
 
 const path = require("path");
 const http = require("http");
@@ -97,6 +98,10 @@ async function main() {
   // El administrador de una clínica: manda sobre siete consultorios y aun así
   // no puede emitir un centavo.
   await Medico.create({ phone: "70000004", nombre: "Admin de clínica", passwordHash: hash, rol: "admin", clinicaId: clinica._id, dosFA: con2fa });
+  // La cuenta que existe SOLO para aprobar pagos: administrativa, sin clínica
+  // y sin pacientes. Es la separación entre quien maneja la plata y quien la
+  // gasta, que antes no se podía ni configurar.
+  await Medico.create({ phone: "70000005", nombre: "María (pagos)", passwordHash: hash, rol: "admin", clinicaId: null, dosFA: con2fa });
   // El destinatario de las recargas.
   await Medico.create({ phone: "79999999", nombre: "Dra. Destino", passwordHash: hash, tipoEspecialidad: "ginecologia" });
 
@@ -105,6 +110,7 @@ async function main() {
     sin2fa: generarToken("70000002", "medico", 36e5),
     comun: generarToken("70000003", "medico", 36e5),
     adminClinica: generarToken("70000004", "admin", 36e5, { admin: true, clinicaId: String(clinica._id) }),
+    pagos: generarToken("70000005", "admin", 36e5, { admin: true }),
     destino: generarToken("79999999", "medico", 36e5),
   };
 
@@ -113,6 +119,13 @@ async function main() {
   app.use(express.json());
   require(path.join(RAIZ, "routes", "operadorSaldo"))(app);
   require(path.join(RAIZ, "routes", "recargas"))(app);
+  // Se monta por una sola razón, y está en la sección 14: el segundo factor
+  // es OBLIGATORIO para acreditar, y se activa por estas rutas. Si le
+  // contestaran 403 a una cuenta administrativa, la cuenta de pagos quedaría
+  // trabada para siempre en "activá el 2FA" sin ninguna pantalla que se lo
+  // permitiera — un candado sin llave, que desde afuera parece un permiso mal
+  // configurado y no un bug.
+  require(path.join(RAIZ, "routes", "medicoAuth"))(app);
   const servidor = http.createServer(app);
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
   const puerto = servidor.address().port;
@@ -123,10 +136,11 @@ async function main() {
   const DELETE = (ruta, token) => pedir(puerto, "DELETE", ruta, token);
 
   console.log("── 1. Quién NO puede emitir saldo ──");
-  // El administrativo de clínica no llega ni al chequeo de operador: lo frena
-  // antes requireAuth(["medico"]), con un 403. Está igual de bloqueado, y por
-  // eso acá se acepta cualquiera de los dos códigos — lo que importa es que
-  // no acredite, no con qué número se le dice que no.
+  // El administrativo de clínica SÍ pasa el requireAuth —desde que el
+  // operador de pagos puede ser una cuenta admin, estas rutas aceptan ese
+  // rol— y se estrella contra el candado que corresponde: no está en
+  // OPERADORES_SALDO. Se acepta 404 o 403 porque lo que importa es que no
+  // acredite, no con qué número se le dice que no.
   for (const [quien, token] of [
     ["un médico común", tk.comun],
     ["el administrador de una clínica", tk.adminClinica],
@@ -330,6 +344,54 @@ async function main() {
   await PUT("/medico/operador/datos-pago", tk.operador, { banco: "Otro banco", cuenta: "999" });
   verificar("editar de nuevo no duplica la configuración",
     await ConfigPago.countDocuments({}) === 1);
+
+  console.log("\n── 14. El que maneja la plata no tiene por qué ser médico ──");
+  // Hasta acá, el operador SIEMPRE era además una cuenta de médico: consumía
+  // Bs 12 por consulta y podía aprobar sus propias recargas. Mientras el
+  // único operador sea el dueño, da igual. El día que entra otra persona a
+  // manejar cobranzas, no: quien administra la plata no debería ser el mismo
+  // que la gasta, y esa separación ni siquiera se podía configurar.
+  //
+  // Lo que se prueba acá es que ahora se puede, y que abrir esa puerta no
+  // abrió ninguna otra.
+  const estPagos = await GET("/medico/operador/estado", tk.pagos);
+  verificar("una cuenta administrativa puede ser operadora",
+    estPagos.estado === 200 && estPagos.cuerpo?.operador === true && estPagos.cuerpo?.dosFAActivo === true);
+
+  const saldoPrevio = (await Medico.findOne({ phone: "79999999" }).lean()).saldoCentavos;
+  const acreditaPagos = await acreditar(tk.pagos, { phone: "79999999", bolivianos: 150, referencia: "QR MARIA 4242" });
+  verificar("y acredita como cualquier operador", acreditaPagos.estado === 200);
+  verificar("  ...quedando registrada como la responsable",
+    (await MovimientoSaldo.findOne({ referenciaClave: "QR MARIA 4242" }).lean())?.acreditadoPor === "70000005");
+  verificar("  ...y el saldo del médico subió Bs 150",
+    (await Medico.findOne({ phone: "79999999" }).lean()).saldoCentavos === saldoPrevio + 15000);
+
+  // Lo importante del otro lado: aceptar el rol "admin" NO le dio el permiso
+  // a todos los admin. El portero sigue siendo la lista del .env.
+  const adminFuera = await acreditar(tk.adminClinica, { phone: "79999999", bolivianos: 999, referencia: "no debería" });
+  verificar("un admin que NO está en OPERADORES_SALDO sigue afuera (404)", adminFuera.estado === 404);
+  verificar("  ...y no dejó rastro de plata",
+    await MovimientoSaldo.countDocuments({ referenciaClave: "NO DEBERÍA" }) === 0);
+
+  // Y que la separación sea de verdad: esta cuenta no puede actuar como
+  // médico ni para lo más inofensivo del circuito, que es avisar un pago
+  // propio. No atiende, así que no consume: no hay nada que cobrarle.
+  const pagosComoMedico = await POST("/medico/recargas", tk.pagos, { bolivianos: 100, referencia: "para mí" });
+  verificar("y no puede usar las rutas de médico ni para avisar un pago propio",
+    pagosComoMedico.estado === 403);
+
+  // El candado 2 es obligatorio: si la cuenta no pudiera activar su segundo
+  // factor, este tipo de cuenta no serviría para nada.
+  const dosFAPagos = await GET("/medico/2fa/estado", tk.pagos);
+  verificar("puede consultar su propio segundo factor", dosFAPagos.estado === 200);
+  const iniciaPagos = await POST("/medico/2fa/iniciar", tk.pagos, {});
+  verificar("  ...y activarlo, que sin eso la cuenta sería un candado sin llave",
+    iniciaPagos.estado === 200 && typeof iniciaPagos.cuerpo?.qr === "string");
+  // Pero sigue sin poder mirar nada clínico: 2FA no es un permiso, es una
+  // puerta con llave sobre los permisos que ya tenía.
+  const auditPagos = await GET("/medico/auditoria", tk.pagos);
+  verificar("  ...y su log de accesos es solo el suyo",
+    auditPagos.estado === 200 && (auditPagos.cuerpo?.eventos || []).every(e => e.medicoPhone === "70000005"));
 
   await new Promise((r) => servidor.close(r));
   await new Promise((r) => setTimeout(r, 400));
