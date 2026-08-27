@@ -15,10 +15,40 @@ let OPERADOR_ELEGIDO = null;
 async function traerEstadoOperador() {
   try {
     OPERADOR_ESTADO = await api("/medico/operador/estado");
+    // Cuántos avisos hay esperando, para el cartel del panel. Solo se pide si
+    // esta cuenta es operadora: para un médico común es una ruta que le
+    // devuelve 404, y no tiene sentido gastarle un pedido.
+    if (OPERADOR_ESTADO.operador) {
+      const cola = await api("/medico/operador/solicitudes");
+      OPERADOR_ESTADO.pendientes = cola.pendientes || 0;
+    }
   } catch {
     OPERADOR_ESTADO = { operador: false };
   }
   return OPERADOR_ESTADO;
+}
+
+// ─── CARTEL EN EL PANEL PRINCIPAL ─────────────────────────────────────────
+//
+// Sin esto, la cola solo se ve entrando a Configuración — o sea que había que
+// ACORDARSE de mirar. Y del otro lado hay un médico que ya pagó y no puede
+// trabajar hasta que alguien apruebe.
+//
+// Aparece únicamente cuando hay algo que hacer. Un cartel permanente diciendo
+// "0 avisos" se deja de ver justo el día que dice 3.
+function avisoOperadorHtml() {
+  const e = OPERADOR_ESTADO;
+  if (!e?.operador || !e.pendientes) return "";
+  return `
+    <div class="card no-imprimir saldo-aviso-panel" id="avisoOperador" style="cursor:pointer;border-color:var(--primary)">
+      <div style="font-weight:600">${t("op.panelPendientes", { n: e.pendientes })}</div>
+      <div class="hint" style="margin:2px 0 0">${t("op.panelAyuda")}</div>
+    </div>`;
+}
+
+function engancharAvisoOperador() {
+  const aviso = document.getElementById("avisoOperador");
+  if (aviso) aviso.onclick = renderSeguridad;
 }
 
 async function pintarOperador() {

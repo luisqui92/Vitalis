@@ -82,6 +82,9 @@ async function renderDashboard() {
       // El saldo se trae acá para poder avisar ANTES de grabar. Si falla, el
       // panel se abre igual y simplemente no hay aviso.
       traerSaldo(),
+      // Para el cartel de avisos de pago pendientes. Devuelve operador:false
+      // enseguida si esta cuenta no acredita, que es el caso de casi todos.
+      traerEstadoOperador(),
     ]);
     // Si mientras esto viajaba el médico ya abrió otra pantalla, este pintado
     // llega tarde y le taparía lo que está haciendo.
@@ -97,6 +100,7 @@ async function renderDashboard() {
     const sinAsignar = (dataBandeja.entrantes || []).length;
 
     app.innerHTML = `
+      ${avisoOperadorHtml()}
       ${avisoSaldoHtml()}
       ${sinAsignar ? `
         <div class="card no-imprimir" style="border-color:var(--warning);cursor:pointer" id="avisoBandeja">
@@ -118,6 +122,7 @@ async function renderDashboard() {
       `}
     `;
     engancharAvisoSaldo();
+    engancharAvisoOperador();
     const avisoBandeja = document.getElementById("avisoBandeja");
     if (avisoBandeja) avisoBandeja.onclick = () => renderBandejaDicom();
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;

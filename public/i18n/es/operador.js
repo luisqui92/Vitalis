@@ -34,4 +34,6 @@ Object.assign(I18N.es, {
   "op.confirmarAprobar": "¿Acreditar Bs {monto} a {nombre}?",
   "op.motivoRechazo": "¿Por qué se rechaza? El médico va a ver este texto.",
   "op.errRechazar": "No se pudo rechazar",
+  "op.panelPendientes": "{n} médico(s) esperando que apruebes su pago",
+  "op.panelAyuda": "Tocá acá para revisarlos y acreditar.",
 });

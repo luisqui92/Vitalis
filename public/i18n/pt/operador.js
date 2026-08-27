@@ -34,4 +34,6 @@ Object.assign(I18N.pt, {
   "op.confirmarAprobar": "Creditar R$ {monto} para {nombre}?",
   "op.motivoRechazo": "Por que está recusando? O médico vai ver este texto.",
   "op.errRechazar": "Não foi possível recusar",
+  "op.panelPendientes": "{n} médico(s) esperando você aprovar o pagamento",
+  "op.panelAyuda": "Toque aqui para revisar e creditar.",
 });

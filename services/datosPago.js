@@ -13,8 +13,16 @@
 //
 // Si no hay NADA configurado, la pantalla se lo dice al médico en vez de
 // mostrarle una tarjeta vacía y dejarlo adivinando dónde pagar.
+// Si nadie configuró PAGO_QR_IMAGEN pero el archivo está donde se espera, se
+// usa ése. Evita que el QR quede subido y sin mostrarse porque faltó una
+// variable de entorno, que es el error tonto que cuesta una tarde.
+const fs = require("fs");
+const path = require("path");
+const QR_POR_DEFECTO = ["/pago-qr.jpg", "/pago-qr.png"]
+  .find(rel => fs.existsSync(path.join(__dirname, "..", "public", rel))) || "";
+
 function datosDePago() {
-  const qr = String(process.env.PAGO_QR_IMAGEN || "").trim();
+  const qr = String(process.env.PAGO_QR_IMAGEN || QR_POR_DEFECTO).trim();
   const banco = String(process.env.PAGO_BANCO || "").trim();
   const cuenta = String(process.env.PAGO_CUENTA || "").trim();
   const titular = String(process.env.PAGO_TITULAR || "").trim();
