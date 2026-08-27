@@ -35,6 +35,8 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { datosDePago } = require("../services/datosPago");
+const { todosLosOperadores } = require("../services/operadores");
+const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
 
 const requireMedico = requireAuth(["medico"]);
@@ -90,6 +92,19 @@ module.exports = function (app) {
     });
     registrar({ req, medicoPhone, accion: "aviso_pago", recurso: `Bs${bolivianos} ref:${referencia}` });
     res.status(201).json({ ok: true, solicitud: paraElMedico(solicitud) });
+
+    // Avisarle al operador. Va DESPUÉS de responder y sin await: el médico no
+    // tiene por qué esperar a que salga una notificación, y si el push falla
+    // —permiso revocado, navegador cerrado— su aviso ya quedó registrado
+    // igual. La cola es la fuente de verdad; esto es solo para que nadie
+    // tenga que acordarse de mirarla.
+    for (const operador of todosLosOperadores()) {
+      notificarMedico(operador, {
+        titulo: `Pago de ${medico?.nombre || medicoPhone}`,
+        cuerpo: `Bs ${saldos.bolivianos(solicitud.montoCentavos)} · ref ${referencia}`,
+        url: "/",
+      }).catch(() => { /* que no llegue el aviso no puede tumbar nada */ });
+    }
   }));
 
   // ─── MIS AVISOS ─────────────────────────────────────────────────────────

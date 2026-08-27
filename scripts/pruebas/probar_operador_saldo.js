@@ -280,6 +280,26 @@ async function main() {
   verificar("  ...y puede volver a avisar",
     (await POST("/medico/recargas", tk.destino, { bolivianos: 150, referencia: "QR mio 1001" })).estado === 201);
 
+  console.log("\n── 12. El panel de pagos ──");
+  const resumen = await GET("/medico/operador/resumen", tk.operador);
+  verificar("el operador ve el resumen", resumen.estado === 200);
+  verificar("  ...con lo que entró este mes", typeof resumen.cuerpo?.cargasMes?.bs === "string");
+  verificar("  ...y cuántas recargas fueron", resumen.cuerpo?.cargasMes?.n > 0);
+  // El consumo se guarda en negativo (es una resta); mostrarlo así se lee
+  // como un error, por eso se da vuelta.
+  verificar("el consumo se muestra en positivo", !String(resumen.cuerpo?.consumoMes?.bs).startsWith("-"));
+  verificar("las últimas cargas traen el nombre del médico, no solo el teléfono",
+    resumen.cuerpo?.ultimasCargas?.every(c => c.nombre && c.nombre !== c.medicoPhone));
+  verificar("  ...y quién las acreditó", resumen.cuerpo?.ultimasCargas?.[0]?.acreditadoPor === "70000001");
+  verificar("un médico común no ve el panel de pagos",
+    (await GET("/medico/operador/resumen", tk.comun)).estado === 404);
+
+  // Y la deuda: alguien que atendió con el saldo agotado.
+  await Medico.updateOne({ phone: "70000003" }, { $set: { saldoCentavos: -3600 } });
+  const conDeuda = await GET("/medico/operador/resumen", tk.operador);
+  verificar("aparece quién está en negativo", conDeuda.cuerpo?.enNegativo?.some(m => m.phone === "70000003"));
+  verificar("  ...y la deuda total se muestra en positivo", conDeuda.cuerpo?.deudaTotalBs === "36.00");
+
   await new Promise((r) => servidor.close(r));
   await new Promise((r) => setTimeout(r, 400));
   await mongoose.connection.dropDatabase();

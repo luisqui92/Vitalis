@@ -36,4 +36,12 @@ Object.assign(I18N.es, {
   "op.errRechazar": "No se pudo rechazar",
   "op.panelPendientes": "{n} médico(s) esperando que apruebes su pago",
   "op.panelAyuda": "Tocá acá para revisarlos y acreditar.",
+  "op.res.hoy": "Entró hoy",
+  "op.res.mes": "Entró este mes",
+  "op.res.consumo": "Consumido este mes",
+  "op.res.recargas": "Recargas del mes",
+  "op.res.deuda": "Bs {monto} en negativo, entre {n} médico(s)",
+  "op.res.deudaAyuda": "Atendieron con el saldo agotado. Se descuenta solo en su próxima recarga.",
+  "op.res.verCargas": "Ver últimas recargas",
+  "op.res.por": "acreditó {quien}",
 });

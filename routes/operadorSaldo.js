@@ -28,21 +28,18 @@
 //
 // Lo que este archivo NO hace: crear cuentas, cambiar contraseñas, ver
 // historias clínicas. Un operador de recargas administra plata y nada más.
-const { Medico, SolicitudRecarga } = require("../db/models");
+const { Medico, SolicitudRecarga, MovimientoSaldo } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { rateLimitPorClave, claveDeMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { esOperador } = require("../services/operadores");
+const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
 
-// Los teléfonos habilitados, del entorno. Vacío = la pantalla no existe para
-// nadie, que es el estado correcto por defecto: si alguien despliega Vitalis
-// sin configurar esto, nadie puede emitir saldo, en vez de que pueda cualquiera.
-const OPERADORES = String(process.env.OPERADORES_SALDO || "")
-  .split(",").map(s => s.trim()).filter(Boolean);
 
 // Por OPERADOR, no por IP. Con la cuota por IP, dos personas acreditando
 // desde la misma oficina se la reparten, y un solo operador procesando diez
@@ -56,10 +53,6 @@ const OPERADORES = String(process.env.OPERADORES_SALDO || "")
 // mandando pedidos a su nombre.
 const limitOperador = rateLimitPorClave("operadorSaldo", 60, 60 * 1000,
   "Demasiadas operaciones seguidas. Esperá un momento.", claveDeMedico);
-
-function esOperador(phone) {
-  return OPERADORES.includes(String(phone));
-}
 
 // Los tres candados, en un solo lugar para que ninguna ruta se olvide de uno.
 function requireOperador(req, res, next) {
@@ -140,6 +133,67 @@ module.exports = function (app) {
     res.json({ medico, ...estado, movimientos });
   }));
 
+  // ─── EL PANEL DE PAGOS ─────────────────────────────────────────────────
+  //
+  // Lo que la cola no dice: cuánto entró, cuánto se consumió, y quiénes están
+  // trabajando en negativo. La cola es el trabajo de hoy; esto es el estado
+  // del negocio.
+  //
+  // Todo sale de MovimientoSaldo, que es el libro. No hay un contador aparte
+  // que se pueda desincronizar — ver el comentario del modelo en db/models.js.
+  app.get("/medico/operador/resumen", limitOperador, requireMedico, requireOperador, asyncRoute(async (_req, res) => {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const mes = new Date(); mes.setDate(1); mes.setHours(0, 0, 0, 0);
+
+    const sumar = async (filtro) => {
+      const filas = await MovimientoSaldo.aggregate([
+        { $match: filtro },
+        { $group: { _id: null, total: { $sum: "$montoCentavos" }, n: { $sum: 1 } } },
+      ]);
+      return { centavos: filas[0]?.total || 0, n: filas[0]?.n || 0 };
+    };
+
+    const [cargasHoy, cargasMes, consumoMes, pendientes, ultimasCargas] = await Promise.all([
+      sumar({ tipo: "carga", createdAt: { $gte: hoy } }),
+      sumar({ tipo: "carga", createdAt: { $gte: mes } }),
+      sumar({ tipo: "consumo", createdAt: { $gte: mes } }),
+      SolicitudRecarga.countDocuments({ estado: "pendiente" }),
+      MovimientoSaldo.find({ tipo: "carga" })
+        .select("medicoPhone montoCentavos referencia acreditadoPor createdAt")
+        .sort({ createdAt: -1 }).limit(25).lean(),
+    ]);
+
+    // Quiénes están en negativo: son los que atendieron con el saldo agotado
+    // y le deben a la casa. Es el número que dice si el modelo prepago está
+    // funcionando o se está convirtiendo en fiado.
+    const enNegativo = await Medico.find({ saldoCentavos: { $lt: 0 } })
+      .select("phone nombre saldoCentavos").sort({ saldoCentavos: 1 }).limit(20).lean();
+
+    // El nombre de cada médico para las últimas cargas, en una sola consulta.
+    const telefonos = [...new Set(ultimasCargas.map(c => c.medicoPhone))];
+    const nombres = Object.fromEntries(
+      (await Medico.find({ phone: { $in: telefonos } }).select("phone nombre").lean())
+        .map(m => [m.phone, m.nombre])
+    );
+
+    res.json({
+      pendientes,
+      cargasHoy: { ...cargasHoy, bs: saldos.bolivianos(cargasHoy.centavos) },
+      cargasMes: { ...cargasMes, bs: saldos.bolivianos(cargasMes.centavos) },
+      // El consumo viene negativo en el libro (es una resta). Se da vuelta
+      // para mostrarlo, porque "consumido: Bs -480" se lee como un error.
+      consumoMes: { n: consumoMes.n, bs: saldos.bolivianos(-consumoMes.centavos) },
+      enNegativo: enNegativo.map(m => ({
+        phone: m.phone, nombre: m.nombre, saldoBs: saldos.bolivianos(m.saldoCentavos),
+      })),
+      deudaTotalBs: saldos.bolivianos(-enNegativo.reduce((a, m) => a + m.saldoCentavos, 0)),
+      ultimasCargas: ultimasCargas.map(c => ({
+        ...c, nombre: nombres[c.medicoPhone] || c.medicoPhone,
+        montoBs: saldos.bolivianos(c.montoCentavos),
+      })),
+    });
+  }));
+
   // ─── LA COLA DE AVISOS DE PAGO ─────────────────────────────────────────
   // Lo que el operador mira apenas entra: quién dice haber pagado y todavía
   // no se le acreditó. Los más viejos primero — el que avisó ayer viene
@@ -213,7 +267,16 @@ module.exports = function (app) {
       req, medicoPhone: req.adminUser.usuario, accion: "aprobar_recarga",
       recurso: `Solicitud:${solicitud._id} Medico:${solicitud.medicoPhone} Bs${bolivianos}`,
     });
-    res.json({ ok: true, ...(await saldos.estadoDe(solicitud.medicoPhone)) });
+    const estado = await saldos.estadoDe(solicitud.medicoPhone);
+    res.json({ ok: true, ...estado });
+
+    // Que el médico se entere sin tener que estar mirando la pantalla: pagó y
+    // está esperando para poder trabajar.
+    notificarMedico(solicitud.medicoPhone, {
+      titulo: "Saldo acreditado",
+      cuerpo: `Se acreditaron Bs ${saldos.bolivianos(Math.round(bolivianos * 100))}. Saldo: Bs ${estado.saldoBs}.`,
+      url: "/",
+    }).catch(() => { /* el saldo ya está cargado, el aviso es un extra */ });
   }));
 
   // ─── RECHAZAR ──────────────────────────────────────────────────────────
@@ -237,6 +300,15 @@ module.exports = function (app) {
       recurso: `Solicitud:${solicitud._id} Medico:${solicitud.medicoPhone}`,
     });
     res.json({ ok: true });
+
+    // El rechazo importa más que la aprobación: el médico se quedó esperando
+    // un saldo que no va a llegar, y tiene que enterarse ahora, no cuando
+    // vaya a grabar una consulta.
+    notificarMedico(solicitud.medicoPhone, {
+      titulo: "No pudimos confirmar tu pago",
+      cuerpo: motivo,
+      url: "/",
+    }).catch(() => { /* lo va a ver igual en la pantalla de saldo */ });
   }));
 
   // ─── ACREDITAR ─────────────────────────────────────────────────────────

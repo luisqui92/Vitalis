@@ -72,6 +72,7 @@ async function pintarOperador() {
     <div class="card" style="border-color:var(--primary)">
       <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
       <div class="hint" style="margin:0 0 10px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
+      <div id="opResumen"></div>
       <div id="opCola"></div>
 
       <div class="seccion-titulo">${t("op.buscar")}</div>
@@ -80,6 +81,7 @@ async function pintarOperador() {
       <div id="opFicha"></div>
     </div>`;
 
+  pintarResumenPagos();
   pintarColaSolicitudes();
 
   const campo = document.getElementById("opBuscar");
@@ -296,4 +298,72 @@ async function pintarColaSolicitudes() {
       }
     };
   });
+}
+
+// ─── EL PANEL DE PAGOS ────────────────────────────────────────────────────
+//
+// Lo que la cola no dice: cuánto entró, cuánto se consumió y quiénes están
+// trabajando en negativo. La cola es el trabajo de hoy; esto es cómo va el
+// negocio.
+//
+// La deuda es el número que hay que mirar con atención: si crece mes a mes,
+// el modelo prepago se está convirtiendo en fiado sin que nadie lo haya
+// decidido.
+async function pintarResumenPagos() {
+  const caja = document.getElementById("opResumen");
+  if (!caja) return;
+  let d;
+  try { d = await api("/medico/operador/resumen"); } catch { caja.innerHTML = ""; return; }
+  if (!caja.isConnected) return;
+
+  caja.innerHTML = `
+    <div class="escr-stats" style="margin-bottom:12px">
+      ${escrStatCardHtml(`Bs ${d.cargasHoy.bs}`, t("op.res.hoy"))}
+      ${escrStatCardHtml(`Bs ${d.cargasMes.bs}`, t("op.res.mes"))}
+      ${escrStatCardHtml(`Bs ${d.consumoMes.bs}`, t("op.res.consumo"))}
+      ${escrStatCardHtml(d.cargasMes.n, t("op.res.recargas"))}
+    </div>
+
+    ${d.enNegativo.length ? `
+      <div class="saldo-aviso saldo-aviso-grave" style="margin:0 0 12px">
+        <div style="font-weight:600">${t("op.res.deuda", { monto: esc(d.deudaTotalBs), n: d.enNegativo.length })}</div>
+        <div class="hint" style="margin:6px 0 0">${t("op.res.deudaAyuda")}</div>
+        ${d.enNegativo.map(m => `
+          <div class="recarga-fila">
+            <span>${esc(m.nombre)}</span><b>Bs ${esc(m.saldoBs)}</b>
+          </div>`).join("")}
+      </div>` : ""}
+
+    ${d.ultimasCargas.length ? `
+      <button class="link" id="btnUltimasCargas" style="width:auto">${t("op.res.verCargas")}</button>
+      <div id="opUltimasCargas" style="display:none">
+        <div class="clin-tabla-caja" style="margin:10px 0 12px">
+          <table class="clin-tabla">
+            <thead><tr>
+              <th>${t("saldo.col.fecha")}</th><th>${t("clin.col.medico")}</th>
+              <th class="num">${t("saldo.col.monto")}</th><th>${t("recarga.referencia")}</th>
+            </tr></thead>
+            <tbody>
+              ${d.ultimasCargas.map(c => `
+                <tr>
+                  <td style="white-space:nowrap">${new Date(c.createdAt).toLocaleDateString(localeActual(), { day: "2-digit", month: "2-digit" })}</td>
+                  <td>${esc(c.nombre)}</td>
+                  <td class="num">${esc(c.montoBs)}</td>
+                  <td>
+                    ${esc(c.referencia || "—")}
+                    <div class="hint" style="margin:0">${t("op.res.por", { quien: esc(c.acreditadoPor || "—") })}</div>
+                  </td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>` : ""}`;
+
+  const btn = document.getElementById("btnUltimasCargas");
+  if (btn) {
+    btn.onclick = () => {
+      const t2 = document.getElementById("opUltimasCargas");
+      t2.style.display = t2.style.display === "none" ? "" : "none";
+    };
+  }
 }
