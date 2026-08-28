@@ -130,6 +130,28 @@ function servirComprimidos(raiz, opciones = {}) {
     try { st = fs.statSync(br); } catch { return next(); }
     if (!st.isFile()) return next();
 
+    // ═══ Y QUE SEA MÁS NUEVO QUE EL ORIGINAL ═══════════════════════════════
+    //
+    // Un .br viejo no es un archivo viejo: es CÓDIGO VIEJO servido con cara
+    // de actual. Se despliega un arreglo, se reinicia, y todo navegador que
+    // acepte brotli —o sea, todos— sigue recibiendo la versión anterior.
+    //
+    // No es hipotético. generar() compara fechas y regenera bien, pero corre
+    // en segundo plano DESPUÉS de que el servidor ya empezó a responder: hay
+    // una ventana, justo después de cada reinicio, en la que el .js del disco
+    // es nuevo y el .br todavía no. Quien recargue ahí se lleva el código
+    // anterior, y con max-age de 5 minutos se lo queda un rato.
+    //
+    // Costó una tarde de diagnóstico: los arreglos aparecían y desaparecían
+    // según el momento en que se recargara, lo que mandó a buscar la causa a
+    // cualquier otro lado —el .env, pm2, el orden de carga de los módulos—.
+    //
+    // Ante la duda se manda el original sin comprimir: se gastan unos KB de
+    // más, que es infinitamente mejor que servir una versión que ya no existe.
+    let fuente;
+    try { fuente = fs.statSync(completo); } catch { return next(); }
+    if (st.mtimeMs < fuente.mtimeMs) return next();
+
     res.setHeader("Content-Encoding", "br");
     res.setHeader("Content-Type", TIPOS[ext] || "application/octet-stream");
     res.setHeader("Content-Length", st.size);
