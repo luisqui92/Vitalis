@@ -21,23 +21,42 @@ let OPERADOR_ESTADO = null;
 let OPERADOR_ELEGIDO = null;
 
 async function traerEstadoOperador() {
+  // ═══ DOS PEDIDOS, DOS try SEPARADOS — Y ES TODO EL ASUNTO ════════════════
+  //
+  // Estaban juntos en un solo try, y costó una tarde entera de diagnóstico.
+  //
+  // /estado contestaba perfecto: "sos operador, te falta el 2FA". Acto
+  // seguido se pedía la cola, que SÍ pasa por requireOperador y sin 2FA
+  // devuelve 403 — y ese 403 caía en el mismo catch, que pisaba la respuesta
+  // buena y dejaba operador:false.
+  //
+  // O sea: la pantalla decía "esta cuenta no tiene permiso para aprobar
+  // pagos" cuando el permiso estaba puesto y lo único que faltaba era el
+  // segundo factor. Mandó a revisar el .env, el cwd de pm2, el orden de
+  // carga de los módulos y la lista de operadores. Todo estaba bien.
+  //
+  // Un catch que abarca dos pedidos hace que el que falla borre lo que el
+  // otro ya había averiguado.
   try {
     OPERADOR_ESTADO = await api("/medico/operador/estado");
-    // Cuántos avisos hay esperando, para el cartel del panel. Solo se pide si
-    // esta cuenta es operadora: para un médico común es una ruta que le
-    // devuelve 404, y no tiene sentido gastarle un pedido.
-    if (OPERADOR_ESTADO.operador) {
-      const cola = await api("/medico/operador/solicitudes");
-      OPERADOR_ESTADO.pendientes = cola.pendientes || 0;
-    }
   } catch (e) {
     // Se distingue "el servidor dijo que no sos operador" de "no pudimos
-    // preguntarle". Antes las dos terminaban en operador:false, y la
-    // pantalla afirmaba que faltaba el permiso aunque el problema fuera un
-    // 429 por recargar mucho o un error del servidor. Un mensaje que asegura
-    // una causa que no comprobó manda a la persona a arreglar lo que no está
-    // roto — y a nosotros nos costó una tarde.
+    // preguntarle": afirmar una causa sin comprobarla manda a la persona a
+    // arreglar lo que no está roto.
     OPERADOR_ESTADO = { operador: false, fallo: e?.status || true, detalle: e?.error || "" };
+    return OPERADOR_ESTADO;
+  }
+
+  // La cola, solo si además hay 2FA: sin él esta ruta contesta 403 seguro, y
+  // pedirla es gastar un rebote para no enterarse de nada. Y aunque falle por
+  // cualquier otro motivo, no puede tocar lo que ya sabemos de la cuenta.
+  if (OPERADOR_ESTADO.operador && OPERADOR_ESTADO.dosFAActivo) {
+    try {
+      const cola = await api("/medico/operador/solicitudes");
+      OPERADOR_ESTADO.pendientes = cola.pendientes || 0;
+    } catch {
+      OPERADOR_ESTADO.pendientes = 0;
+    }
   }
   return OPERADOR_ESTADO;
 }
