@@ -30,8 +30,14 @@ async function traerEstadoOperador() {
       const cola = await api("/medico/operador/solicitudes");
       OPERADOR_ESTADO.pendientes = cola.pendientes || 0;
     }
-  } catch {
-    OPERADOR_ESTADO = { operador: false };
+  } catch (e) {
+    // Se distingue "el servidor dijo que no sos operador" de "no pudimos
+    // preguntarle". Antes las dos terminaban en operador:false, y la
+    // pantalla afirmaba que faltaba el permiso aunque el problema fuera un
+    // 429 por recargar mucho o un error del servidor. Un mensaje que asegura
+    // una causa que no comprobó manda a la persona a arreglar lo que no está
+    // roto — y a nosotros nos costó una tarde.
+    OPERADOR_ESTADO = { operador: false, fallo: e?.status || true, detalle: e?.error || "" };
   }
   return OPERADOR_ESTADO;
 }
@@ -107,7 +113,9 @@ async function renderPagos() {
     app.innerHTML = `
       <div class="card" style="border-color:var(--warning)">
         <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
-        <div class="saldo-aviso">${t("op.faltaPermiso")}</div>
+        <div class="saldo-aviso">${e.fallo
+          ? t("op.noPudimosVerificar", { detalle: esc(e.detalle || e.fallo) })
+          : t("op.faltaPermiso")}</div>
         <button class="secondary" id="btnSalirPagos">${t("comun.salir")}</button>
       </div>`;
     document.getElementById("btnSalirPagos").onclick = logout;
