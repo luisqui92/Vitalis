@@ -98,6 +98,23 @@ function completarLogin(data) {
 // panel son los pagos. Va primero porque también es administrativa, y si
 // preguntáramos al revés terminaría en una clínica que no existe.
 function irAPantallaInicial() {
+  // El botón de salir se mostraba en UN solo lugar: adentro del panel de
+  // pacientes. Una cuenta administrativa —la de la clínica, la de pagos—
+  // nunca pasa por ahí, así que quedaba sin forma de cerrar sesión: había
+  // que borrar los datos del navegador. En una pantalla que aprueba plata,
+  // no poder salir no es una molestia, es que la sesión queda abierta en el
+  // celular de quien sea que lo agarre después.
+  //
+  // Va acá y no en cada pantalla porque acá pasan TODAS las cuentas al
+  // entrar, incluidas las que agreguemos mañana.
+  // El texto se fija acá y no en el HTML porque en el HTML estaba en español
+  // fijo: no hay mecanismo de traducción para el marcado suelto, así que un
+  // médico brasileño leía "Salir" en medio de una interfaz en portugués.
+  if (typeof btnLogout !== "undefined" && btnLogout) {
+    btnLogout.textContent = t("comun.salir");
+    btnLogout.style.display = "inline-block";
+  }
+
   if (typeof esSoloPagos === "function" && esSoloPagos()) return renderPagos();
   if (typeof esSoloAdministrador === "function" && esSoloAdministrador()) return renderClinica();
   if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) return renderInicioEscritorio();
