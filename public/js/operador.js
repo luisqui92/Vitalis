@@ -478,17 +478,33 @@ async function pintarResumenPagos() {
 //
 // Va al final de la pantalla, plegado: se toca una vez cada mucho tiempo, no
 // tiene por qué ocupar el lugar de lo que se usa todos los días.
+// Cuál de las dos cuentas se está mirando. Vive afuera para que cambiar de
+// país no cierre el formulario que se estaba editando.
+let OPERADOR_PAIS_PAGO = "bo";
+
 async function pintarDatosDePago() {
   const caja = document.getElementById("opDatosPago");
   if (!caja) return;
   let d;
-  try { d = await api("/medico/operador/datos-pago"); } catch { caja.innerHTML = ""; return; }
+  try {
+    d = await api(`/medico/operador/datos-pago?pais=${encodeURIComponent(OPERADOR_PAIS_PAGO)}`);
+  } catch { caja.innerHTML = ""; return; }
   if (!caja.isConnected) return;
 
   const resumen = [d.banco, d.cuenta].filter(Boolean).join(" · ") || t("op.dp.sinCargar");
   caja.innerHTML = `
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${t("op.dp.titulo")}</div>
+
+      <!-- Son dos cuentas distintas, en dos monedas distintas. El selector va
+           arriba de todo y no escondido adentro del formulario: editar la
+           cuenta de Brasil creyendo que se edita la de Bolivia es el error
+           que manda todos los pagos de un país a la cuenta del otro. -->
+      <div class="tabs" style="grid-template-columns:repeat(2,1fr);margin:10px 0">
+        <button class="tab${OPERADOR_PAIS_PAGO === "bo" ? " activo" : ""}" data-pais="bo">${t("op.dp.bolivia")}</button>
+        <button class="tab${OPERADOR_PAIS_PAGO === "br" ? " activo" : ""}" data-pais="br">${t("op.dp.brasil")}</button>
+      </div>
+
       <div class="hint" style="margin:0">${t("op.dp.actual", { datos: esc(resumen) })}</div>
       <button class="link" id="btnEditarDatosPago" style="width:auto;margin-top:6px">${t("op.dp.editar")}</button>
 
@@ -514,6 +530,10 @@ async function pintarDatosDePago() {
         : `<div class="saldo-aviso" style="margin-top:12px">${t("op.dp.sinQr")}</div>`}
     </div>`;
 
+  caja.querySelectorAll("[data-pais]").forEach(b => {
+    b.onclick = () => { OPERADOR_PAIS_PAGO = b.dataset.pais; pintarDatosDePago(); };
+  });
+
   document.getElementById("btnEditarDatosPago").onclick = () => {
     const f = document.getElementById("opDatosPagoForm");
     f.style.display = f.style.display === "none" ? "" : "none";
@@ -528,6 +548,7 @@ async function pintarDatosDePago() {
       await api("/medico/operador/datos-pago", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          pais: OPERADOR_PAIS_PAGO,
           banco: document.getElementById("dpBanco").value,
           cuenta: document.getElementById("dpCuenta").value,
           titular: document.getElementById("dpTitular").value,

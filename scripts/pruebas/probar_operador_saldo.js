@@ -104,6 +104,9 @@ async function main() {
   await Medico.create({ phone: "70000005", nombre: "María (pagos)", passwordHash: hash, rol: "admin", clinicaId: null, dosFA: con2fa });
   // El destinatario de las recargas.
   await Medico.create({ phone: "79999999", nombre: "Dra. Destino", passwordHash: hash, tipoEspecialidad: "ginecologia" });
+  // Una médica en Brasil: paga por Pix, en reales, a otra cuenta. Ver la
+  // sección 15 sobre por qué mostrarle la cuenta boliviana es perder plata.
+  await Medico.create({ phone: "79999998", nombre: "Dra. Brasil", passwordHash: hash, idioma: "pt" });
 
   const tk = {
     operador: generarToken("70000001", "medico", 36e5),
@@ -112,6 +115,7 @@ async function main() {
     adminClinica: generarToken("70000004", "admin", 36e5, { admin: true, clinicaId: String(clinica._id) }),
     pagos: generarToken("70000005", "admin", 36e5, { admin: true }),
     destino: generarToken("79999999", "medico", 36e5),
+    brasil: generarToken("79999998", "medico", 36e5),
   };
 
   const express = require("express");
@@ -339,11 +343,49 @@ async function main() {
   const enBase = await ConfigPago.findOne({ clave: "unico" }).lean();
   verificar("queda registrado quién los cambió", enBase.actualizadoPor === "70000001");
 
-  // Cambiarlos otra vez no crea un segundo documento: es la cuenta de la
-  // empresa, no una configuración por persona.
+  // Cambiarlos otra vez no crea un segundo documento POR PAÍS: es la cuenta
+  // de la empresa en Bolivia, no una configuración por persona. (Brasil sí
+  // tiene la suya, y de eso se ocupa la sección 15.)
   await PUT("/medico/operador/datos-pago", tk.operador, { banco: "Otro banco", cuenta: "999" });
   verificar("editar de nuevo no duplica la configuración",
-    await ConfigPago.countDocuments({}) === 1);
+    await ConfigPago.countDocuments({ clave: "unico" }) === 1);
+
+  console.log("\n── 15. Cada país cobra en su cuenta, y no se mezclan ──");
+  // El error que esto previene no es cosmético. Un médico brasileño que ve
+  // la cuenta boliviana transfiere reales a un banco que no los recibe: no
+  // es un pago que "todavía no se acreditó", es plata que no vuelve.
+  //
+  // Se prueba ANTES de cargar los datos de Brasil, que es el estado real de
+  // hoy: Bolivia configurada y Brasil recién empezando.
+  const brSinCargar = await GET("/medico/recargas/datos-pago", tk.brasil);
+  verificar("la médica de Brasil NO ve el banco boliviano",
+    brSinCargar.cuerpo?.banco !== "Otro banco" && !brSinCargar.cuerpo?.banco);
+  verificar("  ...ni su número de cuenta", brSinCargar.cuerpo?.cuenta !== "999");
+  verificar("  ...y se le dice que su país es br", brSinCargar.cuerpo?.pais === "br");
+
+  const guardadoBr = await PUT("/medico/operador/datos-pago", tk.operador, {
+    pais: "br", banco: "Pix", cuenta: "ff439919-4119-405d-838a-6c3e3efd8b55",
+    titular: "BRLA DIGITAL LTDA", documento: "12345678000199",
+  });
+  verificar("el operador puede cargar la cuenta de Brasil", guardadoBr.estado === 200);
+  verificar("  ...y queda guardada aparte, sin pisar la de Bolivia",
+    await ConfigPago.countDocuments({}) === 2);
+
+  const brCargada = await GET("/medico/recargas/datos-pago", tk.brasil);
+  verificar("ahora la médica de Brasil ve SU cuenta",
+    brCargada.cuerpo?.cuenta === "ff439919-4119-405d-838a-6c3e3efd8b55");
+
+  // Y lo simétrico, que es la mitad que se olvida: cargar Brasil no puede
+  // haberle cambiado la cuenta a los médicos de Bolivia.
+  const boSigueIgual = await GET("/medico/recargas/datos-pago", tk.destino);
+  verificar("y la de Bolivia quedó intacta",
+    boSigueIgual.cuerpo?.cuenta === "999" && boSigueIgual.cuerpo?.pais === "bo");
+
+  // El país sale de la cuenta del médico, no de lo que mande el navegador:
+  // si viajara en el pedido, elegir país sería elegir a qué cuenta pagarle.
+  const intentaElegir = await GET("/medico/recargas/datos-pago?pais=br", tk.destino);
+  verificar("un médico no puede pedir la cuenta del otro país",
+    intentaElegir.cuerpo?.pais === "bo" && intentaElegir.cuerpo?.cuenta === "999");
 
   console.log("\n── 14. El que maneja la plata no tiene por qué ser médico ──");
   // Hasta acá, el operador SIEMPRE era además una cuenta de médico: consumía

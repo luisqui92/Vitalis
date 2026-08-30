@@ -36,7 +36,7 @@ const { registrar } = require("../services/auditoria");
 const { esOperador } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
-const { datosDePago, guardarDatosDePago } = require("../services/datosPago");
+const { datosDePago, guardarDatosDePago, normalizarPais } = require("../services/datosPago");
 const { log } = require("../config");
 
 // ═══ POR QUÉ ACÁ DICE "admin" Y EN LAS RUTAS CLÍNICAS NO ═══════════════════
@@ -155,17 +155,23 @@ module.exports = function (app) {
   // ─── DÓNDE NOS PAGAN ───────────────────────────────────────────────────
   // Editable desde la pantalla y no por SSH: es un número de cuenta que
   // cambia, y lo que se cambia con dificultad se queda desactualizado.
-  app.get("/medico/operador/datos-pago", limitOperador, requireSesion, requireOperador, asyncRoute(async (_req, res) => {
-    res.json(await datosDePago());
+  // Acá sí el país viene por parámetro: el operador administra los dos, no
+  // solo el suyo. Es lo contrario de la ruta del médico, donde el país sale
+  // de su cuenta justamente para que no pueda elegirlo.
+  app.get("/medico/operador/datos-pago", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    res.json(await datosDePago(normalizarPais(req.query.pais)));
   }));
 
   app.put("/medico/operador/datos-pago", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
-    const datos = await guardarDatosDePago(req.body || {}, req.adminUser.usuario);
+    const pais = normalizarPais(req.body?.pais);
+    const datos = await guardarDatosDePago(req.body || {}, req.adminUser.usuario, pais);
     // Se audita con el detalle: si un día los pagos empiezan a caer en una
-    // cuenta que no es la nuestra, esto dice quién la cambió y cuándo.
+    // cuenta que no es la nuestra, esto dice quién la cambió y cuándo. Y con
+    // el país, porque ahora son dos cuentas y "cambió la cuenta" sin decir
+    // cuál no alcanza para reconstruir nada.
     registrar({
       req, medicoPhone: req.adminUser.usuario, accion: "cambiar_datos_pago",
-      recurso: `${datos.banco} ${datos.cuenta} (${datos.titular})`,
+      recurso: `[${pais}] ${datos.banco} ${datos.cuenta} (${datos.titular})`,
     });
     res.json({ ok: true, ...datos });
   }));

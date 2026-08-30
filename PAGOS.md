@@ -124,8 +124,34 @@ pm2 restart vitalis
 guarda quién los cambió y cuándo.
 
 Cambiar ese número desvía **todos los pagos futuros**, así que solo lo puede
-hacer un operador, con 2FA, y queda auditado. El QR se toma de
-`public/pago-qr.jpg`.
+hacer un operador, con 2FA, y queda auditado.
+
+### Una cuenta por país
+
+Hay **dos** cuentas, con su pestaña cada una en esa pantalla:
+
+| | Bolivia | Brasil |
+|---|---|---|
+| Moneda | Bs | R$ |
+| Medio | QR bancario | Pix |
+| Imagen del QR | `public/pago-qr.jpg` | `public/pago-qr-br.jpg` |
+
+A cada médico se le muestra **la de su país, y solo esa**. El país sale del
+idioma de su cuenta (es → Bolivia, pt → Brasil), que ya es un dato del
+médico y no del navegador.
+
+Si el país de un médico todavía no tiene datos cargados, se le dice que
+**no hay dónde pagar** — nunca se le muestra la cuenta del otro país. Un
+médico que no puede pagar hoy nos escribe; uno que transfirió reales a un
+banco boliviano perdió la plata y la confianza.
+
+El médico **no puede elegir** el país en el pedido: si pudiera, elegir país
+sería elegir a qué cuenta pagar. El operador sí, porque administra las dos.
+
+> **Pendiente:** los montos no se convierten, solo se reetiquetan. Un médico
+> en Brasil ve "R$ 12" por consulta y "R$ 100" de mínimo — los mismos números
+> que en bolivianos. Si el precio en Brasil tiene que ser otro, hay que
+> separar el precio por país; hoy `PRECIO_CONSULTA_CENTAVOS` es uno solo.
 
 ---
 

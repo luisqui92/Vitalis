@@ -34,7 +34,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
-const { datosDePago } = require("../services/datosPago");
+const { datosDePago, paisDelMedico } = require("../services/datosPago");
 const { todosLosOperadores } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
@@ -60,8 +60,17 @@ function paraElMedico(s) {
 
 module.exports = function (app) {
   // ─── DÓNDE PAGO ─────────────────────────────────────────────────────────
-  app.get("/medico/recargas/datos-pago", limitMedico, requireMedico, asyncRoute(async (_req, res) => {
-    res.json({ ...(await datosDePago()), recargaMinimaCentavos: saldos.RECARGA_MINIMA });
+  // La cuenta que se le muestra es la DE SU PAÍS. El país no viaja desde el
+  // navegador: sale de la cuenta del médico en la base. Si lo mandara el
+  // cliente, cualquiera podría pedir los datos del otro país — que no es
+  // grave en sí (son públicos, se los damos a todos) pero sí lo es al revés:
+  // un brasileño viendo la cuenta boliviana transfiere plata que no vuelve.
+  app.get("/medico/recargas/datos-pago", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("idioma").lean();
+    res.json({
+      ...(await datosDePago(paisDelMedico(medico))),
+      recargaMinimaCentavos: saldos.RECARGA_MINIMA,
+    });
   }));
 
   // ─── AVISAR QUE PAGUÉ ───────────────────────────────────────────────────

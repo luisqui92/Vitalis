@@ -50,6 +50,8 @@ Object.assign(I18N.pt, {
   "op.irAConfig": "Ir para Configuração",
   "op.buscarAyuda": "Para creditar alguém que não avisou pelo app, ou para ver o histórico dele.",
   "op.dp.titulo": "Onde nos pagam",
+  "op.dp.bolivia": "Bolívia · Bs",
+  "op.dp.brasil": "Brasil · R$",
   "op.dp.actual": "Agora: {datos}",
   "op.dp.sinCargar": "sem dados bancários cadastrados",
   "op.dp.editar": "Editar",
