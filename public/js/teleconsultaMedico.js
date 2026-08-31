@@ -147,14 +147,24 @@ async function teleMedEntrar(tc, pacienteId, pacienteTelefono) {
         <div class="hint" style="margin:0">${esc(sala.pacienteNombre || "")}</div>
       </div>
       ${sala.consentimiento ? "" : `<div class="saldo-aviso saldo-aviso-grave">${t("tele.esperandoConsentimiento")}</div>`}
-      <div style="position:relative;padding-top:62%;border-radius:12px;overflow:hidden;background:#000">
-        <iframe src="${esc(sala.url)}?t=${encodeURIComponent(sala.token)}"
-          allow="camera; microphone; fullscreen; speaker; display-capture; autoplay"
-          style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
+      <div id="teleEstado" class="hint" style="margin:8px 0"></div>
+      <div style="position:relative;border-radius:12px;overflow:hidden;background:#000">
+        <video id="teleRemoto" playsinline autoplay style="width:100%;display:block;min-height:240px"></video>
+        <video id="teleLocal" playsinline autoplay muted
+          style="position:absolute;right:10px;bottom:10px;width:28%;max-width:160px;border-radius:8px;border:2px solid rgba(255,255,255,.7)"></video>
       </div>
     </div>`;
 
+  rtcIniciar(sala, {
+    idLocal: "teleLocal", idRemoto: "teleRemoto",
+    alEstado: (texto, malo) => {
+      const caja = document.getElementById("teleEstado");
+      if (caja) { caja.textContent = texto; caja.style.color = malo ? "var(--danger)" : ""; }
+    },
+  });
+
   document.getElementById("teleMedSalir").onclick = async () => {
+    rtcColgar();
     try {
       await api(`/medico/teleconsulta/${tc._id}/terminar`, { method: "POST", body: "{}", headers: { "Content-Type": "application/json" } });
     } catch { /* volver a la ficha igual: dejarlo encerrado sería peor */ }

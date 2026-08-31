@@ -129,8 +129,10 @@ module.exports = function (app) {
     const t = await Teleconsulta.findOne({ _id: req.params.id, medicoPhone });
     if (!vigente(t)) throw new ErrorHttp(404, "Esa teleconsulta ya no está disponible");
 
-    const sala = await video.crearSala(t.salaNombre);
-    const token = await video.tokenDeEntrada(t.salaNombre, { esMedico: true, nombre: "Profesional" });
+    // No hay sala que crear en ningún proveedor: la llamada va directo de un
+    // navegador al otro. Lo que se entrega es el permiso para entrar a la
+    // señalización y por dónde intentar conectarse.
+    const token = video.tokenDeSenal(t.salaNombre, "medico");
 
     if (t.estado === "creada") {
       t.estado = "en_curso";
@@ -139,7 +141,7 @@ module.exports = function (app) {
     }
     registrar({ req, medicoPhone, accion: "teleconsulta_entrar", recurso: `Teleconsulta:${t._id}` });
     res.json({
-      sala: t.salaNombre, url: sala.url, token,
+      sala: t.salaNombre, token, ice: video.iceServers(), hayTurn: video.hayTurn(),
       // Para que la pantalla sepa si ya puede grabar o todavía está esperando
       // que el paciente acepte.
       consentimiento: Boolean(t.consentimiento?.aceptado),
@@ -157,7 +159,6 @@ module.exports = function (app) {
     // La sala se borra después de responder: el médico no tiene por qué
     // esperar a un tercero para que se le cierre la pantalla.
     res.json({ ok: true });
-    video.borrarSala(t.salaNombre).catch(() => {});
   }));
 
   app.post("/medico/teleconsulta/:id/cancelar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
@@ -167,7 +168,6 @@ module.exports = function (app) {
     await t.save();
     registrar({ req, medicoPhone: req.adminUser.usuario, accion: "teleconsulta_cancelada", recurso: `Teleconsulta:${t._id}` });
     res.json({ ok: true });
-    video.borrarSala(t.salaNombre).catch(() => {});
   }));
 
   // ═══ LO PÚBLICO — acá entra el paciente, sin cuenta ═════════════════════
@@ -219,12 +219,8 @@ module.exports = function (app) {
     }
     if (!video.configurado()) throw new ErrorHttp(503, "La videollamada no está disponible en este momento");
 
-    const sala = await video.crearSala(t.salaNombre);
-    const token = await video.tokenDeEntrada(t.salaNombre, { esMedico: false, nombre: t.pacienteNombre || "Paciente" });
-    // La URL la da el proveedor al crear la sala. Que la arme el navegador
-    // significa que el navegador tiene que saber nuestro subdominio, y que
-    // el dia que cambie haya que tocar dos lados.
-    res.json({ sala: t.salaNombre, url: sala.url, token });
+    const token = video.tokenDeSenal(t.salaNombre, "paciente");
+    res.json({ sala: t.salaNombre, token, ice: video.iceServers(), hayTurn: video.hayTurn() });
   }));
 };
 

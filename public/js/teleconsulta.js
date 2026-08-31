@@ -119,29 +119,35 @@ async function pantallaSala(token, datos) {
     return;
   }
 
-  montarSalaDaily(sala, "Estás en la consulta. Esperá a que se conecte tu profesional.");
+  montarSala(sala, false);
 }
 
-// El iframe de Daily. Se usa el embebido del proveedor en vez de armar la
-// videollamada a mano: WebRTC hecho por nosotros necesita servidores TURN
-// propios, y una llamada que no conecta en un 4G de pueblo no es una función
-// a medias, es una consulta perdida.
-function montarSalaDaily(sala, leyenda) {
-  // La URL viene del servidor, que la recibió del proveedor al crear la
-  // sala. Armarla acá obligaría al navegador a conocer nuestro subdominio, y
-  // el día que cambie habría que acordarse de tocar dos lados.
-  if (!sala.url) {
-    app.innerHTML = tarjetaTele(`<div class="error">No pudimos abrir la sala de video.</div>`);
-    return;
-  }
-  const url = `${sala.url}?t=${encodeURIComponent(sala.token)}`;
+// Los dos <video> y el cartel de estado. La misma pantalla la usan el
+// paciente y el médico; lo único que cambia es qué dice arriba.
+function montarSala(sala, esMedico) {
   app.innerHTML = `
     <div style="max-width:900px;margin:0 auto">
-      <div class="hint" style="margin:12px 0">${esc(leyenda)}</div>
-      <div style="position:relative;padding-top:62%;border-radius:12px;overflow:hidden;background:#000">
-        <iframe src="${esc(url)}"
-          allow="camera; microphone; fullscreen; speaker; display-capture; autoplay"
-          style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
+      <div id="teleEstado" class="hint" style="margin:12px 0"></div>
+      <div style="position:relative;border-radius:12px;overflow:hidden;background:#000">
+        <video id="teleRemoto" playsinline autoplay style="width:100%;display:block;min-height:240px"></video>
+        <video id="teleLocal" playsinline autoplay muted
+          style="position:absolute;right:10px;bottom:10px;width:28%;max-width:160px;border-radius:8px;border:2px solid rgba(255,255,255,.7)"></video>
       </div>
+      <button class="secondary" id="teleColgar" style="margin-top:12px">${t("tele.colgar")}</button>
     </div>`;
+
+  const pintarEstado = (texto, malo) => {
+    const caja = document.getElementById("teleEstado");
+    if (caja) {
+      caja.textContent = texto;
+      caja.style.color = malo ? "var(--danger)" : "";
+    }
+  };
+
+  document.getElementById("teleColgar").onclick = () => {
+    rtcColgar();
+    app.innerHTML = tarjetaTele(`<div class="hint" style="font-size:15px">${t("tele.terminada")}</div>`);
+  };
+
+  rtcIniciar(sala, { idLocal: "teleLocal", idRemoto: "teleRemoto", alEstado: pintarEstado });
 }

@@ -64,12 +64,12 @@ app.use(helmet({
       workerSrc: ["'self'", "blob:"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"], // nadie puede embeber Vitalis en un iframe (clickjacking)
-      // La sala de la teleconsulta va en un iframe del proveedor de video
-      // (ver services/video.js). Es lo único que Vitalis embebe, y por eso
-      // la lista tiene un solo dominio en vez de un https: suelto: un
-      // frame-src abierto convierte cualquier XSS en una pantalla falsa de
-      // login dibujada adentro de la app.
-      frameSrc: ["'self'", "https://*.daily.co"],
+      // Sin frameSrc a propósito: la teleconsulta NO embebe a nadie. El
+      // video va directo entre los dos navegadores (ver services/video.js),
+      // así que no hay un iframe de un tercero que permitir. Se llegó a
+      // agregar uno cuando la llamada iba por un proveedor; al sacarlo, se
+      // saca también el permiso — una excepción de CSP que ya no se usa es
+      // de las que se quedan para siempre y nadie recuerda por qué.
     },
   },
 }));
@@ -179,6 +179,11 @@ app.get("/teleconsulta/:token", (_req, res) => res.sendFile(path.join(__dirname,
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 iniciarServidorTiempoReal(server);
+// Señalización de la teleconsulta: solo el arranque de la negociación entre
+// los dos navegadores. El audio y el video NO pasan por acá — ver el
+// encabezado de services/senalizacion.js.
+require("./services/senalizacion").iniciarSenalizacion(server);
+require("./services/video").avisarEstadoAlArrancar();
 server.listen(PORT, () => log.info(`🚀 Vitalis corriendo en puerto ${PORT}`));
 
 // Copias de seguridad automáticas. Va acá, después de levantar el servidor,

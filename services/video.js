@@ -1,105 +1,115 @@
-// Vitalis — La sala de video de una teleconsulta.
+// Vitalis — La videollamada, sin proveedor en el medio.
 //
-// El proveedor es Daily (api.daily.co), que ya está permitido en la CSP
-// porque Vapi lo usa por debajo para sus llamadas.
+// ═══ POR QUÉ NO HAY UN SERVICIO DE VIDEO ACÁ ═══════════════════════════════
 //
-// ═══ APAGADO POR DEFECTO ═══════════════════════════════════════════════════
+// Una teleconsulta son EXACTAMENTE DOS personas: el médico y el paciente. Y
+// para dos personas, WebRTC conecta los navegadores directo — el audio y el
+// video van de uno al otro sin pasar por ningún servidor.
 //
-// Sin DAILY_API_KEY no hay teleconsulta, y se dice claramente en vez de
-// fallar raro a mitad de una llamada. Es la misma idea que OPERADORES_SALDO
-// vacía: una instalación que no configuró esto no tiene la función, en vez
-// de tenerla a medias.
+// Eso no es una optimización de costos (aunque lo sea: no hay minutos que
+// pagar, nunca). Es que el video de un paciente contándole a su médico qué
+// le duele NO PASA POR NADIE MÁS. Un proveedor de video en el medio es una
+// copia de datos clínicos en una empresa que hay que auditar, en un país que
+// hay que mirar, con un contrato que hay que leer.
 //
-// ═══ POR QUÉ LA SALA SE CREA TARDE Y DURA POCO ═════════════════════════════
+// Lo que sí hace falta:
 //
-// La sala NO se crea cuando el médico genera el enlace, sino cuando alguien
-// está por entrar. Si se creara antes, cada enlace generado y nunca usado
-// dejaría una sala abierta en el proveedor — y una sala abierta es una sala
-// a la que alguien puede entrar.
+//   · STUN, para que cada navegador descubra su IP pública. Es un servicio
+//     mínimo y hay públicos gratis. No ve ni un byte del audio.
+//   · TURN, para el 10-20% de casos donde los dos extremos están detrás de
+//     NAT simétrico y no logran verse — típico de redes móviles, o sea de
+//     media Bolivia. Ahí el tráfico SÍ pasa por un relay, así que ese relay
+//     conviene que sea NUESTRO (coturn en la misma VM) y no de un tercero.
 //
-// Y expira sola. Una consulta que empezó a las 10 no tiene por qué seguir
-// teniendo una sala viva a las 6 de la tarde.
-const axios = require("axios");
+// Sin TURN la función igual anda, pero falla en esa fracción y falla feo:
+// la llamada "conecta" y no se escucha nada. Por eso se avisa al arrancar.
 const crypto = require("crypto");
+const { generarToken, verificarToken } = require("./auth");
 const { log } = require("../config");
 
-const API = "https://api.daily.co/v1";
-const CLAVE = process.env.DAILY_API_KEY || "";
-const HORAS_DE_VIDA = Number(process.env.TELECONSULTA_HORAS_SALA || 4);
+// Público de Google por defecto: solo sirve para descubrir la IP propia, no
+// ve tráfico. Se puede reemplazar por el propio con la variable de entorno.
+const STUN = (process.env.STUN_URLS || "stun:stun.l.google.com:19302")
+  .split(",").map(s => s.trim()).filter(Boolean);
 
+const TURN_URL = String(process.env.TURN_URL || "").trim();
+const TURN_SECRET = String(process.env.TURN_SECRET || "").trim();
+const TURN_USUARIO = String(process.env.TURN_USUARIO || "").trim();
+const TURN_CLAVE = String(process.env.TURN_CLAVE || "").trim();
+
+// Vitalis no necesita un proveedor para funcionar, así que esto es siempre
+// true. Queda como función porque las rutas ya preguntan, y porque el día
+// que haga falta un requisito nuevo se pone acá y no en cinco lugares.
 function configurado() {
-  return Boolean(CLAVE);
+  return true;
 }
 
-function cabeceras() {
-  return { Authorization: `Bearer ${CLAVE}`, "Content-Type": "application/json" };
+function hayTurn() {
+  return Boolean(TURN_URL && (TURN_SECRET || (TURN_USUARIO && TURN_CLAVE)));
 }
 
-// Crea la sala si no existe. Idempotente por el nombre: si dos personas
-// entran al mismo tiempo —el médico y el paciente, que es el caso normal—
-// la segunda llamada se encuentra con que ya existe y sigue de largo.
-async function crearSala(nombre) {
-  if (!configurado()) throw new Error("La teleconsulta no está configurada en este servidor");
-  const expira = Math.floor(Date.now() / 1000) + HORAS_DE_VIDA * 3600;
-  try {
-    const res = await axios.post(`${API}/rooms`, {
-      name: nombre,
-      privacy: "private", // sin token no se entra, ni sabiendo el nombre
-      properties: {
-        exp: expira,
-        eject_at_room_exp: true,
-        enable_chat: false,
-        // No se graba del lado del proveedor: el audio lo captura Vitalis
-        // en el navegador del médico, que es donde ya vive todo el circuito
-        // de transcripción. Una grabación en la nube de un tercero es otra
-        // copia de datos clínicos en un lugar más que auditar.
-        enable_recording: false,
-      },
-    }, { headers: cabeceras(), timeout: 15000 });
-    return res.data;
-  } catch (e) {
-    // 400 con "already exists" es el caso normal de dos personas entrando a
-    // la vez, no un error.
-    const msg = e.response?.data?.info || "";
-    if (e.response?.status === 400 && /already exists/i.test(msg)) {
-      const res = await axios.get(`${API}/rooms/${nombre}`, { headers: cabeceras(), timeout: 15000 });
-      return res.data;
-    }
-    log.error("[TELECONSULTA] no se pudo crear la sala:", msg || e.message);
-    throw new Error("No pudimos abrir la sala de video");
+// ═══ CREDENCIALES DE TURN, TEMPORALES ══════════════════════════════════════
+//
+// coturn admite credenciales derivadas de un secreto compartido y con
+// vencimiento (REST API / "long-term credentials"). Es lo que corresponde:
+// un usuario y contraseña fijos de TURN, puestos en el navegador de
+// cualquiera que abra una teleconsulta, es un relay abierto para el mundo —
+// y el ancho de banda lo pagás vos.
+function credencialTurn() {
+  if (!TURN_URL) return null;
+  if (!TURN_SECRET) {
+    // Usuario fijo: se acepta porque hay instalaciones que ya lo tienen así,
+    // pero es el modo flojo. Con TURN_SECRET, cada llamada recibe una
+    // credencial propia que vence en unas horas.
+    return { urls: TURN_URL, username: TURN_USUARIO, credential: TURN_CLAVE };
   }
+  const vence = Math.floor(Date.now() / 1000) + 4 * 3600;
+  const username = `${vence}:vitalis`;
+  const credential = crypto.createHmac("sha1", TURN_SECRET).update(username).digest("base64");
+  return { urls: TURN_URL, username, credential };
 }
 
-// El token de entrada. Es por PERSONA y por sala: el del médico lo hace
-// dueño de la reunión (puede expulsar, y la sala no arranca sin él); el del
-// paciente entra como invitado.
-async function tokenDeEntrada(sala, { esMedico, nombre }) {
-  if (!configurado()) throw new Error("La teleconsulta no está configurada en este servidor");
-  const res = await axios.post(`${API}/meeting-tokens`, {
-    properties: {
-      room_name: sala,
-      is_owner: Boolean(esMedico),
-      user_name: String(nombre || "").slice(0, 60),
-      exp: Math.floor(Date.now() / 1000) + HORAS_DE_VIDA * 3600,
-    },
-  }, { headers: cabeceras(), timeout: 15000 });
-  return res.data.token;
+// Lo que el navegador necesita para armar la conexión.
+function iceServers() {
+  const lista = [{ urls: STUN }];
+  const turn = credencialTurn();
+  if (turn) lista.push(turn);
+  return lista;
 }
 
-async function borrarSala(nombre) {
-  if (!configurado() || !nombre) return;
-  try {
-    await axios.delete(`${API}/rooms/${nombre}`, { headers: cabeceras(), timeout: 15000 });
-  } catch {
-    // Que no se pueda borrar no puede tumbar el cierre de una consulta: la
-    // sala expira sola igual (exp), así que esto es prolijidad, no seguridad.
-  }
+// ═══ EL TOKEN DE SEÑALIZACIÓN ══════════════════════════════════════════════
+//
+// No da acceso a datos: da derecho a entrar a UNA sala de señalización y
+// hablar con el otro extremo. Se firma con el mismo mecanismo que el resto
+// de Vitalis (HMAC con JWT_SECRET) para no inventar un segundo esquema de
+// firma que después nadie audita.
+//
+// Vive poco: es para entrar ahora, no para guardar.
+function tokenDeSenal(sala, rol) {
+  return generarToken(`sala:${sala}`, "senal", 4 * 3600 * 1000, { sala, papel: rol });
 }
 
-// Nombre irrepetible y que no dice nada de nadie. Un nombre de sala
-// adivinable —"consulta-juan-perez"— es un nombre por el que alguien entra.
+function verificarTokenDeSenal(token) {
+  const p = verificarToken(token);
+  if (!p || p.rol !== "senal" || !p.sala) return null;
+  return { sala: p.sala, papel: p.papel === "medico" ? "medico" : "paciente" };
+}
+
+// Nombre irrepetible y que no dice nada de nadie: un nombre adivinable
+// —"consulta-juan-perez"— es un nombre por el que alguien entra.
 function nombreDeSala() {
   return `vit-${crypto.randomBytes(12).toString("hex")}`;
 }
 
-module.exports = { configurado, crearSala, tokenDeEntrada, borrarSala, nombreDeSala, HORAS_DE_VIDA };
+function avisarEstadoAlArrancar() {
+  if (hayTurn()) {
+    log.info(`[TELECONSULTA] WebRTC directo, con TURN propio (${TURN_SECRET ? "credenciales temporales" : "usuario fijo"})`);
+  } else {
+    log.warn("[TELECONSULTA] WebRTC directo SIN TURN — las llamadas entre dos redes móviles pueden conectar y no escucharse. Configurá TURN_URL/TURN_SECRET.");
+  }
+}
+
+module.exports = {
+  configurado, hayTurn, iceServers, tokenDeSenal, verificarTokenDeSenal,
+  nombreDeSala, avisarEstadoAlArrancar,
+};
