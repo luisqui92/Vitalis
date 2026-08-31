@@ -132,9 +132,20 @@ function pintarConsultas(codigoConsultas, idioma) {
 // deliberado (ver personas.js), así que se descuenta antes de comparar —
 // mismo criterio que el selector de idioma en probar_auth.js.
 // Son dos: el aviso arriba del Kardex y el buscador del alta.
+//
+// Lo mismo con el de la teleconsulta (ver teleconsultaMedico.js): esta
+// prueba existe para atajar que el trabajo de i18n cambie el dibujo sin
+// querer, no para congelar el Kardex. Un elemento NUEVO y deliberado se
+// declara acá; lo que no se puede es que aparezca una diferencia que nadie
+// escribió a propósito.
+//
+// En el arnés la función no existe, así que el ternario deja una línea en
+// blanco: por eso se descuenta también ese hueco vacío.
 const sinBloquePersona = (html) => html
   .replace(/\n?\s*<div id="personaBox"><\/div>/g, "")
-  .replace(/\n?\s*<div id="personaAltaBox"><\/div>/g, "");
+  .replace(/\n?\s*<div id="personaAltaBox"><\/div>/g, "")
+  .replace(/\n?\s*<div id="teleMedBox"><\/div>/g, "")
+  .replace(/\n {4}(?=\n {4}<div class="tabs">)/g, "");
 
 let fallos = 0;
 function comparar(nombre, viejo, nuevoBruto) {

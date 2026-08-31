@@ -433,6 +433,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     <button class="back" id="btnBack">${t("kardex.volver")}</button>
     <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
     ${bloquePersonaHtml()}
+    ${typeof teleMedCajaHtml === "function" ? teleMedCajaHtml() : ""}
     <div class="tabs">
       ${Object.entries(tabsKardex).map(([key, t]) => `
         <button class="tab ${tabActiva === key ? "activo" : ""}" data-tab="${key}">
@@ -443,6 +444,9 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
+  // Aparte y sin await: si el proveedor de video tarda en contestar, la
+  // ficha del paciente tiene que estar en pantalla igual.
+  if (typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
   // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
   // igual. El bloque aparece cuando llega.
   cargarBloquePersona(p);
