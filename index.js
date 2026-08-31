@@ -64,6 +64,12 @@ app.use(helmet({
       workerSrc: ["'self'", "blob:"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"], // nadie puede embeber Vitalis en un iframe (clickjacking)
+      // La sala de la teleconsulta va en un iframe del proveedor de video
+      // (ver services/video.js). Es lo único que Vitalis embebe, y por eso
+      // la lista tiene un solo dominio en vez de un https: suelto: un
+      // frame-src abierto convierte cualquier XSS en una pantalla falsa de
+      // login dibujada adentro de la app.
+      frameSrc: ["'self'", "https://*.daily.co"],
     },
   },
 }));
@@ -121,6 +127,9 @@ require("./routes/operadorSaldo")(app);
 // El circuito de recarga visto por el médico: dónde pagar y avisar que pagó.
 // Avisar NO acredita — ver el encabezado del archivo.
 require("./routes/recargas")(app);
+// Telemedicina: la consulta por video. El paciente entra por un enlace que
+// vence, sin cuenta — ver el encabezado de routes/teleconsulta.js.
+require("./routes/teleconsulta")(app);
 
 // Los .br se generan una vez, en segundo plano, para no demorar el arranque.
 // Mientras no estén se sirven los originales: nada se rompe.
@@ -159,6 +168,9 @@ app.use(express.static(PUBLICO, {
 // con membrete en vez de la pantalla de login (ver public/js/informePublico.js).
 app.get(["/", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+// La sala del paciente: mismo frontend, el JS detecta la ruta (ver
+// public/js/teleconsulta.js) y muestra el consentimiento en vez del login.
+app.get("/teleconsulta/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
 // http.createServer (en vez del app.listen de siempre) porque el

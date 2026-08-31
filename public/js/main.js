@@ -8,6 +8,10 @@ if (TOKEN) btnAsistente.style.display = "inline-flex";
 // tiene login, no tiene menú, y hay que atenderla antes que nada.
 if (typeof esPaginaInformePublico === "function" && esPaginaInformePublico()) {
   renderInformePublico();
+} else if (typeof esPaginaTeleconsulta === "function" && esPaginaTeleconsulta()) {
+  // La sala del paciente (/teleconsulta/<token>): tampoco es la app. Va
+  // antes del login, porque quien la abre no tiene cuenta.
+  renderTeleconsulta();
 } else {
 
 aplicarTemaSegunEspecialidad();

@@ -1401,6 +1401,60 @@ const configPagoSchema = new mongoose.Schema({
 }, { timestamps: true });
 const ConfigPago = mongoose.model("ConfigPago", configPagoSchema);
 
+// ─── TELECONSULTA ──────────────────────────────────────────────────────────
+//
+// Una consulta por video. El paciente entra por un enlace que vence, sin
+// cuenta y sin contraseña — el mismo patrón del informe público, porque
+// pedirle a un paciente que se registre para una consulta es perder la
+// consulta.
+//
+// ═══ EL CONSENTIMIENTO ES LA LLAVE, NO UNA CASILLA ═════════════════════════
+//
+// Grabar a un paciente sin que lo autorice no es un problema de formulario:
+// esa grabación no sirve para nada. No es respaldo clínico, no es prueba, y
+// en Brasil (LGPD) y en Bolivia es directamente ilegal.
+//
+// Por eso el consentimiento no es un booleano que alguien consulta si se
+// acuerda: sin él NO SE EMITE el token de la sala. La puerta está cerrada
+// del lado del servidor, no atenuada del lado de la pantalla. Y se guarda
+// cuándo y desde qué IP, porque "dijo que sí" sin fecha no es un registro.
+//
+// Se guarda también el TEXTO exacto que el paciente aceptó. Si mañana
+// cambiamos la redacción, lo que hay que poder mostrar es lo que decía el
+// día que esa persona apretó el botón, no lo que dice hoy.
+const teleconsultaSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  pacienteNombre: { type: String, default: "" },
+
+  // El enlace del paciente. Corto de vida a propósito: un enlace de consulta
+  // que sirve tres meses es un enlace que alguien reenvía por WhatsApp y
+  // termina abriendo un tercero.
+  token: { type: String, required: true, unique: true, index: true },
+  tokenExpira: { type: Date, required: true },
+
+  estado: { type: String, enum: ["creada", "en_curso", "terminada", "cancelada"], default: "creada", index: true },
+
+  consentimiento: {
+    aceptado: { type: Boolean, default: false },
+    fecha: { type: Date, default: null },
+    ip: { type: String, default: "" },
+    // La versión del texto que se aceptó, no la de hoy.
+    texto: { type: String, default: "" },
+  },
+
+  // La sala del proveedor de video. El nombre se guarda para poder borrarla
+  // después; la URL se arma al vuelo.
+  salaNombre: { type: String, default: "" },
+  iniciadaEn: { type: Date, default: null },
+  terminadaEn: { type: Date, default: null },
+
+  // La consulta clínica que salió de esta llamada, cuando se grabó.
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+}, { timestamps: true });
+teleconsultaSchema.index({ medicoPhone: 1, createdAt: -1 });
+const Teleconsulta = mongoose.model("Teleconsulta", teleconsultaSchema);
+
 // Registro de auditoría: quién accedió/hizo qué y cuándo — clave para el
 // secreto médico (poder responder "quién vio la historia de este paciente")
 // y para detectar accesos anómalos. Se escribe siempre, nunca se edita.
@@ -1433,7 +1487,7 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
-module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
