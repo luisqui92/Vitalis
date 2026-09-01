@@ -122,7 +122,23 @@ fi
 paso "2. Respaldo"
 echo "¿Ya hiciste el respaldo desde Panel → Seguridad y verificaste que quedó?"
 read -r -p "Escribí SI para seguir: " RESPUESTA
-[ "$RESPUESTA" = "SI" ] || { rojo "Cancelado. Hacé el respaldo primero."; exit 1; }
+# ═══ POR QUÉ NO ALCANZA CON [ "$RESPUESTA" = "SI" ] ═════════════════════════
+#
+# El SSH del navegador de Google Cloud —que es por donde se despliega esto—
+# manda un retorno de carro con el Enter. O sea que "SI" llega como "SI\r" y
+# la comparación exacta fallaba SIEMPRE: el despliegue quedaba trabado acá,
+# diciendo "hacé el respaldo primero" a alguien que ya lo había hecho y
+# estaba escribiendo SI bien.
+#
+# Se limpia el \r y los espacios, y se aceptan las formas razonables de decir
+# que sí. Lo que NO se hace es aceptar cualquier tecla: la pregunta existe
+# para que alguien se detenga a pensar si hizo el respaldo, y un prompt que
+# se pasa con Enter no detiene a nadie.
+RESPUESTA="$(printf '%s' "$RESPUESTA" | tr -d '\r' | tr -d '[:space:]')"
+case "$RESPUESTA" in
+  SI|Si|si|sI|SÍ|Sí|sí|S|s) ;;
+  *) rojo "Cancelado. Hacé el respaldo primero."; exit 1 ;;
+esac
 ls -lh backups/ 2>/dev/null | tail -3 || echo "(no hay carpeta backups/ acá)"
 
 paso "3. Traer el código"
