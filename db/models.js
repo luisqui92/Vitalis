@@ -260,6 +260,29 @@ const consultaMedicaSchema = new mongoose.Schema({
   // fecha para no volver a aplicar lo mismo si entra de nuevo a la pantalla.
   confirmadaEn: { type: Date, default: null },
   notaEditadaPorMedico: { type: Boolean, default: false },
+  // Qué de las consultas anteriores se relaciona con ESTA. Es la pregunta
+  // que el brief clínico no puede hacer, porque el brief se escribe después
+  // de cada consulta y no sabe por qué viene el paciente hoy (ver el
+  // encabezado de services/hiloClinico.js).
+  //
+  // Cada conexión apunta a una consulta REAL y abrible: sin eso, un modelo
+  // puede escribir un antecedente verosímil que nunca pasó y nadie lo
+  // verificaría, porque suena bien y encaja.
+  //
+  // Si no hay conexiones, no se guarda nada. Una consulta con el hilo vacío
+  // y una sin hilo son lo mismo.
+  hiloClinico: {
+    conexiones: {
+      type: [{
+        consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica" },
+        queDijoEntonces: { type: String, default: "" },
+        porQueImporta: { type: String, default: "" },
+      }],
+      default: undefined,
+    },
+    preguntas: { type: [String], default: undefined },
+    generadoEn: { type: Date, default: null },
+  },
   notaClinica: {
     motivoConsulta: String,
     sintomas: [String],

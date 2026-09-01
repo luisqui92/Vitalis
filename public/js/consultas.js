@@ -6,6 +6,44 @@
 const ICONO_MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
 const ICONO_STOP = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="3"/></svg>`;
 
+// ─── EL HILO CON LAS CONSULTAS ANTERIORES ─────────────────────────────────
+//
+// Va ARRIBA de la nota de hoy, no debajo: es lo que conviene leer antes de
+// quedarse con el diagnóstico, no un apéndice que se mira si sobra tiempo.
+//
+// Si no hay conexiones no dibuja NADA — ni un título, ni un "sin hallazgos".
+// Un cartel que aparece siempre se deja de leer, y el día que dice algo
+// tampoco se lee (ver el encabezado de services/hiloClinico.js).
+function hiloClinicoHtml(c) {
+  const h = c?.hiloClinico;
+  if (!h?.conexiones?.length) return "";
+  return `
+    <div class="card card-secundaria" style="border-color:var(--warning)">
+      <div class="nota-titulo" style="margin-top:0">${t("hilo.titulo")}</div>
+      <div class="hint" style="margin:0 0 10px">${t("hilo.ayuda")}</div>
+      ${h.conexiones.map(x => `
+        <div class="nota-campo" style="margin-bottom:10px">
+          <div>${esc(x.queDijoEntonces)}</div>
+          <div class="hint" style="margin:2px 0 0">${esc(x.porQueImporta)}</div>
+          <button class="link" data-hilo="${esc(String(x.consultaId))}" style="width:auto;margin:2px 0 0">${t("hilo.verConsulta")}</button>
+        </div>`).join("")}
+      ${(h.preguntas || []).length ? `
+        <div class="nota-campo"><b>${t("hilo.preguntas")}</b>
+          <ul style="margin:4px 0 0;padding-left:18px">
+            ${h.preguntas.map(p => `<li>${esc(p)}</li>`).join("")}
+          </ul>
+        </div>` : ""}
+    </div>`;
+}
+
+// Abrir la consulta citada. Es lo que hace que el hilo sea verificable en vez
+// de una afirmación: el médico puede ir a leer qué decía de verdad.
+function engancharHiloClinico() {
+  document.querySelectorAll("[data-hilo]").forEach(b => {
+    b.onclick = () => renderDetalle(b.dataset.hilo);
+  });
+}
+
 // ─── NUEVA CONSULTA (grabar con el logo de Vitalis latiendo, o subir archivo) ──
 function renderNuevaConsulta(pacienteId, pacienteNombre) {
   detenerPolling();
@@ -379,11 +417,13 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         <div class="nombre" style="font-size:16px;font-weight:600">${esc(c.pacienteNombre || t("consulta.sinNombre"))}</div>
         <div class="fecha">${new Date(c.createdAt).toLocaleString(localeActual())}${c.duracionSegundos ? " · " + Math.round(c.duracionSegundos/60) + t("consulta.min") : ""}</div>
       </div>
+      ${hiloClinicoHtml(c)}
       ${notaHtml}
       ${confirmarHtml}
       <div style="margin-top:14px">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
+    engancharHiloClinico();
 
     // ── medicamentos: quitar / agregar filas en la nota editable ──
     const medsBox = document.getElementById("nfMeds");

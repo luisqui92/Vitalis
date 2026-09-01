@@ -10,6 +10,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("../services/assemblyai");
 const { generarNotaClinica } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
+const { generarHilo } = require("../services/hiloClinico");
 const { enviarTexto } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { registrar } = require("../services/auditoria");
@@ -271,6 +272,14 @@ module.exports = function (app) {
 
         if (consulta.notaClinicaEstado === "completado") {
           regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
+          // El hilo con las consultas anteriores. Va acá y no antes porque
+          // necesita la nota de HOY ya escrita: la pregunta es "dado este
+          // motivo, ¿qué del historial se relaciona?", y sin motivo no hay
+          // pregunta.
+          //
+          // Sin await y con catch: es un extra. Si falla, la consulta y su
+          // nota clínica quedan intactas, que es lo que importa.
+          generarHilo(consulta._id).catch(e => log.error("[HILO_CLINICO]", e.message));
         }
       })
       .catch(async (e) => {
