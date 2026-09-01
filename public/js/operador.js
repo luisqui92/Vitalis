@@ -219,7 +219,7 @@ async function buscarParaAcreditar(q) {
         +${esc(m.phone)}${m.tipoEspecialidad ? ` · ${esc(m.tipoEspecialidad)}` : ""}
         ${m.activo ? "" : ` · ${t("op.inactiva")}`}
       </div>
-      <div class="paciente-info" style="font-weight:600">${t("saldo.monto", { monto: esc(m.saldoBs) })}</div>
+      <div class="paciente-info" style="font-weight:600">${esc(m.simbolo || "Bs")} ${esc(m.saldoBs)}</div>
     </div>`).join("");
 
   destino.querySelectorAll("[data-op]").forEach(el => {
@@ -247,7 +247,7 @@ async function abrirFichaOperador(phone) {
       <div style="font-weight:600;font-size:15px">${esc(d.medico.nombre)}</div>
       <div class="hint" style="margin:2px 0 0">+${esc(d.medico.phone)}</div>
       <div class="saldo-monto" style="color:${d.enNegativo ? "var(--danger)" : "var(--primary)"};font-size:24px">
-        ${t("saldo.monto", { monto: esc(d.saldoBs) })}
+        ${esc(d.simbolo || "Bs")} ${esc(d.saldoBs)}
       </div>
       <div class="hint" style="margin:0 0 12px">${t("saldo.alcanzaPara", { n: d.consultasRestantes })}</div>
 
@@ -283,7 +283,11 @@ async function acreditar(igual) {
   // La confirmación dice el NOMBRE, no el teléfono. Acreditarle a la cuenta
   // equivocada es el error caro de esta pantalla, y un número mal elegido no
   // se nota releyéndolo — un nombre sí.
-  if (!confirm(t("op.confirmar", { monto: bolivianos.toFixed(2), nombre: OPERADOR_ELEGIDO.nombre }))) return;
+  const simbolo = OPERADOR_ELEGIDO.simbolo || "Bs";
+  // La confirmación es la última pantalla antes de crear dinero: tiene que
+  // decir el nombre Y la moneda. "¿Acreditar 200 a María?" no alcanza cuando
+  // hay médicos que cobran en dos monedas distintas.
+  if (!confirm(t("op.confirmar", { monto: `${simbolo} ${bolivianos.toFixed(2)}`, nombre: OPERADOR_ELEGIDO.nombre }))) return;
 
   btn.disabled = true;
   try {
@@ -292,7 +296,7 @@ async function acreditar(igual) {
       body: JSON.stringify({ phone: OPERADOR_ELEGIDO.phone, bolivianos, referencia, igual }),
     });
     err.innerHTML = `<div class="hint" style="color:var(--success);font-weight:600">
-      ${t("op.acreditado", { monto: bolivianos.toFixed(2), saldo: r.saldoBs })}</div>`;
+      ${t("op.acreditado", { monto: `${simbolo} ${bolivianos.toFixed(2)}`, saldo: `${r.simbolo || simbolo} ${r.saldoBs}` })}</div>`;
     setTimeout(() => abrirFichaOperador(OPERADOR_ELEGIDO.phone), 1200);
   } catch (e) {
     btn.disabled = false;
@@ -338,15 +342,15 @@ async function pintarColaSolicitudes() {
       <div style="font-weight:600">${t("op.colaTitulo", { n: d.pendientes })}</div>
     </div>
     ${d.solicitudes.map(s => `
-      <div class="card card-secundaria op-solicitud" data-sol="${esc(s._id)}">
+      <div class="card card-secundaria op-solicitud" data-sol="${esc(s._id)}" data-simbolo="${esc(s.simbolo || "Bs")}">
         <div style="font-weight:600">${esc(s.medicoNombre || s.medicoPhone)}</div>
         <div class="hint" style="margin:2px 0 0">
           +${esc(s.medicoPhone)} · ${new Date(s.createdAt).toLocaleString(localeActual(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </div>
-        <div class="saldo-monto" style="font-size:22px">${t("saldo.monto", { monto: esc(s.montoBs) })}</div>
+        <div class="saldo-monto" style="font-size:22px">${esc(s.simbolo || "Bs")} ${esc(s.montoBs)}</div>
         <div class="hint" style="margin:0">${t("recarga.referencia")}: <b>${esc(s.referencia)}</b></div>
         <div class="hint" style="margin:4px 0 0;${s.saldo.enNegativo ? "color:var(--danger);font-weight:600" : ""}">
-          ${t("op.saldoActual", { monto: esc(s.saldo.saldoBs) })}${s.saldo.enNegativo ? ` — ${t("op.enNegativo")}` : ""}
+          ${t("op.saldoActual", { monto: `${esc(s.saldo.simbolo || "Bs")} ${esc(s.saldo.saldoBs)}` })}${s.saldo.enNegativo ? ` — ${t("op.enNegativo")}` : ""}
         </div>
 
         <label>${t("op.montoReal")}</label>
@@ -365,9 +369,11 @@ async function pintarColaSolicitudes() {
       const id = btn.dataset.aprobar;
       const monto = Number(document.querySelector(`[data-monto="${id}"]`).value);
       const nombre = btn.closest(".op-solicitud").querySelector("div").textContent.trim();
+      const simbolo = btn.closest(".op-solicitud").dataset.simbolo || "Bs";
       // La confirmación dice el monto QUE SE VA A ACREDITAR, que puede no ser
-      // el que el médico declaró — es justo el número que hay que releer.
-      if (!confirm(t("op.confirmarAprobar", { monto: monto.toFixed(2), nombre }))) return;
+      // el que el médico declaró — es justo el número que hay que releer. Y
+      // con su moneda: la cola mezcla médicos que cobran en Bs y en R$.
+      if (!confirm(t("op.confirmarAprobar", { monto: `${simbolo} ${monto.toFixed(2)}`, nombre }))) return;
       btn.disabled = true;
       try {
         await api(`/medico/operador/solicitudes/${id}/aprobar`, {
@@ -420,19 +426,22 @@ async function pintarResumenPagos() {
 
   caja.innerHTML = `
     <div class="escr-stats" style="margin-bottom:12px">
-      ${escrStatCardHtml(`Bs ${d.cargasHoy.bs}`, t("op.res.hoy"))}
-      ${escrStatCardHtml(`Bs ${d.cargasMes.bs}`, t("op.res.mes"))}
-      ${escrStatCardHtml(`Bs ${d.consumoMes.bs}`, t("op.res.consumo"))}
+      ${(d.cargasHoy || []).map(c => escrStatCardHtml(`${c.simbolo} ${c.monto}`, t("op.res.hoy"))).join("") || escrStatCardHtml("—", t("op.res.hoy"))}
+      ${(d.cargasMes || []).map(c => escrStatCardHtml(`${c.simbolo} ${c.monto}`, t("op.res.mes"))).join("") || escrStatCardHtml("—", t("op.res.mes"))}
+      ${(d.consumoMes || []).map(c => escrStatCardHtml(`${c.simbolo} ${c.monto}`, t("op.res.consumo"))).join("") || escrStatCardHtml("—", t("op.res.consumo"))}
       ${escrStatCardHtml(d.cargasMes.n, t("op.res.recargas"))}
     </div>
 
     ${d.enNegativo.length ? `
       <div class="saldo-aviso saldo-aviso-grave" style="margin:0 0 12px">
-        <div style="font-weight:600">${t("op.res.deuda", { monto: esc(d.deudaTotalBs), n: d.enNegativo.length })}</div>
+        <div style="font-weight:600">${t("op.res.deuda", {
+          monto: (d.deudaTotal || []).map(x => `${x.simbolo} ${x.monto}`).join(" + ") || "—",
+          n: d.enNegativo.length,
+        })}</div>
         <div class="hint" style="margin:6px 0 0">${t("op.res.deudaAyuda")}</div>
         ${d.enNegativo.map(m => `
           <div class="recarga-fila">
-            <span>${esc(m.nombre)}</span><b>Bs ${esc(m.saldoBs)}</b>
+            <span>${esc(m.nombre)}</span><b>${esc(m.simbolo || "Bs")} ${esc(m.saldoBs)}</b>
           </div>`).join("")}
       </div>` : ""}
 
@@ -450,7 +459,7 @@ async function pintarResumenPagos() {
                 <tr>
                   <td style="white-space:nowrap">${new Date(c.createdAt).toLocaleDateString(localeActual(), { day: "2-digit", month: "2-digit" })}</td>
                   <td>${esc(c.nombre)}</td>
-                  <td class="num">${esc(c.montoBs)}</td>
+                  <td class="num">${esc(c.simbolo || "Bs")} ${esc(c.montoBs)}</td>
                   <td>
                     ${esc(c.referencia || "—")}
                     <div class="hint" style="margin:0">${t("op.res.por", { quien: esc(c.acreditadoPor || "—") })}</div>

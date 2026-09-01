@@ -36,6 +36,7 @@ const { registrar } = require("../services/auditoria");
 const { esOperador } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
+const monedas = require("../services/monedas");
 const { datosDePago, guardarDatosDePago, normalizarPais } = require("../services/datosPago");
 const { log } = require("../config");
 
@@ -125,7 +126,7 @@ module.exports = function (app) {
 
     const porNombre = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     const medicos = await Medico.find({ $or: [{ phone: porNombre }, { nombre: porNombre }] })
-      .select("phone nombre tipoEspecialidad saldoCentavos activo")
+      .select("phone nombre tipoEspecialidad saldoCentavos activo moneda")
       .limit(15)
       .lean();
 
@@ -135,6 +136,11 @@ module.exports = function (app) {
         tipoEspecialidad: m.tipoEspecialidad || "",
         activo: m.activo !== false,
         saldoCentavos: m.saldoCentavos || 0,
+        // El operador ve las dos monedas en la misma lista, así que cada
+        // médico tiene que decir la suya. Sin esto, "200" al lado de un
+        // nombre es un número sin unidad en una pantalla de plata.
+        moneda: monedas.normalizar(m.moneda),
+        simbolo: monedas.config(m.moneda).simbolo,
         saldoBs: saldos.bolivianos(m.saldoCentavos || 0),
       })),
     });
@@ -143,7 +149,7 @@ module.exports = function (app) {
   // ─── VER UNA CUENTA ANTES DE ACREDITARLE ───────────────────────────────
   app.get("/medico/operador/cuenta/:phone", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const phone = String(req.params.phone).trim();
-    const medico = await Medico.findOne({ phone }).select("phone nombre tipoEspecialidad activo").lean();
+    const medico = await Medico.findOne({ phone }).select("phone nombre tipoEspecialidad activo moneda").lean();
     if (!medico) throw new ErrorHttp(404, "No hay ninguna cuenta con ese teléfono");
     const [estado, movimientos] = await Promise.all([
       saldos.estadoDe(phone),
@@ -188,21 +194,35 @@ module.exports = function (app) {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     const mes = new Date(); mes.setDate(1); mes.setHours(0, 0, 0, 0);
 
-    const sumar = async (filtro) => {
+    // ═══ SE AGRUPA POR MONEDA, Y NO ES UN DETALLE DE PRESENTACIÓN ═════════
+    //
+    // Antes esto sumaba TODOS los movimientos en un solo número y lo mostraba
+    // como "Bs". Con un solo médico brasileño en la base, esa cifra ya era
+    // falsa: bolivianos y reales sumados como si fueran lo mismo.
+    //
+    // Y falla en silencio, que es lo peor: nadie mira un total y sospecha.
+    // Por eso ahora no hay un total: hay uno por moneda, y no existe forma de
+    // pedir la suma de las dos.
+    const sumarPorMoneda = async (filtro) => {
       const filas = await MovimientoSaldo.aggregate([
         { $match: filtro },
-        { $group: { _id: null, total: { $sum: "$montoCentavos" }, n: { $sum: 1 } } },
+        { $group: { _id: "$moneda", total: { $sum: "$montoCentavos" }, n: { $sum: 1 } } },
       ]);
-      return { centavos: filas[0]?.total || 0, n: filas[0]?.n || 0 };
+      return filas.map(f => ({
+        moneda: monedas.normalizar(f._id),
+        simbolo: monedas.config(f._id).simbolo,
+        centavos: f.total, n: f.n,
+        monto: monedas.monto(f.total),
+      }));
     };
 
     const [cargasHoy, cargasMes, consumoMes, pendientes, ultimasCargas] = await Promise.all([
-      sumar({ tipo: "carga", createdAt: { $gte: hoy } }),
-      sumar({ tipo: "carga", createdAt: { $gte: mes } }),
-      sumar({ tipo: "consumo", createdAt: { $gte: mes } }),
+      sumarPorMoneda({ tipo: "carga", createdAt: { $gte: hoy } }),
+      sumarPorMoneda({ tipo: "carga", createdAt: { $gte: mes } }),
+      sumarPorMoneda({ tipo: "consumo", createdAt: { $gte: mes } }),
       SolicitudRecarga.countDocuments({ estado: "pendiente" }),
       MovimientoSaldo.find({ tipo: "carga" })
-        .select("medicoPhone montoCentavos referencia acreditadoPor createdAt")
+        .select("medicoPhone montoCentavos moneda referencia acreditadoPor createdAt")
         .sort({ createdAt: -1 }).limit(25).lean(),
     ]);
 
@@ -210,7 +230,7 @@ module.exports = function (app) {
     // y le deben a la casa. Es el número que dice si el modelo prepago está
     // funcionando o se está convirtiendo en fiado.
     const enNegativo = await Medico.find({ saldoCentavos: { $lt: 0 } })
-      .select("phone nombre saldoCentavos").sort({ saldoCentavos: 1 }).limit(20).lean();
+      .select("phone nombre saldoCentavos moneda").sort({ saldoCentavos: 1 }).limit(20).lean();
 
     // El nombre de cada médico para las últimas cargas, en una sola consulta.
     const telefonos = [...new Set(ultimasCargas.map(c => c.medicoPhone))];
@@ -219,19 +239,33 @@ module.exports = function (app) {
         .map(m => [m.phone, m.nombre])
     );
 
+    // La deuda también por moneda: sumar lo que deben unos en Bs con lo que
+    // deben otros en R$ da un número que no significa nada.
+    const deudaPorMoneda = {};
+    for (const m of enNegativo) {
+      const cod = monedas.normalizar(m.moneda);
+      deudaPorMoneda[cod] = (deudaPorMoneda[cod] || 0) - m.saldoCentavos;
+    }
+
     res.json({
       pendientes,
-      cargasHoy: { ...cargasHoy, bs: saldos.bolivianos(cargasHoy.centavos) },
-      cargasMes: { ...cargasMes, bs: saldos.bolivianos(cargasMes.centavos) },
+      cargasHoy, cargasMes,
       // El consumo viene negativo en el libro (es una resta). Se da vuelta
-      // para mostrarlo, porque "consumido: Bs -480" se lee como un error.
-      consumoMes: { n: consumoMes.n, bs: saldos.bolivianos(-consumoMes.centavos) },
+      // para mostrarlo, porque "consumido: -480" se lee como un error.
+      consumoMes: consumoMes.map(c => ({ ...c, centavos: -c.centavos, monto: monedas.monto(-c.centavos) })),
       enNegativo: enNegativo.map(m => ({
-        phone: m.phone, nombre: m.nombre, saldoBs: saldos.bolivianos(m.saldoCentavos),
+        phone: m.phone, nombre: m.nombre,
+        moneda: monedas.normalizar(m.moneda),
+        simbolo: monedas.config(m.moneda).simbolo,
+        saldoBs: saldos.bolivianos(m.saldoCentavos),
       })),
-      deudaTotalBs: saldos.bolivianos(-enNegativo.reduce((a, m) => a + m.saldoCentavos, 0)),
+      deudaTotal: Object.entries(deudaPorMoneda).map(([moneda, centavos]) => ({
+        moneda, simbolo: monedas.config(moneda).simbolo, monto: monedas.monto(centavos),
+      })),
       ultimasCargas: ultimasCargas.map(c => ({
         ...c, nombre: nombres[c.medicoPhone] || c.medicoPhone,
+        moneda: monedas.normalizar(c.moneda),
+        simbolo: monedas.config(c.moneda).simbolo,
         montoBs: saldos.bolivianos(c.montoCentavos),
       })),
     });
@@ -249,11 +283,18 @@ module.exports = function (app) {
 
     // El saldo actual de cada uno, para que el operador vea de una si el
     // médico está trabajando en negativo y conviene apurarse.
-    const conSaldo = await Promise.all(solicitudes.map(async (s) => ({
-      ...s,
-      montoBs: saldos.bolivianos(s.montoCentavos),
-      saldo: await saldos.estadoDe(s.medicoPhone),
-    })));
+    const conSaldo = await Promise.all(solicitudes.map(async (s) => {
+      const estado = await saldos.estadoDe(s.medicoPhone);
+      return {
+        ...s,
+        montoBs: saldos.bolivianos(s.montoCentavos),
+        // El símbolo sale del ESTADO del médico, o sea de su moneda: el
+        // operador ve las dos en la misma cola y "200" sin unidad, en una
+        // pantalla donde se aprueba plata, es una invitación al error.
+        simbolo: estado.simbolo,
+        saldo: estado,
+      };
+    }));
 
     res.json({
       estado, solicitudes: conSaldo,
@@ -375,10 +416,16 @@ module.exports = function (app) {
     // Un techo por operación. No protege de un operador deshonesto —puede
     // hacer varias— pero sí de un dedo que se resbala en el teclado numérico
     // y convierte Bs 200 en Bs 200000.
-    if (bolivianos > 5000) throw new ErrorHttp(400, "Más de Bs 5.000 en una sola carga: si es correcto, hacelo desde el servidor.");
-
-    const medico = await Medico.findOne({ phone: destino }).select("nombre").lean();
+    const medico = await Medico.findOne({ phone: destino }).select("nombre moneda").lean();
     if (!medico) throw new ErrorHttp(404, "No hay ninguna cuenta con ese teléfono");
+
+    // El techo es el de SU moneda, y el mensaje lo dice con su símbolo: a un
+    // médico brasileño no se le habla de bolivianos.
+    const moneda = monedas.normalizar(medico.moneda);
+    const cfg = monedas.config(moneda);
+    if (Math.round(bolivianos * 100) > cfg.techoPorCarga) {
+      throw new ErrorHttp(400, `Más de ${monedas.conSimbolo(cfg.techoPorCarga, moneda)} en una sola carga: si es correcto, hacelo desde el servidor.`);
+    }
 
     try {
       const mov = await saldos.cargar({
@@ -392,7 +439,9 @@ module.exports = function (app) {
       });
       registrar({
         req, medicoPhone: req.adminUser.usuario, accion: "acreditar_saldo",
-        recurso: `Medico:${destino} Bs${bolivianos} ref:${referencia}`,
+        // Con la moneda: "Medico:X 200 ref:Y" en un registro de auditoría de
+        // plata no dice si entraron bolivianos o reales.
+        recurso: `Medico:${destino} ${monedas.conSimbolo(Math.round(bolivianos * 100), moneda)} ref:${referencia}`,
       });
       const estado = await saldos.estadoDe(destino);
       res.json({ ok: true, movimiento: { _id: mov._id, concepto: mov.concepto }, ...estado });

@@ -301,11 +301,16 @@ async function main() {
   console.log("\n── 12. El panel de pagos ──");
   const resumen = await GET("/medico/operador/resumen", tk.operador);
   verificar("el operador ve el resumen", resumen.estado === 200);
-  verificar("  ...con lo que entró este mes", typeof resumen.cuerpo?.cargasMes?.bs === "string");
-  verificar("  ...y cuántas recargas fueron", resumen.cuerpo?.cargasMes?.n > 0);
+  // Es una LISTA por moneda, no un total: ver la sección 16 sobre por qué
+  // sumar bolivianos con reales da una cifra falsa que nadie mira con
+  // sospecha.
+  verificar("  ...con lo que entró este mes, por moneda",
+    Array.isArray(resumen.cuerpo?.cargasMes) && typeof resumen.cuerpo.cargasMes[0]?.monto === "string");
+  verificar("  ...y cuántas recargas fueron", resumen.cuerpo?.cargasMes?.[0]?.n > 0);
   // El consumo se guarda en negativo (es una resta); mostrarlo así se lee
   // como un error, por eso se da vuelta.
-  verificar("el consumo se muestra en positivo", !String(resumen.cuerpo?.consumoMes?.bs).startsWith("-"));
+  verificar("el consumo se muestra en positivo",
+    (resumen.cuerpo?.consumoMes || []).every(c => !String(c.monto).startsWith("-")));
   verificar("las últimas cargas traen el nombre del médico, no solo el teléfono",
     resumen.cuerpo?.ultimasCargas?.every(c => c.nombre && c.nombre !== c.medicoPhone));
   verificar("  ...y quién las acreditó", resumen.cuerpo?.ultimasCargas?.[0]?.acreditadoPor === "70000001");
@@ -316,7 +321,8 @@ async function main() {
   await Medico.updateOne({ phone: "70000003" }, { $set: { saldoCentavos: -3600 } });
   const conDeuda = await GET("/medico/operador/resumen", tk.operador);
   verificar("aparece quién está en negativo", conDeuda.cuerpo?.enNegativo?.some(m => m.phone === "70000003"));
-  verificar("  ...y la deuda total se muestra en positivo", conDeuda.cuerpo?.deudaTotalBs === "36.00");
+  verificar("  ...y la deuda se muestra en positivo y por moneda",
+    conDeuda.cuerpo?.deudaTotal?.some(d => d.moneda === "BOB" && d.monto === "36.00"));
 
   console.log("\n── 13. Dónde nos pagan, editable sin SSH ──");
   const PUT = (ruta, token, cuerpo) => pedir(puerto, "PUT", ruta, token, cuerpo);
@@ -349,6 +355,38 @@ async function main() {
   await PUT("/medico/operador/datos-pago", tk.operador, { banco: "Otro banco", cuenta: "999" });
   verificar("editar de nuevo no duplica la configuración",
     await ConfigPago.countDocuments({ clave: "unico" }) === 1);
+
+  console.log("\n── 16. Bolivianos y reales no se suman ──");
+  // El bug que esto ataja no da error: da un número. El panel sumaba TODOS
+  // los movimientos y lo mostraba como "Bs", así que con un solo médico
+  // brasileño la cifra del mes ya era falsa — y una cifra falsa en un panel
+  // de plata no se nota nunca, porque nadie mira un total y sospecha.
+  await Medico.updateOne({ phone: "79999998" }, { $set: { moneda: "BRL", dosFA: con2fa } });
+  await Medico.updateOne({ phone: "79999999" }, { $set: { moneda: "BOB" } });
+
+  const cargaBr = await acreditar(tk.operador, { phone: "79999998", bolivianos: 300, referencia: "PIX BR 1" });
+  verificar("se puede acreditar a un médico que cobra en reales", cargaBr.estado === 200);
+
+  const movBr = await MovimientoSaldo.findOne({ referenciaClave: "PIX BR 1" }).lean();
+  verificar("  ...y el movimiento queda anotado en BRL", movBr?.moneda === "BRL");
+  const movBo = await MovimientoSaldo.findOne({ referenciaClave: "QR BCP 1111" }).lean();
+  verificar("  ...mientras el boliviano sigue en BOB", movBo?.moneda === "BOB");
+
+  const resumen2 = await GET("/medico/operador/resumen", tk.operador);
+  const porMoneda = Object.fromEntries((resumen2.cuerpo?.cargasMes || []).map(c => [c.moneda, c]));
+  verificar("el resumen separa las dos monedas", Boolean(porMoneda.BOB && porMoneda.BRL));
+  verificar("  ...y NO existe un total que las mezcle",
+    resumen2.cuerpo?.cargasMes?.length === 2 && !("bs" in (resumen2.cuerpo.cargasMes[0] || {})));
+  verificar("  ...cada una con su símbolo",
+    porMoneda.BOB?.simbolo === "Bs" && porMoneda.BRL?.simbolo === "R$");
+  verificar("  ...y los reales no se contaron entre los bolivianos",
+    Number(porMoneda.BRL.monto) === 300);
+
+  // Que la búsqueda diga la moneda importa: el operador ve las dos en la
+  // misma lista, y "200" sin unidad al lado de un nombre es un error esperando.
+  const busca2 = await GET("/medico/operador/buscar?q=Brasil", tk.operador);
+  verificar("la búsqueda dice en qué moneda cobra cada médico",
+    busca2.cuerpo?.medicos?.[0]?.simbolo === "R$");
 
   console.log("\n── 15. Cada país cobra en su cuenta, y no se mezclan ──");
   // El error que esto previene no es cosmético. Un médico brasileño que ve

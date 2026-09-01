@@ -57,6 +57,12 @@ const medicoSchema = new mongoose.Schema({
   // Vitalis desplegado en Brasil puede atender a un médico que escribe en
   // español, y al revés.
   idioma: { type: String, enum: ["es", "pt"], default: "es" },
+  // En qué moneda cobra esta cuenta. NO se deduce del idioma: si se dedujera,
+  // un médico boliviano que cambia la interfaz a portugués vería su saldo en
+  // Bs escrito como reales, y su próxima recarga quedaría registrada en la
+  // moneda equivocada, en el libro mayor, para siempre. Una preferencia de
+  // pantalla no decide qué es el dinero (ver services/monedas.js).
+  moneda: { type: String, enum: ["BOB", "BRL"], default: "BOB" },
 
   // ─── Clínica (opcional: un médico solo no tiene ninguna) ───────────────
   clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", default: null, index: true },
@@ -1312,6 +1318,10 @@ const movimientoSaldoSchema = new mongoose.Schema({
   // De una carga: quién la acreditó y contra qué comprobante. Sin esto, una
   // carga es plata que apareció de la nada.
   acreditadoPor: { type: String, default: "" },
+  // Un asiento que dice "200" y no dice de qué, no es un hecho: es un número.
+  // Se guarda acá y no se va a preguntar a la cuenta, porque la cuenta dice
+  // cómo está configurada HOY y el libro tiene que decir qué pasó ESE DÍA.
+  moneda: { type: String, enum: ["BOB", "BRL"], default: "BOB", index: true },
   referencia: { type: String, default: "" },
   // La referencia normalizada (mayúsculas, sin espacios de más), que es sobre
   // la que actúa el índice único de abajo. Se guarda aparte para que la

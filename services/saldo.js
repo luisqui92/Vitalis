@@ -34,12 +34,16 @@
 // Medico.saldoCentavos es una copia rápida. Si alguna vez no coincide con la
 // suma de los movimientos, gana la suma — ver reconciliar().
 const { Medico, MovimientoSaldo } = require("../db/models");
+const monedas = require("./monedas");
 const { log } = require("../config");
 
 // En centavos de boliviano. Configurable por entorno porque el precio va a
 // cambiar, y cuando cambie no se pueden retocar los cobros ya hechos: cada
 // movimiento guarda el monto que se cobró ese día.
-const PRECIO_CONSULTA = Number(process.env.PRECIO_CONSULTA_CENTAVOS || 1200);
+// Los valores de la moneda por defecto. Se mantienen exportados porque hay
+// pantallas y pruebas que los piden, pero adentro de este archivo TODO se
+// resuelve por la moneda del médico: ver monedas.config().
+const PRECIO_CONSULTA = monedas.config("BOB").precioConsulta;
 // Hasta dónde se deja llegar el saldo negativo. Cinco consultas de margen:
 // suficiente para que nadie quede a mitad de una jornada sin poder trabajar,
 // poco para que no sea un servicio gratis.
@@ -48,31 +52,43 @@ const LIMITE_NEGATIVO = -5 * PRECIO_CONSULTA;
 const AVISAR_DESDE = 5;
 // Recarga mínima. Es una regla comercial —no tiene sentido procesar a mano
 // una transferencia de Bs 20— pero NO es un bloqueo absoluto: ver cargar().
-const RECARGA_MINIMA = Number(process.env.RECARGA_MINIMA_CENTAVOS || 10000);
+const RECARGA_MINIMA = monedas.config("BOB").recargaMinima;
 
 function bolivianos(centavos) {
   return (centavos / 100).toFixed(2);
 }
 
 // ─── LECTURA ──────────────────────────────────────────────────────────────
+
+// La moneda de una cuenta, en un solo lugar. Si mañana deja de vivir en
+// Medico.moneda, se cambia acá y no en ocho consultas repartidas.
+async function monedaDe(medicoPhone) {
+  const m = await Medico.findOne({ phone: medicoPhone }).select("moneda").lean();
+  return monedas.normalizar(m?.moneda);
+}
+
 async function estadoDe(medicoPhone) {
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda").lean();
   const saldoCentavos = medico?.saldoCentavos || 0;
+  const moneda = monedas.normalizar(medico?.moneda);
+  const cfg = monedas.config(moneda);
   // Se redondea para abajo: si le quedan Bs 18 y cada consulta son 12, le
   // queda UNA, no una y media. Decirle 1.5 sería mentirle.
-  const consultasRestantes = Math.max(0, Math.floor(saldoCentavos / PRECIO_CONSULTA));
+  const consultasRestantes = Math.max(0, Math.floor(saldoCentavos / cfg.precioConsulta));
+  const limiteNegativo = -5 * cfg.precioConsulta;
   return {
     saldoCentavos,
+    moneda, simbolo: cfg.simbolo,
     saldoBs: bolivianos(saldoCentavos),
-    precioConsultaCentavos: PRECIO_CONSULTA,
+    precioConsultaCentavos: cfg.precioConsulta,
     consultasRestantes,
     enNegativo: saldoCentavos < 0,
     // "Bajo" incluye el negativo, no solo el que está por acabarse.
     bajo: consultasRestantes <= AVISAR_DESDE,
     // Si ya no puede ni empezar otra consulta.
-    bloqueado: saldoCentavos <= LIMITE_NEGATIVO,
-    limiteNegativoCentavos: LIMITE_NEGATIVO,
-    recargaMinimaCentavos: RECARGA_MINIMA,
+    bloqueado: saldoCentavos <= limiteNegativo,
+    limiteNegativoCentavos: limiteNegativo,
+    recargaMinimaCentavos: cfg.recargaMinima,
   };
 }
 
@@ -102,14 +118,18 @@ async function movimientosDe(medicoPhone, limite = 50) {
 // actualizar. Eso lo detecta y lo arregla reconciliar(), y es el lado seguro
 // para fallar: el libro dice que se cobró y la copia se pone al día. Al revés
 // —plata descontada sin registro— no hay cómo reconstruirlo.
-async function aplicar({ medicoPhone, tipo, montoCentavos, concepto, consultaId, acreditadoPor, referencia, referenciaClave }) {
-  if (!await Medico.exists({ phone: medicoPhone })) {
+async function aplicar({ medicoPhone, tipo, montoCentavos, concepto, consultaId, acreditadoPor, referencia, referenciaClave, moneda }) {
+  const cuenta = await Medico.findOne({ phone: medicoPhone }).select("moneda").lean();
+  if (!cuenta) {
     throw new Error(`No existe la cuenta ${medicoPhone}`);
   }
+  // La moneda la manda quien llama solo si ya la resolvió; si no, sale de la
+  // cuenta. Nunca queda vacía: un asiento sin moneda no se puede sumar.
+  const monedaMov = monedas.normalizar(moneda || cuenta.moneda);
 
   // 1. Reservar. Acá es donde el índice único ataja el cobro doble.
   const mov = await MovimientoSaldo.create({
-    medicoPhone, tipo, montoCentavos,
+    medicoPhone, tipo, montoCentavos, moneda: monedaMov,
     concepto: concepto || "", consultaId: consultaId || null,
     acreditadoPor: acreditadoPor || "", referencia: referencia || "",
     referenciaClave: referenciaClave || null,
@@ -156,12 +176,18 @@ async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, c
   // Negarse a acreditarla no le enseña la regla — es quedarse con su dinero.
   // Por eso el operador puede pasar por encima a propósito, y queda escrito
   // en el concepto del movimiento que fue una excepción.
-  if (monto < RECARGA_MINIMA && !permitirMenorAlMinimo) {
+  // El mínimo es el DE SU MONEDA: R$ 100 y Bs 100 no son la misma exigencia,
+  // y aplicarle a un médico brasileño el mínimo boliviano sería inventarle
+  // una regla comercial que nadie decidió.
+  const monedaCuenta = await monedaDe(medicoPhone);
+  const cfg = monedas.config(monedaCuenta);
+
+  if (monto < cfg.recargaMinima && !permitirMenorAlMinimo) {
     const e = new Error(
-      `La recarga mínima es Bs ${bolivianos(RECARGA_MINIMA)} y esta es de Bs ${bolivianos(monto)}.`
+      `La recarga mínima es ${monedas.conSimbolo(cfg.recargaMinima, monedaCuenta)} y esta es de ${monedas.conSimbolo(monto, monedaCuenta)}.`
     );
     e.codigo = "menor_al_minimo";
-    e.minimoCentavos = RECARGA_MINIMA;
+    e.minimoCentavos = cfg.recargaMinima;
     throw e;
   }
 
@@ -182,7 +208,7 @@ async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, c
     if (yaCargada) {
       const e = new Error(
         `La referencia "${referencia}" ya se acreditó el ${new Date(yaCargada.createdAt).toLocaleString("es-BO")} ` +
-        `a +${yaCargada.medicoPhone} por Bs ${bolivianos(yaCargada.montoCentavos)} (${yaCargada.acreditadoPor}).`
+        `a +${yaCargada.medicoPhone} por ${monedas.conSimbolo(yaCargada.montoCentavos, yaCargada.moneda)} (${yaCargada.acreditadoPor}).`
       );
       e.codigo = "referencia_repetida";
       e.anterior = yaCargada;
@@ -190,13 +216,14 @@ async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, c
     }
   }
 
-  const bajoMinimo = monto < RECARGA_MINIMA;
+  const bajoMinimo = monto < cfg.recargaMinima;
   const mov = await aplicar({
     medicoPhone, tipo: "carga", montoCentavos: monto,
-    concepto: concepto || `Carga de Bs ${bolivianos(monto)}${bajoMinimo ? " (bajo el mínimo, autorizada)" : ""}`,
+    moneda: monedaCuenta,
+    concepto: concepto || `Carga de ${monedas.conSimbolo(monto, monedaCuenta)}${bajoMinimo ? " (bajo el mínimo, autorizada)" : ""}`,
     acreditadoPor, referencia, referenciaClave,
   });
-  log.info(`[SALDO] carga de Bs ${bolivianos(monto)} a ${medicoPhone} por ${acreditadoPor} [${referencia || "sin referencia"}] — queda Bs ${bolivianos(mov.saldoDespuesCentavos)}`);
+  log.info(`[SALDO] carga de ${monedas.conSimbolo(monto, monedaCuenta)} a ${medicoPhone} por ${acreditadoPor} [${referencia || "sin referencia"}] — queda ${monedas.conSimbolo(mov.saldoDespuesCentavos, monedaCuenta)}`);
   return mov;
 }
 
@@ -212,13 +239,20 @@ async function cobrarConsulta({ medicoPhone, consultaId }) {
   const yaCobrada = await MovimientoSaldo.findOne({ tipo: "consumo", consultaId }).select("_id").lean();
   if (yaCobrada) return { cobrado: false, motivo: "ya_cobrada" };
 
+  // El precio es el de SU moneda. Cobrarle 1200 centavos a un médico
+  // brasileño porque ese es el precio boliviano sería cobrarle un número, no
+  // un precio.
+  const monedaCuenta = await monedaDe(medicoPhone);
+  const cfg = monedas.config(monedaCuenta);
+
   try {
     const mov = await aplicar({
-      medicoPhone, tipo: "consumo", montoCentavos: -PRECIO_CONSULTA,
+      medicoPhone, tipo: "consumo", montoCentavos: -cfg.precioConsulta,
+      moneda: monedaCuenta,
       concepto: "Consulta transcrita", consultaId,
     });
     if (mov.saldoDespuesCentavos < 0) {
-      log.warn(`[SALDO] ${medicoPhone} quedó en Bs ${bolivianos(mov.saldoDespuesCentavos)} — la consulta se completó igual`);
+      log.warn(`[SALDO] ${medicoPhone} quedó en ${monedas.conSimbolo(mov.saldoDespuesCentavos, monedaCuenta)} — la consulta se completó igual`);
     }
     return { cobrado: true, movimiento: mov, saldoCentavos: mov.saldoDespuesCentavos };
   } catch (e) {
@@ -267,5 +301,5 @@ async function reconciliar(medicoPhone, { corregir = false } = {}) {
 
 module.exports = {
   estadoDe, movimientosDe, cargar, cobrarConsulta, ajustar, reconciliar, claveDeReferencia,
-  bolivianos, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE, RECARGA_MINIMA,
+  bolivianos, monedaDe, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE, RECARGA_MINIMA,
 };
