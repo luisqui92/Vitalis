@@ -246,6 +246,12 @@ const consultaMedicaSchema = new mongoose.Schema({
   transcripcionCompleta: String,
   segmentos: [{
     hablante: String,   // "A", "B"... según lo que detecta AssemblyAI (no sabe cuál es médico/paciente)
+    // En la teleconsulta SÍ se sabe, y no por adivinanza: el micrófono del
+    // médico y el audio que llega del paciente son dos fuentes distintas, y
+    // se graban en canales separados. Vacío cuando el audio es de una
+    // consulta presencial, donde las dos voces entran por el mismo micrófono
+    // y lo único que hay es la diarización.
+    quien: { type: String, enum: ["medico", "paciente", ""], default: "" },
     texto: String,
     inicioSeg: Number,
     finSeg: Number,

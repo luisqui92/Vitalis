@@ -216,7 +216,23 @@ async function subirAudio(audioBuffer) {
   return res.data.upload_url;
 }
 
-async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma) {
+// ═══ DOS CANALES LE GANAN A LA DIARIZACIÓN ═══════════════════════════════════
+//
+// En una consulta presencial las dos voces entran por el mismo micrófono, así
+// que separar quién dijo qué es un problema de adivinanza: eso es la
+// diarización (speaker_labels), y devuelve "A" y "B" sin saber cuál de los
+// dos es el médico.
+//
+// En una teleconsulta ese problema no existe, y no hay que resolverlo: hay
+// mejor. El micrófono del médico y el audio que llega del paciente son dos
+// fuentes distintas desde el principio. Se graban en canales separados —el
+// médico en el izquierdo, el paciente en el derecho— y entonces no se
+// adivina nada: el canal 1 ES el médico, por construcción.
+//
+// multichannel y speaker_labels no van juntos, y está bien que no vayan:
+// pedir diarización sobre un audio donde ya sabés quién es quién es pedirle
+// al modelo que dude de un dato que ya tenés.
+async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false } = {}) {
   const lang = idiomaSoportado(idioma);
   const conMedicalMode = IDIOMAS_CON_MEDICAL_MODE.includes(lang);
   if (!conMedicalMode) {
@@ -230,7 +246,7 @@ async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma) {
     {
       audio_url: audioUrl,
       language_code: lang,
-      speaker_labels: true,
+      ...(multicanal ? { multichannel: true } : { speaker_labels: true }),
       // Un RANGO, no un número exacto. Antes iba speakers_expected: 2, con el
       // comentario de que era "solo una ayuda, no un límite estricto". Eso
       // era falso: la documentación dice que speakers_expected se use SOLO
@@ -247,7 +263,7 @@ async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma) {
       // El mínimo en 1 y no en 2 a propósito: forzar dos voces en una
       // grabación donde solo habla el médico lo parte en dos hablantes
       // inventados, que es peor que no separar nada.
-      speaker_options: { min_speakers_expected: 1, max_speakers_expected: 4 },
+      ...(multicanal ? {} : { speaker_options: { min_speakers_expected: 1, max_speakers_expected: 4 } }),
       // Solo donde existe. Mandarlo igual no rompe (la API lo ignora), pero
       // así la petición dice la verdad de lo que va a pasar.
       ...(conMedicalMode ? { domain: "medical-v1" } : {}),
@@ -275,21 +291,47 @@ async function esperarTranscripcion(id) {
   throw new Error("Tiempo de espera agotado transcribiendo el audio");
 }
 
-async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma) {
+// Canal 1 = izquierdo = micrófono del médico. Canal 2 = derecho = lo que
+// llegó del paciente. Lo decide public/js/grabacionTele.js al mezclar, y es
+// la única convención que ata las dos puntas: si alguna vez se da vuelta
+// allá, hay que darla vuelta acá.
+//
+// Devuelve "" si el canal no vino o no es uno de los dos esperados. Vacío
+// significa "no sé", y la pantalla muestra el hablante genérico: preferible
+// a etiquetar de médico algo que dijo el paciente, que es exactamente el
+// tipo de error que después nadie revisa.
+function quienSegunCanal(canal) {
+  const n = String(canal ?? "").trim();
+  if (n === "1") return "medico";
+  if (n === "2") return "paciente";
+  return "";
+}
+
+async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false } = {}) {
   if (!CONFIG.ASSEMBLYAI_API_KEY) {
     throw new Error("ASSEMBLYAI_API_KEY no configurado");
   }
 
   const audioUrl = await subirAudio(audioBuffer);
-  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma);
+  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal });
   const data = await esperarTranscripcion(id);
 
   const segmentos = (data.utterances || []).map(u => ({
     hablante: u.speaker,   // "A", "B"... AssemblyAI no sabe cuál es médico/paciente
+    quien: multicanal ? quienSegunCanal(u.channel) : "",
     texto: u.text,
     inicioSeg: u.start / 1000,
     finSeg: u.end / 1000,
   }));
+
+  // Si se pidió multicanal y no volvió ni un canal, la grabación salió mono
+  // (un navegador que no respetó la mezcla) o la respuesta no trae channel.
+  // No es motivo para tirar la transcripción —el texto está igual—, pero
+  // tiene que quedar escrito: la próxima vez que alguien mire por qué la
+  // teleconsulta no dice quién habló, esto lo contesta.
+  if (multicanal && segmentos.length && !segmentos.some(s => s.quien)) {
+    log.warn("[ASSEMBLYAI] multicanal pedido pero ningún segmento trae canal — se guarda sin médico/paciente");
+  }
 
   return {
     transcripcionCompleta: data.text || "",

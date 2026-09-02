@@ -90,6 +90,9 @@ Object.assign(I18N.es, {
   "consulta.errTranscribir": "Ocurrió un error al transcribir",
   "consulta.transcripcion": "Transcripción",
   "consulta.hablante": "Hablante {n}",
+  // En la teleconsulta se sabe quién es quién (canales separados), no se adivina.
+  "consulta.quienMedico": "Médico",
+  "consulta.quienPaciente": "Paciente",
   "consulta.sinTranscripcion": "Sin transcripción",
   "consulta.sinNombre": "Sin nombre de paciente",
   "consulta.min": " min",

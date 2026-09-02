@@ -402,9 +402,16 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     } else if (c.estado === "error") {
       body = `<div class="error">⚠️ ${esc(c.error || t("consulta.errTranscribir"))}</div>`;
     } else if (c.segmentos && c.segmentos.length) {
+      // "quien" solo viene de la teleconsulta, donde el médico y el paciente
+      // se grabaron en canales separados y no hay nada que adivinar. En la
+      // consulta presencial no está, y ahí sigue el "Hablante A / B" de la
+      // diarización — decir "Médico" sobre una adivinanza sería inventar una
+      // certeza que no tenemos.
       body = `<div class="seccion-titulo">${t("consulta.transcripcion")}</div>` + c.segmentos.map(s => `
-        <div class="segmento h${s.hablante && s.hablante.charCodeAt(0) % 2}">
-          <div class="quien">${t("consulta.hablante", { n: esc(s.hablante) })}</div>
+        <div class="segmento h${s.quien ? (s.quien === "medico" ? 0 : 1) : (s.hablante && s.hablante.charCodeAt(0) % 2)}">
+          <div class="quien">${s.quien
+            ? t(s.quien === "medico" ? "consulta.quienMedico" : "consulta.quienPaciente")
+            : t("consulta.hablante", { n: esc(s.hablante) })}</div>
           <div class="texto">${esc(s.texto)}</div>
         </div>`).join("");
     } else {

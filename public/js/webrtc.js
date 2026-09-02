@@ -38,7 +38,11 @@ function rtcCerrar() {
 //   datos   — { token, ice, hayTurn } que devolvió el servidor
 //   idLocal / idRemoto — ids de los <video>
 //   alEstado(texto, esProblema) — para que cada pantalla lo muestre a su modo
-async function rtcIniciar(datos, { idLocal, idRemoto, alEstado }) {
+// alStreams (opcional) se llama cuando llega el audio del otro extremo, con
+// las dos puntas: el micrófono de acá y lo que llega de allá. Es el momento
+// exacto en que se puede grabar en dos canales — antes no hay con qué, y no
+// hay consulta que grabar.
+async function rtcIniciar(datos, { idLocal, idRemoto, alEstado, alStreams }) {
   rtcCerrar();
   const decir = (t, malo) => { try { alEstado?.(t, Boolean(malo)); } catch { /* la pantalla se fue */ } };
 
@@ -69,6 +73,12 @@ async function rtcIniciar(datos, { idLocal, idRemoto, alEstado }) {
     if (vRemoto && ev.streams[0]) {
       vRemoto.srcObject = ev.streams[0];
       vRemoto.play?.().catch(() => {});
+    }
+    // ontrack se dispara una vez por pista (audio y video llegan por
+    // separado), así que esto puede llamarse dos veces con el mismo stream.
+    // Quien escucha tiene que aguantar que lo llamen de nuevo.
+    if (ev.streams[0]) {
+      try { alStreams?.(rtcStreamLocal, ev.streams[0]); } catch { /* la pantalla se fue */ }
     }
   };
 

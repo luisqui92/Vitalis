@@ -97,7 +97,11 @@ const selects = [...ruta.matchAll(/\.select\("tipoEspecialidad[^"]*"\)/g)].map(m
 // tratamientos, y ese no lo necesita.
 const conIdioma = selects.filter(s => s.includes("idioma")).length;
 verificar(`${conIdioma} de ${selects.length} consultas al médico traen el idioma`, conIdioma >= 2);
-verificar("la transcripción recibe el idioma", /transcribirConsultaMedica\(audioBuffer,[^)]*idioma\)/.test(ruta));
+// Se busca que el idioma sea un argumento, no que sea el ÚLTIMO: la llamada
+// lleva además un objeto de opciones (multicanal, para la teleconsulta) y
+// atarse a la posición hacía fallar la prueba por agregar un parámetro que no
+// tiene nada que ver con el idioma.
+verificar("la transcripción recibe el idioma", /transcribirConsultaMedica\(audioBuffer,[^;]*?idioma\s*[,)]/.test(ruta));
 verificar("la nota clínica también", /\},\s*medicoParaVocabulario\?\.idioma\);/.test(ruta));
 
 console.log("\n── 6. La nota clínica sale en el idioma del médico ──");

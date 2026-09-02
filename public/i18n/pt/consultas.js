@@ -94,6 +94,8 @@ Object.assign(I18N.pt, {
   "consulta.errTranscribir": "Ocorreu um erro ao transcrever",
   "consulta.transcripcion": "Transcrição",
   "consulta.hablante": "Interlocutor {n}",
+  "consulta.quienMedico": "Médico",
+  "consulta.quienPaciente": "Paciente",
   "consulta.sinTranscripcion": "Sem transcrição",
   "consulta.sinNombre": "Sem nome de paciente",
   "consulta.min": " min",

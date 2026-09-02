@@ -49,8 +49,13 @@ function crearIndicadorAudio(orbEl) {
 
 // Sube el audio grabado/subido y crea la consulta. Se usa tanto grabando
 // local como desde el celular vinculado como micrófono remoto.
-async function subirConsulta(pacienteId, blob, mimeType) {
-  return api("/medico/consultas?pacienteId=" + encodeURIComponent(pacienteId), {
+// teleconsultaId, cuando viene, dice dos cosas: que esta consulta salió de
+// una videollamada (y por lo tanto el audio tiene al médico y al paciente en
+// canales separados), y a cuál engancharla.
+async function subirConsulta(pacienteId, blob, mimeType, { teleconsultaId } = {}) {
+  let url = "/medico/consultas?pacienteId=" + encodeURIComponent(pacienteId);
+  if (teleconsultaId) url += "&teleconsultaId=" + encodeURIComponent(teleconsultaId);
+  return api(url, {
     method: "POST",
     headers: { "Content-Type": mimeType || "audio/webm" },
     body: blob,

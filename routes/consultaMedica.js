@@ -4,7 +4,7 @@
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
 const { CONFIG, log } = require("../config");
-const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO, Teleconsulta } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("../services/assemblyai");
@@ -95,9 +95,34 @@ module.exports = function (app) {
     if (!pacienteId) throw new ErrorHttp(400, "Falta pacienteId — elegí o creá un paciente antes de grabar");
     const paciente = await obtenerOFallar(Paciente, { _id: pacienteId, medicoPhone }, "Paciente no encontrado");
 
+    // Si el audio salió de una videollamada, viene con el médico en un canal
+    // y el paciente en el otro (public/js/grabacionTele.js). Eso cambia cómo
+    // se pide la transcripción: no hace falta diarizar lo que ya viene
+    // separado.
+    //
+    // Se verifica que la teleconsulta sea de ESTE médico y de ESTE paciente
+    // antes de creerle al parámetro: si no, cualquiera podría enganchar una
+    // consulta a la videollamada de otro. Un id que no pasa el control se
+    // ignora y la consulta se guarda igual —el audio ya existe y perderlo
+    // sería peor—, pero sin enganchar nada.
+    const teleconsultaId = String(req.query.teleconsultaId || "").trim();
+    let teleconsulta = null;
+    if (teleconsultaId) {
+      teleconsulta = await Teleconsulta.findOne({ _id: teleconsultaId, medicoPhone, pacienteId: paciente._id });
+      if (!teleconsulta) {
+        log.warn(`[TELECONSULTA] ${medicoPhone} mandó audio con teleconsultaId ${teleconsultaId} que no es suya o no es de ese paciente — se guarda como consulta suelta`);
+      }
+    }
+    const multicanal = Boolean(teleconsulta);
+
     const consulta = await ConsultaMedica.create({
       medicoPhone, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "procesando",
     });
+
+    if (teleconsulta) {
+      teleconsulta.consultaId = consulta._id;
+      await teleconsulta.save();
+    }
 
     res.status(202).json({ ok: true, consulta });
 
@@ -105,7 +130,7 @@ module.exports = function (app) {
     // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
     const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
 
-    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma)
+    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal })
       .then(async ({ transcripcionCompleta, segmentos, duracionSegundos }) => {
         consulta.estado = "completado";
         consulta.transcripcionCompleta = transcripcionCompleta;
