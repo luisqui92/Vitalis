@@ -10,9 +10,9 @@
 // impide que dentro de seis meses alguien lo saque "para simplificar".
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
-// Con una clave falsa alcanza: lo que se prueba es el permiso, no el
-// proveedor. Las llamadas a Daily se interceptan más abajo.
-process.env.DAILY_API_KEY = "clave-de-prueba";
+// Ya no hay proveedor de video: la llamada va directo entre los dos
+// navegadores. Lo único que reparte el servidor es el token de señalización,
+// y se cuenta más abajo.
 
 const path = require("path");
 const http = require("http");
@@ -81,13 +81,19 @@ async function main() {
   const { hashPassword, generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
 
-  // Daily no se llama de verdad: se sustituye el módulo ya cargado. Lo que
-  // se prueba es QUIÉN consigue un token, no que Daily funcione.
+  // Se cuenta cuántos tokens de señalización se reparten, sin cambiar lo que
+  // hacen: un token es el derecho a entrar a la sala, así que "no se emitió
+  // ninguno" es la forma de comprobar que el candado del consentimiento no
+  // dejó pasar a nadie.
+  //
+  // Antes acá se sustituían crearSala/tokenDeEntrada/borrarSala, que eran de
+  // cuando había un proveedor de video. Esas funciones ya no existen: los
+  // reemplazos no los llamaba nadie y el contador daba 0 siempre — la prueba
+  // pasaba sin poder fallar nunca, que es peor que no tenerla.
   const video = require(path.join(RAIZ, "services", "video"));
-  let salasCreadas = 0, tokensEmitidos = 0;
-  video.crearSala = async (n) => { salasCreadas++; return { name: n }; };
-  video.tokenDeEntrada = async () => { tokensEmitidos++; return "token-de-sala-falso"; };
-  video.borrarSala = async () => {};
+  const emitirTokenDeVerdad = video.tokenDeSenal;
+  let tokensEmitidos = 0;
+  video.tokenDeSenal = (sala, rol) => { tokensEmitidos++; return emitirTokenDeVerdad(sala, rol); };
 
   const hash = await hashPassword("Prueba123.");
   await Medico.create({ phone: "70000001", nombre: "Dra. Uno", passwordHash: hash });
