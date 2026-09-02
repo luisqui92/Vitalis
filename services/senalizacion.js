@@ -23,6 +23,7 @@
 // Por eso el tercero que llega se rechaza, y por eso cada papel entra una
 // sola vez: si el médico se reconecta, el socket viejo se cierra.
 const { WebSocketServer } = require("ws");
+const { registrarWs } = require("./wsRuteo");
 const { verificarTokenDeSenal } = require("./video");
 const { log } = require("../config");
 
@@ -42,7 +43,9 @@ function mandar(socket, obj) {
 }
 
 function iniciarSenalizacion(httpServer) {
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws-tele" });
+  // noServer + registrarWs, NO { server, path }: ver services/wsRuteo.js —
+  // montarlo de la otra forma rompía esta ruta Y la del tiempo real.
+  const wss = registrarWs(httpServer, "/ws-tele", new WebSocketServer({ noServer: true }));
 
   wss.on("connection", (socket, req) => {
     const url = new URL(req.url, "http://localhost");

@@ -10,6 +10,7 @@
 // frontend decide qué volver a pedir según qué pantalla esté mirando en ese
 // momento (ver public/js/realtime.js).
 const { WebSocketServer } = require("ws");
+const { registrarWs } = require("./wsRuteo");
 const { verificarToken } = require("./auth");
 const { log } = require("../config");
 
@@ -17,7 +18,10 @@ const { log } = require("../config");
 const conexionesPorMedico = new Map();
 
 function iniciarServidorTiempoReal(httpServer) {
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  // noServer + registrarWs, NO { server, path }: dos WebSocketServer colgados
+  // del mismo servidor HTTP se destruyen las conexiones entre ellos. Está
+  // explicado en services/wsRuteo.js.
+  const wss = registrarWs(httpServer, "/ws", new WebSocketServer({ noServer: true }));
 
   wss.on("connection", (socket, req) => {
     const url = new URL(req.url, "http://localhost");
