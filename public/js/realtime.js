@@ -48,7 +48,12 @@ function desconectarTiempoReal() {
 // el aviso muchas veces lo dispara el guardado del propio médico, así que
 // se borraría solo. Se registran igual, para que el aviso no caiga sobre la
 // pantalla anterior y lo saque de acá; refrescarlas es no hacer nada.
-const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete"]);
+//
+// La sala de la teleconsulta va en la misma bolsa, y ahí no es que se
+// perdería lo escrito: repintar arranca los <video> del DOM y con ellos la
+// conexión WebRTC. La llamada se corta en la mitad, con el paciente del
+// otro lado.
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele"]);
 
 function refrescarPantallaActual() {
   if (!PANTALLA_ACTUAL) return;
@@ -90,6 +95,15 @@ envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", pa
 // justo en el único momento en que el token está a la vista.
 envolverParaTiempoReal("renderEquiposRayos", (pacienteVuelta) => ({ tipo: "equiposRayos", params: { pacienteVuelta } }));
 envolverParaTiempoReal("renderBandejaDicom", () => ({ tipo: "bandejaDicom", params: {} }));
+// Entrar a la videoconsulta ES un POST del propio médico, así que dispara un
+// aviso de cambio a los dos segundos. Sin registrarse acá, ese aviso caía
+// sobre la pantalla anterior —la ficha del paciente— y la repintaba encima
+// de la sala: el médico entraba, veía la videollamada un instante y volvía
+// solo a la ficha, sin tocar nada y sin ningún error.
+//
+// Es el mismo caso que renderEquiposRayos acá arriba. Es lo que pasa cuando
+// una pantalla se pinta sin decir que existe.
+envolverParaTiempoReal("teleMedEntrar", () => ({ tipo: "salaTele", params: {} }));
 // Estas dos van a PANTALLAS_SIN_REFRESCO: se registran para que el aviso de
 // cambio sepa que el médico ya no está en la ficha del paciente, y ahí se
 // queda quieto en vez de repintarla encima del informe a medio escribir.
