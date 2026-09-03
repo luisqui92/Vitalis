@@ -97,11 +97,21 @@ async function main() {
       tipoEspecialidad: "medicina_general",
       // Esto es lo que la manda a cobrar por Pix. Ver el encabezado.
       idioma: "pt",
+      // Y esto es lo que de verdad la hace una cuenta brasileña. El idioma es
+      // una preferencia de pantalla; la moneda decide bajo qué reglas trabaja:
+      // en qué moneda se registran sus recargas en el libro mayor, y que
+      // recete por Memed —en Brasil una receta necesita firma digital, y la de
+      // Vitalis no la tiene (ver services/memed.js).
+      //
+      // Faltaba, y el síntoma no era un error: era una cuenta que se veía
+      // brasileña, cobraba por Pix, y no podía recetar.
+      moneda: "BRL",
     });
     contrasenaNueva = true;
     console.log(`✅ Conta criada: +${phone} — ${nombre} (português)`);
   } else {
     medico.idioma = "pt";
+    medico.moneda = "BRL";
     await medico.save();
     console.log(`ℹ️  +${phone} já existia — agora em português (senha sem alterações).`);
   }
