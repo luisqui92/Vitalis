@@ -5,7 +5,9 @@ const { Medico, AuditLog } = require("../db/models");
 const { generarToken, verificarToken, hashPassword, verificarPassword, requireAuth } = require("../services/auth");
 const { generarSecreto, generarUriOtpAuth, verificarCodigo } = require("../services/totp");
 const { registrar } = require("../services/auditoria");
-const { esOperador } = require("../services/operadores");
+const { esOperador, todosLosOperadores } = require("../services/operadores");
+const { notificarMedico } = require("../services/push");
+const { log } = require("../config");
 const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 
@@ -19,6 +21,24 @@ const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 // /medico/2fa/iniciar le contestaba 403. Quedaba trabada para siempre en
 // "activá el 2FA" sin ninguna pantalla que se lo permitiera.
 const requireMedico = requireAuth(["medico", "admin"]);
+
+// Le avisa a quien aprueba que hay alguien esperando. Sin esto la fila
+// existe pero nadie la mira, y el médico que pidió cuenta se queda sin
+// respuesta pensando que Vitalis no anda.
+async function avisarSolicitudPendiente(medico) {
+  const aprobadores = todosLosOperadores();
+  if (!aprobadores.length) {
+    // Nadie configurado es una fila que no avanza nunca. Que se vea en el
+    // log del arranque no alcanza: esto pasa meses después.
+    log.warn(`[CUENTAS] ${medico.nombre} pidió cuenta y OPERADORES_SALDO está vacía — nadie va a enterarse`);
+    return;
+  }
+  await Promise.all(aprobadores.map(phone => notificarMedico(phone, {
+    titulo: "Nueva solicitud de cuenta",
+    cuerpo: `${medico.nombre} — matrícula ${medico.matricula || "no declarada"}`,
+    url: "/",
+  }).catch(() => {})));
+}
 
 // El rol del TOKEN no es el mismo campo que el rol de la cuenta, y la
 // diferencia es la que sostiene el permiso: un director es médico para todo
@@ -60,15 +80,46 @@ module.exports = function (app) {
     const tipoEspecialidad = ["odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
     const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
     const password = String(req.body?.password || "");
+    const matricula = String(req.body?.matricula || "").trim().slice(0, 60);
+    const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
+    // No se verifica contra ningún registro —no hay una API del colegio
+    // médico— así que exigirla no prueba nada por sí sola. Pero obliga a
+    // que mentir sea una decisión consciente, y le da a quien aprueba algo
+    // concreto que mirar en vez de un nombre suelto.
+    if (!matricula) throw new ErrorHttp(400, "Falta la matrícula profesional");
 
     const yaExiste = await Medico.findOne({ phone });
     if (yaExiste) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
 
-    const medico = await Medico.create({ phone, nombre, especialidad, tipoEspecialidad, idioma, passwordHash: await hashPassword(password), activo: true });
-    registrar({ req, medicoPhone: phone, accion: "registro" });
-    res.json({ ok: true, phone: medico.phone, nombre: medico.nombre });
+    // ─── LA CUENTA NACE APAGADA ─────────────────────────────────────────
+    //
+    // Registrarse no da acceso: pone a la persona en una fila. Acá adentro
+    // hay historias clínicas de gente real, y esa puerta no se abre a un
+    // nombre y una contraseña que nadie miró.
+    //
+    // activo: false Y estadoCuenta: "pendiente" son dos cosas distintas a
+    // propósito. "activo" es el interruptor que ya usaba todo el sistema
+    // para dejar entrar o no; "estadoCuenta" es POR QUÉ. Sin el segundo, un
+    // médico legítimo esperando aprobación y uno dado de baja se ven igual,
+    // y no se les puede decir cosas distintas.
+    const medico = await Medico.create({
+      phone, nombre, especialidad, tipoEspecialidad, idioma,
+      passwordHash: await hashPassword(password),
+      matricula,
+      activo: false,
+      estadoCuenta: "pendiente",
+      solicitud: { pedidaEn: new Date(), mensaje },
+    });
+    registrar({ req, medicoPhone: phone, accion: "solicitud_cuenta", detalle: `matrícula: ${matricula || "(sin matrícula)"}` });
+    log.info(`[CUENTAS] nueva solicitud de ${nombre} (${phone}) — matrícula ${matricula || "no declarada"}`);
+
+    // Avisar a quien aprueba, sin que la respuesta dependa de eso: si el
+    // aviso falla, la solicitud igual quedó guardada y se ve en el panel.
+    avisarSolicitudPendiente(medico).catch(e => log.warn("[CUENTAS] no se pudo avisar la solicitud:", e.message));
+
+    res.json({ ok: true, pendiente: true, phone: medico.phone, nombre: medico.nombre });
   }));
 
   // ─── LOGIN (paso 1: teléfono + contraseña) ──────────────────────────────
@@ -79,7 +130,13 @@ module.exports = function (app) {
     const password = String(req.body?.password || "");
     if (!phone || !password) throw new ErrorHttp(400, "phone y password son requeridos");
 
-    const medico = await Medico.findOne({ phone, activo: true });
+    // Se busca SIN filtrar por activo, y el estado de la cuenta se mira
+    // DESPUÉS de verificar la contraseña. El orden es la parte que importa:
+    // si se dijera "tu cuenta está pendiente" a quien no sabe la contraseña,
+    // cualquiera podría averiguar qué teléfonos tienen cuenta en Vitalis
+    // probando números. Primero probás que sos vos; recién ahí te contamos
+    // en qué estado está lo tuyo.
+    const medico = await Medico.findOne({ phone });
     const { ok, requiereRehash } = medico
       ? await verificarPassword(password, medico.passwordHash)
       : { ok: false, requiereRehash: false };
@@ -87,6 +144,26 @@ module.exports = function (app) {
     if (!ok) {
       registrar({ req, medicoPhone: phone, accion: "login_fallido", exito: false });
       throw new ErrorHttp(401, "Teléfono o contraseña incorrectos");
+    }
+
+    // Contraseña correcta pero la cuenta todavía no entra. Antes esto caía en
+    // el mismo "teléfono o contraseña incorrectos" de arriba, y un médico
+    // legítimo esperando aprobación se pasaba la tarde reescribiendo bien una
+    // contraseña que ya estaba bien.
+    if (medico.estadoCuenta === "pendiente") {
+      registrar({ req, medicoPhone: phone, accion: "login_pendiente", exito: false });
+      throw new ErrorHttp(403, "Tu solicitud todavía está en revisión. Te avisamos por WhatsApp apenas la aprobemos.");
+    }
+    if (medico.estadoCuenta === "rechazada") {
+      registrar({ req, medicoPhone: phone, accion: "login_rechazada", exito: false });
+      throw new ErrorHttp(403, medico.solicitud?.motivo
+        ? `Tu solicitud no fue aprobada: ${medico.solicitud.motivo}`
+        : "Tu solicitud no fue aprobada. Escribinos si creés que es un error.");
+    }
+    // Aprobada pero apagada: es una baja o una suspensión, no una fila.
+    if (!medico.activo) {
+      registrar({ req, medicoPhone: phone, accion: "login_inactiva", exito: false });
+      throw new ErrorHttp(403, "Tu cuenta está desactivada. Escribinos para reactivarla.");
     }
 
     // Migración transparente: la contraseña era correcta pero el hash

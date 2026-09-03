@@ -89,6 +89,42 @@ const medicoSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
 
+  // ─── Cómo entró esta cuenta ───────────────────────────────────────────
+  //
+  // Registrarse en Vitalis no da acceso: da un lugar en una fila. Quien pide
+  // cuenta queda en "pendiente" y no entra hasta que alguien lo aprueba a
+  // mano. Esto no es contra los bots —para eso alcanzaría un captcha—: es
+  // que acá adentro se guardan historias clínicas de personas reales, y no
+  // se le abre esa puerta a nombre y contraseña, sin saber quién es.
+  //
+  // El default es "aprobada" A PROPÓSITO, y es la línea más importante de
+  // este bloque: las cuentas que ya existen no tienen este campo, y mongoose
+  // les aplica el default al leerlas. Si el default fuera "pendiente", el
+  // día que esto se despliegue TODOS los médicos que hoy trabajan quedarían
+  // afuera de su propio sistema, con sus pacientes en la sala de espera.
+  //
+  // Solo el registro público pone "pendiente" explícitamente. Las cuentas
+  // que crea un administrador de clínica para su equipo nacen aprobadas: ahí
+  // ya hubo alguien que respondió por esa persona, que es justamente lo que
+  // esta fila busca.
+  estadoCuenta: { type: String, enum: ["pendiente", "aprobada", "rechazada"], default: "aprobada", index: true },
+  // La matrícula profesional. Vitalis NO la verifica contra ningún registro
+  // —no hay una API del colegio médico boliviano— así que no es una prueba:
+  // es un dato que quien aprueba puede mirar, y que hace que mentir sea una
+  // decisión consciente y no un descuido.
+  matricula: { type: String, default: "" },
+  solicitud: {
+    pedidaEn: { type: Date, default: null },
+    // Lo que la persona escribe sobre sí misma. Es lo único que quien
+    // aprueba tiene para decidir, así que se guarda entero.
+    mensaje: { type: String, default: "" },
+    resueltaEn: { type: Date, default: null },
+    resueltaPor: { type: String, default: "" },
+    // Por qué se rechazó. Se le muestra a quien lo pidió: un "no" sin motivo
+    // genera un segundo intento idéntico y una consulta por WhatsApp.
+    motivo: { type: String, default: "" },
+  },
+
   // Saldo prepago, en centavos de boliviano (Bs 12 = 1200). Es una COPIA
   // rápida de la suma de MovimientoSaldo, no la verdad — para no sumar toda
   // la historia cada vez que se pinta una pantalla. Puede quedar en negativo

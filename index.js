@@ -87,6 +87,9 @@ app.use(middlewareAvisarCambios);
 
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
+// La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en
+// Vitalis no da acceso — ver el encabezado de routes/solicitudesCuenta.js.
+require("./routes/solicitudesCuenta")(app);
 require("./routes/consultaMedica")(app);
 require("./routes/pacientes")(app);
 require("./routes/medicamentos")(app);

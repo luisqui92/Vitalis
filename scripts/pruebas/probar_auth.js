@@ -40,9 +40,16 @@ function correr(codigoAuth, idioma) {
   const login = app.innerHTML;
   vm.runInContext("renderRegistro();", sandbox);
   const registro = app.innerHTML;
+  // Los otros dos pasos del registro. Se piden con typeof porque esta misma
+  // función corre también sobre el auth.js de main, donde no existen: el
+  // registro de entonces era una sola pantalla.
+  vm.runInContext('typeof renderRegistroPaso2 === "function" ? renderRegistroPaso2() : (app.innerHTML = "");', sandbox);
+  const registro2 = app.innerHTML;
+  vm.runInContext('typeof renderRegistroEnviado === "function" ? renderRegistroEnviado("Dra. Fulana Pérez") : (app.innerHTML = "");', sandbox);
+  const enviado = app.innerHTML;
   vm.runInContext('renderLogin2FA("tok");', sandbox);
   const dosfa = app.innerHTML;
-  return { login, registro, dosfa };
+  return { login, registro, registro2, enviado, dosfa };
 }
 
 // Le saca el selector de idioma, que es lo único nuevo a propósito.
@@ -58,7 +65,14 @@ const nuevoEs = correr(ahora, "es");
 const nuevoPt = correr(ahora, "pt");
 
 let fallos = 0;
-for (const pantalla of ["login", "registro", "dosfa"]) {
+// El registro YA NO se compara contra main: se rediseñó a propósito (dos
+// pasos, matrícula profesional obligatoria, y una pantalla de "qué pasa
+// ahora" porque la cuenta ya no entra al instante). Comparar una pantalla
+// que se cambió adrede contra la versión vieja solo prueba que se cambió.
+//
+// Login y 2FA sí siguen comparándose: esas no se tocaron, y esta prueba es
+// lo que garantiza que el i18n no las movió ni un carácter.
+for (const pantalla of ["login", "dosfa"]) {
   const a = viejo[pantalla];
   const b = sinSelector(nuevoEs[pantalla]);
   if (a === b) {
@@ -76,7 +90,7 @@ for (const pantalla of ["login", "registro", "dosfa"]) {
 // (ahí el médico ya se identificó: cambiar el idioma a mitad del login sería
 // raro y además no cambiaría nada, porque manda su cuenta).
 console.log("");
-for (const [pantalla, debeEstar] of [["login", true], ["registro", true], ["dosfa", false]]) {
+for (const [pantalla, debeEstar] of [["login", true], ["registro", true], ["registro2", false], ["enviado", false], ["dosfa", false]]) {
   const tiene = nuevoEs[pantalla].includes("idioma-opcion");
   const ok = tiene === debeEstar;
   console.log(`${ok ? "✅" : "❌"} selector en ${pantalla}: ${tiene ? "sí" : "no"} (esperado: ${debeEstar ? "sí" : "no"})`);
@@ -85,15 +99,24 @@ for (const [pantalla, debeEstar] of [["login", true], ["registro", true], ["dosf
 
 // En portugués, las etiquetas tienen que cambiar de verdad.
 console.log("");
+// "Clínica geral" y el botón de crear cuenta viven ahora en el paso 2, así
+// que la búsqueda abarca las cuatro pantallas.
+const todoPt = nuevoPt.login + nuevoPt.registro + nuevoPt.registro2 + nuevoPt.enviado;
 const esperadasPt = ["Telefone", "Senha", "Entrar", "Cadastre-se", "Nome completo", "Criar conta", "Clínica geral"];
-const faltan = esperadasPt.filter(x => !(nuevoPt.login + nuevoPt.registro).includes(x));
+const faltan = esperadasPt.filter(x => !todoPt.includes(x));
 console.log(faltan.length === 0
   ? `✅ portugués: las ${esperadasPt.length} etiquetas esperadas aparecen`
   : `❌ portugués: faltan ${faltan.join(", ")}`);
 if (faltan.length) fallos++;
 
 // Y no debe quedar español suelto en las pantallas en portugués.
-const españolSuelto = ["Contraseña", "Ingresar", "Registrarme", "Teléfono"].filter(x => (nuevoPt.login + nuevoPt.registro).includes(x));
+//
+// Se mira SOLO EL TEXTO VISIBLE, sin etiquetas ni atributos. Buscar sobre el
+// HTML crudo daba falsos positivos absurdos: id="rSiguiente" hacía saltar la
+// prueba por "Siguiente" mientras el botón mostraba "Continuar". Un id es
+// código, no un texto que alguien lea.
+const soloTexto = (html) => html.replace(/<[^>]*>/g, " ");
+const españolSuelto = ["Contraseña", "Ingresar", "Registrarme", "Teléfono", "Matrícula profesional", "Siguiente"].filter(x => soloTexto(todoPt).includes(x));
 console.log(españolSuelto.length === 0
   ? "✅ portugués: no quedó ninguna etiqueta en español"
   : `❌ portugués: quedaron en español → ${españolSuelto.join(", ")}`);

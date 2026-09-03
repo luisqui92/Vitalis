@@ -168,6 +168,7 @@ async function renderPagos() {
     <div class="seccion-titulo" style="margin-top:0">${t("op.titulo")}</div>
     <div class="hint" style="margin:0 0 12px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
 
+    <div id="opCuentas"></div>
     <div id="opResumen"></div>
     <div id="opCola"></div>
 
@@ -182,6 +183,10 @@ async function renderPagos() {
     <div id="opDatosPago"></div>`;
 
   engancharEncabezadoPagos();
+  // Va primero y sin await, como los demás: una persona esperando que le
+  // abran la cuenta es más urgente que un pago, pero si esta consulta tarda
+  // no puede retrasar el resto del panel.
+  pintarSolicitudesDeCuenta();
   pintarResumenPagos();
   pintarColaSolicitudes();
   pintarDatosDePago();
@@ -569,6 +574,112 @@ async function pintarDatosDePago() {
     } catch (e) {
       btn.disabled = false;
       err.innerHTML = `<div class="error">${esc(e.error || t("op.dp.errGuardar"))}</div>`;
+    }
+  };
+}
+
+// ─── SOLICITUDES DE CUENTA ────────────────────────────────────────────────
+//
+// Quién pidió entrar a Vitalis y todavía está esperando. Va en el mismo panel
+// que los pagos porque es la misma clase de decisión —quién está adentro— y
+// la toma la misma persona, con el mismo segundo factor.
+//
+// Se muestra ARRIBA de los pagos: alguien esperando que le abran la cuenta no
+// puede trabajar; un pago sin acreditar es una demora.
+async function pintarSolicitudesDeCuenta() {
+  const caja = document.getElementById("opCuentas");
+  if (!caja) return;
+
+  let datos;
+  try {
+    datos = await api("/medico/solicitudes-cuenta");
+  } catch {
+    // Sin permiso o sin red: no se dibuja nada. Un cartel de error acá le
+    // taparía los pagos a alguien que entró a acreditar un pago.
+    caja.innerHTML = "";
+    return;
+  }
+  if (!caja.isConnected) return;
+
+  const pendientes = datos.pendientes || [];
+  if (!pendientes.length) {
+    // Cero solicitudes es el estado normal. Se dice en una línea, sin tarjeta:
+    // una caja vacía y grande todos los días entrena a no mirar esta zona.
+    caja.innerHTML = `<div class="hint" style="margin:0 0 14px">${t("cuentas.ninguna")}</div>`;
+    return;
+  }
+
+  caja.innerHTML = `
+    <div class="card" style="border-color:var(--primary)">
+      <div class="seccion-titulo" style="margin-top:0">${t("cuentas.titulo", { n: pendientes.length })}</div>
+      <div class="hint" style="margin:0 0 12px">${t("cuentas.ayuda")}</div>
+      ${pendientes.map(s => solicitudCuentaHtml(s)).join("")}
+    </div>`;
+
+  pendientes.forEach(s => engancharSolicitudCuenta(s));
+}
+
+function solicitudCuentaHtml(s) {
+  const dias = s.solicitud?.pedidaEn
+    ? Math.floor((Date.now() - new Date(s.solicitud.pedidaEn)) / 86400000)
+    : 0;
+  return `
+    <div class="sol-item" id="sol-${esc(s.phone)}">
+      <div class="sol-nombre">${esc(s.nombre)}</div>
+      <div class="sol-datos">
+        ${t("cuentas.matricula")}: <span class="sol-matricula">${esc(s.matricula || t("cuentas.sinMatricula"))}</span><br>
+        ${t("area." + (s.tipoEspecialidad || "medicina_general"))}${s.especialidad ? ` · ${esc(s.especialidad)}` : ""}<br>
+        ${esc(s.phone)} · ${dias === 0 ? t("cuentas.hoy") : t("cuentas.hace", { dias })}
+      </div>
+      ${s.solicitud?.mensaje ? `<div class="sol-mensaje">${esc(s.solicitud.mensaje)}</div>` : ""}
+      <div class="sol-acciones">
+        <button class="primary" data-aprobar="${esc(s.phone)}">${t("cuentas.aprobar")}</button>
+        <button class="secondary" data-rechazar="${esc(s.phone)}">${t("cuentas.rechazar")}</button>
+      </div>
+      <div data-err="${esc(s.phone)}"></div>
+    </div>`;
+}
+
+function engancharSolicitudCuenta(s) {
+  const fila = document.getElementById(`sol-${s.phone}`);
+  if (!fila) return;
+  const errBox = fila.querySelector(`[data-err="${s.phone}"]`);
+  const bloquear = (si) => fila.querySelectorAll("button").forEach(b => { b.disabled = si; });
+
+  fila.querySelector(`[data-aprobar="${s.phone}"]`).onclick = async () => {
+    // Aprobar le abre a alguien la puerta de un sistema de historias
+    // clínicas. Un toque sin querer no puede hacer eso.
+    if (!confirm(t("cuentas.confirmarAprobar", { nombre: s.nombre }))) return;
+    bloquear(true);
+    errBox.innerHTML = "";
+    try {
+      await api(`/medico/solicitudes-cuenta/${encodeURIComponent(s.phone)}/aprobar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      });
+      pintarSolicitudesDeCuenta();
+    } catch (e) {
+      bloquear(false);
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("cuentas.errAprobar"))}</div>`;
+    }
+  };
+
+  fila.querySelector(`[data-rechazar="${s.phone}"]`).onclick = async () => {
+    // El motivo es obligatorio del lado del servidor; se pide acá para no
+    // hacerle descubrir el requisito con un error después de decidir.
+    const motivo = prompt(t("cuentas.pedirMotivo", { nombre: s.nombre }));
+    if (motivo === null) return;
+    if (!motivo.trim()) { errBox.innerHTML = `<div class="error">${t("cuentas.errMotivo")}</div>`; return; }
+    bloquear(true);
+    errBox.innerHTML = "";
+    try {
+      await api(`/medico/solicitudes-cuenta/${encodeURIComponent(s.phone)}/rechazar`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo: motivo.trim() }),
+      });
+      pintarSolicitudesDeCuenta();
+    } catch (e) {
+      bloquear(false);
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("cuentas.errRechazar"))}</div>`;
     }
   };
 }
