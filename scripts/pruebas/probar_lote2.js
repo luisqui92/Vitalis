@@ -26,6 +26,9 @@ function entorno(idioma) {
   });
   const s = {
     app, console, MEDICO_TIPO_ESPECIALIDAD: "medicina_general", MEDICO_NOMBRE: "Dra. Camila",
+    // La moneda de la cuenta: decide qué se dibuja donde Brasil trabaja
+    // distinto (la receta va por Memed). "BOB" es el caso de siempre.
+    MEDICO_MONEDA: "BOB",
     esc: (x) => String(x == null ? "" : x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])),
     document: {
       getElementById: () => nodo(), querySelectorAll: () => [], querySelector: () => nodo(),
@@ -71,8 +74,25 @@ function pintar(archivos, idioma, llamadas) {
 
 const deMain = (ruta) => execSync(`git -C ${RAIZ} show main:${ruta}`, { encoding: "utf8" });
 
+// Igual que el bloque de persona en probar_kardex.js: esta prueba existe
+// para atajar que el i18n cambie el dibujo SIN QUERER, no para congelar las
+// pantallas. Un elemento nuevo y deliberado se declara acá.
+//
+// La caja de Memed es la receta digital de Brasil (ver services/memed.js).
+// En una cuenta boliviana no dibuja nada, pero el hueco queda igual en el
+// marcado, y es ese hueco el que hay que descontar.
+const sinCajasNuevas = (html) => html
+  .replace(/\n?\s*<!-- En Brasil se receta por Memed[\s\S]*?-->/g, "")
+  .replace(/\n?\s*<div id="memedBox"><\/div>/g, "")
+  // El id que le da nombre a la caja de la receta de Vitalis, para poder
+  // sacarla cuando la cuenta receta por Memed. Es un id, no un cambio de
+  // dibujo: no se ve.
+  .replace(/<div class="card" id="recetaNuevaBox">/g, '<div class="card">');
+
 let fallos = 0;
-function comparar(nombre, viejo, nuevo) {
+function comparar(nombre, viejoBruto, nuevoBruto) {
+  const viejo = viejoBruto;
+  const nuevo = Object.fromEntries(Object.entries(nuevoBruto).map(([k, v]) => [k, sinCajasNuevas(v)]));
   for (const k of Object.keys(viejo)) {
     if (viejo[k] === nuevo[k]) {
       console.log(`✅ ${nombre}/${k}: idéntico (${viejo[k].length} car.)`);

@@ -74,6 +74,8 @@ function completarLogin(data) {
   // El idioma llega del servidor igual que la especialidad: es un dato de la
   // cuenta, no del navegador. Se fija antes de pintar nada.
   fijarIdioma(data.idioma || "es");
+  MEDICO_MONEDA = data.moneda || "BOB";
+  localStorage.setItem("salud_moneda", MEDICO_MONEDA);
   MEDICO_ROL = data.rol || "medico";
   localStorage.setItem("salud_rol", MEDICO_ROL);
   MEDICO_CLINICA = data.clinica || "";

@@ -75,7 +75,10 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.id, medicoPhone }, "Paciente no encontrado");
 
-    const campos = ["nombre", "sexo", "telefono", "notas", "especie", "raza", "duenoNombre", "tutorNombre", "tutorParentesco"];
+    // "cpf" solo lo usa Brasil, para recetar por Memed. Va en la misma lista
+    // porque el campo existe para todos y queda vacío donde no aplica —
+    // ramificar la ruta por país sería dos caminos para guardar un texto.
+    const campos = ["nombre", "sexo", "telefono", "notas", "especie", "raza", "duenoNombre", "tutorNombre", "tutorParentesco", "cpf"];
     for (const campo of campos) {
       if (req.body?.[campo] !== undefined) paciente[campo] = String(req.body[campo]).trim();
     }

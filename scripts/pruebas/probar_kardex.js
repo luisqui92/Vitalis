@@ -58,6 +58,9 @@ function entorno(idioma) {
   });
   const s = {
     app, console, MEDICO_NOMBRE: "Dra. Camila", MEDICO_TIPO_ESPECIALIDAD: "medicina_general",
+    // La moneda de la cuenta: decide qué se dibuja donde Brasil trabaja
+    // distinto (la receta va por Memed). "BOB" es el caso de siempre.
+    MEDICO_MONEDA: "BOB",
     headerSub: { textContent: "" }, btnLogout: { style: {} }, btnAsistente: { style: {} },
     esc: (x) => String(x == null ? "" : x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])),
     document: { getElementById: () => nodo(), querySelectorAll: () => [], querySelector: () => nodo(), createElement: () => nodo(), documentElement: {} },
@@ -145,6 +148,10 @@ const sinBloquePersona = (html) => html
   .replace(/\n?\s*<div id="personaBox"><\/div>/g, "")
   .replace(/\n?\s*<div id="personaAltaBox"><\/div>/g, "")
   .replace(/\n?\s*<div id="teleMedBox"><\/div>/g, "")
+  // La fila del CPF: solo se dibuja en cuentas brasileñas (Memed lo necesita
+  // para recetar). En el arnés la moneda es BOB, así que el ternario deja el
+  // hueco vacío que hay que descontar.
+  .replace(/\n {8}(?=\n {8}<div class="dato-row" style="border-bottom:none">)/g, "")
   .replace(/\n {4}(?=\n {4}<div class="tabs">)/g, "");
 
 let fallos = 0;

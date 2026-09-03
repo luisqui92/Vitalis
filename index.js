@@ -31,6 +31,12 @@ app.set("trust proxy", 1);
 // puede ser estricta: nada de scripts/estilos/imágenes de otro origen salvo
 // lo que Vitalis realmente usa (el WebSocket de AssemblyAI para la
 // transcripción en vivo, y las imágenes data: de los códigos QR).
+// Los dominios de Memed salen del servicio y no de una lista escrita acá
+// para que se puedan ampliar con una variable de entorno: si su módulo pide
+// un dominio más que no está en la documentación, el síntoma es una pantalla
+// en blanco sin error, y no hace falta desplegar a ciegas para probarlo.
+const DOMINIOS_MEMED = require("./services/memed").dominiosCsp();
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -43,20 +49,24 @@ app.use(helmet({
       // consulta (audio.js arma el procesador de audio como blob: en vez
       // de un archivo propio, y Chrome exige blob: en script-src —no en
       // worker-src— para eso).
-      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='"],
+      // Los de Memed son la receta digital de Brasil: su módulo se carga
+      // como script de ellos y se dibuja adentro de Vitalis. Sin esto la
+      // pantalla de recetar queda en blanco SIN NINGÚN ERROR VISIBLE, que es
+      // la peor forma de fallar — ver services/memed.js.
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='", ...DOMINIOS_MEMED],
       styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
       // 'blob:' es para las fotos clínicas que se traen con Authorization
       // por header (no por URL) y se abren como blob local — el comparador
       // antes/después y el mapa anatómico de Vitalis Face las muestran
       // como <img> directo en la página, no en una pestaña aparte.
-      imgSrc: ["'self'", "data:", "blob:"],
+      imgSrc: ["'self'", "data:", "blob:", ...DOMINIOS_MEMED],
       // Las de Daily/Vapi son para la llamada de voz por navegador de la
       // página pública de reserva (public/js/reservarLlamada.js) — Vapi
       // usa la infraestructura de Daily para el audio en tiempo real, y
       // reparte las salas entre varios subdominios que no se pueden listar
       // uno por uno (por eso el wss: general, como recomienda la propia
       // guía de CSP de Daily).
-      connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:"],
+      connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:", ...DOMINIOS_MEMED],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       // El decoder Draco (vista 3D del odontograma) corre en un Web Worker
@@ -64,12 +74,22 @@ app.use(helmet({
       workerSrc: ["'self'", "blob:"],
       baseUri: ["'self'"],
       frameAncestors: ["'none'"], // nadie puede embeber Vitalis en un iframe (clickjacking)
-      // Sin frameSrc a propósito: la teleconsulta NO embebe a nadie. El
-      // video va directo entre los dos navegadores (ver services/video.js),
-      // así que no hay un iframe de un tercero que permitir. Se llegó a
-      // agregar uno cuando la llamada iba por un proveedor; al sacarlo, se
-      // saca también el permiso — una excepción de CSP que ya no se usa es
-      // de las que se quedan para siempre y nadie recuerda por qué.
+      // ═══ frameSrc: UNA SOLA EXCEPCIÓN, Y ANOTADA ═══════════════════════
+      //
+      // Acá decía "sin frameSrc a propósito: la teleconsulta NO embebe a
+      // nadie", y esa sigue siendo la regla: el video va directo entre los
+      // dos navegadores y no hay ningún proveedor que permitir.
+      //
+      // Memed es la excepción, y es deliberada, no un descuido: en Brasil una
+      // receta necesita firma digital ICP-Brasil, y esa firma la emite su
+      // módulo dentro de una pantalla suya. Sin embeberlos no hay forma de
+      // recetar legalmente en Brasil.
+      //
+      // Es UNA excepción, para UN proveedor, con un motivo escrito. El día
+      // que Brasil deje de recetarse por Memed, esta línea se va con él —
+      // una excepción de CSP que ya no se usa es de las que se quedan para
+      // siempre y nadie recuerda por qué.
+      frameSrc: ["'self'", ...DOMINIOS_MEMED],
     },
   },
 }));
@@ -90,6 +110,9 @@ require("./routes/medicoAuth")(app);
 // La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en
 // Vitalis no da acceso — ver el encabezado de routes/solicitudesCuenta.js.
 require("./routes/solicitudesCuenta")(app);
+// Receta digital de Brasil. En Brasil una receta necesita firma ICP-Brasil,
+// así que no se receta por Vitalis sino solo por Memed — ver services/memed.js.
+require("./routes/memed")(app);
 require("./routes/consultaMedica")(app);
 require("./routes/pacientes")(app);
 require("./routes/medicamentos")(app);

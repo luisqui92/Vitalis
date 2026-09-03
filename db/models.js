@@ -113,6 +113,22 @@ const medicoSchema = new mongoose.Schema({
   // es un dato que quien aprueba puede mirar, y que hace que mentir sea una
   // decisión consciente y no un descuido.
   matricula: { type: String, default: "" },
+  // El consejo profesional, partido. Brasil lo necesita así para recetar por
+  // Memed: sigla (CRM, CRO...), estado y número. Y el ESTADO ES EL DEL
+  // CONSEJO, no el del domicilio — es el error más fácil de cometer y no se
+  // nota hasta que una receta sale con el registro de otro estado.
+  //
+  // "matricula" de arriba sigue siendo el texto libre que se declara al
+  // pedir cuenta, en cualquier país. Esto es lo estructurado, y solo lo
+  // llenan las cuentas que recetan en Brasil.
+  conselho: {
+    sigla: { type: String, default: "" },
+    uf: { type: String, default: "" },
+    numero: { type: String, default: "" },
+  },
+  // Memed los pide para dar de alta al prescriptor.
+  cpf: { type: String, default: "" },
+  email: { type: String, default: "" },
   solicitud: {
     pedidaEn: { type: Date, default: null },
     // Lo que la persona escribe sobre sí misma. Es lo único que quien
@@ -227,6 +243,11 @@ const pacienteSchema = new mongoose.Schema({
   sexo: { type: String, default: "" },
   telefono: { type: String, default: "" },
   notas: { type: String, default: "" },
+  // Solo Brasil: Memed identifica al paciente por CPF y sin él no se puede
+  // recetar. Vacío en el resto — pedirle el CPF a un paciente boliviano
+  // sería pedirle un documento que no tiene.
+  cpf: { type: String, default: "" },
+
   // Solo Vitalis Veterinaria: acá "nombre" es el de la mascota y "telefono"
   // ya venía siendo el de contacto (el dueño), así que solo faltan estos 3.
   especie: { type: String, default: "" },
@@ -1238,8 +1259,33 @@ const recetaSchema = new mongoose.Schema({
   }],
   indicaciones: { type: String, default: "" },
   fecha: { type: Date, required: true },
+
+  // ─── De dónde salió esta receta ──────────────────────────────────────
+  //
+  // "vitalis" es la de siempre: un documento que se imprime, válido donde
+  // alcanza con eso. "memed" es una receta FIRMADA DIGITALMENTE que vive en
+  // Memed — acá queda la referencia y una copia de los medicamentos, porque
+  // son dato clínico que el hilo clínico y el brief necesitan, pero el
+  // documento legal no es de Vitalis y no finge serlo.
+  //
+  // La distinción tiene que estar guardada, no deducida: dentro de un año
+  // nadie va a poder decir cuál de estas recetas tenía firma mirando los
+  // medicamentos.
+  origen: { type: String, enum: ["vitalis", "memed"], default: "vitalis", index: true },
+  memed: {
+    prescriptionUuid: { type: String, default: "" },
+    reimpresion: { type: Boolean, default: false },
+  },
 }, { timestamps: true });
 recetaSchema.index({ pacienteId: 1, fecha: -1 });
+// Una reimpresión en Memed vuelve a disparar el mismo evento con el mismo
+// uuid. Sin esto, cada vez que el médico reimprime una receta aparecería una
+// receta nueva en el Kardex — el índice lo impide de raíz, que es más
+// confiable que un "if" del lado del que escribe.
+recetaSchema.index({ "memed.prescriptionUuid": 1 }, {
+  unique: true,
+  partialFilterExpression: { "memed.prescriptionUuid": { $type: "string", $gt: "" } },
+});
 const Receta = mongoose.model("Receta", recetaSchema);
 
 // Recordatorios Médicos: vencimientos/controles próximos, vistos en una

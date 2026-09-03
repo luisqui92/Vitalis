@@ -4,6 +4,11 @@ const API = ""; // mismo dominio que la API — todo este server ES Vitalis
 let TOKEN = localStorage.getItem("salud_token") || null;
 let MEDICO_NOMBRE = localStorage.getItem("salud_nombre") || "";
 let MEDICO_TIPO_ESPECIALIDAD = localStorage.getItem("salud_tipo_especialidad") || "medicina_general";
+// En qué moneda —y por lo tanto bajo qué reglas— trabaja esta cuenta. Se
+// guarda como la especialidad porque hay pantallas que se arman al CARGAR,
+// antes de poder preguntarle nada al servidor. Solo decide qué se dibuja: el
+// permiso y la ley los aplica el servidor en cada pedido.
+let MEDICO_MONEDA = localStorage.getItem("salud_moneda") || "BOB";
 // En escritorio ancho (ver escritorio.js) esto se reapunta al contenedor
 // del panel de escritorio — así ninguna pantalla existente (renderDashboard,
 // renderAgenda, etc.) necesita saber si está en celular o en escritorio,

@@ -26,6 +26,9 @@ async function renderSeguridad() {
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
     pintarSaldo();
+    // Sin await, como los demás: si Memed no contesta, Configuración se abre
+    // igual. Y en cuentas que no recetan por Memed no dibuja nada.
+    if (typeof memedPintarConsejo === "function") memedPintarConsejo();
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando seguridad")}</div>`;
@@ -37,6 +40,9 @@ function pintarSeguridad(dosFAActivo, eventos) {
     <button class="back" id="btnBack">← Panel</button>
 
     <div id="saldoBox"></div>
+    <!-- Solo en cuentas brasileñas: el consejo profesional con el que se
+         firman las recetas. Se llena en renderSeguridad. -->
+    <div id="memedConsejoBox"></div>
 
     ${notificacionesHtml()}
 

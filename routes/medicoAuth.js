@@ -61,6 +61,11 @@ function datosDeSesion(medico) {
     nombre: medico.nombre,
     tipoEspecialidad: medico.tipoEspecialidad,
     idioma: medico.idioma || "es",
+    // La moneda decide bajo qué reglas trabaja esta cuenta, no solo cómo se
+    // muestra el saldo: en Brasil la receta va por Memed porque ahí una
+    // receta necesita firma digital. Por eso viaja en la sesión — el
+    // navegador tiene que saber qué botón de recetar dibujar.
+    moneda: medico.moneda || "BOB",
     rol: medico.rol || "medico",
     clinica: medico.clinicaId ? String(medico.clinicaId) : null,
     // Solo para que la pantalla sepa si dibujar la sección de pagos. NO es

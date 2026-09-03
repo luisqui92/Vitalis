@@ -15,7 +15,12 @@ function filaMedicamentoHtml() {
 
 function tabRecetasHtml(recetas) {
   return `
-    <div class="card">
+    <!-- En Brasil se receta por Memed y esta caja reemplaza a la de abajo:
+         una receta sin firma digital no vale, y dos botones de recetar —uno
+         con validez legal y otro sin ella— son una trampa esperando a que
+         alguien apurado use el equivocado. Se llena en wireTabRecetas. -->
+    <div id="memedBox"></div>
+    <div class="card" id="recetaNuevaBox">
       <div class="seccion-titulo" style="margin-top:0">${t("receta.nueva")}</div>
       <label>${t("receta.fecha")}</label>
       <input id="recFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
@@ -30,7 +35,7 @@ function tabRecetasHtml(recetas) {
     ${recetas.map(r => `
       <div class="item" data-ver-receta="${r._id}">
         <div class="top">
-          <div class="nombre">${esc(r.medicamentos.map(m => m.nombre).join(", "))}</div>
+          <div class="nombre">${r.origen === "memed" ? `<span class="badge badge-completado">${t("memed.firmada")}</span> ` : ""}${esc(r.medicamentos.map(m => m.nombre).join(", "))}</div>
           <button class="link" data-borrar-receta="${r._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
         <div class="fecha">${new Date(r.fecha).toLocaleDateString(localeActual())}</div>
@@ -174,6 +179,10 @@ async function renderRecetaOptica(id) {
 
 function wireTabRecetas(p, recetas) {
   if (MEDICO_TIPO_ESPECIALIDAD === "oftalmologia") renderRecetaOpticaBox(p._id);
+  // Sin await: si la consulta tarda o falla, la pestaña se abre igual con la
+  // receta de siempre. Lo que no puede pasar es lo contrario —quedar sin
+  // ninguna forma de recetar porque una consulta no volvió.
+  if (typeof memedPintarCaja === "function") memedPintarCaja(p._id);
 
   document.getElementById("btnAgregarFila").onclick = () => {
     document.getElementById("recRows").insertAdjacentHTML("beforeend", filaMedicamentoHtml());

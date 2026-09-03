@@ -320,6 +320,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : t("kardex.sinNotas")}</div>` : `
         <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : t("kardex.noRegistrado")}</div>
         <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString(localeActual()) : t("kardex.noRegistrada")}</div>
+        ${MEDICO_MONEDA === "BRL" ? `<div class="dato-row" id="fichaCpf">🪪 ${p.cpf ? esc(p.cpf) : `<button class="link" id="btnCpf" style="width:auto;margin:0;padding:0">${t("memed.cpfFalta")}</button>`}</div>` : ""}
         <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : t("kardex.sinNotas")}</div>`}
       </div>
     </div>
@@ -447,6 +448,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   // Aparte y sin await: si el proveedor de video tarda en contestar, la
   // ficha del paciente tiene que estar en pantalla igual.
   if (typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
+  if (typeof memedCablearCpf === "function") memedCablearCpf(p);
   // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
   // igual. El bloque aparece cuando llega.
   cargarBloquePersona(p);
