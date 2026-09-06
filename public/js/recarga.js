@@ -56,7 +56,7 @@ async function pintarRecarga() {
       const abierto = d.style.display !== "none";
       d.style.display = abierto ? "none" : "";
       btn.textContent = abierto ? t("recarga.quiero") : t("recarga.cerrar");
-      if (!abierto) engancharFormularioRecarga();
+      if (!abierto) { engancharFormularioRecarga(); engancharPix(); }
     };
   }
   const btnHist = document.getElementById("btnMisAvisos");
@@ -110,7 +110,10 @@ function dondePagarHtml(d) {
   return `
     <div class="card card-secundaria" style="margin-top:10px">
       <div class="seccion-titulo" style="margin-top:0">${t("recarga.paso1")}</div>
-      ${d.qr ? `<img src="${esc(d.qr)}" alt="${t("recarga.qr")}" class="recarga-qr">` : ""}
+      <!-- Brasil arma su código con el monto adentro (ver services/pix.js).
+           El QR fijo servía solo para R$ 100 y obligaba a pedir uno nuevo por
+           cada monto distinto. En Bolivia sigue el QR del banco de siempre. -->
+      ${d.pais === "br" ? `<div id="pixBox"></div>` : (d.qr ? `<img src="${esc(d.qr)}" alt="${t("recarga.qr")}" class="recarga-qr">` : "")}
       ${filas.length ? `
         <div class="recarga-datos">
           ${filas.map(([k, v]) => `
@@ -119,8 +122,9 @@ function dondePagarHtml(d) {
 
       <div class="seccion-titulo">${t("recarga.paso2")}</div>
       <div class="hint" style="margin:0 0 10px">${t("recarga.paso2Ayuda")}</div>
-      <label>${t("recarga.cuantoPagaste")}</label>
+      <label>${d.pais === "br" ? t("recarga.cuantoVasAPagar") : t("recarga.cuantoPagaste")}</label>
       <input id="recMonto" type="number" inputmode="decimal" min="1" step="1" placeholder="200">
+      ${d.pais === "br" ? `<button class="secondary" id="btnGenerarPix" style="margin-top:8px">${t("recarga.generarPix")}</button>` : ""}
       <label>${t("recarga.referencia")}</label>
       <input id="recReferencia" type="text" placeholder="${t("recarga.referenciaPlaceholder")}" autocomplete="off">
       <div class="hint" style="margin:6px 0 0">${t("recarga.referenciaAyuda")}</div>
@@ -182,4 +186,56 @@ function historialHtml(solicitudes) {
         </tbody>
       </table>
     </div>`;
+}
+
+// ─── EL CÓDIGO PIX, CON EL MONTO QUE PUSO ─────────────────────────────────
+//
+// El médico escribe cuánto va a recargar y le sale el código por ESE monto.
+// Antes había un QR fijo de R$ 100 y para cualquier otro monto había que
+// pedirle uno nuevo al proveedor a mano — ver services/pix.js.
+//
+// Se muestran las dos formas porque el médico casi siempre está en el
+// celular: el QR sirve si paga desde otro aparato, y "Copia e Cola" es la
+// única que sirve si el banco está en el MISMO teléfono donde ve el código.
+function engancharPix() {
+  const btn = document.getElementById("btnGenerarPix");
+  if (!btn) return;
+
+  btn.onclick = async () => {
+    const caja = document.getElementById("pixBox");
+    const monto = Number(document.getElementById("recMonto").value);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      caja.innerHTML = `<div class="error">${t("recarga.pixFaltaMonto")}</div>`;
+      return;
+    }
+    btn.disabled = true;
+    caja.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+    try {
+      const r = await api(`/medico/recargas/pix?centavos=${Math.round(monto * 100)}`);
+      caja.innerHTML = `
+        <div class="hint" style="margin:0 0 8px">${t("recarga.pixListo", { monto: esc(r.monto) })}</div>
+        <img src="${esc(r.qr)}" alt="Pix" class="recarga-qr">
+        <div class="hint" style="margin:8px 0 4px">${t("recarga.pixCopiaCola")}</div>
+        <textarea id="pixCodigo" readonly rows="3"
+          style="width:100%;box-sizing:border-box;font-family:monospace;font-size:11px">${esc(r.codigo)}</textarea>
+        <button class="secondary" id="btnCopiarPix" style="margin-top:6px">${t("recarga.pixCopiar")}</button>`;
+
+      document.getElementById("btnCopiarPix").onclick = async () => {
+        const b = document.getElementById("btnCopiarPix");
+        try {
+          await navigator.clipboard.writeText(r.codigo);
+          b.textContent = t("recarga.pixCopiado");
+        } catch {
+          // Sin permiso de portapapeles —pasa en varios navegadores del
+          // celular— se selecciona para que se pueda copiar a mano, en vez
+          // de no hacer nada y parecer roto.
+          document.getElementById("pixCodigo").select();
+        }
+      };
+    } catch (e) {
+      caja.innerHTML = `<div class="error">${esc((e && e.error) || t("recarga.pixError"))}</div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  };
 }

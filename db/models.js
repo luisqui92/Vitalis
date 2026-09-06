@@ -1516,6 +1516,10 @@ const configPagoSchema = new mongoose.Schema({
   titular: { type: String, default: "" },
   documento: { type: String, default: "" },
   whatsapp: { type: String, default: "" },
+  // Solo Brasil: el estándar del código Pix exige la ciudad del que cobra.
+  // Vacío no rompe nada — services/pix.js pone un valor por defecto — pero
+  // algunos bancos la muestran al pagador, así que conviene que sea la real.
+  ciudad: { type: String, default: "" },
   // Quién los tocó por última vez. Si un día los pagos empiezan a ir a una
   // cuenta que no es la nuestra, esto es lo primero que hay que mirar.
   actualizadoPor: { type: String, default: "" },

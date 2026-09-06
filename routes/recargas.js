@@ -35,6 +35,9 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { datosDePago, paisDelMedico } = require("../services/datosPago");
+const QRCode = require("qrcode");
+const { armarCodigo, montoDesdeCentavos } = require("../services/pix");
+const monedas = require("../services/monedas");
 const { todosLosOperadores } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
@@ -71,6 +74,54 @@ module.exports = function (app) {
       ...(await datosDePago(paisDelMedico(medico))),
       recargaMinimaCentavos: saldos.RECARGA_MINIMA,
     });
+  }));
+
+  // ─── EL CÓDIGO PIX, CON EL MONTO QUE ELIGIÓ ─────────────────────────────
+  //
+  // Antes había UN QR con R$ 100 grabado adentro, así que cualquier otro
+  // monto obligaba a pedirle un código nuevo al proveedor, a mano. Acá se
+  // arma en el momento — no hace falta ninguna API, un código Pix es un
+  // texto con un formato estándar (ver services/pix.js).
+  //
+  // Solo Brasil: en Bolivia se paga con el QR del banco, que es otra cosa.
+  app.get("/medico/recargas/pix", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("idioma moneda").lean();
+    if (paisDelMedico(medico) !== "br") throw new ErrorHttp(404, "No encontrado");
+
+    const datos = await datosDePago("br");
+    if (!datos?.cuenta) throw new ErrorHttp(503, "Todavía no está cargada la clave Pix. Escribinos.");
+
+    const centavos = Math.round(Number(req.body?.centavos ?? req.query.centavos) || 0);
+    if (centavos <= 0) throw new ErrorHttp(400, "Poné cuánto querés recargar");
+    // El mismo techo que usa la acreditación, y de la misma fuente: un código
+    // por un monto que después el operador no va a poder acreditar es una
+    // trampa puesta con anticipación.
+    const cfg = monedas.config("BRL");
+    if (centavos > cfg.techoPorCarga) {
+      throw new ErrorHttp(400, `Para más de ${monedas.conSimbolo(cfg.techoPorCarga, "BRL")} escribinos antes.`);
+    }
+    if (centavos < cfg.recargaMinima) {
+      throw new ErrorHttp(400, `La recarga mínima es ${monedas.conSimbolo(cfg.recargaMinima, "BRL")}`);
+    }
+
+    // Identifica ESTA recarga. Hoy no se usa para nada; el día que se conecte
+    // el aviso automático del banco, es lo que va a permitir saber que ese
+    // pago fue de este médico sin que nadie lo cruce a mano.
+    const txid = `V${Date.now().toString(36)}${String(medico.phone || "").slice(-4)}`.toUpperCase();
+
+    const codigo = armarCodigo({
+      chave: datos.cuenta,
+      nombre: datos.titular,
+      ciudad: datos.ciudad,
+      montoCentavos: centavos,
+      txid,
+    });
+
+    // El QR y el texto son LO MISMO. Se mandan los dos porque el médico casi
+    // siempre está en el celular, y ahí no puede escanear una pantalla con
+    // ese mismo celular: usa "Pix Copia e Cola" y pega el texto.
+    const qr = await QRCode.toDataURL(codigo, { margin: 1, width: 512 });
+    res.json({ codigo, qr, txid, monto: montoDesdeCentavos(centavos) });
   }));
 
   // ─── AVISAR QUE PAGUÉ ───────────────────────────────────────────────────
