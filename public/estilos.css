@@ -998,3 +998,12 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .sol-mensaje{font-size:13px;background:var(--bg);border-radius:var(--radius-sm);padding:9px 11px;margin-top:9px;line-height:1.5;}
 .sol-acciones{display:flex;gap:8px;margin-top:12px;}
 .sol-acciones button{margin:0;width:auto;flex:1;padding:9px;font-size:13px;}
+
+/* ─── PLANES ──────────────────────────────────────────────────────────────
+   Dos opciones que se tocan. No es una tabla comparativa con veinte filas:
+   el médico ya sabe qué hace Vitalis, lo único que elige es cómo paga. */
+.plan-opcion{border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:8px;cursor:pointer;background:var(--card);transition:border-color .15s ease,transform .1s ease;}
+.plan-opcion:hover{border-color:var(--primary);}
+.plan-opcion:active{transform:scale(.99);}
+.plan-nombre{font-weight:600;font-size:14.5px;}
+.plan-precio{font-family:var(--font-marca);font-size:22px;font-weight:600;color:var(--primary);margin-top:2px;letter-spacing:-.01em;}

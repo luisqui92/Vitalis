@@ -1,0 +1,23 @@
+// Vitalis — Português · planos e consultas de cortesia.
+Object.assign(I18N.pt, {
+  "plan.titulo": "Seu plano",
+  "plan.mensual": "Mensal",
+  "plan.anual": "Anual",
+  "plan.activoTitulo": "Plano {plan} ativo",
+  "plan.venceEn": "Faltam {dias} dias. As consultas não descontam saldo.",
+  "plan.porVencer": "Seu plano vence em {dias} dias. Renove para não ficar sem serviço.",
+  "plan.gratisRestantes": "{n} consultas grátis",
+  "plan.gratisAyuda": "Sua conta começa com {total} consultas sem custo. Teste tudo antes de pagar.",
+  "plan.quedanPocas": "Restam {n} consultas grátis. Veja os planos quando quiser, sem pressa.",
+  "plan.ultimaGratis": "É sua última consulta grátis. Escolha como quer continuar.",
+  "plan.verPlanes": "Ver planos",
+  "plan.renovar": "Renovar meu plano",
+  "plan.elegirAyuda": "Escolha o que servir para você. Pode mudar quando quiser.",
+  "plan.renovarAyuda": "Os dias novos somam aos que faltam, não substituem.",
+  "plan.mensualAyuda": "Consultas sem limite. Compensa a partir de {n} consultas por mês.",
+  "plan.anualAyuda": "Doze meses pelo preço de onze: {meses} mês grátis.",
+  "plan.oPrepago": "Ou continue no pré-pago: você carrega saldo e cada consulta desconta {monto}. Sem compromisso.",
+  "plan.pagarTitulo": "Plano {plan} · {monto}",
+  "plan.pagarManual": "Para ativar o plano {plan}, transfira {monto} para a conta acima e nos avise.",
+  "plan.despuesDePagar": "Depois de pagar, avise pelo botão abaixo e ativamos seu plano.",
+});
