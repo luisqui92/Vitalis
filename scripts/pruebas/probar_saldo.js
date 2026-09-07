@@ -61,8 +61,14 @@ async function main() {
   await MovimientoSaldo.init();
 
   const hash = await hashPassword("Prueba123.");
-  const ana = await Medico.create({ phone: "70000001", nombre: "Dra. Ana", passwordHash: hash });
-  await Medico.create({ phone: "70000002", nombre: "Dr. Beto", passwordHash: hash });
+  // Las dos arrancan con las consultas de cortesía YA usadas. Esta prueba es
+  // sobre el prepago —cargar, cobrar, no cobrar dos veces— y con las cuatro
+  // gratis disponibles las primeras consultas no descontarían nada, que es lo
+  // correcto pero es otro comportamiento y tiene su propia prueba
+  // (probar_consultas_gratis.js).
+  const gratisAgotadas = { consultasGratisUsadas: 99 };
+  const ana = await Medico.create({ phone: "70000001", nombre: "Dra. Ana", passwordHash: hash, ...gratisAgotadas });
+  await Medico.create({ phone: "70000002", nombre: "Dr. Beto", passwordHash: hash, ...gratisAgotadas });
 
   console.log("── 1. Una cuenta nueva arranca en cero ──");
   let e = await saldos.estadoDe(ana.phone);

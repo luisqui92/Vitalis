@@ -92,8 +92,10 @@ verificar("el aviso de saldo bajo respeta el plan", /bajo:\s*!plan\.activa/.test
 verificar("el bloqueo también", /bloqueado:\s*!plan\.activa/.test(saldo));
 // Y lo más importante: que el descuento sea CERO, no que se saltee el
 // movimiento. Sin el movimiento no se sabe cuántas consultas hace un plan.
-verificar("la consulta de un suscriptor se anota con monto cero",
-  /montoCentavos:\s*conPlan\s*\?\s*0\s*:/.test(saldo));
+// "sinCargo" es plan vigente O consulta de cortesía: en los dos casos el
+// movimiento se escribe con monto cero, no se saltea.
+verificar("la consulta sin cargo se anota con monto cero",
+  /montoCentavos:\s*sinCargo\s*\?\s*0\s*:/.test(saldo));
 verificar("  ...y sigue pasando por el índice único de consultaId",
   /consultaId,?\s*\n\s*\}\);/.test(saldo) || saldo.includes("consultaId,"));
 

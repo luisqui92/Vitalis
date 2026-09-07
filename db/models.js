@@ -141,6 +141,21 @@ const medicoSchema = new mongoose.Schema({
     motivo: { type: String, default: "" },
   },
 
+  // ─── Las consultas de cortesía ─────────────────────────────────────────
+  //
+  // Cada cuenta nueva tiene unas cuantas consultas gratis. No es un regalo:
+  // es la única forma de que un médico sepa si esto le sirve. Para la cuarta
+  // ya sabe si le ahorra tiempo, y recién ahí la decisión de pagar es fácil.
+  //
+  // Se cuenta acá y NO se resuelve regalando saldo, a propósito. Si fueran
+  // R$ 40 de saldo, el día que cambie el precio de la consulta cambiaría
+  // también cuántas son gratis, sin que nadie lo decida. "Cuatro" tiene que
+  // seguir siendo cuatro.
+  //
+  // Es una copia rápida: la verdad está en el libro mayor, donde cada
+  // consulta de cortesía deja su movimiento en cero.
+  consultasGratisUsadas: { type: Number, default: 0 },
+
   // ─── Plan mensual/anual (la alternativa al prepago) ───────────────────
   //
   // Dos formas de pagar, y una cuenta usa UNA de las dos:

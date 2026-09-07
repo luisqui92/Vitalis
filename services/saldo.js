@@ -51,6 +51,14 @@ const PRECIO_CONSULTA = monedas.config("BOB").precioConsulta;
 const LIMITE_NEGATIVO = -5 * PRECIO_CONSULTA;
 // Desde cuántas consultas restantes se le empieza a avisar.
 const AVISAR_DESDE = 5;
+
+// Cuántas consultas gratis tiene una cuenta nueva. Va en el entorno para
+// poder moverlo en una campaña sin desplegar.
+//
+// Es un NÚMERO DE CONSULTAS y no un monto de saldo regalado: si fuera saldo,
+// el día que cambie el precio cambiaría también cuántas son gratis, sin que
+// nadie lo decida.
+const CONSULTAS_GRATIS = Number(process.env.CONSULTAS_GRATIS || 4);
 // Recarga mínima. Es una regla comercial —no tiene sentido procesar a mano
 // una transferencia de Bs 20— pero NO es un bloqueo absoluto: ver cargar().
 const RECARGA_MINIMA = monedas.config("BOB").recargaMinima;
@@ -69,7 +77,7 @@ async function monedaDe(medicoPhone) {
 }
 
 async function estadoDe(medicoPhone) {
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion consultasGratisUsadas").lean();
   const saldoCentavos = medico?.saldoCentavos || 0;
   const moneda = monedas.normalizar(medico?.moneda);
   const cfg = monedas.config(moneda);
@@ -78,6 +86,8 @@ async function estadoDe(medicoPhone) {
   const consultasRestantes = Math.max(0, Math.floor(saldoCentavos / cfg.precioConsulta));
   const limiteNegativo = -5 * cfg.precioConsulta;
   const plan = suscripciones.estado(medico);
+  const gratisUsadas = Math.min(medico?.consultasGratisUsadas || 0, CONSULTAS_GRATIS);
+  const gratisRestantes = CONSULTAS_GRATIS - gratisUsadas;
   return {
     saldoCentavos,
     moneda, simbolo: cfg.simbolo,
@@ -91,12 +101,26 @@ async function estadoDe(medicoPhone) {
     // así que un saldo en cero —o en rojo, de antes de contratar— no
     // significa nada. Sin esto, un médico que acaba de pagar R$ 400 vería
     // "te queda poco saldo" y podría quedar bloqueado.
-    bajo: !plan.activa && consultasRestantes <= AVISAR_DESDE,
+    // Tampoco se avisa mientras le queden de cortesía: una cuenta nueva
+    // arranca en cero y vería "te queda poco saldo" antes de haber usado
+    // Vitalis una sola vez.
+    bajo: !plan.activa && gratisRestantes === 0 && consultasRestantes <= AVISAR_DESDE,
     // Si ya no puede ni empezar otra consulta.
-    bloqueado: !plan.activa && saldoCentavos <= limiteNegativo,
+    bloqueado: !plan.activa && gratisRestantes === 0 && saldoCentavos <= limiteNegativo,
     limiteNegativoCentavos: limiteNegativo,
     recargaMinimaCentavos: cfg.recargaMinima,
     suscripcion: plan,
+    // Las de cortesía. La pantalla las usa para avisar ANTES de que se
+    // acaben —cuando el médico todavía puede decidir con calma— y no el día
+    // que se topa con que ya no puede transcribir.
+    gratis: {
+      total: CONSULTAS_GRATIS,
+      usadas: gratisUsadas,
+      restantes: gratisRestantes,
+      enCortesia: gratisRestantes > 0,
+      // Sobre las dos últimas ya conviene mostrar los planes.
+      porAcabarse: gratisRestantes > 0 && gratisRestantes <= 2,
+    },
   };
 }
 
@@ -266,20 +290,48 @@ async function cobrarConsulta({ medicoPhone, consultaId }) {
   // suscriptor tampoco puede duplicar el registro de una misma consulta.
   const conPlan = suscripciones.vigente(medico);
 
+  // ═══ LAS DE CORTESÍA, ANTES DE COBRAR ═══════════════════════════════════
+  //
+  // El $inc con la condición adentro del filtro es lo que lo hace seguro: si
+  // dos consultas terminan de transcribirse al mismo tiempo con una sola
+  // gratis disponible, la base deja pasar UNA. Preguntar primero y sumar
+  // después dejaría pasar las dos, y regalaríamos consultas de a pares sin
+  // enterarnos.
+  let deCortesia = false;
+  if (!conPlan) {
+    const consumida = await Medico.findOneAndUpdate(
+      { phone: medicoPhone, consultasGratisUsadas: { $lt: CONSULTAS_GRATIS } },
+      { $inc: { consultasGratisUsadas: 1 } },
+      { new: true, projection: { consultasGratisUsadas: 1 } }
+    );
+    deCortesia = Boolean(consumida);
+  }
+  const sinCargo = conPlan || deCortesia;
+
   try {
     const mov = await aplicar({
       medicoPhone, tipo: "consumo",
-      montoCentavos: conPlan ? 0 : -cfg.precioConsulta,
+      montoCentavos: sinCargo ? 0 : -cfg.precioConsulta,
       moneda: monedaCuenta,
-      concepto: conPlan ? `Consulta transcrita (plan ${medico.suscripcion.plan})` : "Consulta transcrita",
+      concepto: conPlan ? `Consulta transcrita (plan ${medico.suscripcion.plan})`
+        : deCortesia ? "Consulta de cortesía"
+        : "Consulta transcrita",
       consultaId,
     });
-    if (conPlan) return { cobrado: true, conPlan: true, movimiento: mov, saldoCentavos: mov.saldoDespuesCentavos };
+    if (sinCargo) return { cobrado: true, conPlan, deCortesia, movimiento: mov, saldoCentavos: mov.saldoDespuesCentavos };
     if (mov.saldoDespuesCentavos < 0) {
       log.warn(`[SALDO] ${medicoPhone} quedó en ${monedas.conSimbolo(mov.saldoDespuesCentavos, monedaCuenta)} — la consulta se completó igual`);
     }
     return { cobrado: true, movimiento: mov, saldoCentavos: mov.saldoDespuesCentavos };
   } catch (e) {
+    // La cortesía ya se descontó ANTES de escribir el movimiento, así que si
+    // el movimiento no se escribió hay que devolverla. Sin esto, dos procesos
+    // cobrando la misma consulta le queman una consulta gratis al médico por
+    // un choque que no tuvo nada que ver con él.
+    if (deCortesia) {
+      await Medico.updateOne({ phone: medicoPhone }, { $inc: { consultasGratisUsadas: -1 } })
+        .catch(() => log.error(`[SALDO] no se pudo devolver la consulta de cortesía a ${medicoPhone}`));
+    }
     // 11000 = el índice único atajó un cobro doble. Es el caso bueno, no un
     // error: significa que dos procesos intentaron cobrar la misma consulta.
     if (e.code === 11000) return { cobrado: false, motivo: "ya_cobrada" };
@@ -325,5 +377,5 @@ async function reconciliar(medicoPhone, { corregir = false } = {}) {
 
 module.exports = {
   estadoDe, movimientosDe, cargar, cobrarConsulta, ajustar, reconciliar, claveDeReferencia,
-  bolivianos, monedaDe, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE, RECARGA_MINIMA,
+  bolivianos, monedaDe, PRECIO_CONSULTA, LIMITE_NEGATIVO, AVISAR_DESDE, RECARGA_MINIMA, CONSULTAS_GRATIS,
 };
