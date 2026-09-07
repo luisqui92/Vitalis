@@ -62,4 +62,11 @@ Object.assign(I18N.es, {
   "op.dp.errGuardar": "No se pudo guardar",
   "op.dp.qrOk": "✅ El código QR está cargado y se le muestra a los médicos.",
   "op.dp.sinQr": "No hay código QR cargado. Subí la imagen al servidor como public/pago-qr.jpg, o cargá los datos bancarios de arriba.",
+  "op.planTitulo": "O activarle un plan",
+  "op.planSinPlan": "Hoy paga por consulta. Usa la misma referencia de arriba.",
+  "op.planVigente": "Ya tiene plan {plan}, le quedan {dias} días. Activar de nuevo los suma.",
+  "op.confirmarPlan": "Vas a activarle el plan {plan} ({monto}) a {nombre}. ¿Confirmás?",
+  "op.confirmarRenovar": "Vas a renovarle el plan {plan} ({monto}) a {nombre}. Los días se suman a los que le quedan. ¿Confirmás?",
+  "op.planListo": "Plan {plan} activo hasta el {hasta}.",
+  "op.errPlan": "No se pudo activar el plan",
 });

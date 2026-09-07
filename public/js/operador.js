@@ -265,12 +265,79 @@ async function abrirFichaOperador(phone) {
       <div id="opErr"></div>
       <button class="secondary" id="btnAcreditar">${t("op.acreditar")}</button>
 
+      <!-- La otra forma de cobrar. Va DEBAJO de acreditar y no arriba: la
+           mayoría de las veces lo que llega es una recarga, y poner el plan
+           primero haría que se toque por error. Usa la MISMA referencia de
+           pago: es el mismo comprobante. -->
+      <div class="seccion-titulo">${t("op.planTitulo")}</div>
+      <div class="hint" style="margin:0 0 8px">
+        ${d.suscripcion && d.suscripcion.activa
+          ? t("op.planVigente", { plan: t("plan." + d.suscripcion.plan), dias: d.suscripcion.diasRestantes })
+          : t("op.planSinPlan")}
+      </div>
+      <div class="sol-acciones">
+        <button class="secondary" data-plan="mensual" style="margin:0">
+          ${t("plan.mensual")} · ${esc((d.suscripcion && d.suscripcion.precios || {}).mensualTexto || "")}
+        </button>
+        <button class="secondary" data-plan="anual" style="margin:0">
+          ${t("plan.anual")} · ${esc((d.suscripcion && d.suscripcion.precios || {}).anualTexto || "")}
+        </button>
+      </div>
+
       ${d.movimientos.length ? `
         <div class="seccion-titulo">${t("op.ultimos")}</div>
         ${movimientosHtml(d.movimientos)}` : ""}
     </div>`;
 
   document.getElementById("btnAcreditar").onclick = () => acreditar(false);
+  caja.querySelectorAll("[data-plan]").forEach(b => {
+    b.onclick = () => activarPlan(b.dataset.plan, d);
+  });
+}
+
+// ─── ACTIVAR UN PLAN ──────────────────────────────────────────────────────
+//
+// Es lo mismo que acreditar saldo —dar servicio contra un pago que alguien
+// dice haber recibido— así que pide lo mismo: la referencia del comprobante,
+// y una confirmación que dice el NOMBRE y hasta cuándo.
+//
+// El nombre y no el teléfono, por la misma razón de siempre: un número mal
+// elegido no se nota releyéndolo, un nombre sí. Y acá el error es peor que
+// acreditar de más, porque un plan mal dado son treinta días de servicio
+// gratis que nadie va a revisar.
+async function activarPlan(plan, d) {
+  const err = document.getElementById("opErr");
+  err.innerHTML = "";
+
+  const referencia = document.getElementById("opReferencia").value.trim();
+  if (!referencia) { err.innerHTML = `<div class="error">${t("op.errReferencia")}</div>`; return; }
+
+  const precios = (d.suscripcion || {}).precios || {};
+  const precio = plan === "anual" ? precios.anualTexto : precios.mensualTexto;
+  const renueva = d.suscripcion && d.suscripcion.activa;
+
+  if (!confirm(t(renueva ? "op.confirmarRenovar" : "op.confirmarPlan", {
+    plan: t("plan." + plan), monto: precio, nombre: d.medico.nombre,
+  }))) return;
+
+  const botones = [...document.querySelectorAll("[data-plan]")];
+  botones.forEach(b => { b.disabled = true; });
+  try {
+    const r = await api("/medico/operador/plan", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: d.medico.phone, plan, referencia }),
+    });
+    err.innerHTML = `<div class="hint">${t("op.planListo", {
+      plan: t("plan." + plan),
+      hasta: new Date(r.hasta).toLocaleDateString(localeActual()),
+    })}</div>`;
+    // Se vuelve a traer la ficha para que el estado que se ve sea el guardado,
+    // no el que suponemos.
+    abrirFichaOperador(d.medico.phone);
+  } catch (e) {
+    botones.forEach(b => { b.disabled = false; });
+    err.innerHTML = `<div class="error">${esc((e && e.error) || t("op.errPlan"))}</div>`;
+  }
 }
 
 async function acreditar(igual) {

@@ -99,5 +99,87 @@ verificar("la consulta sin cargo se anota con monto cero",
 verificar("  ...y sigue pasando por el índice único de consultaId",
   /consultaId,?\s*\n\s*\}\);/.test(saldo) || saldo.includes("consultaId,"));
 
-console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
-process.exit(fallos === 0 ? 0 : 1);
+console.log("\n── 9. La ruta que activa el plan ──");
+// Acá se crea servicio a cambio de un pago que alguien dice haber recibido.
+// Los mismos candados que acreditar plata: lista de operadores, 2FA,
+// referencia obligatoria y auditoría.
+(async () => {
+  const http = require("http");
+  const { MongoMemoryServer } = require("mongodb-memory-server");
+  const mongod = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongod.getUri("vitalis_prueba");
+  process.env.OPERADORES_SALDO = "70000009";
+
+  const mongoose = require("mongoose");
+  await mongoose.connect(process.env.MONGODB_URI);
+  const express = require("express");
+  const app = express();
+  app.use(express.json());
+  require(path.join(RAIZ, "routes", "operadorSaldo"))(app);
+  app.use((err, _q, res, _n) => res.status(err.status || 500).json({ error: err.message }));
+
+  const { Medico, AuditLog } = require(path.join(RAIZ, "db", "models"));
+  const { hashPassword, generarToken } = require(path.join(RAIZ, "services", "auth"));
+  await mongoose.connection.dropDatabase();
+
+  const hash = await hashPassword("Prueba123.");
+  await Medico.create({ phone: "70000009", nombre: "Quien Cobra", passwordHash: hash, activo: true, dosFA: { activo: true, secreto: "X" } });
+  await Medico.create({ phone: "5511900001", nombre: "Dra. Ana Souza", passwordHash: hash, activo: true, moneda: "BRL" });
+  const tk = generarToken("70000009", "medico", 3600 * 1000);
+  const tkAjeno = generarToken("5511900001", "medico", 3600 * 1000);
+
+  const servidor = http.createServer(app);
+  await new Promise(r => servidor.listen(0, "127.0.0.1", r));
+  let n = 0;
+  const POST = (ruta, token, cuerpo) => new Promise(res => {
+    const datos = JSON.stringify(cuerpo || {});
+    const req = http.request({
+      host: "127.0.0.1", port: servidor.address().port, path: ruta, method: "POST",
+      headers: {
+        "X-Forwarded-For": `203.0.113.${(n++ % 250) + 1}`,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json", "Content-Length": Buffer.byteLength(datos),
+      },
+    }, r => { let t = ""; r.on("data", d => t += d); r.on("end", () => { let j = null; try { j = JSON.parse(t); } catch {} res({ estado: r.statusCode, cuerpo: j }); }); });
+    req.on("error", () => res({ estado: 0 }));
+    req.write(datos); req.end();
+  });
+
+  const ajeno = await POST("/medico/operador/plan", tkAjeno, { phone: "5511900001", plan: "mensual", referencia: "x" });
+  verificar("un médico común recibe 404, no un cartel de permisos", ajeno.estado === 404);
+
+  const sinRef = await POST("/medico/operador/plan", tk, { phone: "5511900001", plan: "mensual" });
+  verificar("sin referencia del pago no se activa", sinRef.estado === 400);
+
+  const inventado = await POST("/medico/operador/plan", tk, { phone: "5511900001", plan: "trimestral", referencia: "PIX-1" });
+  verificar("un plan que no existe se rechaza", inventado.estado === 400);
+
+  const ok = await POST("/medico/operador/plan", tk, { phone: "5511900001", plan: "mensual", referencia: "PIX-1" });
+  verificar("con todo en orden se activa", ok.estado === 200);
+  verificar("  ...y cobra el precio brasileño", ok.cuerpo.precioCentavos === 40000);
+
+  const guardado = await Medico.findOne({ phone: "5511900001" }).lean();
+  verificar("queda escrito quién lo activó", guardado.suscripcion.activadaPor === "70000009");
+  verificar("  ...y en qué moneda se cobró", guardado.suscripcion.moneda === "BRL");
+
+  const auditoria = await AuditLog.findOne({ accion: "plan_activado" }).lean();
+  verificar("queda en el log de auditoría", Boolean(auditoria));
+  verificar("  ...con la referencia del pago", /PIX-1/.test(auditoria.detalle || ""));
+
+  // Renovar conserva desde cuándo es cliente: pisarlo con hoy borraría que
+  // este médico paga desde hace un año.
+  const desdeAntes = guardado.suscripcion.desde;
+  const renov = await POST("/medico/operador/plan", tk, { phone: "5511900001", plan: "mensual", referencia: "PIX-2" });
+  verificar("renovar se marca como renovación", renov.cuerpo.renovacion === true);
+  const trasRenovar = await Medico.findOne({ phone: "5511900001" }).lean();
+  verificar("  ...y conserva desde cuándo es cliente",
+    new Date(trasRenovar.suscripcion.desde).getTime() === new Date(desdeAntes).getTime());
+  verificar("  ...sumando el mes al vencimiento anterior",
+    new Date(trasRenovar.suscripcion.hasta) > new Date(guardado.suscripcion.hasta));
+
+  servidor.close();
+  await mongoose.disconnect();
+  await mongod.stop();
+  console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
+  process.exit(fallos === 0 ? 0 : 1);
+})();
