@@ -38,7 +38,11 @@ const MONEDAS = {
   BRL: {
     codigo: "BRL",
     simbolo: "R$",
-    precioConsulta: Number(process.env.PRECIO_CONSULTA_CENTAVOS_BRL || process.env.PRECIO_CONSULTA_CENTAVOS || 1200),
+    // R$ 10,00. NO cae al precio boliviano si falta la variable: son
+    // mercados distintos y el número de Bolivia acá sería una decisión que
+    // nadie tomó. Antes heredaba de PRECIO_CONSULTA_CENTAVOS y eso hacía que
+    // Brasil cobrara Bs 12 disfrazados de R$ 12.
+    precioConsulta: Number(process.env.PRECIO_CONSULTA_CENTAVOS_BRL || 1000),
     recargaMinima: Number(process.env.RECARGA_MINIMA_CENTAVOS_BRL || process.env.RECARGA_MINIMA_CENTAVOS || 10000),
     techoPorCarga: Number(process.env.TECHO_CARGA_CENTAVOS_BRL || process.env.TECHO_CARGA_CENTAVOS || 500000),
   },

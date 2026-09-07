@@ -37,6 +37,7 @@ const { esOperador } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
 const monedas = require("../services/monedas");
+const suscripciones = require("../services/suscripciones");
 const { datosDePago, guardarDatosDePago, normalizarPais } = require("../services/datosPago");
 const { log } = require("../config");
 
@@ -400,6 +401,68 @@ module.exports = function (app) {
   // mínimo, el rechazo de referencias repetidas y el libro de movimientos son
   // los mismos que usa el script. Dos caminos distintos para crear plata, con
   // reglas distintas, es cómo aparecen los agujeros.
+  // ─── ACTIVAR UN PLAN ────────────────────────────────────────────────────
+  //
+  // La otra forma de cobrar: en vez de acreditar saldo, se le da un período
+  // en el que las consultas no descuentan nada.
+  //
+  // Mismo candado que acreditar plata —lista de operadores, 2FA, auditoría—
+  // porque es exactamente lo mismo: dar servicio a cambio de un pago que
+  // alguien dice haber recibido.
+  app.post("/medico/operador/plan", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const quien = req.adminUser.usuario;
+    const destino = String(req.body?.phone || "").trim();
+    const plan = String(req.body?.plan || "").trim();
+    const referencia = String(req.body?.referencia || "").trim().slice(0, 120);
+
+    if (!destino) throw new ErrorHttp(400, "Falta el teléfono del médico");
+    if (!suscripciones.PLANES[plan]) throw new ErrorHttp(400, "Plan desconocido: tiene que ser mensual o anual");
+    // La referencia del pago es obligatoria por la misma razón que en las
+    // recargas: dentro de seis meses, "¿por qué esta cuenta tiene plan?"
+    // tiene que tener respuesta.
+    if (!referencia) throw new ErrorHttp(400, "Poné la referencia del pago");
+
+    const medico = await Medico.findOne({ phone: destino });
+    if (!medico) throw new ErrorHttp(404, "No encontramos ese médico");
+
+    const moneda = monedas.normalizar(medico.moneda);
+    const precio = suscripciones.precioDelPlan(plan, moneda);
+    const hasta = suscripciones.nuevoVencimiento(medico, plan);
+    const renovacion = suscripciones.vigente(medico);
+
+    medico.suscripcion = {
+      plan,
+      // En una renovación se conserva desde cuándo es cliente. Pisarlo con
+      // la fecha de hoy borraría que este médico paga desde hace un año.
+      desde: medico.suscripcion?.desde || new Date(),
+      hasta,
+      precioCentavos: precio,
+      moneda,
+      activadaPor: quien,
+    };
+    await medico.save();
+
+    registrar({
+      req, medicoPhone: quien, accion: renovacion ? "plan_renovado" : "plan_activado",
+      recurso: `Medico:${destino}`,
+      detalle: `${plan} · ${monedas.conSimbolo(precio, moneda)} · hasta ${hasta.toISOString().slice(0, 10)} · ref ${referencia}`,
+    });
+    log.info(`[PLAN] ${quien} ${renovacion ? "renovó" : "activó"} plan ${plan} a ${medico.nombre} (${destino}) hasta ${hasta.toISOString().slice(0, 10)}`);
+
+    notificarMedico(destino, {
+      titulo: renovacion ? "Tu plan se renovó" : "Tu plan está activo",
+      cuerpo: `${plan === "anual" ? "Anual" : "Mensual"} · hasta ${hasta.toLocaleDateString("es-BO")}`,
+      url: "/",
+    }).catch(() => { /* que no llegue el aviso no puede tumbar la activación */ });
+
+    res.json({
+      ok: true, plan, renovacion,
+      hasta, precioCentavos: precio,
+      precioTexto: monedas.conSimbolo(precio, moneda),
+      medico: { phone: medico.phone, nombre: medico.nombre },
+    });
+  }));
+
   app.post("/medico/operador/acreditar", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const destino = String(req.body?.phone || "").trim();
     const bolivianos = Number(req.body?.bolivianos);

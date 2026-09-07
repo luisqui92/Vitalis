@@ -141,6 +141,33 @@ const medicoSchema = new mongoose.Schema({
     motivo: { type: String, default: "" },
   },
 
+  // ─── Plan mensual/anual (la alternativa al prepago) ───────────────────
+  //
+  // Dos formas de pagar, y una cuenta usa UNA de las dos:
+  //
+  //   · prepago      — carga saldo y cada consulta le descuenta;
+  //   · suscripción  — paga por mes o por año y las consultas no descuentan.
+  //
+  // No conviven: mientras el plan esté vigente, cobrarConsulta no toca el
+  // saldo. Y cuando vence, la cuenta NO se bloquea: vuelve al prepago con el
+  // saldo que tenga. Cortarle el sistema a un médico que está grabando una
+  // consulta porque se le venció el plan ayer es exactamente lo que este
+  // sistema evita en todos lados (por eso el prepago tampoco corta en cero,
+  // sino cinco consultas más abajo).
+  suscripcion: {
+    plan: { type: String, enum: ["mensual", "anual", ""], default: "" },
+    desde: { type: Date, default: null },
+    // Hasta cuándo vale. La comparación es contra esta fecha y nada más: sin
+    // "activo: true" que pueda quedar en true después de vencido, que es la
+    // clase de dato que se desincroniza y nadie mira.
+    hasta: { type: Date, default: null, index: true },
+    // Lo que se cobró, guardado como valor. Si mañana sube el precio, las
+    // suscripciones viejas siguen diciendo lo que se pagó de verdad.
+    precioCentavos: { type: Number, default: 0 },
+    moneda: { type: String, default: "" },
+    activadaPor: { type: String, default: "" },
+  },
+
   // Saldo prepago, en centavos de boliviano (Bs 12 = 1200). Es una COPIA
   // rápida de la suma de MovimientoSaldo, no la verdad — para no sumar toda
   // la historia cada vez que se pinta una pantalla. Puede quedar en negativo

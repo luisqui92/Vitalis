@@ -35,6 +35,7 @@
 // suma de los movimientos, gana la suma — ver reconciliar().
 const { Medico, MovimientoSaldo } = require("../db/models");
 const monedas = require("./monedas");
+const suscripciones = require("./suscripciones");
 const { log } = require("../config");
 
 // En centavos de boliviano. Configurable por entorno porque el precio va a
@@ -68,7 +69,7 @@ async function monedaDe(medicoPhone) {
 }
 
 async function estadoDe(medicoPhone) {
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion").lean();
   const saldoCentavos = medico?.saldoCentavos || 0;
   const moneda = monedas.normalizar(medico?.moneda);
   const cfg = monedas.config(moneda);
@@ -76,6 +77,7 @@ async function estadoDe(medicoPhone) {
   // queda UNA, no una y media. Decirle 1.5 sería mentirle.
   const consultasRestantes = Math.max(0, Math.floor(saldoCentavos / cfg.precioConsulta));
   const limiteNegativo = -5 * cfg.precioConsulta;
+  const plan = suscripciones.estado(medico);
   return {
     saldoCentavos,
     moneda, simbolo: cfg.simbolo,
@@ -84,11 +86,17 @@ async function estadoDe(medicoPhone) {
     consultasRestantes,
     enNegativo: saldoCentavos < 0,
     // "Bajo" incluye el negativo, no solo el que está por acabarse.
-    bajo: consultasRestantes <= AVISAR_DESDE,
+    //
+    // Con plan vigente los dos avisos se apagan: las consultas no descuentan,
+    // así que un saldo en cero —o en rojo, de antes de contratar— no
+    // significa nada. Sin esto, un médico que acaba de pagar R$ 400 vería
+    // "te queda poco saldo" y podría quedar bloqueado.
+    bajo: !plan.activa && consultasRestantes <= AVISAR_DESDE,
     // Si ya no puede ni empezar otra consulta.
-    bloqueado: saldoCentavos <= limiteNegativo,
+    bloqueado: !plan.activa && saldoCentavos <= limiteNegativo,
     limiteNegativoCentavos: limiteNegativo,
     recargaMinimaCentavos: cfg.recargaMinima,
+    suscripcion: plan,
   };
 }
 
@@ -242,15 +250,31 @@ async function cobrarConsulta({ medicoPhone, consultaId }) {
   // El precio es el de SU moneda. Cobrarle 1200 centavos a un médico
   // brasileño porque ese es el precio boliviano sería cobrarle un número, no
   // un precio.
-  const monedaCuenta = await monedaDe(medicoPhone);
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("moneda suscripcion").lean();
+  const monedaCuenta = monedas.normalizar(medico?.moneda);
   const cfg = monedas.config(monedaCuenta);
+
+  // ═══ CON PLAN VIGENTE NO SE DESCUENTA — PERO SE ANOTA ═══════════════════
+  //
+  // El movimiento se escribe igual, con monto cero. Parece redundante y no
+  // lo es: es la única forma de saber cuántas consultas hace un plan de
+  // R$ 400, y eso es lo que contesta si el precio está bien puesto o si hay
+  // alguien haciendo 300 al mes mientras la transcripción se paga por
+  // consulta.
+  //
+  // Además el índice único por consultaId sigue valiendo, así que un
+  // suscriptor tampoco puede duplicar el registro de una misma consulta.
+  const conPlan = suscripciones.vigente(medico);
 
   try {
     const mov = await aplicar({
-      medicoPhone, tipo: "consumo", montoCentavos: -cfg.precioConsulta,
+      medicoPhone, tipo: "consumo",
+      montoCentavos: conPlan ? 0 : -cfg.precioConsulta,
       moneda: monedaCuenta,
-      concepto: "Consulta transcrita", consultaId,
+      concepto: conPlan ? `Consulta transcrita (plan ${medico.suscripcion.plan})` : "Consulta transcrita",
+      consultaId,
     });
+    if (conPlan) return { cobrado: true, conPlan: true, movimiento: mov, saldoCentavos: mov.saldoDespuesCentavos };
     if (mov.saldoDespuesCentavos < 0) {
       log.warn(`[SALDO] ${medicoPhone} quedó en ${monedas.conSimbolo(mov.saldoDespuesCentavos, monedaCuenta)} — la consulta se completó igual`);
     }
