@@ -162,9 +162,21 @@ console.log("\n── 9. La ruta que activa el plan ──");
   verificar("queda escrito quién lo activó", guardado.suscripcion.activadaPor === "70000009");
   verificar("  ...y en qué moneda se cobró", guardado.suscripcion.moneda === "BRL");
 
-  const auditoria = await AuditLog.findOne({ accion: "plan_activado" }).lean();
+  // registrar() escribe SIN await —la auditoría nunca puede bloquear ni hacer
+  // fallar la operación real—, así que leer una sola vez es una carrera: esta
+  // prueba fallaba una corrida de cada tres, que es peor que no tenerla,
+  // porque enseña a ignorar el rojo. Se espera a que aparezca.
+  const esperarA = async (buscar, ms = 2000) => {
+    const hasta = Date.now() + ms;
+    for (;;) {
+      const encontrado = await buscar();
+      if (encontrado || Date.now() > hasta) return encontrado;
+      await new Promise(r => setTimeout(r, 25));
+    }
+  };
+  const auditoria = await esperarA(() => AuditLog.findOne({ accion: "plan_activado" }).lean());
   verificar("queda en el log de auditoría", Boolean(auditoria));
-  verificar("  ...con la referencia del pago", /PIX-1/.test(auditoria.detalle || ""));
+  verificar("  ...con la referencia del pago", /PIX-1/.test(auditoria?.detalle || ""));
 
   // Renovar conserva desde cuándo es cliente: pisarlo con hoy borraría que
   // este médico paga desde hace un año.

@@ -206,6 +206,8 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 .cuenta { display: flex; flex-direction: column; }
 .cuenta-fila { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--linea); font-size: .9rem; }
 .cuenta-fila span:first-child { color: var(--tinta-2); }
+.cuenta-fila.total span:first-child { color: var(--tinta); }
+#pyEstado .cuenta-fila { align-items: baseline; }
 .cuenta-fila .cifra { font-weight: 500; white-space: nowrap; }
 .cuenta-fila.total { border-bottom: 0; border-top: 1.5px solid var(--tinta); font-weight: 600; margin-top: 4px; padding-top: 11px; }
 .cuenta-fila.total span:first-child { color: var(--tinta); }
@@ -431,9 +433,48 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
     <p class="rotulo" style="padding-top:10px" id="tPaisesPie">—</p>
   </section>
 
+
+  <!-- ── Estado de resultados ─────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">04</span><h2>Tu ganancia, mes a mes</h2></div>
+    <p class="prosa" style="margin-bottom:22px;color:var(--tinta-2)">
+      Lo mismo que vería un contador. Movés el mes y ves de dónde sale cada peso: qué entró,
+      qué se fue, y cuánto queda limpio.
+    </p>
+
+    <div class="panel" style="margin-bottom:24px">
+      <div class="mandos" style="grid-template-columns:1fr">
+        <label class="mando" style="border-right:0">
+          <span class="mando-cab">
+            <span class="mando-nom">Mes que estás mirando</span>
+            <span class="mando-val" id="pyMesVal">36</span>
+          </span>
+          <input type="range" id="pyMes" min="1" max="36" step="1" value="36">
+          <span class="mando-nota">Del 1 al 36. Arrastrá para ver cómo cambia mes a mes.</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="rejilla-2">
+      <div class="cuenta" id="pyEstado"></div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="resumen" id="pyResumen" style="margin-bottom:0"></div>
+        <p class="nota" id="pyNota">—</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:38px;margin-bottom:14px">Los mismos renglones, en el tiempo</h3>
+    <div class="tabla-caja">
+      <table class="comparativa"><thead><tr>
+        <th>Concepto</th><th>Mes 6</th><th>Mes 12</th><th>Mes 18</th>
+        <th>Mes 24</th><th>Mes 30</th><th class="destacada">Mes 36</th>
+      </tr></thead><tbody id="pyTabla"></tbody></table>
+    </div>
+  </section>
+
   <!-- ── Utilidad neta ─────────────────────────────────── -->
   <section>
-    <div class="sec-cab"><span class="sec-num">04</span><h2>Utilidad neta: cuándo y cuánta</h2></div>
+    <div class="sec-cab"><span class="sec-num">05</span><h2>Utilidad neta: cuándo y cuánta</h2></div>
     <p class="prosa" style="margin-bottom:22px;color:var(--tinta-2)">
       Utilidad neta de verdad: después de la comisión del vendedor, del costo de IA, de los
       gastos fijos y de los impuestos —los de la venta y los de la ganancia—. En qué mes el
@@ -481,7 +522,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 
   <!-- ── 04 ────────────────────────────────────────────── -->
   <section>
-    <div class="sec-cab"><span class="sec-num">05</span><h2>Las tres proyecciones</h2></div>
+    <div class="sec-cab"><span class="sec-num">06</span><h2>Las tres proyecciones</h2></div>
     <p class="prosa" style="margin-bottom:26px;color:var(--tinta-2)">
       Mismo motor, tres juegos de supuestos. Ninguno deja crecer las altas sin límite: cada uno
       declara cuántos médicos se pueden dar de alta por mes, porque el cuello de botella real no
@@ -518,7 +559,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 
   <!-- ── 05 ────────────────────────────────────────────── -->
   <section>
-    <div class="sec-cab"><span class="sec-num">06</span><h2>El rango, mes a mes</h2></div>
+    <div class="sec-cab"><span class="sec-num">07</span><h2>El rango, mes a mes</h2></div>
 
     <div class="lienzo">
       <div class="lienzo-cab">
@@ -561,7 +602,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 
   <!-- ── 06 ────────────────────────────────────────────── -->
   <section>
-    <div class="sec-cab"><span class="sec-num">07</span><h2>Libro mayor consolidado</h2></div>
+    <div class="sec-cab"><span class="sec-num">08</span><h2>Libro mayor consolidado</h2></div>
     <p class="prosa" style="margin-bottom:18px;color:var(--tinta-2)">
       El detalle mes a mes en dólares, escenario <strong id="mayorQue">realista</strong>. Los
       negativos van entre paréntesis y en rojo. La línea verde marca el primer mes en que la
@@ -578,7 +619,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 
   <!-- ── 07 ────────────────────────────────────────────── -->
   <section>
-    <div class="sec-cab"><span class="sec-num">08</span><h2>Lo que ya está pagado</h2></div>
+    <div class="sec-cab"><span class="sec-num">09</span><h2>Lo que ya está pagado</h2></div>
     <p class="prosa" style="margin-bottom:24px;color:var(--tinta-2)">
       Vitalis no es un proyecto que empieza: es uno que ya se construyó y está funcionando.
       El desarrollo representa <strong>US$ 85.000</strong> de trabajo de ingeniería ya
@@ -620,7 +661,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 
   <!-- ── 08 ────────────────────────────────────────────── -->
   <section>
-    <div class="sec-cab"><span class="sec-num">09</span><h2>Cuánto hace falta</h2></div>
+    <div class="sec-cab"><span class="sec-num">10</span><h2>Cuánto hace falta</h2></div>
     <div class="rejilla-2">
       <div class="cuenta">
         <div class="cuenta-fila"><span>Gastos fijos hasta el equilibrio<br><span class="rotulo" id="fPeriodo">—</span></span><span class="cifra" id="fFijos">—</span></div>
@@ -653,7 +694,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
        al servir la página; el invitado nunca ve este bloque
        ni las rutas que usa —le contestarían 404 igual—. -->
   <section id="secInvitaciones" hidden>
-    <div class="sec-cab"><span class="sec-num">10</span><h2>Compartir este reporte</h2></div>
+    <div class="sec-cab"><span class="sec-num">11</span><h2>Compartir este reporte</h2></div>
     <p class="prosa" style="margin-bottom:22px;color:var(--tinta-2)">
       Cada enlace es independiente: vence solo y se puede apagar sin tocar los demás.
       Quien lo abra ve este mismo reporte, sin cuenta y sin contraseña — por eso conviene
@@ -902,7 +943,9 @@ function consolidar(fBr, fBo) {
     var cVar = consultas * costoPorConsulta();
     var comision = ingresos * (G.comision / 100);
     var fijos = fijosDelMes(activos);
+    var bruta = ingresos - cVar;
     var contribucion = ingresos - cVar - comision;
+    var operativa = contribucion - fijos;
 
     // Los impuestos sobre la venta se pagan aunque el mes cierre en pérdida;
     // el de utilidades sólo si hay utilidad. Sin esto, "utilidad neta" no es
@@ -923,6 +966,8 @@ function consolidar(fBr, fBo) {
       cVar:cVar, comision:comision, fijos:fijos,
       impVentas:impVentas, impUtil:impUtil, impuestos:impVentas + impUtil,
       contribucion:contribucion, operativo:operativo, neta:neta,
+      bruta:bruta, operativa:operativa,
+      margenBruto: ingresos > 0 ? bruta / ingresos : 0,
       margen: ingresos > 0 ? neta / ingresos : 0,
       acum:acum,
     });
@@ -1120,6 +1165,117 @@ function pintarPaises(R) {
 
   document.getElementById("tPaisesPie").textContent =
     "Escenario " + e + " · R$ " + G.usdBrl.toFixed(2) + " y Bs " + G.usdBob.toFixed(2) + " por dólar";
+}
+
+/* ── EL ESTADO DE RESULTADOS ────────────────────────────────
+   La pregunta más directa que se le puede hacer a un modelo
+   —"¿cuánto gano este mes?"— no la contestaba ninguna pantalla:
+   estaba repartida entre once columnas de un libro mayor.
+   Acá va en el orden en que lo escribe un contador, y cada
+   renglón dice de dónde sale el de abajo.
+
+   El orden importa: la comisión NO entra en la ganancia bruta.
+   Bruta es lo que queda después de producir el servicio; la
+   comisión es gasto de venta y va después. Mezclarlas hace que
+   el margen bruto parezca peor de lo que es. */
+function pintarGanancia(R) {
+  var c = R.co.realista;
+  var mes = Number(document.getElementById("pyMes").value);
+  var d = c.en(mes);
+  document.getElementById("pyMesVal").textContent = "Mes " + mes;
+
+  // En bolivianos, que es en lo que se piensa cuando se pregunta cuánto queda.
+  var enBs = function (v) { return contable(v * G.usdBob, "Bs"); };
+
+  var renglones = [
+    ["Ingresos del mes", d.ingresos, "", true],
+    ["    Brasil", d.ingBr, "sub", false],
+    ["    Bolivia", d.ingBo, "sub", false],
+    ["Costo de IA y WhatsApp", -d.cVar, "resta", false],
+    ["Ganancia bruta", d.bruta, "total", true, Math.round(d.margenBruto * 100) + " %"],
+    ["Comisiones de venta", -d.comision, "resta", false],
+    ["Gastos fijos", -d.fijos, "resta", false],
+    ["Ganancia operativa", d.operativa, "total", true],
+    ["Impuestos", -d.impuestos, "resta", false],
+    ["Ganancia neta", d.neta, "final", true, Math.round(d.margen * 100) + " %"],
+  ];
+
+  document.getElementById("pyEstado").innerHTML =
+    '<div class="cuenta-tit"><h3>Mes ' + mes + '</h3><span class="rotulo">en dólares</span></div>' +
+    renglones.map(function (r) {
+      var clase = r[2] === "total" || r[2] === "final" ? "cuenta-fila total" : "cuenta-fila";
+      var color = r[2] === "resta" ? "neg" : (r[3] ? signo(r[1]) : "");
+      var valor = r[2] === "resta" ? "(" + usd(Math.abs(r[1])) + ")" : contable(r[1], "US$");
+      var pct = r[4] ? '<span style="color:var(--tinta-3)"> · ' + r[4] + "</span>" : "";
+      var nombre = r[2] === "sub"
+        ? '<span style="padding-left:18px;font-size:.85em">' + r[0].trim() + "</span>"
+        : r[0];
+      return '<div class="' + clase + '"><span>' + nombre + '</span>' +
+        '<span class="cifra ' + color + '">' + valor + pct + "</span></div>";
+    }).join("") +
+    '<div class="cuenta-fila" style="border-bottom:0;padding-top:12px">' +
+    '<span class="rotulo">Ganancia neta en bolivianos</span>' +
+    '<span class="cifra ' + signo(d.neta) + '">' + enBs(d.neta) + "</span></div>";
+
+  // Lo acumulado hasta este mes: la otra pregunta que sigue siempre a la
+  // primera, y que mirando un solo mes no se puede contestar.
+  var hasta = c.filas.slice(0, mes);
+  var suma = function (k) { return hasta.reduce(function (a, f) { return a + f[k]; }, 0); };
+
+  document.getElementById("pyResumen").innerHTML = [
+    ["Ganancia neta del mes", contable(d.neta, "US$"), enBs(d.neta)],
+    ["Margen neto", Math.round(d.margen * 100) + " %", "sobre lo facturado"],
+    ["Neto acumulado", contable(suma("neta"), "US$"), "desde el mes 1"],
+    ["Médicos pagando", fN.format(d.base), "en los dos países"],
+  ].map(function (x) {
+    return '<div class="res"><span class="rotulo">' + x[0] + "</span>" +
+      '<span class="res-val ' + (String(x[1]).charAt(0) === "(" ? "neg" : "") + '">' + x[1] + "</span>" +
+      '<span class="res-pie">' + x[2] + "</span></div>";
+  }).join("");
+
+  var nota = document.getElementById("pyNota");
+  if (d.neta < 0) {
+    nota.innerHTML = "<strong>Este mes todavía pone plata.</strong> Faltan médicos para cubrir " +
+      "los " + usd(d.fijos) + " de estructura. Según el modelo eso se da vuelta en el mes " +
+      (c.be || "—") + ".";
+  } else {
+    nota.innerHTML = "<strong>De cada dólar que factura, se queda con " +
+      (d.margen * 100).toFixed(0) + " centavos.</strong> Los otros " +
+      (100 - d.margen * 100).toFixed(0) + " se van en IA y WhatsApp (" +
+      Math.round(d.cVar / d.ingresos * 100) + "), comisiones (" +
+      Math.round(d.comision / d.ingresos * 100) + "), estructura (" +
+      Math.round(d.fijos / d.ingresos * 100) + ") e impuestos (" +
+      Math.round(d.impuestos / d.ingresos * 100) + ").";
+  }
+
+  // Los mismos renglones en el tiempo, que es donde se ve qué mejora y qué no.
+  var meses = [6, 12, 18, 24, 30, 36];
+  var filas = [
+    { et:"Ingresos", v:function (x) { return x.ingresos; }, f:function (x) { return usd(x.ingresos); }, grueso:true },
+    { et:"Costo de IA y WhatsApp", f:function (x) { return "(" + usd(x.cVar) + ")"; }, neg:true },
+    { et:"Ganancia bruta", v:function (x) { return x.bruta; },
+      f:function (x) { return usd(x.bruta) + " · " + Math.round(x.margenBruto * 100) + " %"; }, grueso:true, sep:true },
+    { et:"Comisiones de venta", f:function (x) { return "(" + usd(x.comision) + ")"; }, neg:true },
+    { et:"Gastos fijos", f:function (x) { return "(" + usd(x.fijos) + ")"; }, neg:true },
+    { et:"Ganancia operativa", v:function (x) { return x.operativa; },
+      f:function (x) { return contable(x.operativa, "US$"); }, grueso:true, sep:true },
+    { et:"Impuestos", f:function (x) { return "(" + usd(x.impuestos) + ")"; }, neg:true },
+    { et:"Ganancia neta", v:function (x) { return x.neta; },
+      f:function (x) { return contable(x.neta, "US$"); }, grueso:true, sep:true },
+    { et:"Margen neto", v:function (x) { return x.margen; },
+      f:function (x) { return Math.round(x.margen * 100) + " %"; } },
+  ];
+  document.getElementById("pyTabla").innerHTML = filas.map(function (f) {
+    return '<tr class="' + ((f.grueso ? "grueso " : "") + (f.sep ? "separa" : "")).trim() + '">' +
+      "<td>" + f.et + "</td>" +
+      meses.map(function (m) {
+        var x = c.en(m);
+        // Cada celda se pinta por SU propio valor: heredar el signo de la
+        // ganancia neta dejaba los ingresos en rojo los meses con pérdida.
+        var clase = (f.neg ? "neg" : (f.v ? signo(f.v(x)) : "")) + (m === 36 ? " destacada" : "");
+        return '<td class="' + clase.trim() + '">' + f.f(x) + "</td>";
+      }).join("") + "</tr>";
+  }).join("");
 }
 
 /* ── Qué porción del mercado hay que capturar ───────────────
@@ -1457,6 +1613,7 @@ function recalcular() {
   pintarDesarrollo();
   pintarEncabezado(R);
   pintarPaises(R);
+  pintarGanancia(R);
   pintarMargen(R);
   pintarGraficoMargen(R);
   pintarPenetracion(R);
@@ -1524,6 +1681,10 @@ function sincronizar() {
     if (r && Number(r.value) !== G[m.k]) r.value = G[m.k];
   });
 }
+
+document.getElementById("pyMes").addEventListener("input", function () {
+  pintarGanancia(correrTodo());
+});
 
 document.addEventListener("input", function (ev) {
   var campo = ev.target.getAttribute && ev.target.getAttribute("data-campo");
