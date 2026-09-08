@@ -1,0 +1,1707 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<style>
+@font-face {
+  font-family: "Fraunces"; src: url("/fonts/fraunces-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+@font-face {
+  font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+:root { color-scheme: light dark; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>Modelo Financiero Vitalis</title>
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Identidad: papel de contador. Verde pálido, tinta negra, los
+   negativos en rojo y entre paréntesis. Las cifras siempre en
+   monoespaciada para que las columnas se lean de un vistazo.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --papel:#F1F3EC; --carta:#FBFCF6; --carta-alt:#F6F8F0;
+  --tinta:#15170F; --tinta-2:#545A47; --tinta-3:#868D72;
+  --linea:#D9DECD; --linea-2:#B6BEA2;
+  --rojo:#9E2B20; --verde:#2F6B3E; --azul:#2B4A66; --ambar:#8A6516;
+  --sombra:0 1px 0 rgba(21,23,15,.06); --r:3px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papel:#12140D; --carta:#1A1D14; --carta-alt:#1E2117;
+    --tinta:#E9ECDD; --tinta-2:#A7AE94; --tinta-3:#757C63;
+    --linea:#2B3021; --linea-2:#454C36;
+    --rojo:#E27A67; --verde:#74C088; --azul:#7FA8C9; --ambar:#D6A445;
+    --sombra:0 1px 0 rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --papel:#12140D; --carta:#1A1D14; --carta-alt:#1E2117;
+  --tinta:#E9ECDD; --tinta-2:#A7AE94; --tinta-3:#757C63;
+  --linea:#2B3021; --linea-2:#454C36;
+  --rojo:#E27A67; --verde:#74C088; --azul:#7FA8C9; --ambar:#D6A445;
+  --sombra:0 1px 0 rgba(0,0,0,.4);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--papel); color: var(--tinta);
+  font-family: "InterVar", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+}
+.hoja { max-width: 1140px; margin: 0 auto; padding: 0 24px 96px; }
+.prosa { max-width: 68ch; }
+
+h1,h2,h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem,4.4vw,3rem); line-height: 1.08; letter-spacing: -.015em; }
+h2 { font-size: 1.55rem; line-height: 1.2; letter-spacing: -.01em; }
+h3 { font-size: 1.02rem; line-height: 1.3; }
+p  { margin: 0; }
+
+.cifra { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.rotulo { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .688rem; letter-spacing: .13em; text-transform: uppercase; color: var(--tinta-3); }
+.neg { color: var(--rojo); }
+.pos { color: var(--verde); }
+
+.tapa { border-bottom: 2px solid var(--tinta); padding: 56px 0 26px; display: flex; flex-direction: column; gap: 18px; }
+.tapa-alto { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; flex-wrap: wrap; }
+.tesis { font-family: Fraunces, Georgia, serif; font-size: 1.19rem; line-height: 1.5; color: var(--tinta-2); max-width: 62ch; }
+.tesis em { color: var(--tinta); font-style: italic; }
+
+.franja { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); border-bottom: 1px solid var(--linea-2); }
+.ind { padding: 20px 20px 20px 0; border-right: 1px solid var(--linea); display: flex; flex-direction: column; gap: 4px; }
+.ind:last-child { border-right: 0; }
+.ind-valor { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 1.5rem; font-weight: 500; line-height: 1.05; letter-spacing: -.02em; }
+.ind-pie { font-size: .78rem; color: var(--tinta-3); }
+
+section { padding-top: 56px; }
+.sec-cab { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--linea-2); padding-bottom: 10px; margin-bottom: 24px; }
+.sec-num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .75rem; color: var(--rojo); font-weight: 600; }
+
+.panel { background: var(--carta); border: 1px solid var(--linea-2); border-radius: var(--r); box-shadow: var(--sombra); }
+.barra { display: flex; border-bottom: 1px solid var(--linea); flex-wrap: wrap; }
+.barra-tit { padding: 13px 18px; border-right: 1px solid var(--linea); display: flex; align-items: center; }
+.grupo { display: flex; flex: 1 1 200px; }
+.opc {
+  flex: 1 1 auto; appearance: none; background: transparent; border: 0;
+  border-right: 1px solid var(--linea); padding: 13px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .73rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--tinta-2); cursor: pointer;
+  transition: background .15s, color .15s; white-space: nowrap;
+}
+.opc:last-child { border-right: 0; }
+.opc:hover { background: var(--carta-alt); color: var(--tinta); }
+.opc[aria-pressed="true"] { background: var(--tinta); color: var(--papel); }
+.opc:focus-visible { outline: 2px solid var(--rojo); outline-offset: -2px; }
+
+.mandos { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); }
+.mando { padding: 15px 18px; border-right: 1px solid var(--linea); border-bottom: 1px solid var(--linea); display: flex; flex-direction: column; gap: 6px; }
+.mando-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.mando-nom { font-size: .85rem; color: var(--tinta-2); }
+.mando-val { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: .93rem; font-weight: 600; white-space: nowrap; }
+.mando-nota { font-size: .73rem; color: var(--tinta-3); line-height: 1.4; }
+
+input[type="range"] { appearance: none; -webkit-appearance: none; width: 100%; height: 18px; background: transparent; cursor: pointer; margin: 0; }
+input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--linea-2); }
+input[type="range"]::-moz-range-track { height: 2px; background: var(--linea-2); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; margin-top: -5.5px; background: var(--rojo); border: 0; border-radius: 50%; }
+input[type="range"]::-moz-range-thumb { width: 13px; height: 13px; background: var(--rojo); border: 0; border-radius: 50%; }
+input[type="range"]:focus-visible { outline: 2px solid var(--rojo); outline-offset: 3px; }
+.fijo { background: var(--carta-alt); }
+.fijo .mando-val { color: var(--tinta-2); }
+
+.lienzo { background: var(--carta); border: 1px solid var(--linea-2); border-radius: var(--r); padding: 18px 18px 10px; box-shadow: var(--sombra); }
+.lienzo + .lienzo { margin-top: 18px; }
+.lienzo-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.leyenda { display: flex; gap: 15px; flex-wrap: wrap; }
+.ley { display: flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--tinta-2); }
+.ley i { width: 11px; height: 11px; border-radius: 2px; display: block; }
+svg { display: block; width: 100%; height: auto; }
+
+.tabla-caja { border: 1px solid var(--linea-2); border-radius: var(--r); overflow: auto; background: var(--carta); box-shadow: var(--sombra); }
+.tabla-caja + .tabla-caja { margin-top: 26px; }
+.tabla-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--linea); flex-wrap: wrap; }
+.mayor-caja { max-height: 440px; }
+table { border-collapse: collapse; width: 100%; }
+.comparativa { min-width: 620px; }
+.paises { min-width: 860px; }
+.mayor { min-width: 900px; }
+.costos { min-width: 480px; }
+thead th {
+  background: var(--carta); border-bottom: 1.5px solid var(--tinta);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .68rem; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--tinta-2); font-weight: 500;
+  padding: 11px 16px; text-align: right; white-space: nowrap;
+}
+.mayor thead th, .paises thead th { position: sticky; z-index: 1; }
+.paises thead tr.agrupada th { top: 0; }
+.paises thead tr:not(.agrupada) th { top: 33px; }
+.mayor thead th { top: 0; }
+thead th:first-child { text-align: left; }
+thead th.destacada { color: var(--tinta); }
+thead tr.agrupada th { border-bottom: 1px solid var(--linea); font-size: .64rem; color: var(--tinta-3); padding-bottom: 6px; }
+th.bordeIzq, td.bordeIzq { border-left: 1px solid var(--linea-2); }
+tbody td {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+  font-size: .82rem; padding: 8px 16px; text-align: right;
+  border-bottom: 1px solid var(--linea); white-space: nowrap;
+}
+tbody td:first-child { text-align: left; color: var(--tinta-2); font-family: "InterVar", sans-serif; font-size: .87rem; }
+tbody tr:nth-child(even) { background: var(--carta-alt); }
+td.destacada, th.destacada { background: rgba(47,107,62,.07); }
+tbody tr.grueso td { font-weight: 600; }
+tbody tr.grueso td:first-child { color: var(--tinta); }
+tbody tr.separa td { border-top: 1.5px solid var(--linea-2); }
+tbody tr.cierre td { border-top: 1.5px solid var(--tinta); border-bottom: 0; font-weight: 600; }
+tbody tr.cierre td:first-child { color: var(--tinta); }
+.mayor tbody tr.hito td { font-weight: 600; }
+.mayor tbody tr.hito td:first-child { color: var(--tinta); }
+.mayor tbody tr.corte td { border-bottom: 1.5px solid var(--verde); }
+
+.resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); border-top: 1px solid var(--linea-2); border-bottom: 1px solid var(--linea-2); margin-bottom: 22px; }
+.res { padding: 16px 18px 16px 0; border-right: 1px solid var(--linea); display: flex; flex-direction: column; gap: 3px; }
+.res:last-child { border-right: 0; }
+.res-val { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 1.24rem; font-weight: 500; letter-spacing: -.015em; }
+.res-pie { font-size: .76rem; color: var(--tinta-3); }
+
+.boton {
+  appearance: none; background: var(--tinta); color: var(--papel); border: 0;
+  border-radius: 3px; padding: 11px 18px; cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .74rem; letter-spacing: .1em; text-transform: uppercase;
+  transition: opacity .15s;
+}
+.boton:hover { opacity: .85; }
+.boton:disabled { opacity: .45; cursor: default; }
+.boton:focus-visible { outline: 2px solid var(--rojo); outline-offset: 2px; }
+.boton.tenue { background: transparent; color: var(--rojo); border: 1px solid var(--linea-2); }
+input[type="text"] {
+  width: 100%; background: var(--papel); color: var(--tinta);
+  border: 1px solid var(--linea-2); border-radius: 3px; padding: 9px 11px;
+  font-family: "InterVar", sans-serif; font-size: .9rem;
+}
+input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offset: 1px; }
+.enlace {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .74rem;
+  color: var(--tinta-2); word-break: break-all; max-width: 30ch; display: inline-block;
+}
+
+.nota { border-left: 2px solid var(--rojo); padding: 2px 0 2px 16px; color: var(--tinta-2); font-size: .93rem; }
+.nota em { font-style: italic; color: var(--tinta); }
+.nota.aviso { border-left-color: var(--ambar); }
+.nota.bien { border-left-color: var(--verde); }
+.rejilla-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 26px; }
+.lista { display: flex; flex-direction: column; gap: 14px; }
+.item { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.item .cifra { color: var(--rojo); font-size: .82rem; font-weight: 600; padding-top: .22em; white-space: nowrap; }
+.item p { font-size: .93rem; color: var(--tinta-2); }
+.item strong { color: var(--tinta); font-weight: 600; }
+
+.cuenta { display: flex; flex-direction: column; }
+.cuenta-fila { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--linea); font-size: .9rem; }
+.cuenta-fila span:first-child { color: var(--tinta-2); }
+.cuenta-fila .cifra { font-weight: 500; white-space: nowrap; }
+.cuenta-fila.total { border-bottom: 0; border-top: 1.5px solid var(--tinta); font-weight: 600; margin-top: 4px; padding-top: 11px; }
+.cuenta-fila.total span:first-child { color: var(--tinta); }
+.cuenta-tit { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1.5px solid var(--tinta); margin-bottom: 4px; }
+
+.pie { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--linea-2); font-size: .8rem; color: var(--tinta-3); display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 640px) {
+  .hoja { padding: 0 16px 64px; }
+  .ind { padding: 16px 14px 16px 0; }
+  .ind-valor { font-size: 1.25rem; }
+}
+</style>
+
+</head>
+<body>
+<div class="hoja">
+
+  <header class="tapa">
+    <div class="tapa-alto">
+      <h1>Modelo financiero<br>Vitalis</h1>
+      <div style="text-align:right">
+        <div class="rotulo">Brasil · Bolivia</div>
+        <div class="rotulo" style="color:var(--rojo)">36 meses · 3 escenarios</div>
+      </div>
+    </div>
+    <p class="tesis">
+      Un prontuario que se escribe solo: el médico graba la consulta, Vitalis la transcribe
+      y devuelve la nota clínica, la receta y el kardex. <em>Ya está en producción, en dos países,
+      con médicos atendiendo.</em> El desarrollo ya está pagado. Lo que sigue es qué hace falta
+      para que esto crezca — y cuánto deja.
+    </p>
+  </header>
+
+  <div class="franja">
+    <div class="ind">
+      <span class="rotulo">Ingresos mes 36</span>
+      <span class="ind-valor" id="kMrr">—</span>
+      <span class="ind-pie" id="kArr">—</span>
+    </div>
+    <div class="ind">
+      <span class="rotulo">Médicos pagando</span>
+      <span class="ind-valor" id="kMed">—</span>
+      <span class="ind-pie" id="kMedPie">—</span>
+    </div>
+    <div class="ind">
+      <span class="rotulo">Punto de equilibrio</span>
+      <span class="ind-valor" id="kBe">—</span>
+      <span class="ind-pie" id="kBePie">—</span>
+    </div>
+    <div class="ind">
+      <span class="rotulo">Margen neto</span>
+      <span class="ind-valor" id="kMargenNeto">—</span>
+      <span class="ind-pie" id="kMargenPie">—</span>
+    </div>
+    <div class="ind">
+      <span class="rotulo">Capital necesario</span>
+      <span class="ind-valor" id="kCap">—</span>
+      <span class="ind-pie">caja máxima consumida</span>
+    </div>
+    <div class="ind">
+      <span class="rotulo">Ya invertido</span>
+      <span class="ind-valor">US$ 85.000</span>
+      <span class="ind-pie">desarrollo, a costo</span>
+    </div>
+  </div>
+  <p class="rotulo" style="padding-top:10px">Cifras consolidadas en dólares · escenario realista</p>
+
+  <!-- ── 01 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">01</span><h2>Dos mercados, una unidad</h2></div>
+    <p class="prosa" style="margin-bottom:24px;color:var(--tinta-2)">
+      Todo se apoya en una sola unidad: <strong>una consulta grabada</strong>. Cuesta lo mismo en
+      los dos países porque se paga en dólares — transcripción, generación de la nota clínica,
+      almacenamiento. Lo que cambia es el precio de venta.
+    </p>
+
+    <div class="rejilla-2">
+      <div class="cuenta">
+        <div class="cuenta-tit"><h3>Brasil</h3><span class="rotulo">Real · R$</span></div>
+        <div class="cuenta-fila"><span>Precio por consulta</span><span class="cifra" id="uBrPrecio">—</span></div>
+        <div class="cuenta-fila"><span>Transcripción y nota clínica (medido)</span><span class="cifra neg" id="uBrIa">—</span></div>
+        <div class="cuenta-fila"><span>Aviso al paciente por WhatsApp</span><span class="cifra neg" id="uBrWa">—</span></div>
+        <div class="cuenta-fila"><span>Comisión del vendedor</span><span class="cifra neg" id="uBrCom">—</span></div>
+        <div class="cuenta-fila total"><span>Contribución por consulta</span><span class="cifra pos" id="uBrMargen">—</span></div>
+        <div class="cuenta-fila" style="margin-top:12px"><span>Plan mensual</span><span class="cifra" id="uBrPlan">—</span></div>
+        <div class="cuenta-fila"><span>Plan anual (se regala 1 mes)</span><span class="cifra" id="uBrAnual">—</span></div>
+        <div class="cuenta-fila total"><span>El plan se paga a las</span><span class="cifra" id="uBrCruce">—</span></div>
+      </div>
+      <div class="cuenta">
+        <div class="cuenta-tit"><h3>Bolivia</h3><span class="rotulo">Boliviano · Bs</span></div>
+        <div class="cuenta-fila"><span>Precio por consulta</span><span class="cifra" id="uBoPrecio">—</span></div>
+        <div class="cuenta-fila"><span>Transcripción y nota clínica (medido)</span><span class="cifra neg" id="uBoIa">—</span></div>
+        <div class="cuenta-fila"><span>Aviso al paciente por WhatsApp</span><span class="cifra neg" id="uBoWa">—</span></div>
+        <div class="cuenta-fila"><span>Comisión del vendedor</span><span class="cifra neg" id="uBoCom">—</span></div>
+        <div class="cuenta-fila total"><span>Contribución por consulta</span><span class="cifra pos" id="uBoMargen">—</span></div>
+        <div class="cuenta-fila" style="margin-top:12px"><span>Plan mensual</span><span class="cifra" id="uBoPlan">—</span></div>
+        <div class="cuenta-fila"><span>Plan anual (se regala 1 mes)</span><span class="cifra" id="uBoAnual">—</span></div>
+        <div class="cuenta-fila total"><span>El plan se paga a las</span><span class="cifra" id="uBoCruce">—</span></div>
+      </div>
+    </div>
+
+    <p class="nota aviso" style="margin-top:26px;max-width:74ch">
+      <strong>Los mismos precios, medidos en dólares, no son los mismos precios.</strong>
+      La consulta brasileña vale <span class="cifra" id="nBrUsd">—</span> y la boliviana
+      <span class="cifra" id="nBoUsd">—</span>: Bolivia cobra la mitad por el mismo trabajo.
+      En el plan mensual la diferencia casi desaparece
+      (<span class="cifra" id="nBrPlanUsd">—</span> contra <span class="cifra" id="nBoPlanUsd">—</span>),
+      y de ahí sale la asimetría: en Brasil el plan conviene desde
+      <span id="nBrCruce">40</span> consultas y en Bolivia recién desde
+      <span id="nBoCruce">75</span>. Subir la consulta boliviana es la palanca de precio más
+      obvia que queda sin usar.
+    </p>
+  </section>
+
+  <!-- ── 02 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">02</span><h2>Supuestos</h2></div>
+    <p class="prosa" style="margin-bottom:20px;color:var(--tinta-2)">
+      Cada mercado tiene sus propios supuestos comerciales; los costos son uno solo, en dólares,
+      porque hay un solo equipo y un solo sistema detrás. Todo lo de abajo se recalcula al instante.
+    </p>
+
+    <div class="panel">
+      <div class="barra">
+        <div class="barra-tit"><span class="rotulo">Mercado</span></div>
+        <div class="grupo" id="gMercado">
+          <button class="opc" data-mercado="br" aria-pressed="true">Brasil</button>
+          <button class="opc" data-mercado="bo" aria-pressed="false">Bolivia</button>
+        </div>
+        <div class="barra-tit" style="border-left:1px solid var(--linea)"><span class="rotulo">Escenario</span></div>
+        <div class="grupo" id="gEscenario">
+          <button class="opc" data-esc="pesimista" aria-pressed="false">Pesimista</button>
+          <button class="opc" data-esc="realista" aria-pressed="true">Realista</button>
+          <button class="opc" data-esc="optimista" aria-pressed="false">Optimista</button>
+        </div>
+      </div>
+      <div class="mandos" id="mandos"></div>
+    </div>
+
+    <h3 style="margin-top:34px;margin-bottom:12px">Costos y tipos de cambio — comunes a los dos países</h3>
+    <div class="panel">
+      <div class="mandos" id="mandosGlobales"></div>
+      <div class="mandos">
+        <div class="mando fijo">
+          <div class="mando-cab"><span class="mando-nom">Consultas de cortesía</span><span class="mando-val">4</span></div>
+          <span class="mando-nota">Fijo en el código, igual en los dos países. Cada cuenta nueva atiende 4 consultas sin pagar: cuestan pero no facturan.</span>
+        </div>
+        <div class="mando fijo">
+          <div class="mando-cab"><span class="mando-nom">Plan anual</span><span class="mando-val">11 de 12</span></div>
+          <span class="mando-nota">Doce meses al precio de once. Se modela por su equivalente mensual.</span>
+        </div>
+        <div class="mando fijo">
+          <div class="mando-cab"><span class="mando-nom">Cambio Bs por R$</span><span class="mando-val" id="mCruce">—</span></div>
+          <span class="mando-nota">No se elige: sale de dividir los dos tipos de cambio contra el dólar, así no puede haber tres números que se contradigan.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rejilla-2" style="margin-top:26px">
+      <p class="nota">
+        Los precios y las 4 consultas gratis salen del sistema en producción. El costo de IA
+        está <strong>medido</strong>: US$ 0,130 de transcripción y US$ 0,002 de nota clínica por
+        consulta de 20 minutos. Altas, activación, bajas y volumen por médico siguen siendo
+        estimaciones — son las cuatro cifras que hay que reemplazar con datos reales apenas los
+        primeros meses las produzcan.
+      </p>
+      <p class="nota aviso">
+        <strong>WhatsApp deja de ser gratis el 1 de octubre de 2026.</strong> Meta empieza a
+        cobrar por mensaje, y son dos por consulta. Está cargado en el modelo con una tarifa
+        estimada porque poner ese costo en cero es la forma más fácil de que el margen mienta:
+        en el segmento de menor precio se lleva una porción que se nota. En cuanto haya tarifa
+        real, hay que cargarla acá.<br><br>
+        <strong>Y el cambio boliviano.</strong> Bolivia unificó su régimen cambiario en 2026 —
+        el peg de Bs 6,96 ya no aplica y la referencia está cerca de 11,5. Además, sacar
+        bolivianos del país no es automático.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 03 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">03</span><h2>Ingresos por país, en su moneda y en dólares</h2></div>
+    <p class="prosa" style="margin-bottom:20px;color:var(--tinta-2)">
+      Lo que factura cada país en su propia moneda y lo que eso vale convertido. La última
+      columna es la que importa para cualquiera que ponga plata: el total en dólares.
+    </p>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="barra">
+        <div class="barra-tit"><span class="rotulo">Escenario de la tabla</span></div>
+        <div class="grupo" id="gEscTabla">
+          <button class="opc" data-esct="pesimista" aria-pressed="false">Pesimista</button>
+          <button class="opc" data-esct="realista" aria-pressed="true">Realista</button>
+          <button class="opc" data-esct="optimista" aria-pressed="false">Optimista</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="resumen" id="tPaisesResumen"></div>
+
+    <div class="tabla-caja mayor-caja">
+      <table class="paises">
+        <thead>
+          <tr class="agrupada">
+            <th></th>
+            <th colspan="2">Brasil</th>
+            <th colspan="2" class="bordeIzq">Bolivia</th>
+            <th colspan="4" class="bordeIzq destacada">Consolidado</th>
+          </tr>
+          <tr>
+            <th>Mes</th>
+            <th>Ingresos R$</th><th>US$</th>
+            <th class="bordeIzq">Ingresos Bs</th><th>US$</th>
+            <th class="bordeIzq destacada">Médicos</th><th class="destacada">Ingresos US$</th>
+            <th class="destacada">Utilidad neta</th><th class="destacada">Margen</th>
+          </tr>
+        </thead>
+        <tbody id="tPaises"></tbody>
+      </table>
+    </div>
+    <p class="rotulo" style="padding-top:10px" id="tPaisesPie">—</p>
+  </section>
+
+  <!-- ── Utilidad neta ─────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">04</span><h2>Utilidad neta: cuándo y cuánta</h2></div>
+    <p class="prosa" style="margin-bottom:22px;color:var(--tinta-2)">
+      Utilidad neta de verdad: después de la comisión del vendedor, del costo de IA, de los
+      gastos fijos y de los impuestos —los de la venta y los de la ganancia—. En qué mes el
+      negocio cruza cada nivel de margen y se queda ahí, no el mes suelto que lo toca por
+      casualidad.
+    </p>
+
+    <div class="tabla-caja">
+      <div class="tabla-cab"><h3>Mes en que el margen neto llega a…</h3><span class="rotulo">y se sostiene</span></div>
+      <table class="comparativa"><thead><tr>
+        <th>Escenario</th><th>Equilibrio</th><th>5 %</th><th>10 %</th><th>20 %</th>
+        <th>Margen mes 36</th><th>Utilidad mes 36</th><th>Utilidad 36 meses</th>
+      </tr></thead><tbody id="tMargen"></tbody></table>
+    </div>
+
+    <div class="lienzo" style="margin-top:26px">
+      <div class="lienzo-cab">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <h3>Margen neto mes a mes</h3>
+          <span class="rotulo" id="margenNota">—</span>
+        </div>
+        <div class="leyenda">
+          <span class="ley"><i style="background:var(--linea-2)"></i>Pesimista</span>
+          <span class="ley"><i style="background:var(--verde)"></i>Realista</span>
+          <span class="ley"><i style="background:var(--azul)"></i>Optimista</span>
+        </div>
+      </div>
+      <svg id="gMargen" viewBox="0 0 760 280" role="img" aria-label="Margen neto mensual en los tres escenarios, con referencias al 5 y 10 por ciento"></svg>
+    </div>
+
+    <div class="rejilla-2" style="margin-top:26px">
+      <div class="cuenta">
+        <div class="cuenta-tit"><h3>Cuánta estructura aguanta</h3><span class="rotulo">al mes 36</span></div>
+        <div class="cuenta-fila"><span>Gastos fijos previstos hoy en el modelo</span><span class="cifra" id="hFijos">—</span></div>
+        <div class="cuenta-fila"><span>Máximo manteniendo 20 % de margen neto</span><span class="cifra" id="h20">—</span></div>
+        <div class="cuenta-fila"><span>Máximo manteniendo 10 % de margen neto</span><span class="cifra" id="h10">—</span></div>
+        <div class="cuenta-fila total"><span>Máximo manteniendo 5 % de margen neto</span><span class="cifra" id="h5">—</span></div>
+        <div class="cuenta-fila" style="border-bottom:0;padding-top:12px">
+          <span class="rotulo">Equivale a un equipo de</span><span class="cifra" id="hEquipo">—</span>
+        </div>
+      </div>
+      <p class="nota" id="notaMargen" style="align-self:start">—</p>
+    </div>
+  </section>
+
+  <!-- ── 04 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">05</span><h2>Las tres proyecciones</h2></div>
+    <p class="prosa" style="margin-bottom:26px;color:var(--tinta-2)">
+      Mismo motor, tres juegos de supuestos. Ninguno deja crecer las altas sin límite: cada uno
+      declara cuántos médicos se pueden dar de alta por mes, porque el cuello de botella real no
+      es la demanda sino quién los acompaña. Las tablas por país llegan hasta la
+      <strong>contribución</strong> — los gastos fijos no se reparten entre países porque no se
+      gastan por país: son uno solo y aparecen en el consolidado.
+    </p>
+
+    <div class="tabla-caja">
+      <div class="tabla-cab"><h3>Brasil</h3><span class="rotulo">en reales</span></div>
+      <table class="comparativa"><thead><tr>
+        <th></th><th>Pesimista</th><th class="destacada">Realista</th><th>Optimista</th>
+      </tr></thead><tbody id="tBr"></tbody></table>
+    </div>
+
+    <div class="tabla-caja">
+      <div class="tabla-cab"><h3>Bolivia</h3><span class="rotulo">en bolivianos</span></div>
+      <table class="comparativa"><thead><tr>
+        <th></th><th>Pesimista</th><th class="destacada">Realista</th><th>Optimista</th>
+      </tr></thead><tbody id="tBo"></tbody></table>
+    </div>
+
+    <div class="tabla-caja">
+      <div class="tabla-cab"><h3>Consolidado</h3><span class="rotulo">en dólares · ya con los gastos fijos</span></div>
+      <table class="comparativa"><thead><tr>
+        <th></th><th>Pesimista</th><th class="destacada">Realista</th><th>Optimista</th>
+      </tr></thead><tbody id="tCo"></tbody></table>
+    </div>
+
+    <h3 style="margin-top:38px;margin-bottom:14px">Cuánto mercado necesita esto</h3>
+    <div class="resumen" id="tMercado"></div>
+    <p class="nota bien" style="max-width:74ch" id="notaMercado">—</p>
+  </section>
+
+  <!-- ── 05 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">06</span><h2>El rango, mes a mes</h2></div>
+
+    <div class="lienzo">
+      <div class="lienzo-cab">
+        <h3>Ingresos mensuales consolidados · US$</h3>
+        <div class="leyenda">
+          <span class="ley"><i style="background:var(--linea-2)"></i>Pesimista</span>
+          <span class="ley"><i style="background:var(--verde)"></i>Realista</span>
+          <span class="ley"><i style="background:var(--azul)"></i>Optimista</span>
+        </div>
+      </div>
+      <svg id="gAbanico" viewBox="0 0 760 300" role="img" aria-label="Ingresos mensuales consolidados en dólares, tres escenarios, 36 meses"></svg>
+    </div>
+
+    <div class="lienzo">
+      <div class="lienzo-cab">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <h3>Caja acumulada — dónde está el pozo</h3>
+          <span class="rotulo" id="cajaNota">—</span>
+        </div>
+        <div class="leyenda">
+          <span class="ley"><i style="background:var(--linea-2)"></i>Pesimista</span>
+          <span class="ley"><i style="background:var(--verde)"></i>Realista</span>
+          <span class="ley"><i style="background:var(--azul)"></i>Optimista</span>
+        </div>
+      </div>
+      <svg id="gCaja" viewBox="0 0 760 260" role="img" aria-label="Caja acumulada consolidada en dólares, tres escenarios"></svg>
+    </div>
+
+    <div class="lienzo">
+      <div class="lienzo-cab">
+        <h3>Médicos pagando · escenario realista</h3>
+        <div class="leyenda">
+          <span class="ley"><i style="background:var(--verde)"></i>Brasil</span>
+          <span class="ley"><i style="background:var(--ambar)"></i>Bolivia</span>
+        </div>
+      </div>
+      <svg id="gMedicos" viewBox="0 0 760 200" role="img" aria-label="Médicos pagando por país en el escenario realista"></svg>
+    </div>
+  </section>
+
+  <!-- ── 06 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">07</span><h2>Libro mayor consolidado</h2></div>
+    <p class="prosa" style="margin-bottom:18px;color:var(--tinta-2)">
+      El detalle mes a mes en dólares, escenario <strong id="mayorQue">realista</strong>. Los
+      negativos van entre paréntesis y en rojo. La línea verde marca el primer mes en que la
+      operación se paga sola.
+    </p>
+    <div class="tabla-caja mayor-caja">
+      <table class="mayor"><thead><tr>
+        <th>Mes</th><th>Altas</th><th>Médicos</th><th>Consultas</th>
+        <th>Ingresos</th><th>Costo IA</th><th>Comisiones</th>
+        <th>Gastos fijos</th><th>Impuestos</th><th>Utilidad neta</th><th>Caja acumulada</th>
+      </tr></thead><tbody id="mayor"></tbody></table>
+    </div>
+  </section>
+
+  <!-- ── 07 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">08</span><h2>Lo que ya está pagado</h2></div>
+    <p class="prosa" style="margin-bottom:24px;color:var(--tinta-2)">
+      Vitalis no es un proyecto que empieza: es uno que ya se construyó y está funcionando.
+      El desarrollo representa <strong>US$ 85.000</strong> de trabajo de ingeniería ya
+      ejecutado y financiado por el fundador. No es una estimación de lo que costaría: es lo
+      que costó, valuado a la tarifa a la que se hizo, y repartido por disciplina para que se
+      pueda discutir renglón por renglón en vez de creer o no creer un número entero.
+    </p>
+
+    <div class="tabla-caja">
+      <div class="tabla-cab">
+        <h3>Desarrollo ejecutado</h3>
+        <span class="rotulo" id="tarifaRotulo">—</span>
+      </div>
+      <table class="costos"><thead><tr>
+        <th>Disciplina</th><th>Horas</th><th>US$</th><th>Peso</th>
+      </tr></thead><tbody id="tCosto"></tbody></table>
+    </div>
+
+    <div class="rejilla-2" style="margin-top:30px">
+      <div class="lista">
+        <div class="item"><span class="cifra">58.770</span><p><strong>líneas de código propio</strong> en producción — backend, frontend, base de datos y pruebas. Es lo que respalda las horas de la tabla: no son horas declaradas, son horas que dejaron código funcionando.</p></div>
+        <div class="item"><span class="cifra">27</span><p><strong>suites de pruebas automatizadas</strong> en verde, incluidas las del cobro, las consultas de cortesía y la generación de códigos Pix, verificada carácter por carácter contra un QR que un banco ya aceptó.</p></div>
+        <div class="item"><span class="cifra">16</span><p><strong>integraciones externas</strong>: WhatsApp Business, transcripción, IA clínica, telemedicina con WebRTC y servidor TURN propio, Pix y Memed para receta digital en Brasil.</p></div>
+      </div>
+      <div class="lista">
+        <div class="item"><span class="cifra">2</span><p><strong>mercados abiertos y operando</strong>, con moneda, precio, idioma y medios de pago separados por país dentro del mismo sistema. No es un plan de expansión: ya funciona.</p></div>
+        <div class="item"><span class="cifra">0</span><p><strong>de inversores previos.</strong> Los US$ 85.000 los puso el fundador en trabajo, sin ronda ni dilución: el 100 % de la empresa está en una sola mano.</p></div>
+        <div class="item"><span class="cifra">1</span><p><strong>fundador.</strong> Es la mayor fragilidad del proyecto: hoy el conocimiento del sistema vive en una sola cabeza. Es lo primero que hay que resolver con capital de terceros.</p></div>
+      </div>
+    </div>
+
+    <p class="nota bien" style="margin-top:26px;max-width:74ch">
+      Reponer ese mismo sistema contratando afuera —a tarifas de agencia de US$ 60 a 90 la
+      hora— costaría entre <strong>US$ 127.500 y US$ 191.000</strong> y tomaría no menos de un
+      año. Esa diferencia contra los US$ 85.000 es lo que el fundador ya aportó al proyecto
+      antes de que entre nadie más.
+    </p>
+  </section>
+
+  <!-- ── 08 ────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-cab"><span class="sec-num">09</span><h2>Cuánto hace falta</h2></div>
+    <div class="rejilla-2">
+      <div class="cuenta">
+        <div class="cuenta-fila"><span>Gastos fijos hasta el equilibrio<br><span class="rotulo" id="fPeriodo">—</span></span><span class="cifra" id="fFijos">—</span></div>
+        <div class="cuenta-fila"><span>Costo de IA y almacenamiento</span><span class="cifra" id="fVar">—</span></div>
+        <div class="cuenta-fila"><span>Comisiones de venta</span><span class="cifra" id="fCom">—</span></div>
+        <div class="cuenta-fila"><span>Ingresos cobrados en ese período</span><span class="cifra pos" id="fIng">—</span></div>
+        <div class="cuenta-fila total"><span>Capital operativo</span><span class="cifra" id="fCapital">—</span></div>
+        <div class="cuenta-fila" style="margin-top:14px"><span>Marca, registro INPI/SENAPI y dominios</span><span class="cifra">US$ 5.200</span></div>
+        <div class="cuenta-fila"><span>LGPD, cifrado de respaldos y auditoría</span><span class="cifra">US$ 8.300</span></div>
+        <div class="cuenta-fila"><span>Segundo ingeniero, 12 meses</span><span class="cifra">US$ 36.000</span></div>
+        <div class="cuenta-fila"><span>Colchón del 20 %</span><span class="cifra" id="fColchon">—</span></div>
+        <div class="cuenta-fila total"><span>Ronda sugerida</span><span class="cifra" id="fTotal">—</span></div>
+      </div>
+      <div class="prosa" style="display:flex;flex-direction:column;gap:14px">
+        <p class="nota bien" id="notaCapital">—</p>
+        <p style="font-size:.93rem;color:var(--tinta-2)">Cuatro cosas que un inversor va a preguntar y conviene contestar antes:</p>
+        <div class="lista">
+          <div class="item"><span class="cifra">01</span><p><strong>El nombre.</strong> «Vitalis» colisiona con marcas de salud en Brasil y los dominios están tomados. El cambio está resuelto técnicamente y sin ejecutar: es un costo conocido, no una sorpresa.</p></div>
+          <div class="item"><span class="cifra">02</span><p><strong>Datos clínicos.</strong> El sistema guarda historias médicas. El cifrado de respaldos y la política de datos bajo LGPD tienen que cerrarse antes de escalar, no después.</p></div>
+          <div class="item"><span class="cifra">03</span><p><strong>Dependencia de Meta.</strong> El aviso al paciente viaja por WhatsApp Business: es un canal alquilado. El plan de contingencia por SMS y correo está diseñado y sin construir.</p></div>
+          <div class="item"><span class="cifra">04</span><p><strong>Bolivia en moneda dura.</strong> La facturación boliviana vale lo que valga el cambio al que se pueda convertir. Está modelada al paralelo, con descuento, a propósito.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Invitaciones ─────────────────────────────────────
+       Solo se muestra al operador. El servidor pone __MODO__
+       al servir la página; el invitado nunca ve este bloque
+       ni las rutas que usa —le contestarían 404 igual—. -->
+  <section id="secInvitaciones" hidden>
+    <div class="sec-cab"><span class="sec-num">10</span><h2>Compartir este reporte</h2></div>
+    <p class="prosa" style="margin-bottom:22px;color:var(--tinta-2)">
+      Cada enlace es independiente: vence solo y se puede apagar sin tocar los demás.
+      Quien lo abra ve este mismo reporte, sin cuenta y sin contraseña — por eso conviene
+      uno por persona, y no reenviar el mismo.
+    </p>
+
+    <div class="panel" style="margin-bottom:22px">
+      <div class="mandos">
+        <label class="mando">
+          <span class="mando-cab"><span class="mando-nom">Para quién es</span></span>
+          <input type="text" id="invEtiqueta" maxlength="80" placeholder="Nombre del inversor o del fondo">
+          <span class="mando-nota">Sirve para saber cuál apagar dentro de seis meses.</span>
+        </label>
+        <label class="mando">
+          <span class="mando-cab"><span class="mando-nom">Vence en</span><span class="mando-val" id="invDiasVal">30 días</span></span>
+          <input type="range" id="invDias" min="1" max="180" step="1" value="30">
+          <span class="mando-nota">Máximo 180 días. Cuanto más corto, mejor.</span>
+        </label>
+        <div class="mando" style="justify-content:center">
+          <button class="boton" id="invCrear">Crear enlace</button>
+          <span class="mando-nota" id="invAviso">&nbsp;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabla-caja">
+      <table class="comparativa"><thead><tr>
+        <th>Para quién</th><th>Vence</th><th>Visitas</th><th>Enlace</th><th></th>
+      </tr></thead><tbody id="invLista"></tbody></table>
+    </div>
+  </section>
+
+  <footer class="pie">
+    <span>Modelo operativo: ingresos, costos e impuestos de la operación. No incluye estructura de financiamiento ni pasivos existentes.<br>
+    Precios y consultas de cortesía tomados del sistema en producción. Costo de IA medido; altas, activación, bajas y volumen son supuestos ajustables.</span>
+    <span class="cifra" id="sello">—</span>
+  </footer>
+</div>
+
+<script nonce="__NONCE__">
+"use strict";
+
+var MESES = 36, GRATIS = 4;
+var MERCADOS = { br: { nom: "Brasil", sim: "R$" }, bo: { nom: "Bolivia", sim: "Bs" } };
+var ESCS = ["pesimista", "realista", "optimista"];
+
+/* ── Palancas comerciales, por mercado y escenario ──────── */
+var MANDOS = [
+  { k:"nuevos1",    nom:"Altas el primer mes",     min:1,  max:80,   paso:1,  tipo:"n",   uni:" médicos",
+    nota:"Médicos que abren cuenta en el mes 1." },
+  { k:"crecimiento",nom:"Crecimiento de las altas",min:0,  max:30,   paso:1,  tipo:"pct",
+    nota:"Cuánto más se capta cada mes respecto al anterior." },
+  { k:"techo",      nom:"Techo de altas por mes",  min:5,  max:400,  paso:5,  tipo:"n",   uni:" médicos",
+    nota:"Cuántas cuentas nuevas se pueden atender por mes. Sin este límite el crecimiento compuesto se vuelve una fantasía." },
+  { k:"activacion", nom:"Activación",              min:5,  max:90,   paso:1,  tipo:"pct",
+    nota:"De los que prueban las 4 gratis, cuántos empiezan a pagar." },
+  { k:"churn",      nom:"Bajas mensuales",         min:1,  max:15,   paso:0.5,tipo:"pct",
+    nota:"Médicos que dejan de pagar cada mes." },
+  { k:"mixPlan",    nom:"Eligen plan mensual",     min:0,  max:100,  paso:1,  tipo:"pct",
+    nota:"El resto se queda en prepago por consulta." },
+  { k:"consPre",    nom:"Consultas · prepago",     min:2,  max:60,   paso:1,  tipo:"n",   uni:" / mes",
+    nota:"Volumen del médico que paga por consulta." },
+  { k:"consPlan",   nom:"Consultas · con plan",    min:20, max:250,  paso:5,  tipo:"n",   uni:" / mes",
+    nota:"Volumen del médico con plan. Cuanto más alto, más costo de IA." },
+  { k:"precioCons", nom:"Precio por consulta",     min:3,  max:60,   paso:1,  tipo:"$",
+    nota:"Prepago. Sale del sistema en producción." },
+  { k:"precioPlan", nom:"Precio del plan mensual", min:100,max:2500, paso:25, tipo:"$0",
+    nota:"El plan anual son doce meses al precio de once." },
+];
+
+/* Brasil: mercado grande, plan competitivo a las 40 consultas.
+   Bolivia: mercado chico y consulta barata en dólares, así que
+   el plan solo le cierra a quien tiene mucho volumen.        */
+var P = {
+  br: {
+    pesimista:{ nuevos1:3,  crecimiento:6,  techo:25,  activacion:30, churn:7, mixPlan:15, consPre:8,  consPlan:45, precioCons:10, precioPlan:400 },
+    realista: { nuevos1:6,  crecimiento:12, techo:60,  activacion:45, churn:5, mixPlan:30, consPre:12, consPlan:55, precioCons:10, precioPlan:400 },
+    optimista:{ nuevos1:12, crecimiento:18, techo:120, activacion:60, churn:3, mixPlan:45, consPre:16, consPlan:70, precioCons:10, precioPlan:400 },
+  },
+  bo: {
+    pesimista:{ nuevos1:2,  crecimiento:4,  techo:12, activacion:28, churn:8, mixPlan:5,  consPre:8,  consPlan:80,  precioCons:12, precioPlan:900 },
+    realista: { nuevos1:4,  crecimiento:8,  techo:30, activacion:42, churn:6, mixPlan:12, consPre:12, consPlan:95,  precioCons:12, precioPlan:900 },
+    optimista:{ nuevos1:8,  crecimiento:13, techo:60, activacion:55, churn:4, mixPlan:22, consPre:16, consPlan:110, precioCons:12, precioPlan:900 },
+  },
+};
+
+/* ── Costos: uno solo, en dólares, para los dos países ────── */
+var MANDOS_GLOBALES = [
+  { k:"costoCons",   nom:"Costo de IA por consulta",     min:0.03, max:1,     paso:0.002,tipo:"u3",
+    nota:"MEDIDO, no estimado: US$ 0,130 de transcripción (AssemblyAI con diarización y vocabulario médico, consulta de 20 min) más US$ 0,002 de la nota clínica en tokens reales." },
+  { k:"msgs",        nom:"Mensajes de WhatsApp por consulta", min:0, max:6,   paso:1,    tipo:"n", uni:" mensajes",
+    nota:"Aviso al paciente, ida y vuelta." },
+  { k:"costoMsg",    nom:"Costo por mensaje de WhatsApp",min:0,    max:0.10,  paso:0.005,tipo:"u3",
+    nota:"Meta empieza a cobrar el 1 de octubre de 2026. Poner esto en cero es la forma más fácil de que el margen mienta." },
+  { k:"comision",    nom:"Comisión del vendedor",        min:0,    max:25,    paso:0.5,  tipo:"pct",
+    nota:"Sobre todo lo cobrado, mes a mes. Se paga sólo si entra plata: no hay gasto de captación por adelantado." },
+  { k:"fijosBase",   nom:"Gastos fijos de base",         min:200,  max:20000, paso:100,  tipo:"u0",
+    nota:"Servidores, herramientas, administración. Total de los dos países. No incluye un sueldo de mercado para el fundador." },
+  { k:"soporte100",  nom:"Soporte por cada 100 médicos", min:0,    max:3000,  paso:20,   tipo:"u0",
+    nota:"Los fijos no son fijos: atender 500 médicos necesita gente. Crece con la base activa, no con el calendario." },
+  { k:"usdBrl",      nom:"Reales por dólar",             min:3.5,  max:9,     paso:0.05, tipo:"tc",
+    nota:"Para convertir la facturación brasileña." },
+  { k:"usdBob",      nom:"Bolivianos por dólar",         min:6.9,  max:16,    paso:0.1,  tipo:"tc",
+    nota:"Bolivia unificó su régimen cambiario en 2026: el peg de 6,96 ya no aplica. Referencia BCB cerca de 11,5." },
+  { k:"impVentas",   nom:"Impuestos sobre la venta",     min:0,    max:25,    paso:0.5,  tipo:"pct",
+    nota:"Simples Nacional en Brasil, IVA e IT en Bolivia. Se pagan aunque el mes cierre en pérdida." },
+  { k:"impUtil",     nom:"Impuesto a las utilidades",    min:0,    max:40,    paso:1,    tipo:"pct",
+    nota:"IRPJ en Brasil, IUE en Bolivia. Sólo sobre los meses que dan ganancia." },
+];
+var G = {
+  costoCons: 0.132, msgs: 2, costoMsg: 0.01, comision: 8,
+  fijosBase: 1000, soporte100: 260,
+  usdBrl: 5.40, usdBob: 11.50, impVentas: 10, impUtil: 25,
+};
+
+// Cuántos médicos hay a los que se les puede vender. Sirve para una sola cosa,
+// pero importante: mostrar qué porción del mercado necesita capturar el modelo.
+// Un plan que necesita el 98 % de su mercado no es optimista, es imposible.
+var MERCADO = {
+  br: { direccionables: 150000, nota: "de ~575.000 médicos registrados en el CFM, los que ejercen en consultorio privado con capacidad de pago" },
+  bo: { direccionables: 2130,   nota: "médicos en consultorios y clínicas privadas del eje troncal (Santa Cruz, La Paz, Cochabamba)" },
+};
+
+/* ── El desarrollo ya ejecutado ─────────────────────────────
+   2.075 horas a US$ 40 = US$ 83.000. Repartidas por área para
+   que se pueda discutir renglón por renglón en vez de creer o
+   no creer un número entero.                                */
+var TARIFA = 40;
+
+/* ── LOS US$ 85.000, REPARTIDOS POR DISCIPLINA ──────────────
+   Por disciplina y no por pantalla: un inversor no compra
+   "el módulo de odontograma", compra que exista backend,
+   base de datos, pruebas y seguridad. Cada renglón se puede
+   discutir por separado, que es la única forma de que un
+   número entero deje de ser una afirmación y pase a ser una
+   cuenta. 2.125 horas a US$ 40. */
+var DESARROLLO = [
+  { area:"Programación backend — servicios y rutas",   h:620, det:"11.681 líneas en 77 archivos" },
+  { area:"Programación frontend — la aplicación",      h:560, det:"17.584 líneas en 52 archivos" },
+  { area:"Integraciones externas",                     h:240, det:"16 servicios de terceros" },
+  { area:"Pruebas automatizadas",                      h:195, det:"27 suites, 4.997 líneas" },
+  { area:"Análisis funcional y arquitectura",          h:150, det:"antes de escribir cada módulo" },
+  { area:"Base de datos — modelado e índices",         h:145, det:"1.662 líneas, más de 40 colecciones" },
+  { area:"Seguridad — sesiones, 2FA, idempotencia",    h:110, det:"auditoría y candados a nivel de base" },
+  { area:"Infraestructura, despliegue y monitoreo",    h:75,  det:"servidor propio, respaldos, TURN" },
+  { area:"Dos idiomas, dos monedas, dos países",       h:30,  det:"español y portugués, R$ y Bs" },
+];
+
+var sel = { mercado: "br", escenario: "realista", escTabla: "realista" };
+
+/* ── Formato ────────────────────────────────────────────── */
+var fN  = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 0 });
+var fN2 = new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function dinero(v, sim)  { return sim + " " + fN.format(Math.round(v)); }
+function dinero2(v, sim) { return sim + " " + fN2.format(v); }
+function usd(v)  { return "US$ " + fN.format(Math.round(v)); }
+function usd2(v) { return "US$ " + fN2.format(v); }
+function contable(v, sim) {
+  var t = sim === "US$" ? usd(Math.abs(v)) : dinero(Math.abs(v), sim);
+  return v < 0 ? "(" + t + ")" : t;
+}
+function signo(v) { return v < 0 ? "neg" : (v > 0 ? "pos" : ""); }
+
+// Los primeros meses el margen es −700 % porque casi no hay ingresos todavía.
+// El número es cierto y no dice nada: se recorta para que la columna se lea.
+function pctMargen(fila) {
+  if (fila.ingresos <= 0) return "—";
+  if (fila.margen < -1) return "< −100 %";
+  return (fila.margen * 100).toFixed(0) + " %";
+}
+function tasa(m) { return m === "br" ? G.usdBrl : G.usdBob; }
+
+/* ── Motor comercial, en moneda local ───────────────────────
+   Un médico nuevo pasa su primer mes gastando las 4 consultas
+   de cortesía: cuestan y no facturan. Recién al mes siguiente,
+   si activó, entra a la base que paga.                      */
+function modelarMercado(q) {
+  var filas = [], base = 0, porEntrar = 0, altas = q.nuevos1;
+
+  for (var m = 1; m <= MESES; m++) {
+    // El crecimiento compuesto sin techo da números de fantasía: a 18 %
+    // mensual son 400 veces más altas en el mes 36 que en el primero.
+    if (m > 1) altas = Math.min(altas * (1 + q.crecimiento / 100), q.techo);
+
+    base = base * (1 - q.churn / 100) + porEntrar;
+    porEntrar = altas * (q.activacion / 100);
+
+    var conPlan = base * (q.mixPlan / 100);
+    var prepago = base - conPlan;
+
+    var cGratis  = altas * GRATIS;
+    var cPrepago = prepago * q.consPre;
+    var cPlan    = conPlan * q.consPlan;
+
+    filas.push({
+      m:m, altas:altas, base:base, conPlan:conPlan, prepago:prepago,
+      consultas: cGratis + cPrepago + cPlan,
+      ingresos: conPlan * q.precioPlan + cPrepago * q.precioCons,
+    });
+  }
+  return filas;
+}
+
+/* Contribución de un mercado en su moneda: hasta acá se puede
+   atribuir sin repartir nada de forma arbitraria. */
+function contribucionLocal(filas, mercado) {
+  var t = tasa(mercado);
+  return filas.map(function (d) {
+    var cVar = d.consultas * costoPorConsulta() * t;
+    var comision = d.ingresos * (G.comision / 100);
+    return Object.assign({}, d, {
+      cVar: cVar, comision: comision,
+      contribucion: d.ingresos - cVar - comision,
+    });
+  });
+}
+
+/* ── LOS FIJOS NO SON FIJOS ─────────────────────────────────
+   Dejarlos planos tres años mientras la base se multiplica es
+   el error que un inversor detecta en treinta segundos. Pero
+   hacerlos crecer con el CALENDARIO tampoco sirve: la
+   estructura no crece porque pase el tiempo, crece porque hay
+   más médicos que atender. Se ata a la base activa. */
+function fijosDelMes(activos) {
+  return G.fijosBase + Math.ceil(activos / 100) * G.soporte100;
+}
+
+/* Lo que cuesta una consulta, en dólares: la IA más el aviso al
+   paciente. El segundo es cero hasta que Meta empiece a cobrar,
+   y ahí deja de serlo para siempre. */
+function costoPorConsulta() {
+  return G.costoCons + G.msgs * G.costoMsg;
+}
+
+/* ── Consolidado, en dólares ────────────────────────────── */
+function consolidar(fBr, fBo) {
+  var filas = [], acum = 0, minCaja = 0, fondo = 0, be = 0;
+
+  for (var i = 0; i < MESES; i++) {
+    var a = fBr[i], b = fBo[i];
+    var ingBr = a.ingresos / G.usdBrl, ingBo = b.ingresos / G.usdBob;
+    var ingresos = ingBr + ingBo;
+    var consultas = a.consultas + b.consultas;
+    var activos = a.base + b.base;
+    var cVar = consultas * costoPorConsulta();
+    var comision = ingresos * (G.comision / 100);
+    var fijos = fijosDelMes(activos);
+    var contribucion = ingresos - cVar - comision;
+
+    // Los impuestos sobre la venta se pagan aunque el mes cierre en pérdida;
+    // el de utilidades sólo si hay utilidad. Sin esto, "utilidad neta" no es
+    // neta y es lo primero que un inversor va a marcar.
+    var impVentas = ingresos * (G.impVentas / 100);
+    var operativo = contribucion - fijos - impVentas;
+    var impUtil = operativo > 0 ? operativo * (G.impUtil / 100) : 0;
+    var neta = operativo - impUtil;
+
+    acum += neta;
+    if (acum < minCaja) { minCaja = acum; fondo = i + 1; }
+    if (!be && neta > 0) be = i + 1;
+
+    filas.push({
+      m:i + 1, altas:a.altas + b.altas, base:a.base + b.base,
+      consultas:consultas, ingresos:ingresos, ingBr:ingBr, ingBo:ingBo,
+      ingBrLocal:a.ingresos, ingBoLocal:b.ingresos,
+      cVar:cVar, comision:comision, fijos:fijos,
+      impVentas:impVentas, impUtil:impUtil, impuestos:impVentas + impUtil,
+      contribucion:contribucion, operativo:operativo, neta:neta,
+      margen: ingresos > 0 ? neta / ingresos : 0,
+      acum:acum,
+    });
+  }
+
+  var hasta = filas.slice(0, fondo || MESES);
+  var suma = function (c) { return hasta.reduce(function (x, d) { return x + d[c]; }, 0); };
+  var todo = function (c) { return filas.reduce(function (x, d) { return x + d[c]; }, 0); };
+  var fin = filas[MESES - 1];
+
+  // En qué mes el margen neto llega por primera vez a cada nivel, y se queda:
+  // un mes suelto que toca el 10 % y vuelve a bajar no es haber llegado.
+  function cruce(nivel) {
+    for (var k = 0; k < MESES; k++) {
+      if (filas[k].margen >= nivel) {
+        var sostiene = true;
+        for (var j = k; j < Math.min(k + 3, MESES); j++) if (filas[j].margen < nivel) sostiene = false;
+        if (sostiene) return filas[k].m;
+      }
+    }
+    return 0;
+  }
+
+  return {
+    filas:filas, fin:fin, be:be, fondo:fondo, capital:Math.abs(minCaja),
+    fijosAcum:suma("fijos"), varAcum:suma("cVar"), comAcum:suma("comision"), ingAcum:suma("ingresos"),
+    ingTotal:todo("ingresos"), netaTotal:todo("neta"), impTotal:todo("impuestos"),
+    margenPct: fin.ingresos > 0 ? fin.contribucion / fin.ingresos : 0,
+    margenNeto: fin.margen,
+    cruce: cruce,
+    en: function (mes) { return filas[mes - 1]; },
+  };
+}
+
+function correrTodo() {
+  var R = { br:{}, bo:{}, co:{}, brc:{}, boc:{} };
+  ESCS.forEach(function (e) {
+    var fBr = modelarMercado(P.br[e]), fBo = modelarMercado(P.bo[e]);
+    R.br[e] = fBr; R.bo[e] = fBo;
+    R.brc[e] = contribucionLocal(fBr, "br");
+    R.boc[e] = contribucionLocal(fBo, "bo");
+    R.co[e] = consolidar(fBr, fBo);
+  });
+  return R;
+}
+
+/* ── Ejes ───────────────────────────────────────────────── */
+function escala(min, max) {
+  if (max === min) max = min + 1;
+  var bruto = (max - min) / 5;
+  var mag = Math.pow(10, Math.floor(Math.log10(Math.abs(bruto) || 1)));
+  var norm = bruto / mag;
+  var paso = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  var lo = Math.floor(min / paso) * paso, hi = Math.ceil(max / paso) * paso;
+  var marcas = [];
+  for (var v = lo; v <= hi + paso * 0.001; v += paso) marcas.push(v);
+  return { lo:lo, hi:hi, marcas:marcas };
+}
+function abreviar(v) {
+  var a = Math.abs(v);
+  if (a >= 1e6) return (v / 1e6).toFixed(a % 1e6 === 0 ? 0 : 1) + "M";
+  if (a >= 1000) return Math.round(v / 1000) + "k";
+  return String(Math.round(v));
+}
+function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function abanico(idSvg, W, H, series, campo, recorte) {
+  var iz = 64, de = 16, ar = 14, ab = 30;
+  var pw = W - iz - de, ph = H - ar - ab;
+
+  var vals = [0];
+  series.forEach(function (s) { s.filas.forEach(function (d) { vals.push(d[campo]); }); });
+  // Recortar cuando un escenario es tanto más grande que los otros que los
+  // aplasta: en la caja acumulada, el pozo es justo lo que hay que ver.
+  var e = recorte ? escala(recorte.min, recorte.max)
+                  : escala(Math.min.apply(null, vals), Math.max.apply(null, vals));
+  var y = function (v) { return ar + ph - (v - e.lo) / (e.hi - e.lo) * ph; };
+  var x = function (i) { return iz + (i + 0.5) * (pw / MESES); };
+
+  var linea = css("--linea"), linea2 = css("--linea-2"), tinta3 = css("--tinta-3");
+  var recinto = idSvg + "-recinto";
+  var s = '<clipPath id="' + recinto + '"><rect x="' + iz + '" y="' + ar + '" width="' + pw + '" height="' + ph + '"/></clipPath>';
+
+  e.marcas.forEach(function (v) {
+    var cero = Math.abs(v) < 1e-9;
+    s += '<line x1="' + iz + '" y1="' + y(v).toFixed(1) + '" x2="' + (W - de) + '" y2="' + y(v).toFixed(1) +
+         '" stroke="' + (cero ? linea2 : linea) + '" stroke-width="' + (cero ? 1.2 : 1) + '"/>' +
+         '<text x="' + (iz - 8) + '" y="' + (y(v) + 3.5).toFixed(1) + '" text-anchor="end" fill="' + tinta3 +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">' + abreviar(v) + '</text>';
+  });
+
+  s += '<g clip-path="url(#' + recinto + ')">';
+  var peor = series[0].filas, mejor = series[2].filas;
+  var d = peor.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v[campo]).toFixed(1); }).join(" ");
+  for (var i = MESES - 1; i >= 0; i--) d += " L" + x(i).toFixed(1) + " " + y(mejor[i][campo]).toFixed(1);
+  s += '<path d="' + d + ' Z" fill="' + linea2 + '" opacity="0.22"/>';
+
+  series.forEach(function (se) {
+    var p = se.filas.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v[campo]).toFixed(1); }).join(" ");
+    s += '<path d="' + p + '" fill="none" stroke="' + se.color + '" stroke-width="' + se.grosor +
+         '" stroke-linejoin="round" stroke-linecap="round"/>';
+    var u = se.filas[MESES - 1][campo];
+    if (u >= e.lo && u <= e.hi) {
+      s += '<circle cx="' + x(MESES - 1).toFixed(1) + '" cy="' + y(u).toFixed(1) + '" r="3.2" fill="' + se.color + '"/>';
+    }
+  });
+  s += "</g>";
+
+  [1, 6, 12, 18, 24, 30, 36].forEach(function (m) {
+    s += '<text x="' + x(m - 1).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" fill="' + tinta3 +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">M' + m + '</text>';
+  });
+  document.getElementById(idSvg).innerHTML = s;
+}
+
+function pintarMedicos(R) {
+  var W = 760, H = 200, iz = 64, de = 16, ar = 14, ab = 28;
+  var pw = W - iz - de, ph = H - ar - ab;
+  var br = R.br.realista, bo = R.bo.realista;
+  var e = escala(0, Math.max.apply(null, br.map(function (d, i) { return d.base + bo[i].base; })));
+  var y = function (v) { return ar + ph - (v - e.lo) / (e.hi - e.lo) * ph; };
+  var x = function (i) { return iz + (i + 0.5) * (pw / MESES); };
+
+  var linea = css("--linea"), tinta3 = css("--tinta-3"), verde = css("--verde"), ambar = css("--ambar");
+  var s = "";
+  e.marcas.forEach(function (v) {
+    s += '<line x1="' + iz + '" y1="' + y(v).toFixed(1) + '" x2="' + (W - de) + '" y2="' + y(v).toFixed(1) +
+         '" stroke="' + linea + '" stroke-width="1"/>' +
+         '<text x="' + (iz - 8) + '" y="' + (y(v) + 3.5).toFixed(1) + '" text-anchor="end" fill="' + tinta3 +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">' + abreviar(v) + '</text>';
+  });
+  function area(alto, color, op) {
+    var d = br.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(alto(i)).toFixed(1); }).join(" ");
+    return '<path d="' + d + " L" + x(MESES - 1).toFixed(1) + " " + y(0).toFixed(1) +
+           " L" + x(0).toFixed(1) + " " + y(0).toFixed(1) + ' Z" fill="' + color + '" opacity="' + op + '"/>';
+  }
+  s += area(function (i) { return br[i].base + bo[i].base; }, ambar, 0.7);
+  s += area(function (i) { return br[i].base; }, verde, 0.85);
+  [1, 6, 12, 18, 24, 30, 36].forEach(function (m) {
+    s += '<text x="' + x(m - 1).toFixed(1) + '" y="' + (H - 9) + '" text-anchor="middle" fill="' + tinta3 +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">M' + m + '</text>';
+  });
+  document.getElementById("gMedicos").innerHTML = s;
+}
+
+/* ── La tabla de los dos países ─────────────────────────── */
+function pintarPaises(R) {
+  var e = sel.escTabla;
+  var br = R.br[e], bo = R.bo[e], co = R.co[e];
+
+  // Los 36 meses completos: es lo que un inversor va a querer recorrer,
+  // no seis fotos sueltas.
+  var hitos = { 6:1, 12:1, 18:1, 24:1, 30:1, 36:1 };
+  var cuerpo = co.filas.map(function (c) {
+    var a = br[c.m - 1], b = bo[c.m - 1];
+    return '<tr class="' + (hitos[c.m] ? "hito" : "") + '">' +
+      "<td>Mes " + c.m + "</td>" +
+      "<td>" + dinero(a.ingresos, "R$") + "</td>" +
+      "<td>" + usd(c.ingBr) + "</td>" +
+      '<td class="bordeIzq">' + dinero(b.ingresos, "Bs") + "</td>" +
+      "<td>" + usd(c.ingBo) + "</td>" +
+      '<td class="bordeIzq destacada">' + fN.format(c.base) + "</td>" +
+      '<td class="destacada">' + usd(c.ingresos) + "</td>" +
+      '<td class="destacada ' + signo(c.neta) + '">' + contable(c.neta, "US$") + "</td>" +
+      '<td class="destacada ' + signo(c.neta) + '">' + pctMargen(c) + "</td>" +
+      "</tr>";
+  }).join("");
+
+  var tBr = br.reduce(function (x, d) { return x + d.ingresos; }, 0);
+  var tBo = bo.reduce(function (x, d) { return x + d.ingresos; }, 0);
+  cuerpo += '<tr class="cierre"><td>Acumulado</td>' +
+    "<td>" + dinero(tBr, "R$") + "</td><td>" + usd(tBr / G.usdBrl) + "</td>" +
+    '<td class="bordeIzq">' + dinero(tBo, "Bs") + "</td><td>" + usd(tBo / G.usdBob) + "</td>" +
+    '<td class="bordeIzq destacada">—</td>' +
+    '<td class="destacada">' + usd(co.ingTotal) + "</td>" +
+    '<td class="destacada ' + signo(co.netaTotal) + '">' + contable(co.netaTotal, "US$") + "</td>" +
+    '<td class="destacada">' + (co.ingTotal > 0 ? (co.netaTotal / co.ingTotal * 100).toFixed(0) : 0) + " %</td></tr>";
+
+  document.getElementById("tPaises").innerHTML = cuerpo;
+
+  var parteBr = tBr / G.usdBrl, parteBo = tBo / G.usdBob;
+  var pct = Math.round(parteBr / (parteBr + parteBo) * 100);
+
+  // Las cuatro cifras del período, arriba, para no tener que bajar 36 filas.
+  document.getElementById("tPaisesResumen").innerHTML = [
+    ["Cobrado en 36 meses", usd(co.ingTotal), "Brasil " + pct + " % · Bolivia " + (100 - pct) + " %"],
+    ["Ingresos del mes 36", usd(co.fin.ingresos), usd(co.fin.ingresos * 12) + " anualizado"],
+    ["Utilidad neta acumulada", contable(co.netaTotal, "US$"), "después de impuestos"],
+    ["Impuestos pagados", usd(co.impTotal), G.impVentas + " % venta · " + G.impUtil + " % utilidad"],
+  ].map(function (c) {
+    return '<div class="res"><span class="rotulo">' + c[0] + '</span>' +
+      '<span class="res-val ' + (c[1].charAt(0) === "(" ? "neg" : "") + '">' + c[1] + "</span>" +
+      '<span class="res-pie">' + c[2] + "</span></div>";
+  }).join("");
+
+  document.getElementById("tPaisesPie").textContent =
+    "Escenario " + e + " · R$ " + G.usdBrl.toFixed(2) + " y Bs " + G.usdBob.toFixed(2) + " por dólar";
+}
+
+/* ── Qué porción del mercado hay que capturar ───────────────
+   La pregunta que hunde a la mayoría de las proyecciones. Un
+   plan que necesita el 98 % de su mercado direccionable no es
+   optimista: es aritméticamente imposible, y el que lo lee lo
+   sabe. Conviene calcularlo antes que lo calcule él. */
+function pintarPenetracion(R) {
+  var br = R.br.realista[MESES - 1].base, bo = R.bo.realista[MESES - 1].base;
+  var pBr = br / MERCADO.br.direccionables * 100;
+  var pBo = bo / MERCADO.bo.direccionables * 100;
+
+  document.getElementById("tMercado").innerHTML = [
+    ["Médicos direccionables · Brasil", fN.format(MERCADO.br.direccionables), MERCADO.br.nota],
+    ["Penetración al mes 36", pBr.toFixed(2) + " %", fN.format(br) + " médicos"],
+    ["Médicos direccionables · Bolivia", fN.format(MERCADO.bo.direccionables), MERCADO.bo.nota],
+    ["Penetración al mes 36", pBo.toFixed(1) + " %", fN.format(bo) + " médicos"],
+  ].map(function (c) {
+    return '<div class="res"><span class="rotulo">' + c[0] + '</span>' +
+      '<span class="res-val">' + c[1] + "</span>" +
+      '<span class="res-pie">' + c[2] + "</span></div>";
+  }).join("");
+
+  var n = document.getElementById("notaMercado");
+  if (pBr < 5 && pBo < 25) {
+    n.innerHTML = "<strong>El modelo no depende de dominar ningún mercado.</strong> Al mes 36 " +
+      "toma el " + pBr.toFixed(2) + " % de los médicos direccionables en Brasil y el " +
+      pBo.toFixed(1) + " % en Bolivia. Es lo que separa una proyección de una ilusión: si el " +
+      "tamaño real del mercado fuera la mitad de lo estimado, estas cifras siguen siendo " +
+      "alcanzables. Un plan que necesita saturar su mercado no tiene ese margen.";
+  } else {
+    n.innerHTML = "<strong>Cuidado: el modelo necesita el " + pBr.toFixed(1) + " % de Brasil y el " +
+      pBo.toFixed(1) + " % de Bolivia.</strong> Cuanto más se acerca al total del mercado, más " +
+      "depende de que la estimación de ese mercado sea exacta — y esa estimación es siempre " +
+      "lo menos confiable de cualquier plan. Conviene bajar el techo de altas.";
+  }
+}
+
+/* ── Cuándo llega cada nivel de margen ──────────────────── */
+function pintarMargen(R) {
+  var niveles = [0.05, 0.10, 0.20];
+  document.getElementById("tMargen").innerHTML = ESCS.map(function (e) {
+    var r = R.co[e];
+    var celda = function (mes) {
+      return mes ? '<td class="pos">Mes ' + mes + "</td>" : '<td class="neg">no llega</td>';
+    };
+    return '<tr class="' + (e === "realista" ? "grueso" : "") + '">' +
+      '<td style="text-transform:capitalize">' + e + "</td>" +
+      celda(r.be) + niveles.map(function (n) { return celda(r.cruce(n)); }).join("") +
+      '<td class="' + signo(r.margenNeto) + '">' + (r.margenNeto * 100).toFixed(0) + " %</td>" +
+      '<td class="' + signo(r.fin.neta) + '">' + contable(r.fin.neta, "US$") + "</td>" +
+      '<td class="' + signo(r.netaTotal) + '">' + contable(r.netaTotal, "US$") + "</td>" +
+      "</tr>";
+  }).join("");
+
+  // Vuelta al revés: con los ingresos del mes 36, cuánta estructura mensual se
+  // puede sostener sin bajar de cada margen. Un margen alto no es un lujo, es
+  // el espacio que hay para contratar.
+  var c = R.co.realista.fin;
+  var techo = function (objetivo) {
+    // neta = (contribución − fijos − impVentas) · (1 − impUtil) = objetivo · ingresos
+    var antes = objetivo * c.ingresos / (1 - G.impUtil / 100);
+    return c.contribucion - c.impVentas - antes;
+  };
+  var t5 = techo(0.05), t10 = techo(0.10), t20 = techo(0.20);
+  document.getElementById("hFijos").textContent = usd(c.fijos);
+  document.getElementById("h20").textContent = usd(Math.max(0, t20));
+  document.getElementById("h10").textContent = usd(Math.max(0, t10));
+  document.getElementById("h5").textContent  = usd(Math.max(0, t5));
+  document.getElementById("hEquipo").textContent =
+    Math.max(0, Math.floor(t10 / 3000)) + " personas a US$ 3.000";
+
+  var nota = document.getElementById("notaMargen");
+  var m36 = R.co.realista.margenNeto;
+  if (m36 > 0.25) {
+    nota.innerHTML = "<strong>Cuidado con mostrar " + (m36 * 100).toFixed(0) +
+      " % de margen neto.</strong> Un inversor con oficio no lo lee como un buen negocio: " +
+      "lo lee como costos que faltan. La lectura honesta es al revés — el margen es alto " +
+      "porque hoy trabaja una sola persona. Mostrado como <em>capacidad de contratar</em> " +
+      "convence; mostrado como <em>rentabilidad</em>, no. Con los ingresos del mes 36 se " +
+      "puede sostener un equipo de " + usd(Math.max(0, t10)) + " al mes y todavía cerrar " +
+      "con 10 % neto: ese es el número que conviene poner en la mesa.";
+  } else if (m36 > 0) {
+    nota.innerHTML = "<strong>" + (m36 * 100).toFixed(0) + " % de margen neto al mes 36.</strong> " +
+      "Está en la banda que un inversor acepta sin discutir. La estructura que sostiene ese " +
+      "margen es de " + usd(c.fijos) + " al mes; hay lugar hasta " + usd(Math.max(0, t5)) +
+      " antes de bajar del 5 %.";
+  } else {
+    nota.innerHTML = "<strong>El escenario realista no llega a margen positivo en 36 meses.</strong> " +
+      "Con esta estructura de costos hay que bajar los gastos fijos, subir precios o " +
+      "acelerar las altas: los tres están arriba, en los supuestos.";
+  }
+}
+
+/* Margen neto en el tiempo, con las referencias del 5 % y el 10 %. */
+function pintarGraficoMargen(R) {
+  var W = 760, H = 280, iz = 64, de = 16, ar = 14, ab = 30;
+  var pw = W - iz - de, ph = H - ar - ab;
+
+  var vals = [0];
+  ESCS.forEach(function (e) { R.co[e].filas.forEach(function (d) { vals.push(d.margen); }); });
+  // Los primeros meses caen a −700 %: dejarlos en escala gasta dos tercios del
+  // cuadro en ruido y aplasta justo la zona donde se cruza el 5 % y el 10 %.
+  var esc = escala(-0.30, Math.min(Math.max.apply(null, vals), 1) + 0.05);
+  var y = function (v) { return ar + ph - (v - esc.lo) / (esc.hi - esc.lo) * ph; };
+  var x = function (i) { return iz + (i + 0.5) * (pw / MESES); };
+
+  var linea = css("--linea"), linea2 = css("--linea-2"), tinta3 = css("--tinta-3"), rojo = css("--rojo");
+  var recinto = "gMargen-recinto";
+  var s = '<clipPath id="' + recinto + '"><rect x="' + iz + '" y="' + ar + '" width="' + pw + '" height="' + ph + '"/></clipPath>';
+
+  esc.marcas.forEach(function (v) {
+    var cero = Math.abs(v) < 1e-9;
+    s += '<line x1="' + iz + '" y1="' + y(v).toFixed(1) + '" x2="' + (W - de) + '" y2="' + y(v).toFixed(1) +
+         '" stroke="' + (cero ? linea2 : linea) + '" stroke-width="' + (cero ? 1.2 : 1) + '"/>' +
+         '<text x="' + (iz - 8) + '" y="' + (y(v) + 3.5).toFixed(1) + '" text-anchor="end" fill="' + tinta3 +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">' + Math.round(v * 100) + '%</text>';
+  });
+
+  // Las dos referencias van a pocos píxeles una de otra: una etiqueta arriba y
+  // la otra abajo, o se pisan y no se lee ninguna.
+  [[0.10, -5], [0.05, 11]].forEach(function (par) {
+    var n = par[0];
+    if (n < esc.lo || n > esc.hi) return;
+    s += '<line x1="' + iz + '" y1="' + y(n).toFixed(1) + '" x2="' + (W - de) + '" y2="' + y(n).toFixed(1) +
+         '" stroke="' + rojo + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.75"/>' +
+         '<text x="' + (W - de - 4) + '" y="' + (y(n) + par[1]).toFixed(1) + '" text-anchor="end" fill="' + rojo +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5">' + Math.round(n * 100) + ' % neto</text>';
+  });
+
+  s += '<g clip-path="url(#' + recinto + ')">';
+  [["pesimista", css("--linea-2"), 1.5], ["optimista", css("--azul"), 1.5], ["realista", css("--verde"), 2.2]]
+    .forEach(function (par) {
+      var p = R.co[par[0]].filas.map(function (v, i) {
+        return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v.margen).toFixed(1);
+      }).join(" ");
+      s += '<path d="' + p + '" fill="none" stroke="' + par[1] + '" stroke-width="' + par[2] +
+           '" stroke-linejoin="round" stroke-linecap="round"/>';
+    });
+  s += "</g>";
+
+  [1, 6, 12, 18, 24, 30, 36].forEach(function (m) {
+    s += '<text x="' + x(m - 1).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" fill="' + tinta3 +
+         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10">M' + m + '</text>';
+  });
+  document.getElementById("gMargen").innerHTML = s;
+
+  var fuera = ESCS.filter(function (e) { return !R.co[e].be; })
+    .map(function (e) { return e; });
+  document.getElementById("margenNota").textContent =
+    "escala recortada abajo en −30 %; los primeros meses caen fuera de cuadro" +
+    (fuera.length ? " · el " + fuera.join(" y el ") + " nunca sube a cero" : "");
+}
+
+/* ── Comparativa por escenario ──────────────────────────── */
+function pintarMercado(idCuerpo, porEsc, sim) {
+  var filas = [
+    { et:"Médicos pagando · mes 12", f:function (r) { return fN.format(r[11].base); } },
+    { et:"Médicos pagando · mes 24", f:function (r) { return fN.format(r[23].base); } },
+    { et:"Médicos pagando · mes 36", f:function (r) { return fN.format(r[35].base); }, grueso:true },
+    { et:"Consultas por mes · mes 36", f:function (r) { return fN.format(r[35].consultas); }, sep:true },
+    { et:"Ingresos del mes · mes 12", f:function (r) { return dinero(r[11].ingresos, sim); } },
+    { et:"Ingresos del mes · mes 24", f:function (r) { return dinero(r[23].ingresos, sim); } },
+    { et:"Ingresos del mes · mes 36", f:function (r) { return dinero(r[35].ingresos, sim); }, grueso:true },
+    { et:"Ingresos anualizados · mes 36", f:function (r) { return dinero(r[35].ingresos * 12, sim); } },
+    { et:"Costo de IA · mes 36", f:function (r) { return "(" + dinero(r[35].cVar, sim) + ")"; }, clase:function () { return "neg"; }, sep:true },
+    { et:"Comisiones · mes 36", f:function (r) { return "(" + dinero(r[35].comision, sim) + ")"; }, clase:function () { return "neg"; } },
+    { et:"Contribución · mes 36", f:function (r) {
+        return dinero(r[35].contribucion, sim) + "  (" + Math.round(r[35].contribucion / r[35].ingresos * 100) + " %)"; },
+      grueso:true },
+    { et:"Cobrado en 36 meses", f:function (r) { return dinero(r.reduce(function (x, d) { return x + d.ingresos; }, 0), sim); }, sep:true, grueso:true },
+  ];
+  document.getElementById(idCuerpo).innerHTML = filas.map(function (f) {
+    var clases = (f.grueso ? "grueso " : "") + (f.sep ? "separa" : "");
+    return '<tr class="' + clases.trim() + '"><td>' + f.et + "</td>" +
+      ESCS.map(function (e) {
+        var c = (f.clase ? f.clase(porEsc[e]) : "") + (e === "realista" ? " destacada" : "");
+        return '<td class="' + c.trim() + '">' + f.f(porEsc[e]) + "</td>";
+      }).join("") + "</tr>";
+  }).join("");
+}
+
+function pintarConsolidado(porEsc) {
+  var filas = [
+    { et:"Médicos pagando · mes 36", f:function (r) { return fN.format(r.fin.base); }, grueso:true },
+    { et:"Consultas por mes · mes 36", f:function (r) { return fN.format(r.fin.consultas); } },
+    { et:"Ingresos del mes · mes 12", f:function (r) { return usd(r.en(12).ingresos); }, sep:true },
+    { et:"Ingresos del mes · mes 24", f:function (r) { return usd(r.en(24).ingresos); } },
+    { et:"Ingresos del mes · mes 36", f:function (r) { return usd(r.fin.ingresos); }, grueso:true },
+    { et:"Ingresos anualizados · mes 36", f:function (r) { return usd(r.fin.ingresos * 12); } },
+    { et:"Contribución · mes 36", f:function (r) { return usd(r.fin.contribucion) + "  (" + Math.round(r.margenPct * 100) + " %)"; }, sep:true },
+    { et:"Gastos fijos · mes 36", f:function (r) { return "(" + usd(r.fin.fijos) + ")"; }, clase:function () { return "neg"; } },
+    { et:"Impuestos · mes 36", f:function (r) { return "(" + usd(r.fin.impuestos) + ")"; }, clase:function () { return "neg"; } },
+    { et:"Utilidad neta · mes 36", f:function (r) { return contable(r.fin.neta, "US$"); }, clase:function (r) { return signo(r.fin.neta); }, grueso:true },
+    { et:"Margen neto · mes 36", f:function (r) { return (r.margenNeto * 100).toFixed(0) + " %"; }, clase:function (r) { return signo(r.margenNeto); }, grueso:true },
+    { et:"Punto de equilibrio", f:function (r) { return r.be ? "Mes " + r.be : "> 36"; }, clase:function (r) { return r.be ? "pos" : "neg"; }, sep:true, grueso:true },
+    { et:"Capital consumido", f:function (r) { return usd(r.capital); }, grueso:true },
+    { et:"Caja acumulada al mes 36", f:function (r) { return contable(r.fin.acum, "US$"); }, clase:function (r) { return signo(r.fin.acum); } },
+  ];
+  document.getElementById("tCo").innerHTML = filas.map(function (f) {
+    var clases = (f.grueso ? "grueso " : "") + (f.sep ? "separa" : "");
+    return '<tr class="' + clases.trim() + '"><td>' + f.et + "</td>" +
+      ESCS.map(function (e) {
+        var c = (f.clase ? f.clase(porEsc[e]) : "") + (e === "realista" ? " destacada" : "");
+        return '<td class="' + c.trim() + '">' + f.f(porEsc[e]) + "</td>";
+      }).join("") + "</tr>";
+  }).join("");
+}
+
+function pintarMayor(r) {
+  var hitos = { 1:1, 6:1, 12:1, 18:1, 24:1, 30:1, 36:1 };
+  document.getElementById("mayor").innerHTML = r.filas.map(function (d) {
+    var clases = (hitos[d.m] ? "hito " : "") + (d.m === r.be ? "corte" : "");
+    return '<tr class="' + clases.trim() + '">' +
+      "<td>Mes " + d.m + "</td>" +
+      "<td>" + fN.format(d.altas) + "</td>" +
+      "<td>" + fN.format(d.base) + "</td>" +
+      "<td>" + fN.format(d.consultas) + "</td>" +
+      "<td>" + usd(d.ingresos) + "</td>" +
+      '<td class="neg">(' + usd(d.cVar) + ")</td>" +
+      '<td class="neg">(' + usd(d.comision) + ")</td>" +
+      '<td class="neg">(' + usd(d.fijos) + ")</td>" +
+      '<td class="neg">(' + usd(d.impuestos) + ")</td>" +
+      '<td class="' + signo(d.neta) + '">' + contable(d.neta, "US$") + "</td>" +
+      '<td class="' + signo(d.acum) + '">' + contable(d.acum, "US$") + "</td>" +
+      "</tr>";
+  }).join("");
+}
+
+/* ── Economía unitaria ──────────────────────────────────── */
+function pintarUnidad() {
+  ["br", "bo"].forEach(function (mk) {
+    var q = P[mk].realista, sim = MERCADOS[mk].sim, t = tasa(mk);
+    var id = mk === "br" ? "uBr" : "uBo";
+    var costoIa = G.costoCons * t, costoWa = G.msgs * G.costoMsg * t;
+    var costo = costoIa + costoWa;
+    var com = q.precioCons * (G.comision / 100);
+    var margen = q.precioCons - costo - com;
+    document.getElementById(id + "Precio").textContent = dinero2(q.precioCons, sim) + "   " + usd2(q.precioCons / t);
+    document.getElementById(id + "Ia").textContent = "(" + dinero2(costoIa, sim) + ")";
+    document.getElementById(id + "Wa").textContent = costoWa > 0
+      ? "(" + dinero2(costoWa, sim) + ")"
+      : "sin costo — hasta que Meta cobre";
+    document.getElementById(id + "Com").textContent    = "(" + dinero2(com, sim) + ")";
+    var n = document.getElementById(id + "Margen");
+    n.textContent = dinero2(margen, sim) + "   " + Math.round(margen / q.precioCons * 100) + " %";
+    n.className = "cifra " + signo(margen);
+    document.getElementById(id + "Plan").textContent  = dinero(q.precioPlan, sim) + "   " + usd(q.precioPlan / t);
+    document.getElementById(id + "Anual").textContent = dinero(q.precioPlan * 11, sim) + "   " + usd(q.precioPlan * 11 / t);
+    document.getElementById(id + "Cruce").textContent = Math.round(q.precioPlan / q.precioCons) + " consultas";
+  });
+  document.getElementById("nBrUsd").textContent     = usd2(P.br.realista.precioCons / G.usdBrl);
+  document.getElementById("nBoUsd").textContent     = usd2(P.bo.realista.precioCons / G.usdBob);
+  document.getElementById("nBrPlanUsd").textContent = usd(P.br.realista.precioPlan / G.usdBrl);
+  document.getElementById("nBoPlanUsd").textContent = usd(P.bo.realista.precioPlan / G.usdBob);
+  document.getElementById("nBrCruce").textContent   = Math.round(P.br.realista.precioPlan / P.br.realista.precioCons);
+  document.getElementById("nBoCruce").textContent   = Math.round(P.bo.realista.precioPlan / P.bo.realista.precioCons);
+}
+
+/* ── El desarrollo ejecutado ────────────────────────────── */
+function pintarDesarrollo() {
+  var horas = DESARROLLO.reduce(function (a, d) { return a + d.h; }, 0);
+  var total = horas * TARIFA;
+  var cuerpo = DESARROLLO.map(function (d) {
+    return "<tr><td>" + d.area + '<br><span class="rotulo">' + d.det + "</span></td><td>" +
+      fN.format(d.h) + "</td><td>" + usd(d.h * TARIFA) + "</td><td>" +
+      Math.round(d.h / horas * 100) + " %</td></tr>";
+  }).join("");
+  cuerpo += '<tr class="cierre"><td>Total</td><td>' + fN.format(horas) + "</td><td>" +
+    usd(total) + "</td><td>100 %</td></tr>";
+  document.getElementById("tCosto").innerHTML = cuerpo;
+  document.getElementById("tarifaRotulo").textContent =
+    fN.format(horas) + " horas a US$ " + TARIFA + " · unos " + Math.round(horas / 150) + " meses de dedicación completa";
+}
+
+/* ── Encabezado y fondos ────────────────────────────────── */
+function pintarEncabezado(R) {
+  var c = R.co.realista;
+  document.getElementById("kMrr").textContent = usd(c.fin.ingresos);
+  document.getElementById("kArr").textContent = usd(c.fin.ingresos * 12) + " anualizado";
+  document.getElementById("kMed").textContent = fN.format(c.fin.base);
+  document.getElementById("kMedPie").textContent =
+    fN.format(R.br.realista[35].base) + " en Brasil · " + fN.format(R.bo.realista[35].base) + " en Bolivia";
+
+  var be = document.getElementById("kBe");
+  be.textContent = c.be ? "Mes " + c.be : "> 36";
+  be.className = "ind-valor " + (c.be ? "pos" : "neg");
+  document.getElementById("kBePie").textContent = c.be ? "primer mes con utilidad neta positiva" : "no llega dentro del horizonte";
+  document.getElementById("kCap").textContent = usd(c.capital);
+
+  var mn = document.getElementById("kMargenNeto");
+  mn.textContent = (c.margenNeto * 100).toFixed(0) + " %";
+  mn.className = "ind-valor " + signo(c.margenNeto);
+  var m10 = c.cruce(0.10);
+  document.getElementById("kMargenPie").textContent =
+    "mes 36 · llega al 10 % en el mes " + (m10 || "—");
+}
+
+function pintarFondos(R) {
+  var c = R.co.realista;
+  var discretos = 5200 + 8300 + 36000;
+  var colchon = (c.capital + discretos) * 0.20;
+  var total = c.capital + discretos + colchon;
+
+  document.getElementById("fPeriodo").textContent = "meses 1 a " + (c.fondo || MESES);
+  document.getElementById("fFijos").textContent   = usd(c.fijosAcum);
+  document.getElementById("fVar").textContent     = usd(c.varAcum);
+  document.getElementById("fCom").textContent     = usd(c.comAcum);
+  document.getElementById("fIng").textContent     = "− " + usd(c.ingAcum);
+  document.getElementById("fCapital").textContent = usd(c.capital);
+  document.getElementById("fColchon").textContent = usd(colchon);
+  document.getElementById("fTotal").textContent   = usd(total);
+
+  // El hallazgo que cambia la conversación: con esta estructura de costos, lo
+  // que hace falta no es capital para sobrevivir, es capital para acelerar.
+  var nota = document.getElementById("notaCapital");
+  if (c.capital < 30000) {
+    nota.innerHTML = "<strong>El agujero operativo es chico: " + usd(c.capital) +
+      ".</strong> Con esta estructura de costos el negocio se sostiene casi solo — llega al " +
+      (c.be ? "equilibrio en el mes " + c.be : "cierre sin equilibrio") +
+      ". La ronda no es para sobrevivir: es para dejar de depender de una sola persona y " +
+      "comprar velocidad. Es una posición de negociación mucho mejor que la contraria.";
+  } else {
+    nota.innerHTML = "<strong>El agujero operativo es de " + usd(c.capital) +
+      "</strong> y se toca en el mes " + (c.fondo || MESES) +
+      ". Ese es el piso de la ronda: por debajo, el proyecto se queda sin aire antes de llegar al equilibrio.";
+  }
+}
+
+/* ── Ciclo ──────────────────────────────────────────────── */
+function recalcular() {
+  var R = correrTodo();
+
+  pintarUnidad();
+  pintarDesarrollo();
+  pintarEncabezado(R);
+  pintarPaises(R);
+  pintarMargen(R);
+  pintarGraficoMargen(R);
+  pintarPenetracion(R);
+  pintarMercado("tBr", R.brc, "R$");
+  pintarMercado("tBo", R.boc, "Bs");
+  pintarConsolidado(R.co);
+
+  var s = [
+    { filas: R.co.pesimista.filas, color: css("--linea-2"), grosor: 1.5 },
+    { filas: R.co.realista.filas,  color: css("--verde"),   grosor: 2.2 },
+    { filas: R.co.optimista.filas, color: css("--azul"),    grosor: 1.5 },
+  ];
+  abanico("gAbanico", 760, 300, [s[0], s[2], s[1]], "ingresos");
+
+  // La caja se recorta alrededor del pozo: con el optimista entero, el pozo
+  // —que es lo que decide cuánta plata hace falta— queda como una raya.
+  var pozo = Math.max(R.co.pesimista.capital, R.co.realista.capital, 1);
+  abanico("gCaja", 760, 260, [s[0], s[2], s[1]], "acum", { min: -pozo * 1.2, max: pozo * 1.2 });
+  document.getElementById("cajaNota").textContent = "escala recortada al pozo; el optimista se va por arriba";
+
+  pintarMedicos(R);
+  pintarMayor(R.co[sel.escenario]);
+  document.getElementById("mayorQue").textContent = sel.escenario;
+  document.getElementById("mCruce").textContent = (G.usdBob / G.usdBrl).toFixed(2);
+
+  pintarFondos(R);
+  guardar();
+}
+
+/* ── Mandos ─────────────────────────────────────────────── */
+function textoMando(m, valor, sim) {
+  if (m.tipo === "pct") return (m.paso < 1 ? valor.toFixed(1) : valor) + " %";
+  if (m.tipo === "$")   return dinero2(valor, sim);
+  if (m.tipo === "$0")  return dinero(valor, sim);
+  if (m.tipo === "u2")  return usd2(valor);
+  if (m.tipo === "u3")  return "US$ " + valor.toFixed(3);
+  if (m.tipo === "u0")  return usd(valor);
+  if (m.tipo === "tc")  return valor.toFixed(2);
+  return fN.format(valor) + (m.uni || "");
+}
+
+function construirMandos(destino, lista, leer) {
+  document.getElementById(destino).innerHTML = lista.map(function (m) {
+    return '<label class="mando">' +
+      '<span class="mando-cab"><span class="mando-nom">' + m.nom + '</span>' +
+      '<span class="mando-val" data-val="' + destino + "-" + m.k + '"></span></span>' +
+      '<input type="range" data-campo="' + destino + "-" + m.k + '" min="' + m.min + '" max="' + m.max +
+      '" step="' + m.paso + '" value="' + leer()[m.k] + '">' +
+      '<span class="mando-nota">' + m.nota + "</span></label>";
+  }).join("");
+}
+
+function sincronizar() {
+  var q = P[sel.mercado][sel.escenario], sim = MERCADOS[sel.mercado].sim;
+  MANDOS.forEach(function (m) {
+    var v = document.querySelector('[data-val="mandos-' + m.k + '"]');
+    var r = document.querySelector('[data-campo="mandos-' + m.k + '"]');
+    if (v) v.textContent = textoMando(m, q[m.k], sim);
+    if (r && Number(r.value) !== q[m.k]) r.value = q[m.k];
+  });
+  MANDOS_GLOBALES.forEach(function (m) {
+    var v = document.querySelector('[data-val="mandosGlobales-' + m.k + '"]');
+    var r = document.querySelector('[data-campo="mandosGlobales-' + m.k + '"]');
+    if (v) v.textContent = textoMando(m, G[m.k], "US$");
+    if (r && Number(r.value) !== G[m.k]) r.value = G[m.k];
+  });
+}
+
+document.addEventListener("input", function (ev) {
+  var campo = ev.target.getAttribute && ev.target.getAttribute("data-campo");
+  if (!campo) return;
+  var partes = campo.split("-");
+  if (partes[0] === "mandos") P[sel.mercado][sel.escenario][partes[1]] = Number(ev.target.value);
+  else G[partes[1]] = Number(ev.target.value);
+  sincronizar();
+  recalcular();
+});
+
+function grupo(id, atributo, alElegir) {
+  document.getElementById(id).addEventListener("click", function (ev) {
+    var v = ev.target.getAttribute && ev.target.getAttribute(atributo);
+    if (!v) return;
+    this.querySelectorAll(".opc").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+    ev.target.setAttribute("aria-pressed", "true");
+    alElegir(v);
+    sincronizar();
+    recalcular();
+  });
+}
+grupo("gMercado",   "data-mercado", function (v) { sel.mercado = v; });
+grupo("gEscenario", "data-esc",     function (v) { sel.escenario = v; });
+grupo("gEscTabla",  "data-esct",    function (v) { sel.escTabla = v; });
+
+/* Comodidad de quien mira: si movió las palancas, las encuentra igual al volver. */
+function guardar() {
+  try { localStorage.setItem("modeloVitalis3", JSON.stringify({ P:P, G:G })); } catch (e) {}
+}
+try {
+  var crudo = localStorage.getItem("modeloVitalis3");
+  if (crudo) {
+    var g = JSON.parse(crudo);
+    if (g && g.P) Object.keys(P).forEach(function (mk) {
+      ESCS.forEach(function (e) {
+        MANDOS.forEach(function (m) {
+          var v = g.P[mk] && g.P[mk][e] && g.P[mk][e][m.k];
+          if (typeof v === "number") P[mk][e][m.k] = v;
+        });
+      });
+    });
+    if (g && g.G) MANDOS_GLOBALES.forEach(function (m) {
+      if (typeof g.G[m.k] === "number") G[m.k] = g.G[m.k];
+    });
+  }
+} catch (e) {}
+
+construirMandos("mandos", MANDOS, function () { return P[sel.mercado][sel.escenario]; });
+construirMandos("mandosGlobales", MANDOS_GLOBALES, function () { return G; });
+sincronizar();
+recalcular();
+
+/* ── COMPARTIR EL REPORTE ───────────────────────────────────
+   El servidor sustituye __MODO__ al servir la página. El
+   invitado recibe "invitado" y este bloque no hace nada: no es
+   que se le esconda el botón —las rutas le contestarían 404
+   igual—, es que no tiene sentido mostrárselo. */
+(function () {
+  if ("__MODO__" !== "operador") return;
+  var sec = document.getElementById("secInvitaciones");
+  sec.hidden = false;
+
+  var token = null;
+  try { token = localStorage.getItem("salud_token"); } catch (e) {}
+
+  var dias = document.getElementById("invDias");
+  var diasVal = document.getElementById("invDiasVal");
+  var etiqueta = document.getElementById("invEtiqueta");
+  var boton = document.getElementById("invCrear");
+  var aviso = document.getElementById("invAviso");
+  var lista = document.getElementById("invLista");
+
+  dias.addEventListener("input", function () {
+    diasVal.textContent = dias.value + (dias.value === "1" ? " día" : " días");
+  });
+
+  function pedir(ruta, opciones) {
+    opciones = opciones || {};
+    opciones.headers = Object.assign(
+      { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      opciones.headers || {}
+    );
+    return fetch(ruta, opciones).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; })
+        .then(function (j) { throw new Error(j.error || "No se pudo completar"); });
+      return r.json();
+    });
+  }
+
+  function urlDe(codigo) { return location.origin + "/report/i/" + codigo; }
+
+  function fecha(iso) {
+    try { return new Date(iso).toLocaleDateString("es-BO", { day:"numeric", month:"short", year:"numeric" }); }
+    catch (e) { return ""; }
+  }
+
+  function pintar(invitaciones) {
+    if (!invitaciones.length) {
+      lista.innerHTML = '<tr><td colspan="5" style="color:var(--tinta-3)">Todavía no hay enlaces activos.</td></tr>';
+      return;
+    }
+    lista.innerHTML = invitaciones.map(function (i) {
+      return "<tr><td>" + esc(i.etiqueta) + "</td>" +
+        "<td>" + fecha(i.expiraEn) + "</td>" +
+        "<td>" + (i.visitas || 0) + "</td>" +
+        '<td><span class="enlace">' + esc(urlDe(i.codigo)) + "</span></td>" +
+        '<td><button class="boton tenue" data-copiar="' + esc(i.codigo) + '">Copiar</button> ' +
+        '<button class="boton tenue" data-apagar="' + esc(i.codigo) + '">Apagar</button></td></tr>';
+    }).join("");
+  }
+
+  function esc(x) {
+    return String(x == null ? "" : x)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function refrescar() {
+    pedir("/report/invitaciones")
+      .then(function (d) { pintar(d.invitaciones || []); })
+      .catch(function () {
+        lista.innerHTML = '<tr><td colspan="5" class="neg">No se pudo leer la lista.</td></tr>';
+      });
+  }
+
+  boton.addEventListener("click", function () {
+    var nombre = etiqueta.value.trim();
+    if (!nombre) { aviso.textContent = "Poné para quién es."; etiqueta.focus(); return; }
+    boton.disabled = true;
+    aviso.textContent = "Creando…";
+    pedir("/report/invitaciones", {
+      method: "POST",
+      body: JSON.stringify({ etiqueta: nombre, dias: Number(dias.value) }),
+    }).then(function (inv) {
+      etiqueta.value = "";
+      // Se copia sola: el paso siguiente siempre es pegarla en un mensaje.
+      var url = urlDe(inv.codigo);
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url)
+          .then(function () { aviso.textContent = "Listo — el enlace ya está copiado."; })
+          .catch(function () { aviso.textContent = "Listo. Copialo de la tabla."; });
+      } else {
+        aviso.textContent = "Listo. Copialo de la tabla.";
+      }
+      refrescar();
+    }).catch(function (e) {
+      aviso.textContent = e.message;
+    }).then(function () { boton.disabled = false; });
+  });
+
+  lista.addEventListener("click", function (ev) {
+    var copiar = ev.target.getAttribute && ev.target.getAttribute("data-copiar");
+    var apagar = ev.target.getAttribute && ev.target.getAttribute("data-apagar");
+    if (copiar && navigator.clipboard) {
+      navigator.clipboard.writeText(urlDe(copiar)).catch(function () {});
+      ev.target.textContent = "Copiado";
+      setTimeout(function () { ev.target.textContent = "Copiar"; }, 1500);
+    }
+    if (apagar) {
+      // Apagar un enlace corta el acceso de alguien: se pregunta antes.
+      if (!confirm("¿Apagar este enlace? Quien lo tenga deja de poder abrir el reporte.")) return;
+      pedir("/report/invitaciones/" + encodeURIComponent(apagar), { method: "DELETE" })
+        .then(refrescar)
+        .catch(function (e) { alert(e.message); });
+    }
+  });
+
+  refrescar();
+})();
+
+document.getElementById("sello").textContent =
+  new Date().toLocaleDateString("es-BO", { year:"numeric", month:"long", day:"numeric" });
+
+if (window.matchMedia) {
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", recalcular);
+}
+</script>
+
+</body>
+</html>

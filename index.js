@@ -157,6 +157,11 @@ require("./routes/recargas")(app);
 // vence, sin cuenta — ver el encabezado de routes/teleconsulta.js.
 require("./routes/teleconsulta")(app);
 
+// El reporte financiero para inversores. La vista NO vive en public/ —si
+// viviera, express.static la serviría sin preguntar nada y el permiso de
+// abajo sería decoración. Ver el encabezado de routes/reporte.js.
+require("./routes/reporte")(app);
+
 // Los .br se generan una vez, en segundo plano, para no demorar el arranque.
 // Mientras no estén se sirven los originales: nada se rompe.
 prepararEnSegundoPlano([path.join(__dirname, "public", "vendor")]);

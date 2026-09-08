@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Reporte · Vitalis</title>
+<style>
+/* Sin fuentes externas: la CSP de Vitalis solo admite 'self' y las dos
+   variables ya están alojadas para el resto de la aplicación. */
+@font-face {
+  font-family: "Fraunces"; src: url("/fonts/fraunces-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+@font-face {
+  font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+:root {
+  --papel:#F1F3EC; --carta:#FBFCF6; --tinta:#15170F; --tinta-2:#545A47;
+  --linea:#D9DECD; --linea-2:#B6BEA2; --rojo:#9E2B20;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel:#12140D; --carta:#1A1D14; --tinta:#E9ECDD; --tinta-2:#A7AE94;
+    --linea:#2B3021; --linea-2:#454C36; --rojo:#E27A67;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:var(--papel); color:var(--tinta); padding:24px;
+  font-family:"InterVar", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size:16px; line-height:1.6;
+}
+.caja { width:100%; max-width:26rem; }
+h1 { font-family:Fraunces, Georgia, serif; font-weight:600; font-size:1.9rem; line-height:1.1; margin:0 0 10px; }
+p { margin:0; color:var(--tinta-2); font-size:.94rem; }
+.marca { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.7rem;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--rojo); margin-bottom:14px; }
+.aviso {
+  margin-top:26px; padding:16px 18px; background:var(--carta);
+  border:1px solid var(--linea-2); border-radius:3px; font-size:.92rem; color:var(--tinta-2);
+}
+.aviso strong { color:var(--tinta); }
+a { color:var(--rojo); }
+.cargando { margin-top:26px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; color:var(--tinta-2); }
+</style>
+</head>
+<body>
+  <div class="caja">
+    <div class="marca">Vitalis</div>
+    <h1>Reporte financiero</h1>
+    <p>Proyecciones a 36 meses, Brasil y Bolivia.</p>
+    <div class="cargando" id="estado">Buscando tu sesión…</div>
+    <div class="aviso" id="aviso" hidden></div>
+  </div>
+
+<script nonce="__NONCE__">
+(function () {
+  "use strict";
+  var estado = document.getElementById("estado");
+  var aviso = document.getElementById("aviso");
+
+  function noPasa(html) {
+    estado.hidden = true;
+    aviso.innerHTML = html;
+    aviso.hidden = false;
+  }
+
+  // La sesión de Vitalis ya está en el navegador si el operador entró a la
+  // aplicación. Acá no se pide contraseña de nuevo: reusar la sesión evita
+  // tener una segunda pantalla de login que mantener —y que asegurar—.
+  var token = null;
+  try { token = localStorage.getItem("salud_token"); } catch (e) {}
+
+  if (!token) {
+    noPasa('<strong>No hay ninguna sesión abierta en este navegador.</strong><br><br>' +
+      'Entrá primero a <a href="/">Vitalis</a> con tu cuenta y volvé a esta página.<br><br>' +
+      'Si te compartieron un enlace de invitación, abrí ese enlace directamente: no necesita cuenta.');
+    return;
+  }
+
+  fetch("/report/vista", { headers: { Authorization: "Bearer " + token } })
+    .then(function (r) {
+      if (r.status === 401) {
+        throw new Error('<strong>Tu sesión venció.</strong><br><br>Entrá de nuevo a ' +
+          '<a href="/">Vitalis</a> y volvé a esta página.');
+      }
+      if (!r.ok) {
+        // El servidor contesta 404 —no 403— a quien no es operador, así que
+        // desde acá las dos situaciones se ven igual y el mensaje lo dice.
+        throw new Error('<strong>Esta cuenta no puede ver el reporte.</strong><br><br>' +
+          'El reporte financiero está limitado a las cuentas de operador.');
+      }
+      return r.text();
+    })
+    .then(function (html) {
+      // Se reemplaza el documento entero: el reporte trae su propio <head>,
+      // sus estilos y su script, y ya viene autorizado por el nonce que le
+      // puso el servidor en ESA respuesta.
+      document.open();
+      document.write(html);
+      document.close();
+    })
+    .catch(function (e) {
+      noPasa(e.message && e.message.indexOf("<") === 0
+        ? e.message
+        : '<strong>No se pudo cargar el reporte.</strong><br><br>Revisá tu conexión y recargá la página.');
+    });
+})();
+</script>
+</body>
+</html>

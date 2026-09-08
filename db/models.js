@@ -1654,9 +1654,46 @@ const correccionIASchema = new mongoose.Schema({
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 
+
+// ─── INVITACIONES AL REPORTE ───────────────────────────────────────────────
+//
+// El reporte financiero se le muestra a inversores, y a un inversor no se le
+// da la cuenta de operador: se le da un enlace propio, que vence y se puede
+// apagar sin tocar nada más.
+//
+// ═══ POR QUÉ EN LA BASE Y NO UN TOKEN FIRMADO ══════════════════════════════
+//
+// Un token firmado con vencimiento adentro sería más simple y no necesitaría
+// esta colección. Pero un token firmado NO SE PUEDE REVOCAR: una vez emitido,
+// vale hasta que expire, y no hay forma de apagarlo si la conversación con
+// ese inversor se terminó mal o el enlace se reenvió a quien no debía.
+//
+// Acá la fila ES el permiso. Borrar o marcar la fila corta el acceso en el
+// próximo pedido, que es exactamente lo que hace falta cuando alguien
+// pregunta "¿podés desactivar el que le mandé a fulano?".
+//
+// El código lo genera crypto.randomBytes(24): 192 bits, no se adivina ni
+// probando. Por eso no hay contraseña además del enlace — el enlace ES la
+// credencial, igual que en /informe/:token y /teleconsulta/:token.
+const invitacionReporteSchema = new mongoose.Schema({
+  codigo: { type: String, required: true, unique: true, index: true },
+  // Para quién es. Sirve para saber cuál apagar seis meses después, cuando
+  // nadie se acuerde de qué enlace le mandó a quién.
+  etiqueta: { type: String, default: "" },
+  creadaPor: { type: String, default: "" },
+  expiraEn: { type: Date, required: true },
+  revocada: { type: Boolean, default: false },
+  // Cuántas veces se abrió. No identifica a nadie: solo permite ver que un
+  // enlace que se mandó a una persona se abrió cuarenta veces.
+  visitas: { type: Number, default: 0 },
+  ultimaVisita: { type: Date, default: null },
+}, { timestamps: true });
+const InvitacionReporte = mongoose.model("InvitacionReporte", invitacionReporteSchema);
+
 module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, Informe,
-  CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO };
+  CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,
+  InvitacionReporte };
