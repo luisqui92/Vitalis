@@ -1677,6 +1677,17 @@ const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
 // credencial, igual que en /informe/:token y /teleconsulta/:token.
 const invitacionReporteSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true, index: true },
+  // "invitacion" es el enlace que se le manda a un inversor. "pase" es otra
+  // cosa: un vale de un solo uso y de un minuto que se emite a sí mismo el
+  // operador para poder ABRIR el reporte como navegación.
+  //
+  // Hace falta porque la CSP se aplica por documento, no por respuesta:
+  // traer el reporte con fetch y escribirlo en la página deja adentro un
+  // <script> con un nonce que ese documento nunca autorizó, y el navegador
+  // lo bloquea sin decir nada. Con el pase, el reporte se abre navegando y
+  // su propia CSP es la que rige.
+  tipo: { type: String, enum: ["invitacion", "pase"], default: "invitacion", index: true },
+  usada: { type: Boolean, default: false },
   // Para quién es. Sirve para saber cuál apagar seis meses después, cuando
   // nadie se acuerde de qué enlace le mandó a quién.
   etiqueta: { type: String, default: "" },

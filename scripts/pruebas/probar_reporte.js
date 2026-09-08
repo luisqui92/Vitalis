@@ -110,7 +110,41 @@ verificar("el script lleva el marcador del nonce", vista.includes('<script nonce
   verificar("pide no guardar copia", /no-store/.test(dueño.cab["cache-control"] || ""));
   verificar("pide no indexar", /noindex/.test(dueño.cab["x-robots-tag"] || ""));
 
-  console.log("\n── 7. La puerta del invitado ──");
+  console.log("\n── 7. El pase: el reporte se abre NAVEGANDO ──");
+  // El error que costó un despliegue: traer el reporte con fetch y escribirlo
+  // con document.write. La CSP se aplica al documento, no a la respuesta, así
+  // que el <script> quedaba firmado con un nonce que ese documento nunca
+  // autorizó y el navegador lo bloqueaba en silencio — la página se veía
+  // entera y no hacía nada.
+  const entrada = fs.readFileSync(path.join(RAIZ, "vistas", "reporteEntrada.html"), "utf8");
+  const sinComentarios = entrada.replace(/\/\/.*$/gm, "");
+  verificar("la entrada NO escribe el documento a mano", !/document\s*\.\s*write/.test(sinComentarios));
+  verificar("  ...navega al reporte", /location\.replace\("\/report\/v\//.test(sinComentarios));
+
+  const pase = await pedir("/report/pase", { metodo: "POST", token: tkDueño });
+  verificar("el operador se emite un pase", pase.estado === 200 && Boolean(pase.cuerpo.codigo));
+  const conPase = await pedir(`/report/v/${pase.cuerpo.codigo}`);
+  verificar("  ...y con él abre el reporte", conPase.estado === 200 && /Modelo financiero/.test(conPase.texto));
+  verificar("  ...con el nonce ya reemplazado", !conPase.texto.includes("__NONCE__") && /script nonce="/.test(conPase.texto));
+  verificar("  ...y el nonce de la página es el de SU cabecera",
+    (conPase.cab["content-security-policy"] || "").includes(
+      "'nonce-" + (conPase.texto.match(/<script nonce="([^"]+)"/) || [])[1] + "'"));
+
+  // De un solo uso: cuando el código llegue al historial del navegador ya no
+  // sirve para nada, que es lo que permite que viaje en la URL.
+  const repetido = await pedir(`/report/v/${pase.cuerpo.codigo}`);
+  verificar("un pase gastado no sirve dos veces", repetido.estado === 302);
+  verificar("  ...y devuelve a la puerta, que emite uno nuevo", repetido.cab.location === "/report");
+
+  const pase2 = await pedir("/report/pase", { metodo: "POST", token: tkDueño });
+  const ajenoPase = await pedir("/report/pase", { metodo: "POST", token: tkAjeno });
+  verificar("un médico común no puede emitirse un pase", ajenoPase.estado === 404);
+  // Un pase no es una invitación: no puede abrir la puerta del invitado ni
+  // aparecer en la lista de enlaces compartidos.
+  const paseComoInvitacion = await pedir(`/report/i/${pase2.cuerpo.codigo}`);
+  verificar("un pase no sirve como enlace de invitado", paseComoInvitacion.estado === 404);
+
+  console.log("\n── 8. La puerta del invitado ──");
   const creada = await pedir("/report/invitaciones", {
     metodo: "POST", token: tkDueño, cuerpo: { etiqueta: "Fondo Ejemplo", dias: 15 },
   });
@@ -128,7 +162,7 @@ verificar("el script lleva el marcador del nonce", vista.includes('<script nonce
   const trasVisita = await InvitacionReporte.findOne({ codigo: creada.cuerpo.codigo }).lean();
   verificar("queda anotado que se abrió", trasVisita.visitas === 1);
 
-  console.log("\n── 8. Se puede apagar, que es todo el punto ──");
+  console.log("\n── 9. Se puede apagar, que es todo el punto ──");
   // Un token firmado con el vencimiento adentro no se puede revocar: vale
   // hasta que expire. Por eso la invitación es una fila y no una firma.
   const apagada = await pedir(`/report/invitaciones/${creada.cuerpo.codigo}`, { metodo: "DELETE", token: tkDueño });
@@ -142,7 +176,7 @@ verificar("el script lleva el marcador del nonce", vista.includes('<script nonce
   verificar("  ...con la misma respuesta que un código inventado",
     despues.estado === nuncaExistio.estado && despues.texto === nuncaExistio.texto);
 
-  console.log("\n── 9. Un enlace vencido tampoco ──");
+  console.log("\n── 10. Un enlace vencido tampoco ──");
   const vieja = await InvitacionReporte.create({
     codigo: "c".repeat(32), etiqueta: "Vencida",
     expiraEn: new Date(Date.now() - 86400000), creadaPor: "62741818",
@@ -153,7 +187,7 @@ verificar("el script lleva el marcador del nonce", vista.includes('<script nonce
   verificar("  ...y los dos se ven idénticos desde afuera",
     inventado.estado === vencida.estado && inventado.texto === vencida.texto);
 
-  console.log("\n── 10. Los límites del emisor ──");
+  console.log("\n── 11. Los límites del emisor ──");
   const sinEtiqueta = await pedir("/report/invitaciones", { metodo: "POST", token: tkDueño, cuerpo: {} });
   verificar("sin decir para quién es, no se emite", sinEtiqueta.estado === 400);
   const larga = await pedir("/report/invitaciones", {
@@ -163,7 +197,7 @@ verificar("el script lleva el marcador del nonce", vista.includes('<script nonce
   const dura = (new Date(larga.cuerpo.expiraEn) - Date.now()) / 86400000;
   verificar("un vencimiento absurdo se recorta a 180 días", dura <= 181);
 
-  console.log("\n── 11. La lista no muestra las apagadas ──");
+  console.log("\n── 12. La lista no muestra las apagadas ──");
   const lista = await pedir("/report/invitaciones", { token: tkDueño });
   const codigos = (lista.cuerpo.invitaciones || []).map(i => i.codigo);
   verificar("la apagada no aparece", !codigos.includes(creada.cuerpo.codigo));

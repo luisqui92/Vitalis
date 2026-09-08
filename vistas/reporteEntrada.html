@@ -101,7 +101,13 @@ a { color:var(--rojo); }
     return;
   }
 
-  fetch("/report/vista", { headers: { Authorization: "Bearer " + token } })
+  // Se pide un pase y se NAVEGA. La tentación era traer el reporte con fetch y
+  // escribirlo acá con document.write — se ve más directo y no funciona: la
+  // CSP se aplica al documento, no a la respuesta, así que el <script> del
+  // reporte llegaría firmado con un nonce que este documento nunca autorizó y
+  // el navegador lo bloquearía sin decir nada. La página se ve entera y no
+  // hace nada: tablas vacías, gráficos en blanco, botones muertos.
+  fetch("/report/pase", { method: "POST", headers: { Authorization: "Bearer " + token } })
     .then(function (r) {
       if (r.status === 401) {
         // "Entrá de nuevo a Vitalis" NO alcanza y es una trampa: abrir la
@@ -118,15 +124,13 @@ a { color:var(--rojo); }
         throw new Error('<strong>Esta cuenta no puede ver el reporte.</strong><br><br>' +
           'El reporte financiero está limitado a las cuentas de operador.');
       }
-      return r.text();
+      return r.json();
     })
-    .then(function (html) {
-      // Se reemplaza el documento entero: el reporte trae su propio <head>,
-      // sus estilos y su script, y ya viene autorizado por el nonce que le
-      // puso el servidor en ESA respuesta.
-      document.open();
-      document.write(html);
-      document.close();
+    .then(function (d) {
+      // replace y no href: el pase ya se gastó, así que volver atrás a esta
+      // página tiene que emitir uno nuevo, no reintentar el viejo.
+      estado.textContent = "Abriendo el reporte…";
+      location.replace("/report/v/" + encodeURIComponent(d.codigo));
     })
     .catch(function (e) {
       noPasa(e.message && e.message.indexOf("<") === 0

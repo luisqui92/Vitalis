@@ -101,9 +101,36 @@ async function invitacionValida(codigo) {
   if (!codigo || typeof codigo !== "string" || codigo.length < 20) return null;
   return InvitacionReporte.findOne({
     codigo,
+    tipo: "invitacion",
     revocada: { $ne: true },
     expiraEn: { $gt: new Date() },
   });
+}
+
+// ═══ EL PASE, Y POR QUÉ EXISTE ═════════════════════════════════════════════
+//
+// La CSP se aplica al DOCUMENTO, no a la respuesta. Traer el reporte con
+// fetch y escribirlo con document.write deja adentro un <script> firmado con
+// el nonce de OTRA respuesta —una que nunca se navegó—, así que el documento
+// que rige es el original y el navegador bloquea el script en silencio: la
+// página se ve entera y no hace nada.
+//
+// La otra salida sería mandar el token de sesión en la URL. No: ese token
+// acredita saldo, y en la URL queda en el historial y en los registros del
+// servidor. El pase es de un solo uso y de un minuto — cuando llega al
+// historial ya no sirve para nada.
+//
+// Se marca usado con findOneAndUpdate y no con un if: dos pedidos a la vez
+// con el mismo código tienen que dejar pasar uno solo.
+const VIDA_PASE = 60 * 1000;
+
+async function quemarPase(codigo) {
+  if (!codigo || typeof codigo !== "string" || codigo.length < 20) return null;
+  return InvitacionReporte.findOneAndUpdate(
+    { codigo, tipo: "pase", usada: { $ne: true }, expiraEn: { $gt: new Date() } },
+    { $set: { usada: true, ultimaVisita: new Date() } },
+    { new: true }
+  );
 }
 
 module.exports = (app) => {
@@ -146,6 +173,30 @@ module.exports = (app) => {
   // El contenido de verdad. Acá sí hay portero.
   app.get("/report/vista", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     registrar({ req, medicoPhone: req.adminUser.usuario, accion: "reporte_visto" });
+    servirVista(res, PLANTILLA_REPORTE, { MODO: "operador" });
+  }));
+
+  // El operador se emite un pase para poder abrir el reporte NAVEGANDO. Es un
+  // POST porque acá sí viaja la cabecera Authorization, que en una navegación
+  // no viajaría.
+  app.post("/report/pase", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const codigo = crypto.randomBytes(24).toString("base64url");
+    await InvitacionReporte.create({
+      codigo, tipo: "pase", etiqueta: "pase de sesión",
+      creadaPor: req.adminUser.usuario,
+      expiraEn: new Date(Date.now() + VIDA_PASE),
+    });
+    res.json({ codigo });
+  }));
+
+  // Y acá lo gasta. Es una navegación de verdad, así que la CSP y el nonce de
+  // ESTA respuesta son los que rigen y el script del reporte sí corre.
+  app.get("/report/v/:codigo", asyncRoute(async (req, res) => {
+    const pase = await quemarPase(req.params.codigo);
+    // Un pase gastado o vencido no es un error: es alguien que recargó la
+    // página. Se lo manda a la puerta, que le emite uno nuevo.
+    if (!pase) return res.redirect(302, "/report");
+    registrar({ req, medicoPhone: pase.creadaPor, accion: "reporte_visto" });
     servirVista(res, PLANTILLA_REPORTE, { MODO: "operador" });
   }));
 
@@ -198,7 +249,7 @@ module.exports = (app) => {
   }));
 
   app.get("/report/invitaciones", limitOperador, requireSesion, requireOperador, asyncRoute(async (_req, res) => {
-    const lista = await InvitacionReporte.find({ revocada: { $ne: true } })
+    const lista = await InvitacionReporte.find({ tipo: "invitacion", revocada: { $ne: true } })
       .sort({ createdAt: -1 }).limit(50)
       .select("codigo etiqueta expiraEn visitas ultimaVisita createdAt").lean();
     res.json({ invitaciones: lista });
@@ -206,7 +257,7 @@ module.exports = (app) => {
 
   app.delete("/report/invitaciones/:codigo", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const r = await InvitacionReporte.updateOne(
-      { codigo: req.params.codigo },
+      { codigo: req.params.codigo, tipo: "invitacion" },
       { $set: { revocada: true } }
     );
     if (!r.matchedCount) throw new ErrorHttp(404, "Ese enlace no existe");
