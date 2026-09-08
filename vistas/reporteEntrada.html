@@ -44,6 +44,14 @@ p { margin:0; color:var(--tinta-2); font-size:.94rem; }
 }
 .aviso strong { color:var(--tinta); }
 a { color:var(--rojo); }
+.boton {
+  appearance:none; background:var(--tinta); color:var(--papel); border:0; border-radius:3px;
+  padding:11px 18px; cursor:pointer; margin-top:4px;
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:.74rem; letter-spacing:.1em; text-transform:uppercase;
+}
+.boton:hover { opacity:.85; }
+.boton:focus-visible { outline:2px solid var(--rojo); outline-offset:2px; }
 .cargando { margin-top:26px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; color:var(--tinta-2); }
 </style>
@@ -67,6 +75,17 @@ a { color:var(--rojo); }
     estado.hidden = true;
     aviso.innerHTML = html;
     aviso.hidden = false;
+    var boton = document.getElementById("reentrar");
+    if (boton) boton.addEventListener("click", function () {
+      // Se limpia lo mismo que limpia el botón Salir de la aplicación: dejar
+      // el token vencido puesto es exactamente lo que causa este bucle.
+      try {
+        Object.keys(localStorage)
+          .filter(function (k) { return k.indexOf("salud_") === 0; })
+          .forEach(function (k) { localStorage.removeItem(k); });
+      } catch (e) {}
+      location.href = "/";
+    });
   }
 
   // La sesión de Vitalis ya está en el navegador si el operador entró a la
@@ -85,8 +104,13 @@ a { color:var(--rojo); }
   fetch("/report/vista", { headers: { Authorization: "Bearer " + token } })
     .then(function (r) {
       if (r.status === 401) {
-        throw new Error('<strong>Tu sesión venció.</strong><br><br>Entrá de nuevo a ' +
-          '<a href="/">Vitalis</a> y volvé a esta página.');
+        // "Entrá de nuevo a Vitalis" NO alcanza y es una trampa: abrir la
+        // aplicación con el token vencido todavía guardado no lo renueva.
+        // Hay que cerrar sesión de verdad, y por eso el botón lo hace acá.
+        throw new Error('<strong>Tu sesión venció.</strong><br><br>' +
+          'Los tokens duran 8 horas. Abrir Vitalis no alcanza: hay que cerrar sesión ' +
+          'y volver a entrar con usuario y contraseña.<br><br>' +
+          '<button class="boton" id="reentrar">Cerrar sesión y entrar</button>');
       }
       if (!r.ok) {
         // El servidor contesta 404 —no 403— a quien no es operador, así que
