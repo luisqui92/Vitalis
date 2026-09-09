@@ -1,4 +1,4 @@
-// Vitalis Odonto — Crea (o actualiza) una cuenta de odontólogo de demo y le
+// Symphomed Odonto — Crea (o actualiza) una cuenta de odontólogo de demo y le
 // suma 5 pacientes con odontogramas ya cargados (varios estados, historial
 // con fechas), para probar la arcada sin tener que cargar todo a mano.
 //

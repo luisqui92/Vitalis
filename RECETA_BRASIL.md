@@ -2,11 +2,11 @@
 
 ## Por qué existe esto
 
-La receta de Vitalis es un documento que se imprime. En Bolivia alcanza. En
+La receta de Symphomed es un documento que se imprime. En Bolivia alcanza. En
 Brasil no: una prescripción necesita **firma digital ICP-Brasil**, y sin ella
 no es una receta, es un papel.
 
-Memed emite con esa firma. Por eso en cuentas brasileñas la receta de Vitalis
+Memed emite con esa firma. Por eso en cuentas brasileñas la receta de Symphomed
 **no convive** con la de Memed: desaparece de la pantalla. Dos botones de
 recetar —uno con validez legal y otro sin ella— es una trampa esperando a que
 alguien apurado use el equivocado.
@@ -23,7 +23,7 @@ Nada, para nadie:
 | Llaves de prueba | Públicas, en su documentación |
 
 Lo único pago que encontramos es mandar la receta por **WhatsApp Business**
-(desde R$ 59,90/mes), y no hace falta: Vitalis ya manda por WhatsApp.
+(desde R$ 59,90/mes), y no hace falta: Symphomed ya manda por WhatsApp.
 
 ## Las llaves
 
@@ -66,7 +66,7 @@ Hace falta una cuenta con `moneda: BRL`. La demo brasileña la tiene:
 node scripts/seed_brasil_demo.js 11987650001
 ```
 
-Después, dentro de Vitalis:
+Después, dentro de Symphomed:
 
 1. **Configuración → Consejo profesional**: sigla (CRM/CRO…), estado y número.
    El estado es **el del consejo, no el del domicilio** — es el error más
@@ -79,9 +79,9 @@ Después, dentro de Vitalis:
 
 Al emitir, la receta vuelve sola al Kardex con la etiqueta **Firmada**.
 
-## Qué hace Vitalis y qué hace Memed
+## Qué hace Symphomed y qué hace Memed
 
-Vitalis **no tiene** base de medicamentos, ni firma, ni pantalla de recetar.
+Symphomed **no tiene** base de medicamentos, ni firma, ni pantalla de recetar.
 La integración son cuatro cosas:
 
 1. `POST integrations.api.memed.com.br/v1/sinapse-prescricao/usuarios` — da de
@@ -91,7 +91,7 @@ La integración son cuatro cosas:
    paciente y abre **su** pantalla.
 4. Escucha su evento `prescricaoImpressa` para copiar la receta al Kardex.
 
-La receta firmada **queda en Memed**. Vitalis guarda la referencia y una copia
+La receta firmada **queda en Memed**. Symphomed guarda la referencia y una copia
 de los medicamentos —que son dato clínico, y los necesitan el hilo clínico y
 el brief— pero el documento legal no es suyo y no finge serlo. Por eso cada
 receta lleva `origen` guardado: dentro de un año nadie va a poder decir cuál

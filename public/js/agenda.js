@@ -1,4 +1,4 @@
-// Vitalis — Agenda: citas del médico (manuales + las que llegan solas por
+// Symphomed — Agenda: citas del médico (manuales + las que llegan solas por
 // WhatsApp), y configuración del horario de atención / calendario de Google.
 
 const ORIGEN_ICONO = { whatsapp: "💬", whatsapp_web: "💬", manual: "🖊️", voz: "📞" };

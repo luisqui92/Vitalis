@@ -1,4 +1,4 @@
-// Vitalis — Vincular este celular como micrófono remoto (ver también
+// Symphomed — Vincular este celular como micrófono remoto (ver también
 // consultas.js: pintarControlRemoto, que vive del lado de la compu).
 
 async function renderVincular() {

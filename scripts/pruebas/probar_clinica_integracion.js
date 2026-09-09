@@ -1,4 +1,4 @@
-// Vitalis — La clínica contra una base de datos de verdad.
+// Symphomed — La clínica contra una base de datos de verdad.
 //
 // Todas las demás pruebas de la clínica son de permisos o de estructura del
 // código: valen, pero ninguna había ejecutado nunca una consulta contra

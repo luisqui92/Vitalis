@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vitalis — Instalar el relay de la teleconsulta (coturn) en esta misma VM.
+# Symphomed — Instalar el relay de la teleconsulta (coturn) en esta misma VM.
 #
 # ═══ POR QUÉ ESTO NO SE CONTRATA ═══════════════════════════════════════════
 #
@@ -147,7 +147,7 @@ paso "5. Configurar"
 [ -f /etc/turnserver.conf ] && cp /etc/turnserver.conf "/etc/turnserver.conf.antes-de-vitalis.$(date +%s)"
 
 cat > /etc/turnserver.conf <<CONF
-# Vitalis — relay de teleconsulta. Generado por scripts/instalar_turn.sh
+# Symphomed — relay de teleconsulta. Generado por scripts/instalar_turn.sh
 # $(date -Is)
 
 listening-port=3478
@@ -226,7 +226,7 @@ paso "6. Firewall de Google Cloud"
 if command -v gcloud >/dev/null 2>&1; then
   gcloud compute firewall-rules create vitalis-turn \
     --allow="udp:3478,tcp:3478,tcp:5349,udp:$PUERTO_MIN-$PUERTO_MAX" \
-    --description="Vitalis: relay de teleconsulta (coturn)" \
+    --description="Symphomed: relay de teleconsulta (coturn)" \
     --direction=INGRESS 2>/dev/null \
     && verde "   regla vitalis-turn creada" \
     || gris "   ya existía (o no hay permisos) — verificá que permita udp:3478 y udp:$PUERTO_MIN-$PUERTO_MAX"

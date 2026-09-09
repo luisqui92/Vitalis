@@ -1,4 +1,4 @@
-# Los pagos en Vitalis
+# Los pagos en Symphomed
 
 Cómo entra la plata, quién la aprueba y desde qué cuenta. Con el porqué de
 cada regla, para que nadie las deshaga sin querer.
@@ -7,7 +7,7 @@ cada regla, para que nadie las deshaga sin querer.
 
 ## 1. La idea en una frase
 
-Vitalis es **prepago**: el médico carga saldo, y cada consulta completada le
+Symphomed es **prepago**: el médico carga saldo, y cada consulta completada le
 descuenta **Bs 12**. No hay factura a fin de mes ni corte de servicio a mitad
 de una consulta.
 
@@ -17,7 +17,7 @@ de una consulta.
 
 1. El médico entra a **Configuración**, y en la tarjeta de su saldo ve **dónde
    pagar**: el QR, el banco, la cuenta y el titular.
-2. Paga **por fuera de Vitalis** (QR o transferencia).
+2. Paga **por fuera de Symphomed** (QR o transferencia).
 3. Vuelve y **avisa**: "pagué Bs 200, referencia X". Eso crea una **solicitud
    pendiente**. **No mueve un centavo.**
 4. Al operador le llega una **notificación**, y el aviso aparece en su

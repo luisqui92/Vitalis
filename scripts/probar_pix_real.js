@@ -1,4 +1,4 @@
-// Vitalis — Qué código Pix estamos mandando, exactamente.
+// Symphomed — Qué código Pix estamos mandando, exactamente.
 //
 // Cuando el banco dice "erro ao processar o pagamento" no dice POR QUÉ, y
 // desde acá hay tres sospechosos que se ven iguales:
@@ -24,10 +24,10 @@ const CUENTA = {
 const centavos = Number(process.argv[2] || 100);
 
 // El mismo txid que arma routes/recargas.js hoy.
-const txidVitalis = `V${Date.now().toString(36)}9999`.toUpperCase();
+const txidSymphomed = `V${Date.now().toString(36)}9999`.toUpperCase();
 
 const variantes = [
-  ["A — como lo manda Vitalis hoy", { ...CUENTA, montoCentavos: centavos, txid: txidVitalis }],
+  ["A — como lo manda Symphomed hoy", { ...CUENTA, montoCentavos: centavos, txid: txidSymphomed }],
   ["B — sin txid propio (estático puro)", { ...CUENTA, montoCentavos: centavos, txid: "" }],
   ["C — con el txid original de BRLA", { ...CUENTA, montoCentavos: centavos, txid: "308a4c8a84284aacbd25430ae" }],
   ["D — sin monto (lo escribe el pagador)", { ...CUENTA, montoCentavos: 0, txid: "" }],

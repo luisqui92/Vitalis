@@ -1,4 +1,4 @@
-// Vitalis — Español · agenda y horario (public/js/agenda.js).
+// Symphomed — Español · agenda y horario (public/js/agenda.js).
 Object.assign(I18N.es, {
   "agenda.cargando": "Cargando agenda...",
   "agenda.error": "Error cargando la agenda",
@@ -43,7 +43,7 @@ Object.assign(I18N.es, {
   "horario.duracion": "Duración de cada consulta (minutos)",
   "horario.googleCalendar": "Calendario de Google (opcional)",
   "horario.googleCalendarPlaceholder": "tu-email@gmail.com",
-  "horario.googleCalendarAyuda": "Compartí ese calendario con la cuenta de servicio de Vitalis (\"hacer cambios en eventos\"). Con esto conectado, Vitalis hace las dos cosas: refleja ahí las citas que se agendan, y antes de ofrecer un horario por WhatsApp revisa que no tengas algo ya puesto directo en tu calendario. Si lo dejás vacío, las citas quedan solo dentro de Vitalis.",
+  "horario.googleCalendarAyuda": "Compartí ese calendario con la cuenta de servicio de Symphomed (\"hacer cambios en eventos\"). Con esto conectado, Symphomed hace las dos cosas: refleja ahí las citas que se agendan, y antes de ofrecer un horario por WhatsApp revisa que no tengas algo ya puesto directo en tu calendario. Si lo dejás vacío, las citas quedan solo dentro de Symphomed.",
   "horario.infoConsultorio": "Información del consultorio (para el asistente de WhatsApp)",
   "horario.infoConsultorioPlaceholder": "Ej: Atendemos de lunes a viernes de 8 a 17hs. Consulta general: 150 Bs. Estamos en Av. América #123, Cochabamba. Aceptamos efectivo y QR. Si no podés venir, avisá con 24hs de anticipación.",
   "horario.infoConsultorioAyuda": "El número de WhatsApp usa esto para responder preguntas de los pacientes (horarios, precios, ubicación, políticas...) — solo contesta con lo que escribas acá, nunca inventa.",

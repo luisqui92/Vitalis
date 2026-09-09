@@ -1,4 +1,4 @@
-// Vitalis — Que nunca se sirva código viejo con cara de nuevo.
+// Symphomed — Que nunca se sirva código viejo con cara de nuevo.
 //
 // Los estáticos se sirven precomprimidos (.br) cuando el navegador los
 // acepta, que es siempre. Si ese .br quedó atrasado respecto del .js, el

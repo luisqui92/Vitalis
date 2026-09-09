@@ -1,4 +1,4 @@
-// Vitalis — Demo del simulador quirúrgico con fotos reales
+// Symphomed — Demo del simulador quirúrgico con fotos reales
 //
 // El seeder de estética (seed_estetica_demo.js) llena la cuenta con
 // pacientes, tratamientos y saldos, pero sus fotos son cuadrados de color

@@ -1,4 +1,4 @@
-// Vitalis Odonto — Odontograma: arcada dibujada en SVG (2D, no 3D — ver
+// Symphomed Odonto — Odontograma: arcada dibujada en SVG (2D, no 3D — ver
 // conversación) con panel de detalle tipo timeline por pieza. (Dentición
 // temporal queda para una próxima vuelta.)
 

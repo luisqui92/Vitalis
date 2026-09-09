@@ -1,4 +1,4 @@
-// Vitalis — Español · Centro de Estudios (subir, cámara guiada, comparador).
+// Symphomed — Español · Centro de Estudios (subir, cámara guiada, comparador).
 Object.assign(I18N.es, {
   // Las claves ("laboratorio", "frontal", "OD") son lo que se guarda en la
   // base y no se traducen nunca. Acá solo la etiqueta.
@@ -30,7 +30,7 @@ Object.assign(I18N.es, {
   "est.25d.titulo": "Simulación 2.5D",
   "est.25d.ayuda": "{n} vistas cargadas. Girá entre ellas y mirá la misma\n        cirugía desde cada ángulo — cada posición es una foto real del paciente.",
   "est.25d.girar": "🔄 Girar las {n} vistas",
-  "est.face": "🧠 Abrir Vitalis Face — análisis completo",
+  "est.face": "🧠 Abrir Symphomed Face — análisis completo",
   "est.subir.titulo": "Subir estudio",
   "est.subir.nombre": "Título (ej: Hemograma completo)",
   "est.fecha": "Fecha",

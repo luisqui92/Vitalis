@@ -1,4 +1,4 @@
-// Vitalis — Español · panel de clínica (varios consultorios).
+// Symphomed — Español · panel de clínica (varios consultorios).
 Object.assign(I18N.es, {
   "clin.cargando": "Cargando la clínica...",
   "clin.error": "Error cargando la clínica",

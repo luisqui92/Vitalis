@@ -1,4 +1,4 @@
-// Vitalis — Centro de Estudios: laboratorios, radiografías, ecografías,
+// Symphomed — Centro de Estudios: laboratorios, radiografías, ecografías,
 // tomografías, resonancias, ECG y fotos clínicas, todos ligados al paciente.
 //
 // Las fotos clínicas (cirugía plástica, dermatología) suman dos cosas más:
@@ -10,7 +10,7 @@
 // "OD") es lo que va a la base y no se traduce nunca. La etiqueta se resuelve
 // al llamar, porque este archivo se carga antes del login.
 const TIPOS_ESTUDIO_CLAVES = ["laboratorio", "radiografia", "ecografia", "tomografia", "resonancia", "ecg", "foto", "otro"];
-// Vitalis Visión: tipos de estudio propios de oftalmología, se suman a la
+// Symphomed Visión: tipos de estudio propios de oftalmología, se suman a la
 // lista general solo para esa especialidad.
 const TIPOS_ESTUDIO_OFTALMOLOGIA_CLAVES = ["oct", "fondo_ojo", "campimetria", "biometria"];
 
@@ -33,7 +33,7 @@ function tiposEstudioTodos() {
 }
 function ladosOjo() { return etiquetasDe(["OD", "OI", "ambos"], "ojo."); }
 
-// Odontología/medicina general: 3 ángulos alcanza. Vitalis Face (estética/
+// Odontología/medicina general: 3 ángulos alcanza. Symphomed Face (estética/
 // plástica/dermatología) usa 5, para un seguimiento más fino de un
 // procedimiento (nariz, mentón, etc.) — ver angulosFotoActivos().
 const ANGULOS_FOTO_3_CLAVES = ["frontal", "perfil", "tres_cuartos"];
@@ -118,7 +118,7 @@ function tabEstudiosHtml(estudios) {
 }
 
 function wireTabEstudios(p, estudios) {
-  // Vitalis Rayos: se completa aparte y sin await porque necesita dos
+  // Symphomed Rayos: se completa aparte y sin await porque necesita dos
   // consultas propias al servidor — que la pestaña no se quede esperando
   // por algo que la mayoría de las especialidades ni usa.
   pintarBloqueCaptura(p);
@@ -344,7 +344,7 @@ function wireTabEstudios(p, estudios) {
   document.querySelectorAll("[data-ver-estudio]").forEach(el => {
     el.onclick = () => {
       const e = estudios.find(x => x._id === el.dataset.verEstudio);
-      // Las imágenes se abren en el visor de Vitalis (zoom, contraste,
+      // Las imágenes se abren en el visor de Symphomed (zoom, contraste,
       // mediciones); los PDF y todo lo demás, como siempre.
       if (e && String(e.archivoMime || "").startsWith("image/")) abrirVisorImagen(e._id, e);
       else abrirArchivoEstudio(el.dataset.verEstudio);
@@ -622,7 +622,7 @@ async function abrirCamaraGuiada(anguloInicial, onCapturada) {
   };
 }
 
-// ─── SESIÓN GUIADA (los 5 ángulos de Vitalis Face en una sola pasada) ────
+// ─── SESIÓN GUIADA (los 5 ángulos de Symphomed Face en una sola pasada) ────
 // Como en la verificación facial de un banco: le va diciendo al paciente
 // hacia dónde girar y va capturando sola en cada posición, en vez de que
 // el médico repita "elegir ángulo → alinear → capturar" cinco veces.

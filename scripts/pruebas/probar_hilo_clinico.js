@@ -1,4 +1,4 @@
-// Vitalis — Que el hilo clínico no invente una consulta que nunca pasó.
+// Symphomed — Que el hilo clínico no invente una consulta que nunca pasó.
 //
 // El hilo señala qué del historial se relaciona con la consulta de hoy. Su
 // valor entero depende de una cosa: que lo que diga haya pasado de verdad.

@@ -1,4 +1,4 @@
-// Vitalis — utilidades chicas compartidas entre rutas
+// Symphomed — utilidades chicas compartidas entre rutas
 const { CONFIG } = require("../config");
 
 const MS_OFFSET_BOLIVIA = CONFIG.OFFSET_HORAS * 60 * 60 * 1000; // -4h fijo, sin horario de verano

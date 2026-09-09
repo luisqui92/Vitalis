@@ -1,4 +1,4 @@
-// Vitalis — Español · textos compartidos por varias pantallas.
+// Symphomed — Español · textos compartidos por varias pantallas.
 Object.assign(I18N.es, {
   // Por índice de getDay(): 0 = domingo.
   "dia.corto.0": "Dom",

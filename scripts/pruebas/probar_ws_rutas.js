@@ -1,4 +1,4 @@
-// Vitalis — Que los dos WebSocket convivan en el mismo servidor.
+// Symphomed — Que los dos WebSocket convivan en el mismo servidor.
 //
 // Esto existe por un error que estuvo en producción y que ninguna prueba
 // agarraba: /ws (tiempo real) y /ws-tele (teleconsulta) montados con

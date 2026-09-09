@@ -1,4 +1,4 @@
-// Vitalis — La señalización de la teleconsulta.
+// Symphomed — La señalización de la teleconsulta.
 //
 // ═══ QUÉ HACE Y, SOBRE TODO, QUÉ NO ════════════════════════════════════════
 //

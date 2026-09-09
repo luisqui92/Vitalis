@@ -1,4 +1,4 @@
-// Vitalis — Config y Logger
+// Symphomed — Config y Logger
 
 // Sin esto, un .env en el servidor es solo un archivo de texto sin efecto —
 // las variables de entorno tienen que venir sí o sí del entorno real del
@@ -107,12 +107,12 @@ function validateConfig() {
 
   if (missing.length > 0) {
     console.error("❌ Faltan variables de entorno requeridas:", missing.join(", "));
-    console.error("   Vitalis NO puede arrancar sin estas variables.");
+    console.error("   Symphomed NO puede arrancar sin estas variables.");
     process.exit(1);
   }
   if (warnings.length > 0) {
     console.warn("⚠️ Variables opcionales no definidas:", warnings.join(", "));
-    console.warn("   Vitalis funciona igual, pero esas funciones específicas van a estar apagadas.");
+    console.warn("   Symphomed funciona igual, pero esas funciones específicas van a estar apagadas.");
   }
   return true;
 }

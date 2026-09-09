@@ -1,4 +1,4 @@
-// Vitalis — Que un aviso de "algo cambió" no saque al médico de donde está.
+// Symphomed — Que un aviso de "algo cambió" no saque al médico de donde está.
 //
 // ═══ EL ERROR QUE ESTO ARREGLA ═════════════════════════════════════════════
 //

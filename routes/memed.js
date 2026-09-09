@@ -1,10 +1,10 @@
-// Vitalis — Recetar por Memed (Brasil).
+// Symphomed — Recetar por Memed (Brasil).
 //
 // Dos rutas y nada más: una entrega el token con el que el navegador abre el
 // módulo de Memed, y la otra guarda la referencia de lo que se recetó.
 //
 // Ver el encabezado de services/memed.js para por qué en Brasil no se receta
-// por Vitalis sino solo por Memed.
+// por Symphomed sino solo por Memed.
 const { Medico, Paciente, Receta } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
@@ -41,7 +41,7 @@ module.exports = function (app) {
       corresponde: true,
       // Se distinguen los dos motivos por los que puede no andar, porque las
       // soluciones son distintas y ninguna la puede adivinar el médico:
-      // faltarle SU consejo profesional lo arregla él; que Vitalis no tenga
+      // faltarle SU consejo profesional lo arregla él; que Symphomed no tenga
       // las llaves de Memed no.
       listo: memed.configurado() && memed.consejoCompleto(medico),
       faltaConsejo: !memed.consejoCompleto(medico),

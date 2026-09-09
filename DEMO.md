@@ -1,4 +1,4 @@
-# Grabar una demo de Vitalis
+# Grabar una demo de Symphomed
 
 ## Lo primero: nunca con pacientes reales
 
@@ -100,7 +100,7 @@ Unos dos minutos y medio. Los tiempos son orientativos.
 | Tiempo | Qué se ve | Qué decís |
 |---|---|---|
 | 0:00–0:15 | Kardex de María Elena, con sus consultas previas | "Esto es lo que un médico tarda diez minutos en escribir después de cada consulta." |
-| 0:15–0:25 | Consulta nueva → botón de grabar | "Vitalis lo hace mientras el médico atiende." |
+| 0:15–0:25 | Consulta nueva → botón de grabar | "Symphomed lo hace mientras el médico atiende." |
 | 0:25–1:20 | La pantalla grabando, mientras leés el guion de arriba | *(nada — que se escuche la consulta)* |
 | 1:20–1:30 | Parar. "Transcribiendo…" | "Esto tarda menos de un minuto." |
 | 1:30–2:00 | La nota clínica aparecida: motivo, examen, diagnóstico, plan | "Nadie escribió esto. Salió de lo que se habló." |
@@ -123,7 +123,7 @@ instantáneo se nota y te cuesta la credibilidad.
 - **Grabar sin guion de cámara.** Se nota en los titubeos y en el mouse dando
   vueltas buscando el botón. Hacé una pasada en seco antes de grabar.
 - **Hablar sobre la consulta mientras se graba la consulta.** Se mezcla con el
-  audio que Vitalis está transcribiendo y la nota sale con tus comentarios
+  audio que Symphomed está transcribiendo y la nota sale con tus comentarios
   adentro.
 
 ## Después

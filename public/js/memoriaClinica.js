@@ -1,4 +1,4 @@
-// Vitalis — Memoria Clínica Conversacional: preguntale al Kardex en lenguaje
+// Symphomed — Memoria Clínica Conversacional: preguntale al Kardex en lenguaje
 // natural sobre la historia de un paciente puntual. El chat es solo de esta
 // sesión (no se persiste), por paciente.
 const memoriaHistorialPorPaciente = {};

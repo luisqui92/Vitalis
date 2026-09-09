@@ -1,4 +1,4 @@
-// Vitalis Visión — Mapa ocular: la ficha de cada paciente, ojo por ojo y
+// Symphomed Visión — Mapa ocular: la ficha de cada paciente, ojo por ojo y
 // estructura por estructura (córnea, iris, retina...). Se crea solo, con
 // las 12 estructuras × 2 ojos en "normal", la primera vez que se abre —
 // mismo criterio que el odontograma.

@@ -1,4 +1,4 @@
-// Vitalis — Português · plano de tratamento, orçamento e pagamentos.
+// Symphomed — Português · plano de tratamento, orçamento e pagamentos.
 Object.assign(I18N.pt, {
   "moneda.formato": "R$ {monto}",
   "moneda.decimal": ",",

@@ -1,6 +1,6 @@
-// Vitalis — Estáticos precomprimidos
+// Symphomed — Estáticos precomprimidos
 //
-// El detector facial de Vitalis Face son 13 MB que el navegador se baja la
+// El detector facial de Symphomed Face son 13 MB que el navegador se baja la
 // primera vez: 9 MB de WebAssembly y 3,6 MB del modelo. En una conexión de
 // consultorio eso es medio minuto mirando un spinner, y el médico —con razón—
 // cree que el sistema se colgó.

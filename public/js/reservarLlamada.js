@@ -1,4 +1,4 @@
-// Vitalis — Llamada de voz por navegador en la página pública de reserva:
+// Symphomed — Llamada de voz por navegador en la página pública de reserva:
 // habla con el mismo asistente de Vapi que contesta llamadas telefónicas
 // reales, pero por internet (micrófono del navegador), sin necesitar
 // ningún número de teléfono. Es un módulo aparte, cargado como <script

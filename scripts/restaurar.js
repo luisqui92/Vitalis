@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — Restaurar una copia de seguridad
+// Symphomed — Restaurar una copia de seguridad
 // ═══════════════════════════════════════════════════════════════════════════
 // Uso:
 //   node scripts/restaurar.js                        → lista los respaldos
@@ -115,10 +115,10 @@ async function restaurar(ruta, { encima }) {
   } else {
     console.log(`
   Listo. Falta una cosa más: los archivos de estudios.
-    tar -xzf <respaldo>-archivos.tar.gz -C <carpeta de Vitalis>
+    tar -xzf <respaldo>-archivos.tar.gz -C <carpeta de Symphomed>
   (si el .tar.gz está cifrado, descifralo primero con --extraer-archivos)
 
-  Y reiniciá Vitalis:  pm2 restart vitalis
+  Y reiniciá Symphomed:  pm2 restart vitalis
 `);
   }
   await mongoose.disconnect();
@@ -141,7 +141,7 @@ async function confirmar(texto, palabra) {
 
   if (banderas.has("--encima")) {
     console.log(`
-  ⚠️  ESTO VA A BORRAR Y REEMPLAZAR LA BASE DE DATOS REAL DE VITALIS.
+  ⚠️  ESTO VA A BORRAR Y REEMPLAZAR LA BASE DE DATOS REAL DE SYMPHOMED.
       Todo lo que se haya cargado después de este respaldo se pierde.
 
       Respaldo:  ${ruta}

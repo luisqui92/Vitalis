@@ -1,4 +1,4 @@
-// Vitalis — Reserva de citas por link (sin login): la página que abre el
+// Symphomed — Reserva de citas por link (sin login): la página que abre el
 // paciente desde el WhatsApp para ver el calendario real y elegir
 // día/hora/nombre en un solo lugar, en vez de contar números en una lista
 // de texto. El link trae un token firmado (mismo mecanismo que el login de

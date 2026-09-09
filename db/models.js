@@ -1,4 +1,4 @@
-// Vitalis — Schemas MongoDB
+// Symphomed — Schemas MongoDB
 const mongoose = require("mongoose");
 const { CONFIG, log } = require("../config");
 
@@ -54,7 +54,7 @@ const medicoSchema = new mongoose.Schema({
   // Idioma en el que este médico trabaja: la interfaz, sus notas clínicas y
   // lo que sus pacientes reciben por WhatsApp. Va acá y no en el servidor
   // porque es un ajuste profesional, no de infraestructura — el mismo
-  // Vitalis desplegado en Brasil puede atender a un médico que escribe en
+  // Symphomed desplegado en Brasil puede atender a un médico que escribe en
   // español, y al revés.
   idioma: { type: String, enum: ["es", "pt"], default: "es" },
   // En qué moneda cobra esta cuenta. NO se deduce del idioma: si se dedujera,
@@ -91,7 +91,7 @@ const medicoSchema = new mongoose.Schema({
 
   // ─── Cómo entró esta cuenta ───────────────────────────────────────────
   //
-  // Registrarse en Vitalis no da acceso: da un lugar en una fila. Quien pide
+  // Registrarse en Symphomed no da acceso: da un lugar en una fila. Quien pide
   // cuenta queda en "pendiente" y no entra hasta que alguien lo aprueba a
   // mano. Esto no es contra los bots —para eso alcanzaría un captcha—: es
   // que acá adentro se guardan historias clínicas de personas reales, y no
@@ -108,7 +108,7 @@ const medicoSchema = new mongoose.Schema({
   // ya hubo alguien que respondió por esa persona, que es justamente lo que
   // esta fila busca.
   estadoCuenta: { type: String, enum: ["pendiente", "aprobada", "rechazada"], default: "aprobada", index: true },
-  // La matrícula profesional. Vitalis NO la verifica contra ningún registro
+  // La matrícula profesional. Symphomed NO la verifica contra ningún registro
   // —no hay una API del colegio médico boliviano— así que no es una prueba:
   // es un dato que quien aprueba puede mirar, y que hace que mentir sea una
   // decisión consciente y no un descuido.
@@ -191,7 +191,7 @@ const medicoSchema = new mongoose.Schema({
   saldoCentavos: { type: Number, default: 0 },
   // Agenda: horario de atención (para calcular horarios disponibles) y,
   // opcional, el calendario de Google donde se reflejan las citas (se
-  // comparte ese calendario con la cuenta de servicio de Vitalis).
+  // comparte ese calendario con la cuenta de servicio de Symphomed).
   horarioAtencion: {
     type: [{ diaSemana: Number, horaInicio: String, horaFin: String }], // diaSemana: 0=domingo … 6=sábado
     default: [
@@ -290,12 +290,12 @@ const pacienteSchema = new mongoose.Schema({
   // sería pedirle un documento que no tiene.
   cpf: { type: String, default: "" },
 
-  // Solo Vitalis Veterinaria: acá "nombre" es el de la mascota y "telefono"
+  // Solo Symphomed Veterinaria: acá "nombre" es el de la mascota y "telefono"
   // ya venía siendo el de contacto (el dueño), así que solo faltan estos 3.
   especie: { type: String, default: "" },
   raza: { type: String, default: "" },
   duenoNombre: { type: String, default: "" },
-  // Solo Vitalis Pediatría. La edad corregida es la diferencia entre lo que
+  // Solo Symphomed Pediatría. La edad corregida es la diferencia entre lo que
   // el chico tiene y lo que tendría si hubiera nacido a término: a un
   // prematuro de 32 semanas hay que restarle 8 semanas hasta los 2 años,
   // porque si no su curva de crecimiento se lee como un retraso que no
@@ -414,7 +414,7 @@ const consultaMedicaSchema = new mongoose.Schema({
     antecedentesPersonalesNuevos: [String],
     antecedentesFamiliaresNuevos: [{ parentesco: String, condicion: String }],
     vacunasMencionadas: [{ nombre: String, dosis: String, fecha: String }],
-    // Vitalis Odonto: tratamientos que el odontólogo dice que hay que hacer
+    // Symphomed Odonto: tratamientos que el odontólogo dice que hay que hacer
     // ("hay que poner un implante acá"), emparejados (si se puede) contra su
     // propio catálogo de precios. Cada uno se confirma o descarta por
     // separado — al confirmar recién se crea el ítem real en el presupuesto
@@ -425,7 +425,7 @@ const consultaMedicaSchema = new mongoose.Schema({
       catalogoNombreSugerido: { type: String, default: null },
       estado: { type: String, enum: ["pendiente", "agregado", "descartado"], default: "pendiente" },
     }],
-    // Vitalis Visión: hallazgos por ojo/estructura detectados en la
+    // Symphomed Visión: hallazgos por ojo/estructura detectados en la
     // consulta ("ojo derecho, cristalino con opacidad cortical leve").
     // A diferencia de las sugerencias de arriba, estos se aplican solos al
     // mapa ocular apenas termina de generarse la nota (el médico corrige
@@ -437,7 +437,7 @@ const consultaMedicaSchema = new mongoose.Schema({
       hallazgo: { type: String, default: "" },
       estado: { type: String, default: "" },
     }],
-    // Vitalis Odonto: igual que examenOcularSugerido, pero para el estado
+    // Symphomed Odonto: igual que examenOcularSugerido, pero para el estado
     // clínico de cada pieza del odontograma ("la 33 tiene caries", "hay que
     // extraer la 18") — se aplica solo al odontograma apenas termina de
     // generarse la nota, no hace falta que el odontólogo lo confirme (lo
@@ -450,7 +450,7 @@ const consultaMedicaSchema = new mongoose.Schema({
       estado: { type: String, default: "" },
       hallazgo: { type: String, default: "" },
     }],
-    // Vitalis Gineco: hallazgos por órgano detectados en la consulta
+    // Symphomed Gineco: hallazgos por órgano detectados en la consulta
     // ("ovario izquierdo con quiste simple"). Igual que el mapa ocular y el
     // odontograma, se aplican solos al mapa apenas se genera la nota.
     ginecoSugerido: [{
@@ -495,7 +495,7 @@ const vacunaSchema = new mongoose.Schema({
 vacunaSchema.index({ pacienteId: 1, fecha: -1 });
 const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 
-// ─── ODONTOGRAMA (Vitalis Odonto) ────────────────────────────────────────
+// ─── ODONTOGRAMA (Symphomed Odonto) ────────────────────────────────────────
 // Numeración FDI/ISO-3950 (dos dígitos por cuadrante), la que se usa en
 // Bolivia y el resto de Latinoamérica — no la "Universal" de EE.UU.
 // Dentición permanente: 11-18, 21-28, 31-38, 41-48 (32 piezas). La
@@ -528,7 +528,7 @@ const piezaDentalSchema = new mongoose.Schema({
       // "voz" = lo aplicó solo la IA desde una consulta (ver
       // odontogramaSugerido más arriba); "manual" = lo cargó el odontólogo
       // a mano desde la pestaña Odontograma. Igual patrón que el historial
-      // de estructuras oculares de Vitalis Visión.
+      // de estructuras oculares de Symphomed Visión.
       fuente: { type: String, enum: ["voz", "manual"], default: "manual" },
       consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
     }],
@@ -543,7 +543,7 @@ const odontogramaSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Odontograma = mongoose.model("Odontograma", odontogramaSchema);
 
-// ─── Vitalis Visión (oftalmología) ──────────────────────────────────────
+// ─── Symphomed Visión (oftalmología) ──────────────────────────────────────
 // Mapa ocular: un documento por paciente con las 12 estructuras × 2 ojos
 // (igual patrón que el odontograma — se crea solo, todo en "normal", la
 // primera vez que se abre). El estado de cada estructura puede venir de la
@@ -582,7 +582,7 @@ const examenOcularSchema = new mongoose.Schema({
 }, { timestamps: true });
 const ExamenOcular = mongoose.model("ExamenOcular", examenOcularSchema);
 
-// Vitalis Gineco — mapa del aparato reproductor: mismo patrón que el
+// Symphomed Gineco — mapa del aparato reproductor: mismo patrón que el
 // odontograma y el mapa ocular, pero por órgano. La ginecóloga marca qué
 // encontró en cada uno y queda el historial de cómo fue cambiando.
 const ORGANOS_GINECO = [
@@ -622,7 +622,7 @@ const examenGinecologicoSchema = new mongoose.Schema({
 }, { timestamps: true });
 const ExamenGinecologico = mongoose.model("ExamenGinecologico", examenGinecologicoSchema);
 
-// Vitalis Vet — mapa corporal: lesiones marcadas sobre la silueta del
+// Symphomed Vet — mapa corporal: lesiones marcadas sobre la silueta del
 // animal. A diferencia del odontograma (donde un diente es una unidad
 // discreta), una lesión está en un PUNTO: se marca donde caiga y se
 // autoetiqueta con la región anatómica, para que además de verse tenga un
@@ -687,7 +687,7 @@ const recetaOpticaSchema = new mongoose.Schema({
 }, { timestamps: true });
 const RecetaOptica = mongoose.model("RecetaOptica", recetaOpticaSchema);
 
-// ─── Vitalis Obstetricia (ginecología y obstetricia) ────────────────────
+// ─── Symphomed Obstetricia (ginecología y obstetricia) ────────────────────
 // Un embarazo por vez: se abre con la FUM (fecha de última menstruación),
 // que es lo único que hace falta para calcular la FPP (fecha probable de
 // parto, regla de Naegele: FUM + 280 días / 40 semanas) y las semanas de
@@ -730,7 +730,7 @@ const tratamientoPlanSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
   nombre: { type: String, required: true },
   piezaFdi: { type: Number, default: null }, // opcional: número FDI de la pieza (ver Odontograma)
-  regionFacial: { type: String, default: "" }, // opcional: para Vitalis Face (ej: "Nariz", "Mentón")
+  regionFacial: { type: String, default: "" }, // opcional: para Symphomed Face (ej: "Nariz", "Mentón")
   precio: { type: Number, required: true, default: 0 },
   estado: { type: String, enum: ["pendiente", "en_proceso", "realizado"], default: "pendiente" },
   notas: { type: String, default: "" },
@@ -806,7 +806,7 @@ const estudioSchema = new mongoose.Schema({
   // para poder agrupar y comparar antes/después del mismo ángulo entre
   // fechas distintas (ver /medico/pacientes/:id en la pestaña Estudios).
   anguloFoto: { type: String, default: "" },
-  // Vitalis Visión: a qué ojo corresponde un estudio (OCT, fondo de ojo,
+  // Symphomed Visión: a qué ojo corresponde un estudio (OCT, fondo de ojo,
   // campimetría...) — "OD", "OI" o "ambos". Vacío si no aplica.
   ladoOjo: { type: String, default: "" },
   // ─── Visor de imágenes ───────────────────────────────────────────────
@@ -840,7 +840,7 @@ const estudioSchema = new mongoose.Schema({
     // olvide.
     planoDetector: { type: Boolean, default: false },
   },
-  // Vitalis Face: los diez puntos del perfil que el cirujano marcó a mano
+  // Symphomed Face: los diez puntos del perfil que el cirujano marcó a mano
   // sobre esta foto, normalizados 0..1 (glabela, nasion, dorso, punta,
   // subnasal, labio sup., labio inf., surco, pogonion, gnation).
   //
@@ -849,7 +849,7 @@ const estudioSchema = new mongoose.Schema({
   // números que de verdad se miran en una rinoplastia y que no necesitan
   // ninguna calibración para ser correctos.
   perfilMarcado: { type: [{ x: Number, y: Number, _id: false }], default: [] },
-  // Vitalis Face: anotaciones del médico sobre la foto, en coordenadas
+  // Symphomed Face: anotaciones del médico sobre la foto, en coordenadas
   // normalizadas 0..1. Van pegadas al estudio y no a la consulta porque lo
   // que anotan es ESTA foto: "acá la asimetría del ala", "cicatriz previa".
   // Al abrir la foto de nuevo —hoy, o en el control de los tres meses—
@@ -889,9 +889,9 @@ const estudioSchema = new mongoose.Schema({
     rotacion: { type: Number, default: 0 },
     espejo: { type: Boolean, default: false },
   },
-  // ─── Origen DICOM (Caja Vitalis) ─────────────────────────────────────
+  // ─── Origen DICOM (Caja Symphomed) ─────────────────────────────────────
   // Cuando el estudio entró por la caja de la clínica, acá queda de dónde
-  // salió. Vitalis guarda la VISTA PREVIA; el .dcm original de 16 bits se
+  // salió. Symphomed guarda la VISTA PREVIA; el .dcm original de 16 bits se
   // queda en el disco de la caja y no sale de ahí nunca — por eso se anota
   // en qué equipo vive y con qué identificador volver a pedirlo.
   dicom: DICOM_ORIGEN,
@@ -907,9 +907,9 @@ estudioSchema.index(
 );
 const Estudio = mongoose.model("Estudio", estudioSchema);
 
-// ─── VITALIS RAYOS ────────────────────────────────────────────────────────
+// ─── SYMPHOMED RAYOS ────────────────────────────────────────────────────────
 // El equipo de rayos (o el ecógrafo, o cualquier aparato de imagen) no habla
-// con Vitalis: habla con el software del fabricante que corre en una PC del
+// con Symphomed: habla con el software del fabricante que corre en una PC del
 // consultorio y deja las imágenes en una carpeta. El "puente" (agente-rayos/)
 // corre en esa PC, vigila la carpeta y sube lo nuevo acá.
 //
@@ -950,14 +950,14 @@ const capturaPendienteSchema = new mongoose.Schema({
 capturaPendienteSchema.index({ expiraEn: 1 }, { expireAfterSeconds: 0 });
 const CapturaPendiente = mongoose.model("CapturaPendiente", capturaPendienteSchema);
 
-// ─── BANDEJA DE ENTRADA (Caja Vitalis DICOM) ──────────────────────────────
+// ─── BANDEJA DE ENTRADA (Caja Symphomed DICOM) ──────────────────────────────
 // La ventana de captura funciona en un consultorio con un sillón: el
 // odontólogo abre la ficha, dispara, y la placa cae en ese paciente.
 //
 // En un centro de imagen no: los estudios llegan todo el día desde varios
 // equipos y nadie está apretando "capturar" por cada uno. Ahí el estudio
 // entra a esta bandeja con el nombre que el técnico tipeó en el aparato, y
-// el médico lo asigna. Si el técnico puso el código de paciente de Vitalis,
+// el médico lo asigna. Si el técnico puso el código de paciente de Symphomed,
 // se asigna solo y la bandeja ni se entera.
 //
 // Es un modelo aparte y NO un Estudio con pacienteId vacío, a propósito: un
@@ -994,7 +994,7 @@ estudioEntranteSchema.index(
 const EstudioEntrante = mongoose.model("EstudioEntrante", estudioEntranteSchema);
 
 
-// ═══ VITALIS NEURODESARROLLO ══════════════════════════════════════════════
+// ═══ SYMPHOMED NEURODESARROLLO ══════════════════════════════════════════════
 // Autismo, síndrome de Down y otras condiciones del neurodesarrollo no
 // entran en una historia clínica común, y por una razón de fondo: no hay
 // una enfermedad que curar. El expediente no es un registro de lo que
@@ -1105,7 +1105,7 @@ const ObjetivoNeuro = mongoose.model("ObjetivoNeuro", objetivoNeuroSchema);
 // Es el mismo patrón que la pestaña de Vacunas: qué corresponde a esta
 // edad, qué está hecho y qué está atrasado.
 //
-// IMPORTANTE: la plantilla que trae Vitalis (ver services/vigilancia.js) es
+// IMPORTANTE: la plantilla que trae Symphomed (ver services/vigilancia.js) es
 // un punto de partida basado en guías publicadas, NO un protocolo. Cada
 // ítem es editable y borrable, porque el protocolo que manda es el del
 // médico tratante y el de su país.
@@ -1138,7 +1138,7 @@ const VigilanciaSalud = mongoose.model("VigilanciaSalud", vigilanciaSaludSchema)
 // una charla: sale de instrumentos estandarizados, y hoy sus resultados
 // viven en un PDF adjunto o en una frase suelta de la evolución.
 //
-// UNA LÍNEA QUE NO SE CRUZA: Vitalis registra el RESULTADO, nunca el
+// UNA LÍNEA QUE NO SE CRUZA: Symphomed registra el RESULTADO, nunca el
 // instrumento. El ADOS-2 es propiedad de WPS —los ítems, las hojas de
 // codificación, el algoritmo y las tablas de conversión— y exige
 // calificación profesional y entrenamiento formal. Reproducir cualquiera de
@@ -1308,11 +1308,14 @@ const recetaSchema = new mongoose.Schema({
   // alcanza con eso. "memed" es una receta FIRMADA DIGITALMENTE que vive en
   // Memed — acá queda la referencia y una copia de los medicamentos, porque
   // son dato clínico que el hilo clínico y el brief necesitan, pero el
-  // documento legal no es de Vitalis y no finge serlo.
+  // documento legal no es de Symphomed y no finge serlo.
   //
   // La distinción tiene que estar guardada, no deducida: dentro de un año
   // nadie va a poder decir cuál de estas recetas tenía firma mirando los
   // medicamentos.
+  // "vitalis" en minúscula NO es la marca: es un valor guardado en cada receta
+  // ya emitida. Renombrarlo al cambiar de nombre el producto invalidaría todas
+  // las recetas históricas y las búsquedas por origen dejarían de encontrarlas.
   origen: { type: String, enum: ["vitalis", "memed"], default: "vitalis", index: true },
   memed: {
     prescriptionUuid: { type: String, default: "" },
@@ -1333,7 +1336,7 @@ const Receta = mongoose.model("Receta", recetaSchema);
 // Recordatorios Médicos: vencimientos/controles próximos, vistos en una
 // sola lista global del panel del médico (no por paciente) — "qué se viene"
 // en todo el consultorio. Mandarlo solo por WhatsApp queda pendiente hasta
-// resolver esa integración; por ahora el médico lo revisa dentro de Vitalis.
+// resolver esa integración; por ahora el médico lo revisa dentro de Symphomed.
 const recordatorioSchema = new mongoose.Schema({
   pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
   pacienteNombre: { type: String, required: true }, // snapshot, evita un join para pintar la lista
@@ -1425,7 +1428,7 @@ const SuscripcionPush = mongoose.model("SuscripcionPush", suscripcionPushSchema)
 // ─── SALDO PREPAGO ─────────────────────────────────────────────────────────
 //
 // El médico carga saldo (transferencia o QR) y cada consulta transcrita se lo
-// descuenta. Esto es lo que el MÉDICO le paga a Vitalis — no confundir con
+// descuenta. Esto es lo que el MÉDICO le paga a Symphomed — no confundir con
 // TratamientoPlan.pagos, que es lo que el PACIENTE le paga al médico. Son dos
 // plateas distintas y nunca se tocan.
 //
@@ -1540,7 +1543,7 @@ const SolicitudRecarga = mongoose.model("SolicitudRecarga", solicitudRecargaSche
 
 // ─── DATOS DE PAGO ─────────────────────────────────────────────────────────
 //
-// Dónde le pagan a Vitalis: banco, cuenta, titular. Vive en la base y no en
+// Dónde le pagan a Symphomed: banco, cuenta, titular. Vive en la base y no en
 // el .env porque son datos que CAMBIAN —se abre otra cuenta, cambia el
 // titular— y pedirle a alguien que entre por SSH y reinicie el servidor para
 // corregir un número de cuenta es una forma de garantizar que ese número

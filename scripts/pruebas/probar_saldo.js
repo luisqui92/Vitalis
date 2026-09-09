@@ -1,4 +1,4 @@
-// Vitalis — El saldo prepago, contra una base de datos de verdad.
+// Symphomed — El saldo prepago, contra una base de datos de verdad.
 //
 // Esto mueve plata. Un error acá no es una pantalla fea: es cobrarle de más a
 // un médico, o cobrarle dos veces la misma consulta, o dejarlo sin poder

@@ -1,4 +1,4 @@
-// Vitalis — Português · visualizador de imagens com medições e calibração.
+// Symphomed — Português · visualizador de imagens com medições e calibração.
 //
 // A regra do visualizador: sem calibração, pixels. Nunca milímetros
 // inventados. Os avisos abaixo fazem parte dessa honestidade — distinguem um

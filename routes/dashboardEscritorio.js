@@ -1,4 +1,4 @@
-// Vitalis — Endpoints propios de la vista de escritorio: listados cruzados
+// Symphomed — Endpoints propios de la vista de escritorio: listados cruzados
 // entre pacientes (recetas, estudios) que la app móvil nunca necesitó
 // (ahí todo se navega paciente por paciente), más los resúmenes de
 // Finanzas y Reportes.

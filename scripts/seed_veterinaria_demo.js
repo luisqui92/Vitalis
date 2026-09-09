@@ -1,4 +1,4 @@
-// Vitalis Veterinaria — Crea (o actualiza) una cuenta de veterinaria de
+// Symphomed Veterinaria — Crea (o actualiza) una cuenta de veterinaria de
 // demo con mascotas (especie/raza/dueño), vacunas, medicación, evolución
 // de peso y un Brief Clínico ya armado.
 //

@@ -1,4 +1,4 @@
-// Vitalis — Login y registro de médicos.
+// Symphomed — Login y registro de médicos.
 
 // Las áreas, en el orden en que se ofrecen al registrarse. Los valores son
 // los que guarda la base y NO se traducen nunca: son identificadores, no
@@ -8,7 +8,7 @@ const AREAS = ["medicina_general", "odontologia", "estetica", "oftalmologia", "g
 // ─── SELECTOR DE IDIOMA (solo antes de entrar) ────────────────────────────
 // Antes del login el sistema todavía no sabe quién es el médico, así que no
 // puede saber su idioma. Sin esto, un médico brasileño ve su primera
-// pantalla de Vitalis en español — que es exactamente la impresión que no
+// pantalla de Symphomed en español — que es exactamente la impresión que no
 // queremos dar.
 //
 // Lo que se elige acá manda dos cosas y ninguna más: el idioma de estas
@@ -160,7 +160,7 @@ function renderLogin2FA(tempToken) {
 // ─── REGISTRO ────────────────────────────────────────────────────────────
 //
 // Dos pasos, no un formulario largo. No es decoración: pedirle la matrícula
-// profesional a alguien que todavía no sabe qué es Vitalis se siente una
+// profesional a alguien que todavía no sabe qué es Symphomed se siente una
 // intromisión, y abandona. Primero quién sos —lo que cualquiera espera—, y
 // recién después lo profesional, ya explicado por qué se pide.
 //
@@ -178,7 +178,7 @@ function regPasosHtml(pasoActual) {
 
 function regEncabezadoHtml(paso, titulo, bajada) {
   return `
-    <div class="reg-marca">Vitalis</div>
+    <div class="reg-marca">Symphomed</div>
     ${regPasosHtml(paso)}
     <div class="reg-titulo">${titulo}</div>
     <div class="reg-bajada">${bajada}</div>`;
@@ -316,7 +316,7 @@ function renderRegistroPaso2() {
 
 // La pantalla que antes no existía. La cuenta NO entra todavía, así que esto
 // tiene que decir claramente qué pasó, qué falta y cuánto puede tardar — si
-// no, la persona intenta entrar, la rechazan, y cree que Vitalis está roto.
+// no, la persona intenta entrar, la rechazan, y cree que Symphomed está roto.
 function renderRegistroEnviado(nombre) {
   app.innerHTML = `
     <div class="card reg-card reg-listo">

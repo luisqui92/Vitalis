@@ -1,4 +1,4 @@
-// Vitalis — Que no se pueda entrar a una teleconsulta sin consentir la grabación.
+// Symphomed — Que no se pueda entrar a una teleconsulta sin consentir la grabación.
 //
 // Todo lo demás de este archivo es higiene. Lo que importa es una sola cosa:
 // que el candado del consentimiento esté DEL LADO DEL SERVIDOR y no sea una

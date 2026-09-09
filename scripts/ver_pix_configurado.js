@@ -1,15 +1,15 @@
-// Vitalis — Qué clave Pix está cargada AHORA en producción.
+// Symphomed — Qué clave Pix está cargada AHORA en producción.
 //
 // Cuando un banco contesta "conta de destino não foi encontrada", el que
 // falló fue DICT: el directorio de claves del Banco Central no pudo resolver
 // la clave. Eso ocurre antes de mirar el monto, el txid o el formato, así que
 // solo deja dos causas:
 //
-//   A. la clave cargada en Vitalis NO es la que hay que cobrar — un dígito
+//   A. la clave cargada en Symphomed NO es la que hay que cobrar — un dígito
 //      de menos, un espacio pegado, alguien la pisó desde el panel;
 //   B. la clave es la correcta pero ya no existe del lado del proveedor.
 //
-// Este script imprime lo que Vitalis está usando de verdad, para poder
+// Este script imprime lo que Symphomed está usando de verdad, para poder
 // compararlo con la clave que sí funcionó. No se puede consultar DICT desde
 // acá —hace falta ser participante del SPI—, así que la (B) se confirma
 // pegando la clave suelta en un banco: si no aparece el titular, está muerta.
@@ -31,7 +31,7 @@ const LA_QUE_FUNCIONO = "ff439919-4119-405d-838a-6c3e3efd8b55";
   await mongoose.disconnect();
 
   const clave = String(datos?.cuenta || "");
-  console.log("\n── Lo que Vitalis está cobrando hoy en Brasil ──\n");
+  console.log("\n── Lo que Symphomed está cobrando hoy en Brasil ──\n");
   console.log(`  clave Pix : ${clave ? `«${clave}»` : "(VACÍA — la pantalla de recarga ni siquiera abre)"}`);
   console.log(`  titular   : «${datos?.titular || ""}»`);
   console.log(`  ciudad    : «${datos?.ciudad || ""}»`);

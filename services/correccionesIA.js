@@ -1,4 +1,4 @@
-// Vitalis — Registro de correcciones a lo que sugirió la IA. Se llama
+// Symphomed — Registro de correcciones a lo que sugirió la IA. Se llama
 // desde cada punto donde el médico puede editar una sugerencia antes de
 // confirmarla (reconsulta, tratamiento por voz, mapa ocular). No es para
 // mostrarle nada al médico — sirve para ver en qué se equivoca más la IA

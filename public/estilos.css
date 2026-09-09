@@ -45,7 +45,7 @@
   --sombra:0 1px 2px rgba(36,33,27,.04);
 }
 
-/* ─── Tema "Vitalis Dental" (tinta azul apagado + latón) ──────────────── */
+/* ─── Tema "Symphomed Dental" (tinta azul apagado + latón) ──────────────── */
 body.tema-dental{
   --primary:#5b84a8;
   --primary-dark:#3d5f7d;
@@ -69,7 +69,7 @@ body.tema-dental .segmento.h0{background:#1c2530;}
 body.tema-dental .segmento.h1{background:rgba(201,160,95,.14);}
 body.tema-dental .brief-card{background:linear-gradient(135deg,#1a2732,#151e27);}
 
-/* ─── Tema "Vitalis Face" (rosa ceniza + latón) ────────────────────────── */
+/* ─── Tema "Symphomed Face" (rosa ceniza + latón) ────────────────────────── */
 body.tema-estetica{
   --primary:#a8567e;
   --primary-dark:#7d3f5f;
@@ -93,7 +93,7 @@ body.tema-estetica .segmento.h0{background:#271c21;}
 body.tema-estetica .segmento.h1{background:rgba(201,160,95,.14);}
 body.tema-estetica .brief-card{background:linear-gradient(135deg,#241a1f,#1c1418);}
 
-/* ─── Tema "Vitalis Visión" (índigo apagado + latón) ───────────────────── */
+/* ─── Tema "Symphomed Visión" (índigo apagado + latón) ───────────────────── */
 body.tema-oftalmologia{
   --primary:#5c6394;
   --primary-dark:#40456b;
@@ -117,7 +117,7 @@ body.tema-oftalmologia .segmento.h0{background:#1c1c29;}
 body.tema-oftalmologia .segmento.h1{background:rgba(201,160,95,.14);}
 body.tema-oftalmologia .brief-card{background:linear-gradient(135deg,#1b1b28,#151520);}
 
-/* ─── Tema "Vitalis Veterinaria" (verde bosque apagado + ámbar) ────────── */
+/* ─── Tema "Symphomed Veterinaria" (verde bosque apagado + ámbar) ────────── */
 body.tema-veterinaria{
   --primary:#4a7d54;
   --primary-dark:#345c3c;
@@ -141,7 +141,7 @@ body.tema-veterinaria .segmento.h0{background:#1d2519;}
 body.tema-veterinaria .segmento.h1{background:rgba(201,148,79,.14);}
 body.tema-veterinaria .brief-card{background:linear-gradient(135deg,#1a2318,#161d13);}
 
-/* ─── Tema "Vitalis Obstetricia" (terracota apagado + latón) ───────────── */
+/* ─── Tema "Symphomed Obstetricia" (terracota apagado + latón) ───────────── */
 body.tema-ginecologia{
   --primary:#bd6b4f;
   --primary-dark:#8f4f39;
@@ -162,7 +162,7 @@ body.tema-ginecologia{
 body.tema-ginecologia input,body.tema-ginecologia select,body.tema-ginecologia textarea{background:#271e1a;}
 body.tema-ginecologia button.secondary{background:rgba(189,107,79,.16);color:var(--accent-2);}
 
-/* Vitalis Pediatría — verde azulado suave con acento durazno: la única
+/* Symphomed Pediatría — verde azulado suave con acento durazno: la única
    rama donde el que mira la pantalla muchas veces es la madre, no el
    médico, así que se busca cercanía antes que aire clínico. */
 body.tema-pediatria{
@@ -188,7 +188,7 @@ body.tema-pediatria .segmento.h0{background:#1c292b;}
 body.tema-pediatria .segmento.h1{background:rgba(231,159,109,.14);}
 body.tema-pediatria .brief-card{background:linear-gradient(135deg,#162224,#121b1c);}
 
-/* Vitalis Neurodesarrollo — violeta suave. Es la rama donde más veces mira
+/* Symphomed Neurodesarrollo — violeta suave. Es la rama donde más veces mira
    la pantalla una madre y no un médico, y donde el mapa sensorial usa color
    para significar cosas: por eso la base es tranquila y de bajo contraste,
    para que los estados del mapa se lean solos. */
@@ -331,7 +331,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    peso visual, para que no compitan con el Brief Clínico por la atención. */
 .card-secundaria{background:transparent;border:1px dashed var(--border);box-shadow:none;}
 
-/* ─── Panel "escuchando": el logo de Vitalis late con el volumen real del
+/* ─── Panel "escuchando": el logo de Symphomed late con el volumen real del
    micrófono (más fuerte cuando detecta voz, casi quieto en silencio) ──── */
 .listen-panel{display:none;background:linear-gradient(160deg,var(--primary-dark),rgba(0,0,0,.55)),var(--primary-dark);background-blend-mode:multiply;border-radius:16px;padding:26px 18px 22px;text-align:center;color:#fff;margin-bottom:16px;}
 .listen-orb{position:relative;width:108px;height:108px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;}
@@ -495,7 +495,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
   .escr-stats{grid-template-columns:repeat(2,1fr);}
 }
 
-/* ─── Preguntale a Vitalis ─────────────────────────────────────────────── */
+/* ─── Preguntale a Symphomed ─────────────────────────────────────────────── */
 /* El "?" del encabezado: mismo peso visual que "Salir", sin competirle. */
 .btn-ayuda{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
   font-size:15px;font-weight:700;background:transparent;border:1px solid var(--border);color:var(--text-muted);
@@ -538,7 +538,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .asistente-pie button{margin:0;width:auto;padding:11px 16px;white-space:nowrap;}
 
 /* ═══ HOJA MEMBRETADA DE INFORMES ═══════════════════════════════════════
-   La hoja se dibuja siempre en claro, aunque Vitalis esté en tema oscuro:
+   La hoja se dibuja siempre en claro, aunque Symphomed esté en tema oscuro:
    es un documento que se imprime en papel y que el paciente va a mirar
    fuera de la app. Un informe médico en fondo negro no lo lee nadie. */
 .inf-barra{display:flex;gap:8px;padding:10px;background:#15151a;justify-content:flex-end;z-index:2}
@@ -586,7 +586,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   VITALIS FACE — consola de análisis facial
+   SYMPHOMED FACE — consola de análisis facial
    ──────────────────────────────────────────────────────────────────────────
    Tema oscuro propio: es la única pantalla del sistema donde lo que importa
    es la foto, y un fondo claro alrededor de una cara cambia cómo se percibe
@@ -809,7 +809,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 #simulador25d .s25-btn-primario{
   background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
 
-/* Vitalis Face — editor de anotaciones */
+/* Symphomed Face — editor de anotaciones */
 .vf-editor-nota{position:fixed;z-index:9950;width:260px;background:#11141b;
   border:1px solid #2b3444;border-radius:11px;padding:10px;
   box-shadow:0 12px 34px rgba(0,0,0,.6);color:#e8ebf0}
@@ -1001,7 +1001,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 
 /* ─── PLANES ──────────────────────────────────────────────────────────────
    Dos opciones que se tocan. No es una tabla comparativa con veinte filas:
-   el médico ya sabe qué hace Vitalis, lo único que elige es cómo paga. */
+   el médico ya sabe qué hace Symphomed, lo único que elige es cómo paga. */
 .plan-opcion{border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:8px;cursor:pointer;background:var(--card);transition:border-color .15s ease,transform .1s ease;}
 .plan-opcion:hover{border-color:var(--primary);}
 .plan-opcion:active{transform:scale(.99);}

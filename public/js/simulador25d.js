@@ -1,4 +1,4 @@
-// Vitalis — Simulación 2.5D con las cinco vistas
+// Symphomed — Simulación 2.5D con las cinco vistas
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // La idea equivocada era hacer girar UNA foto. Una foto no trae profundidad:
@@ -430,7 +430,7 @@ function s25ActualizarPie() {
 }
 
 // ═══ CARGA DEL JUEGO DE VISTAS ═════════════════════════════════════════════
-// Aparte de la pantalla, porque la consola de Vitalis Face carga exactamente
+// Aparte de la pantalla, porque la consola de Symphomed Face carga exactamente
 // lo mismo y no tiene por qué repetirlo.
 async function s25CargarVistas(estudios, avisar) {
   // Una foto por ángulo: si hay varias del mismo ángulo se toma la más

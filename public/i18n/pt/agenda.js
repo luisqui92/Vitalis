@@ -1,4 +1,4 @@
-// Vitalis — Português · agenda e horário de atendimento.
+// Symphomed — Português · agenda e horário de atendimento.
 //
 // Esta es la agenda del MÉDICO (su calendario), no el bot de reservas por
 // WhatsApp, que quedó fuera del alcance de Brasil. El único texto que
@@ -48,7 +48,7 @@ Object.assign(I18N.pt, {
   "horario.duracion": "Duração de cada consulta (minutos)",
   "horario.googleCalendar": "Google Agenda (opcional)",
   "horario.googleCalendarPlaceholder": "seu-email@gmail.com",
-  "horario.googleCalendarAyuda": "Compartilhe essa agenda com a conta de serviço do Vitalis (\"fazer alterações em eventos\"). Com isso conectado, o Vitalis faz as duas coisas: reflete ali as consultas agendadas e, antes de oferecer um horário, verifica que você não tenha algo já marcado direto na sua agenda. Se deixar vazio, as consultas ficam só dentro do Vitalis.",
+  "horario.googleCalendarAyuda": "Compartilhe essa agenda com a conta de serviço do Symphomed (\"fazer alterações em eventos\"). Com isso conectado, o Symphomed faz as duas coisas: reflete ali as consultas agendadas e, antes de oferecer um horário, verifica que você não tenha algo já marcado direto na sua agenda. Se deixar vazio, as consultas ficam só dentro do Symphomed.",
   "horario.infoConsultorio": "Informações do consultório (para o assistente)",
   "horario.infoConsultorioPlaceholder": "Ex: Atendemos de segunda a sexta, das 8h às 17h. Consulta geral: R$ 150. Estamos na Av. Paulista, 123, São Paulo. Aceitamos dinheiro e Pix. Se não puder vir, avise com 24h de antecedência.",
   "horario.infoConsultorioAyuda": "O assistente usa isto para responder perguntas dos pacientes (horários, preços, endereço, políticas...) — só responde com o que você escrever aqui, nunca inventa.",

@@ -1,4 +1,4 @@
-// Vitalis — "Quiero recargar": dónde pago y cómo aviso que pagué.
+// Symphomed — "Quiero recargar": dónde pago y cómo aviso que pagué.
 //
 // Vive adentro de la tarjeta de saldo. Antes ahí decía "mandanos el
 // comprobante" y no decía a dónde — el médico quedaba sin saber qué hacer

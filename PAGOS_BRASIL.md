@@ -42,7 +42,7 @@ No por el QR — por el **webhook**.
 
 Hoy, cuando un médico paga, alguien tiene que mirar el extracto y acreditar a
 mano desde el panel del operador. Un PSP con API Pix avisa cuando entra la
-plata, y ahí Vitalis puede acreditar sola contra el `txid` que ya emitimos en
+plata, y ahí Symphomed puede acreditar sola contra el `txid` que ya emitimos en
 `routes/recargas.js`. Ese es el problema que no escala; el del QR es de una
 sola vez.
 

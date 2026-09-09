@@ -1,4 +1,4 @@
-// Vitalis — Que mudar un teléfono no deje historias clínicas huérfanas.
+// Symphomed — Que mudar un teléfono no deje historias clínicas huérfanas.
 //
 // El teléfono es la identidad del médico en ~30 colecciones. Si la mudanza
 // mueve la cuenta pero se olvida una colección, el síntoma no es un error:

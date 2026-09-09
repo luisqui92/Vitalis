@@ -1,4 +1,4 @@
-// Vitalis — Que el código Pix que generamos sea un código Pix de verdad.
+// Symphomed — Que el código Pix que generamos sea un código Pix de verdad.
 //
 // ═══ POR QUÉ ESTA PRUEBA ES DISTINTA A LAS DEMÁS ═══════════════════════════
 //
@@ -50,7 +50,7 @@ verificar("  ...y la clave Pix sigue siendo la misma", c350.includes(CUENTA.chav
 verificar("  ...y el CRC se recalculó (no quedó el viejo)", !c350.endsWith("3B8E"));
 
 console.log("\n── 3. Los centavos no se pierden ──");
-// La plata viaja en centavos en todo Vitalis. Un redondeo acá es un médico
+// La plata viaja en centavos en todo Symphomed. Un redondeo acá es un médico
 // que paga de menos y un saldo que no cuadra.
 for (const [centavos, esperado] of [[1, "0.01"], [99, "0.99"], [100, "1.00"], [12345, "123.45"], [500000, "5000.00"]]) {
   verificar(`${centavos} centavos → R$ ${esperado}`, montoDesdeCentavos(centavos) === esperado);

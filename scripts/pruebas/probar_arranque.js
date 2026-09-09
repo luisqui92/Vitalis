@@ -1,4 +1,4 @@
-// Vitalis — ¿Arranca de verdad?
+// Symphomed — ¿Arranca de verdad?
 //
 // Todas las demás pruebas cargan pedazos: las rutas por un lado, el frontend
 // en un sandbox por el otro. Ninguna levanta index.js. Y hay cosas que solo
@@ -28,7 +28,7 @@ const http = require("http");
 const { spawn } = require("child_process");
 
 const RAIZ = path.join(__dirname, "..", "..");
-const PUERTO = 3987; // uno poco usado, para no chocar con un Vitalis ya corriendo
+const PUERTO = 3987; // uno poco usado, para no chocar con un Symphomed ya corriendo
 
 let fallos = 0;
 function verificar(descripcion, condicion) {
@@ -85,7 +85,7 @@ async function main() {
   if (!mongo) {
     console.log("⏭️  SALTEADA: no hay base de datos para probar.");
     console.log("   MONGO_PRUEBAS=... o npm i --no-save mongodb-memory-server");
-    console.log("   Esto NO es un ✅: no se comprobó que Vitalis arranque.");
+    console.log("   Esto NO es un ✅: no se comprobó que Symphomed arranque.");
     process.exit(0);
   }
 
@@ -114,7 +114,7 @@ async function main() {
 
     console.log("\n── 2. Los paquetes de idioma se arman al arrancar ──");
     // Ésta es la razón principal de esta prueba: los paquetes están en
-    // .gitignore, así que en el servidor NO existen hasta que Vitalis los
+    // .gitignore, así que en el servidor NO existen hasta que Symphomed los
     // genera. Si esto falla, se despliega una app sin textos.
     for (const idioma of ["es", "pt"]) {
       const b = await traer(`/i18n/${idioma}.js`);
@@ -127,7 +127,7 @@ async function main() {
 
     console.log("\n── 3. La app se sirve entera ──");
     const raiz = await traer("/");
-    verificar("/ devuelve el index.html", raiz.estado === 200 && raiz.texto.includes("<title>Vitalis"));
+    verificar("/ devuelve el index.html", raiz.estado === 200 && raiz.texto.includes("<title>Symphomed"));
 
     // Que index.html no pida un archivo que ya no existe: es exactamente el
     // error que deja una pantalla en blanco y no falla en ninguna otra parte.

@@ -1,4 +1,4 @@
-// Vitalis Gineco — Crea (o actualiza) una cuenta de ginecología y
+// Symphomed Gineco — Crea (o actualiza) una cuenta de ginecología y
 // obstetricia de demo con 8 pacientes: embarazadas en distintos trimestres,
 // un embarazo ya terminado (con desenlace) y pacientes ginecológicas sin
 // embarazo. Cada una con consultas espaciadas en el tiempo, ecografías y

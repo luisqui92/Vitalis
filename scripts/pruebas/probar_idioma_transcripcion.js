@@ -1,4 +1,4 @@
-// Vitalis — El idioma del médico llega hasta la transcripción y la nota.
+// Symphomed — El idioma del médico llega hasta la transcripción y la nota.
 //
 // La interfaz en portugués sin esto es una fachada: el médico ve todo en su
 // idioma, graba una consulta, y el audio se manda declarado como español.

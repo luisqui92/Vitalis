@@ -1,4 +1,4 @@
-// Vitalis — Español · receta de medicamentos y receta óptica.
+// Symphomed — Español · receta de medicamentos y receta óptica.
 //
 // Ojo: la receta es un documento con valor legal, y Brasil tiene sus propias
 // exigencias de forma (CFM/ANVISA, CRM del médico, receituário de control

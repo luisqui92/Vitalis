@@ -1,11 +1,11 @@
-// Vitalis — La teleconsulta, del lado del médico.
+// Symphomed — La teleconsulta, del lado del médico.
 //
 // Vive en la ficha del paciente, debajo del nombre: es una forma de atender
 // a ESE paciente, no una sección aparte. Una pestaña más habría quedado
 // escondida entre las otras quince.
 //
 // La pantalla del paciente está en teleconsulta.js. Los nombres de acá van
-// con prefijo teleMed* porque en Vitalis todo function de primer nivel es
+// con prefijo teleMed* porque en Symphomed todo function de primer nivel es
 // global y el último que carga gana, en silencio.
 
 // Si el servidor tiene proveedor de video configurado. Se pregunta una sola

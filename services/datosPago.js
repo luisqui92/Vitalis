@@ -1,4 +1,4 @@
-// Vitalis — A dónde le paga el médico a Vitalis.
+// Symphomed — A dónde le paga el médico a Symphomed.
 //
 // ═══ POR QUÉ ESTO NO VIVE SOLO EN EL .env ══════════════════════════════════
 //
@@ -26,7 +26,7 @@
 //
 // El país sale del IDIOMA del médico, que ya es un dato de su cuenta y no del
 // navegador (ver el comentario de "idioma" en db/models.js). No se agrega un
-// campo nuevo para lo mismo: hoy Vitalis está en dos países y habla dos
+// campo nuevo para lo mismo: hoy Symphomed está en dos países y habla dos
 // idiomas. El día que eso deje de coincidir —un médico brasileño que trabaja
 // en español— hará falta un campo propio, y este es el lugar donde va a
 // doler, a propósito.

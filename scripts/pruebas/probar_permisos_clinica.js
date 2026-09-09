@@ -1,4 +1,4 @@
-// Vitalis — Permisos del panel de clínica.
+// Symphomed — Permisos del panel de clínica.
 //
 // Esta prueba no verifica que el panel funcione: verifica que NO haga de
 // más. Un administrativo tiene acceso a la agenda y a los números de siete

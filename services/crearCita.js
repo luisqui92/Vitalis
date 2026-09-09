@@ -1,4 +1,4 @@
-// Vitalis — Crear una cita confirmada + sincronizarla con Google Calendar
+// Symphomed — Crear una cita confirmada + sincronizarla con Google Calendar
 // (si el médico lo tiene conectado). Un solo lugar para esto porque lo usan
 // tanto la reserva conversacional por WhatsApp (services/reservaCitas.js,
 // para sesiones ya en curso) como la reserva por el link web

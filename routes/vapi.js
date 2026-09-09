@@ -1,4 +1,4 @@
-// Vitalis — Recepcionista de voz (Vapi): recibe los "tool calls" que el
+// Symphomed — Recepcionista de voz (Vapi): recibe los "tool calls" que el
 // asistente de voz dispara durante una llamada real y ejecuta la acción
 // correspondiente (services/vapiHerramientas.js), devolviendo el resultado
 // en texto para que el asistente lo diga en voz alta. Quien conduce la

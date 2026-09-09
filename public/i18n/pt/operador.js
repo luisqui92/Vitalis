@@ -1,9 +1,9 @@
-// Vitalis — Português · tela de operador (creditar recargas).
+// Symphomed — Português · tela de operador (creditar recargas).
 Object.assign(I18N.pt, {
   "op.titulo": "Creditar recargas",
   "op.ayuda": "Busque o médico, confirme o pagamento no banco e credite. A recarga mínima é R$ {minimo}.",
   "op.falta2fa": "Para creditar saldo você precisa da verificação em duas etapas ativa. Ative logo abaixo e entre de novo.",
-  "op.faltaPermiso": "Esta conta ainda não tem permissão para aprovar pagamentos. É preciso adicionar o telefone dela a OPERADORES_SALDO no servidor e reiniciar o Vitalis. Avise quem administra o servidor.",
+  "op.faltaPermiso": "Esta conta ainda não tem permissão para aprovar pagamentos. É preciso adicionar o telefone dela a OPERADORES_SALDO no servidor e reiniciar o Symphomed. Avise quem administra o servidor.",
   "op.noPudimosVerificar": "Não conseguimos verificar a permissão desta conta com o servidor ({detalle}). Não é necessariamente falta de permissão: pode ser um problema momentâneo. Tente de novo em um minuto.",
   "op.buscar": "Buscar médico",
   "op.buscarPlaceholder": "Nome ou telefone",

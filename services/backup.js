@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — Copias de seguridad
+// Symphomed — Copias de seguridad
 // ═══════════════════════════════════════════════════════════════════════════
 // Una copia que nunca se restauró no es una copia: es una carpeta con
 // archivos que uno espera que sirvan. Por eso este módulo, después de armar
@@ -7,7 +7,7 @@
 // documentos. Si no coincide, el respaldo se marca como fallido y el médico
 // lo ve en pantalla. Enterarse el día que se cae el disco es tarde.
 //
-// El volcado lo hace Vitalis solo, sin mongodump: esa herramienta no está
+// El volcado lo hace Symphomed solo, sin mongodump: esa herramienta no está
 // instalada en el servidor y depender de algo que no está es la mejor forma
 // de que el respaldo funcione en la máquina de uno y no en la del cliente.
 // Se usa EJSON, que es el formato del propio driver de Mongo y conserva los
@@ -45,7 +45,7 @@ const SEMANAS = Number(process.env.BACKUP_SEMANAS) || 8;
 // puesto tumbaría el servidor haciendo respaldos sin parar, en silencio.
 const HORAS_INTERVALO = Math.min(168, Math.max(1, Number(process.env.BACKUP_HORAS) || 24));
 
-// A partir de cuántas horas sin respaldo Vitalis lo muestra como problema.
+// A partir de cuántas horas sin respaldo Symphomed lo muestra como problema.
 const HORAS_ALERTA = 48;
 
 // ─── CIFRADO ──────────────────────────────────────────────────────────────
@@ -59,6 +59,10 @@ const HORAS_ALERTA = 48;
 // es infinitamente mejor que no tener respaldo. Lo que SÍ se bloquea es
 // mandar una copia sin cifrar fuera del servidor (ver subirAfuera).
 const CLAVE = process.env.BACKUP_CLAVE || "";
+// NO renombrar con la marca. Esta cabecera está escrita ADENTRO de cada
+// respaldo ya generado, y el prefijo "vitalis-" de más abajo es el nombre de
+// esos archivos en el disco del servidor. Cambiarlos no rompe nada hoy y deja
+// ilegibles todos los respaldos viejos — que es justo cuando uno se entera.
 const MAGIA = Buffer.from("VITALISBK1");
 
 function derivarClave(sal) {
@@ -315,7 +319,7 @@ async function aplicarRetencion() {
 // Un respaldo en el mismo disco que la base NO es un respaldo: protege de un
 // borrado por error, no de que el disco se muera. La subida se delega a un
 // comando configurable (rclone, aws, scp...) para no atarse a un proveedor
-// ni meter un SDK adentro de Vitalis.
+// ni meter un SDK adentro de Symphomed.
 //
 // BACKUP_COMANDO_SUBIDA="rclone copy {archivo} b2:vitalis-respaldos/"
 async function subirAfuera(manifiesto, rutas) {
@@ -401,7 +405,7 @@ function programar() {
     hacerBackup().catch(e => log.error("[BACKUP] falló el respaldo automático:", e.message));
   }, ms);
   // Que el respaldo pendiente no impida que el proceso termine si alguien
-  // apaga Vitalis a propósito.
+  // apaga Symphomed a propósito.
   if (temporizador.unref) temporizador.unref();
 
   log.info(`[BACKUP] programado cada ${HORAS_INTERVALO} h · destino ${DIR_BACKUPS} · ${CLAVE ? "cifrado" : "SIN CIFRAR (falta BACKUP_CLAVE)"}`);

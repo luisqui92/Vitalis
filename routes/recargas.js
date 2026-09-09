@@ -1,11 +1,11 @@
-// Vitalis — El circuito de recarga, de punta a punta.
+// Symphomed — El circuito de recarga, de punta a punta.
 //
 // Antes de esto el médico leía "mandanos el comprobante" y no se le decía a
 // dónde, y el operador no tenía forma de enterarse de que alguien había
 // pagado. Faltaba el circuito entero:
 //
 //   1. El médico ve DÓNDE pagar (QR, banco, cuenta, titular).
-//   2. Paga por fuera de Vitalis y avisa acá: "pagué Bs 200, referencia X".
+//   2. Paga por fuera de Symphomed y avisa acá: "pagué Bs 200, referencia X".
 //   3. Eso crea una SOLICITUD PENDIENTE. No mueve un centavo.
 //   4. El operador ve la cola, lo verifica EN EL BANCO, y aprueba o rechaza.
 //   5. Recién al aprobar se acredita, por services/saldo.js como siempre.

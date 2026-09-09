@@ -1,4 +1,4 @@
-// Vitalis — Tiempo real: si el médico tiene la sesión abierta en dos
+// Symphomed — Tiempo real: si el médico tiene la sesión abierta en dos
 // dispositivos a la vez (celular y compu, por ejemplo), un cambio hecho en
 // uno actualiza al otro solo, sin tocar nada. El servidor no manda eventos
 // finitos por tipo de dato (ver services/realtime.js) — solo avisa "algo

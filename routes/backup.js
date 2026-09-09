@@ -1,4 +1,4 @@
-// Vitalis — Estado de las copias de seguridad, visible para el médico.
+// Symphomed — Estado de las copias de seguridad, visible para el médico.
 // Un respaldo que anda pero que nadie mira es medio respaldo: el día que
 // empieza a fallar, la única forma de enterarse a tiempo es que esté a la
 // vista en la misma pantalla donde el médico ya entra.

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — SmartKardex (antes vivía dentro de ChatGo, ahora es su propia app)
+// Symphomed — SmartKardex (antes vivía dentro de ChatGo, ahora es su propia app)
 // ═══════════════════════════════════════════════════════════════════════════
 const path = require("path");
 const http = require("http");
@@ -15,7 +15,7 @@ validateConfig();
 // Última red de contención: los trabajos en segundo plano (transcripción,
 // nota clínica por IA, WhatsApp) ya deberían atajar sus propios errores,
 // pero si algún caso se escapa, Node por defecto tumba TODO el proceso ante
-// una promesa rechazada sin catch — eso apaga Vitalis para todos los
+// una promesa rechazada sin catch — eso apaga Symphomed para todos los
 // médicos por un solo trabajo de fondo que falló. Mejor perder ese trabajo
 // puntual (y que quede en el log para revisar) que el servidor entero.
 process.on("unhandledRejection", (err) => {
@@ -29,7 +29,7 @@ app.set("trust proxy", 1);
 // ─── HEADERS DE SEGURIDAD ────────────────────────────────────────────────
 // Todo el front es propio (sin CDN ni scripts de terceros), así que la CSP
 // puede ser estricta: nada de scripts/estilos/imágenes de otro origen salvo
-// lo que Vitalis realmente usa (el WebSocket de AssemblyAI para la
+// lo que Symphomed realmente usa (el WebSocket de AssemblyAI para la
 // transcripción en vivo, y las imágenes data: de los códigos QR).
 // Los dominios de Memed salen del servicio y no de una lista escrita acá
 // para que se puedan ampliar con una variable de entorno: si su módulo pide
@@ -50,14 +50,14 @@ app.use(helmet({
       // de un archivo propio, y Chrome exige blob: en script-src —no en
       // worker-src— para eso).
       // Los de Memed son la receta digital de Brasil: su módulo se carga
-      // como script de ellos y se dibuja adentro de Vitalis. Sin esto la
+      // como script de ellos y se dibuja adentro de Symphomed. Sin esto la
       // pantalla de recetar queda en blanco SIN NINGÚN ERROR VISIBLE, que es
       // la peor forma de fallar — ver services/memed.js.
       scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='", ...DOMINIOS_MEMED],
       styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
       // 'blob:' es para las fotos clínicas que se traen con Authorization
       // por header (no por URL) y se abren como blob local — el comparador
-      // antes/después y el mapa anatómico de Vitalis Face las muestran
+      // antes/después y el mapa anatómico de Symphomed Face las muestran
       // como <img> directo en la página, no en una pestaña aparte.
       imgSrc: ["'self'", "data:", "blob:", ...DOMINIOS_MEMED],
       // Las de Daily/Vapi son para la llamada de voz por navegador de la
@@ -73,7 +73,7 @@ app.use(helmet({
       // que Three.js crea a partir de un blob: en vez de un archivo propio.
       workerSrc: ["'self'", "blob:"],
       baseUri: ["'self'"],
-      frameAncestors: ["'none'"], // nadie puede embeber Vitalis en un iframe (clickjacking)
+      frameAncestors: ["'none'"], // nadie puede embeber Symphomed en un iframe (clickjacking)
       // ═══ frameSrc: UNA SOLA EXCEPCIÓN, Y ANOTADA ═══════════════════════
       //
       // Acá decía "sin frameSrc a propósito: la teleconsulta NO embebe a
@@ -108,10 +108,10 @@ app.use(middlewareAvisarCambios);
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
 // La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en
-// Vitalis no da acceso — ver el encabezado de routes/solicitudesCuenta.js.
+// Symphomed no da acceso — ver el encabezado de routes/solicitudesCuenta.js.
 require("./routes/solicitudesCuenta")(app);
 // Receta digital de Brasil. En Brasil una receta necesita firma ICP-Brasil,
-// así que no se receta por Vitalis sino solo por Memed — ver services/memed.js.
+// así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);
 require("./routes/consultaMedica")(app);
 require("./routes/pacientes")(app);
@@ -140,7 +140,7 @@ require("./routes/vinculacion")(app);
 require("./routes/dashboardEscritorio")(app);
 require("./routes/reservaPublica")(app);
 require("./routes/push")(app);
-require("./routes/asistenteVitalis")(app);
+require("./routes/asistenteSymphomed")(app);
 require("./routes/backup")(app);
 // Panel de clínica: varios consultorios vistos desde arriba. Solo agrega
 // números — ver el comentario de arriba de routes/admin.js.
@@ -167,11 +167,11 @@ require("./routes/reporte")(app);
 prepararEnSegundoPlano([path.join(__dirname, "public", "vendor")]);
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────
-app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Vitalis" }));
+app.get("/health", (_req, res) => res.json({ ok: true, servicio: "Symphomed" }));
 
 // ─── ESTÁTICOS + LA APP ───────────────────────────────────────────────────
 // Antes de express.static: si el navegador acepta brotli y existe el .br
-// precomprimido, se manda ese. El detector facial de Vitalis Face son 13 MB
+// precomprimido, se manda ese. El detector facial de Symphomed Face son 13 MB
 // —9 de WebAssembly— y sin esto son 45 segundos de spinner en la primera
 // carga; comprimido son 5,4 MB. Ver services/estaticosComprimidos.js.
 // Los textos de cada idioma viven partidos por módulo (public/i18n/es/…);
@@ -191,7 +191,7 @@ app.use(express.static(PUBLICO, {
     }
   },
 }));
-// Vitalis Veterinaria vive en /veterinaria como landing propia (mismo
+// Symphomed Veterinaria vive en /veterinaria como landing propia (mismo
 // frontend/SPA de siempre — el JS detecta la ruta y ajusta marca/tema/
 // registro antes incluso de loguearse; ver public/js/auth.js y estado.js).
 // /informe/<token> es la página que abre el PACIENTE desde el enlace de
@@ -215,8 +215,8 @@ iniciarServidorTiempoReal(server);
 // encabezado de services/senalizacion.js.
 require("./services/senalizacion").iniciarSenalizacion(server);
 require("./services/video").avisarEstadoAlArrancar();
-server.listen(PORT, () => log.info(`🚀 Vitalis corriendo en puerto ${PORT}`));
+server.listen(PORT, () => log.info(`🚀 Symphomed corriendo en puerto ${PORT}`));
 
 // Copias de seguridad automáticas. Va acá, después de levantar el servidor,
-// para que un problema con los respaldos nunca impida que Vitalis atienda.
+// para que un problema con los respaldos nunca impida que Symphomed atienda.
 require("./services/backup").programar();

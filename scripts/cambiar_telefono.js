@@ -1,4 +1,4 @@
-// Vitalis — Mudar una cuenta de médico a otro número de teléfono.
+// Symphomed — Mudar una cuenta de médico a otro número de teléfono.
 //
 // ═══ POR QUÉ ESTO NO ES CAMBIAR UN CAMPO ═══════════════════════════════════
 //

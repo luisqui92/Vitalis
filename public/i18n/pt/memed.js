@@ -1,4 +1,4 @@
-// Vitalis — Português · receita digital (Memed).
+// Symphomed — Português · receita digital (Memed).
 Object.assign(I18N.pt, {
   "memed.titulo": "Receita digital",
   "memed.ayuda": "A receita é emitida com assinatura digital e chega ao paciente. Fica copiada no prontuário.",

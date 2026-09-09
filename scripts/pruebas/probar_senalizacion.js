@@ -1,4 +1,4 @@
-// Vitalis — Que a la sala de señalización no entre un tercero.
+// Symphomed — Que a la sala de señalización no entre un tercero.
 //
 // El audio y el video de una teleconsulta van directo entre los dos
 // navegadores; por el servidor pasa solo el arranque de la negociación. Pero

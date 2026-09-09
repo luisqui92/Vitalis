@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Face — Simulador quirúrgico sobre la foto real
+// Symphomed Face — Simulador quirúrgico sobre la foto real
 // ═══════════════════════════════════════════════════════════════════════════
 // Lo que ve el paciente NO es un modelo 3D de una cara genérica parecida a
 // la suya: es SU foto, deformada. Por eso se ve real — la piel, la luz, el

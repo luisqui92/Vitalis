@@ -1,4 +1,4 @@
-// Vitalis — Nueva consulta (local o control remoto) y el detalle de una
+// Symphomed — Nueva consulta (local o control remoto) y el detalle de una
 // consulta (transcripción + nota clínica).
 
 // Íconos del botón de grabar (SVG en vez de emoji: se ve nítido y
@@ -44,7 +44,7 @@ function engancharHiloClinico() {
   });
 }
 
-// ─── NUEVA CONSULTA (grabar con el logo de Vitalis latiendo, o subir archivo) ──
+// ─── NUEVA CONSULTA (grabar con el logo de Symphomed latiendo, o subir archivo) ──
 function renderNuevaConsulta(pacienteId, pacienteNombre) {
   detenerPolling();
   app.innerHTML = `

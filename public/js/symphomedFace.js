@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// VITALIS FACE — Consola de análisis facial
+// SYMPHOMED FACE — Consola de análisis facial
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // Junta en una pantalla lo que hasta ahora estaba repartido: las cinco
@@ -311,7 +311,7 @@ const VF_CONTROLES_ZONA = {
 // ═══ LA CONSOLA ════════════════════════════════════════════════════════════
 async function vfAbrirConsola(pacienteId) {
   const capa = document.createElement("div");
-  capa.id = "vitalisFace";
+  capa.id = "symphomedFace";
   capa.className = "vf-capa";
   capa.innerHTML = `<div class="vf-cargando">
     <div class="spinner"></div>
@@ -421,7 +421,7 @@ function vfCerrarConsola() {
   const editor = document.getElementById("vfEditorNota");
   if (editor) editor.remove();
   if (vf) s25LiberarVistas(vf.vistas);
-  const c = document.getElementById("vitalisFace");
+  const c = document.getElementById("symphomedFace");
   if (c) c.remove();
   document.body.style.overflow = "";
   vf = null;
@@ -486,7 +486,7 @@ function vfPintar() {
         <div class="vf-marca">
           <div class="vf-marca-icono">V</div>
           <div>
-            <div class="vf-marca-nombre">VITALIS FACE</div>
+            <div class="vf-marca-nombre">SYMPHOMED FACE</div>
             <div class="vf-marca-sub">Análisis facial 2.5D</div>
           </div>
         </div>
@@ -537,7 +537,7 @@ function vfPintar() {
       <main class="vf-principal">
         <header class="vf-cabecera">
           <div>
-            <h1>Vitalis Face 2.5D</h1>
+            <h1>Symphomed Face 2.5D</h1>
             <p>Cada ángulo es una fotografía real del paciente</p>
           </div>
           <div class="vf-cabecera-acciones">
@@ -1755,7 +1755,7 @@ async function vfGuardarVista() {
     if (vf.simulando && !vf.verOriginal) sfSelloEnLienzo(salida);
     const png = await new Promise(res => salida.toBlob(res, "image/png"));
     const params = new URLSearchParams({
-      nombre: `Vitalis Face · ${vf.vistaActual ? vf.vistaActual.label : "vista"}`,
+      nombre: `Symphomed Face · ${vf.vistaActual ? vf.vistaActual.label : "vista"}`,
       fecha: new Date().toISOString().slice(0, 10),
       tipo: "foto",
     });

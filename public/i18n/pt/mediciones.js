@@ -1,4 +1,4 @@
-// Vitalis — Português · evolução clínica (sinais vitais no tempo).
+// Symphomed — Português · evolução clínica (sinais vitais no tempo).
 Object.assign(I18N.pt, {
   "med.presion": "Pressão arterial",
   "med.glucosa": "Glicemia",

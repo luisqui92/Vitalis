@@ -1,4 +1,4 @@
-// Vitalis Vet — Mapa corporal: se toca la silueta donde está la lesión y
+// Symphomed Vet — Mapa corporal: se toca la silueta donde está la lesión y
 // queda una marca, con su historial de controles (descripción, tamaño y
 // foto por fecha) para ver si crece o cede.
 //

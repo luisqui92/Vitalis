@@ -1,4 +1,4 @@
-// Vitalis — Español · informes firmados y membrete del centro.
+// Symphomed — Español · informes firmados y membrete del centro.
 //
 // El informe es un documento firmado: una vez firmado no se edita. Traducir
 // las etiquetas no cambia su valor legal — para Brasil hay que revisar qué

@@ -1,11 +1,11 @@
-// Vitalis — Las 4 pantallas de escritorio que no existían como concepto en
-// la app móvil (ahí todo se navega paciente por paciente): Vitalis Voice,
+// Symphomed — Las 4 pantallas de escritorio que no existían como concepto en
+// la app móvil (ahí todo se navega paciente por paciente): Symphomed Voice,
 // Indicaciones, Estudios e imágenes, Reportes y Finanzas. Consumen los
 // listados cruzados de routes/dashboardEscritorio.js (más /medico/citas
 // para Voice). Se cargan antes que escritorio.js para que sus funciones
 // ya existan cuando este arma el sidebar.
 
-// ─── VITALIS VOICE (citas gestionadas por el recepcionista telefónico) ──
+// ─── SYMPHOMED VOICE (citas gestionadas por el recepcionista telefónico) ──
 async function renderVozEscritorio() {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("voz.cargando")}</div>`;

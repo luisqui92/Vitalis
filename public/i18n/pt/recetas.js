@@ -1,4 +1,4 @@
-// Vitalis — Português · receita de medicamentos e receita óptica.
+// Symphomed — Português · receita de medicamentos e receita óptica.
 //
 // Traduzir estes rótulos faz a receita ser LIDA em português. Não a torna
 // válida no Brasil: falta o CRM do médico, o formato do receituário exigido

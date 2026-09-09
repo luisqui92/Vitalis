@@ -1,6 +1,6 @@
-// Vitalis — estado compartido, helpers de formato, y el wrapper de fetch.
+// Symphomed — estado compartido, helpers de formato, y el wrapper de fetch.
 // Se carga primero: el resto de los módulos usan estas funciones/variables.
-const API = ""; // mismo dominio que la API — todo este server ES Vitalis
+const API = ""; // mismo dominio que la API — todo este server ES Symphomed
 let TOKEN = localStorage.getItem("salud_token") || null;
 let MEDICO_NOMBRE = localStorage.getItem("salud_nombre") || "";
 let MEDICO_TIPO_ESPECIALIDAD = localStorage.getItem("salud_tipo_especialidad") || "medicina_general";
@@ -19,8 +19,8 @@ const btnLogout = document.getElementById("btnLogout");
 const btnAsistente = document.getElementById("btnAsistente");
 
 // Odontología, estética, oftalmología y veterinaria tienen su propia
-// identidad visual (temas oscuros "Vitalis Dental" / "Vitalis Face" /
-// "Vitalis Visión" / "Vitalis Veterinaria") — medicina general sigue con
+// identidad visual (temas oscuros "Symphomed Dental" / "Symphomed Face" /
+// "Symphomed Visión" / "Symphomed Veterinaria") — medicina general sigue con
 // el look claro de siempre.
 function aplicarTemaSegunEspecialidad() {
   const esDental = MEDICO_TIPO_ESPECIALIDAD === "odontologia";
@@ -41,9 +41,9 @@ function aplicarTemaSegunEspecialidad() {
   if (marcaH1) marcaH1.textContent = t(esDental ? "marca.dental" : esEstetica ? "marca.estetica" : esOftalmologia ? "marca.oftalmologia" : esVeterinaria ? "marca.veterinaria" : esGinecologia ? "marca.ginecologia" : esPediatria ? "marca.pediatria" : esNeuro ? "marca.neuro" : "marca.base");
 }
 
-// /veterinaria es la "landing" de Vitalis Veterinaria: mismo frontend, pero
+// /veterinaria es la "landing" de Symphomed Veterinaria: mismo frontend, pero
 // antes incluso de loguearse ya se ve con la marca/tema propios (nadie que
-// entra por ahí debería ver "Vitalis" a secas). Solo aplica ANTES de
+// entra por ahí debería ver "Symphomed" a secas). Solo aplica ANTES de
 // loguearse — si ya hay sesión, manda la especialidad real de la cuenta
 // (aplicarTemaSegunEspecialidad ya la aplicó), no la ruta por la que entró.
 const ES_LANDING_VETERINARIA = location.pathname.replace(/\/+$/, "") === "/veterinaria";
@@ -150,7 +150,7 @@ const TABS_KARDEX_ODONTOLOGIA = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
-// Vitalis Face (estética/plástica/dermatología): sin odontograma ni
+// Symphomed Face (estética/plástica/dermatología): sin odontograma ni
 // vacunas/evolución — en cambio, Estudios se usa para las fotos clínicas
 // con ángulo guiado, y "plan" (mismo backend que el presupuesto dental)
 // pasa a llamarse Procedimientos.
@@ -164,7 +164,7 @@ const TABS_KARDEX_ESTETICA = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
-// Vitalis Visión (oftalmología): "ojos" es el mapa ocular por estructura,
+// Symphomed Visión (oftalmología): "ojos" es el mapa ocular por estructura,
 // "evolucion" acá se usa para presión intraocular/agudeza visual (con
 // alerta si la tendencia sube), y "plan" (mismo backend de Odonto/Face)
 // pasa a llamarse Procedimientos (cirugía de catarata, láser, etc.).
@@ -180,7 +180,7 @@ const TABS_KARDEX_OFTALMOLOGIA = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
-// Vitalis Veterinaria: mismas fichas que medicina general (consultas,
+// Symphomed Veterinaria: mismas fichas que medicina general (consultas,
 // medicación, antecedentes, vacunas, evolución de peso, estudios, recetas)
 // — el paciente es un animal en vez de una persona, pero la estructura del
 // Kardex es la misma; lo que cambia son los campos de "Paciente" (especie,
@@ -197,7 +197,7 @@ const TABS_KARDEX_VETERINARIA = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
-// Vitalis Obstetricia (ginecología y obstetricia): "embarazo" es la FUM/FPP
+// Symphomed Obstetricia (ginecología y obstetricia): "embarazo" es la FUM/FPP
 // y semanas de gestación del embarazo activo (o para abrir uno nuevo);
 // "evolucion" acá se usa para peso materno, altura uterina y frecuencia
 // cardíaca fetal control a control, y "estudios" para las ecografías
@@ -214,7 +214,7 @@ const TABS_KARDEX_GINECOLOGIA = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
-// Vitalis Pediatría: "crecimiento" son las curvas de la OMS (peso, talla,
+// Symphomed Pediatría: "crecimiento" son las curvas de la OMS (peso, talla,
 // perímetro cefálico e IMC para la edad) y es la pestaña que define la rama
 // — un pediatra la abre antes que ninguna otra. "evolucion" queda para los
 // signos vitales de siempre (temperatura, saturación), que en un chico con
@@ -231,7 +231,7 @@ const TABS_KARDEX_PEDIATRIA = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
-// Vitalis Neurodesarrollo (autismo, síndrome de Down y otras condiciones):
+// Symphomed Neurodesarrollo (autismo, síndrome de Down y otras condiciones):
 // "perfilNeuro" es quién es la persona, qué apoyos necesita y su mapa
 // sensorial; "objetivos" son las metas medibles con su progreso; "salud" es
 // el calendario de controles que hay que ir a buscar. No hay pestaña de
@@ -241,7 +241,7 @@ const TABS_KARDEX_NEURO = {
   perfilNeuro: { icono: ICONOS.persona, claveLabel: "tab.perfil" },
   consultas: { icono: ICONOS.mic, claveLabel: "tab.sesiones" },
   objetivos: { icono: ICONOS.tendencia, claveLabel: "tab.objetivos" },
-  // ADOS-2, ADI-R, Vineland... Vitalis registra el resultado, nunca el
+  // ADOS-2, ADI-R, Vineland... Symphomed registra el resultado, nunca el
   // instrumento: son propiedad de sus editoriales y requieren entrenamiento.
   instrumentos: { icono: ICONOS.clipboard, claveLabel: "tab.instrumentos" },
   salud: { icono: ICONOS.jeringa, claveLabel: "tab.salud" },

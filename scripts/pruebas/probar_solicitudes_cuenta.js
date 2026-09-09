@@ -1,4 +1,4 @@
-// Vitalis — Que registrarse no sea entrar.
+// Symphomed — Que registrarse no sea entrar.
 //
 // Hasta ahora cualquiera con un teléfono se creaba una cuenta de médico y
 // quedaba adentro de un sistema de historias clínicas, al instante. Ahora
@@ -110,7 +110,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
 
   console.log("\n── 3. Un teléfono sin cuenta no se delata ──");
   // Si a un teléfono desconocido se le dijera algo distinto que a uno
-  // pendiente, se podría averiguar quién tiene cuenta en Vitalis probando
+  // pendiente, se podría averiguar quién tiene cuenta en Symphomed probando
   // números. Los dos casos sin la contraseña correcta contestan igual.
   const inexistente = await POST("/medico/login", null, { phone: "79999999", password: "loquesea" });
   const pendienteMalaClave = await POST("/medico/login", null, { phone: REGISTRO.phone, password: "claveEquivocada" });

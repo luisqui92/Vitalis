@@ -1,4 +1,4 @@
-// Vitalis Gineco — Mapa ginecológico: esquema del aparato reproductor
+// Symphomed Gineco — Mapa ginecológico: esquema del aparato reproductor
 // (útero, endometrio, cuello, ovarios y trompas) más las mamas, cada parte
 // clickeable con su hallazgo y su historial. Mismo patrón que el odontograma
 // y el mapa ocular: se toca, se carga qué se encontró, y queda la línea de

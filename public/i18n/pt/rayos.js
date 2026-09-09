@@ -1,4 +1,4 @@
-// Vitalis — Português · equipamento de raio-X e caixa de entrada DICOM.
+// Symphomed — Português · equipamento de raio-X e caixa de entrada DICOM.
 Object.assign(I18N.pt, {
   "rx.invitacion": "🩻 Tem equipamento de raio-X digital?",
   "rx.invitacionLink": "Conecte e as radiografias entram sozinhas",
@@ -42,14 +42,14 @@ Object.assign(I18N.pt, {
   "rx.copiado": "✅ Copiado",
   "rx.seleccionado": "Selecionado — copie com Ctrl+C",
   "rx.instalacion": "Instalação no computador do consultório",
-  "rx.instalacionAyuda": "Faça isto <b>a partir desse mesmo computador</b> — o que tem o software do sensor. Cole abaixo a pasta onde esse software guarda as imagens e o Vitalis monta o arquivo de configuração pronto, com o token dentro.",
+  "rx.instalacionAyuda": "Faça isto <b>a partir desse mesmo computador</b> — o que tem o software do sensor. Cole abaixo a pasta onde esse software guarda as imagens e o Symphomed monta o arquivo de configuração pronto, com o token dentro.",
   "rx.carpeta": "Pasta onde o software guarda as imagens",
   "rx.carpetaPlaceholder": "C:\\Ai-Dental\\Images",
   "rx.carpetaAyuda": "Copie da barra de endereços do Explorador e cole tal como está — das barras cuidamos nós.",
   "rx.bajarConfig": "⬇️ 1. Baixar config.json",
   "rx.bajarAgente": "⬇️ 2. Baixar agente.js",
-  "rx.pasosFinales": "Coloque os dois arquivos <b>numa mesma pasta nova</b> (por exemplo <b>C:\\VitalisRayos</b>). Depois abra ali uma janela de comandos e digite:",
-  "rx.pasoFinal2": "Se aparecer <b>conectado a Vitalis</b>, já está funcionando. Se disser que <i>node</i> não é reconhecido, instale o Node.js em nodejs.org e tente de novo.",
+  "rx.pasosFinales": "Coloque os dois arquivos <b>numa mesma pasta nova</b> (por exemplo <b>C:\\SymphomedRayos</b>). Depois abra ali uma janela de comandos e digite:",
+  "rx.pasoFinal2": "Se aparecer <b>conectado a Symphomed</b>, já está funcionando. Se disser que <i>node</i> não é reconhecido, instale o Node.js em nodejs.org e tente de novo.",
   "rx.errCarpeta": "Falta a pasta — sem isso o agente não sabe onde olhar.",
 
   "dicom.cargando": "Carregando caixa de entrada...",

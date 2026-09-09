@@ -1,4 +1,4 @@
-// Vitalis — Persona compartida entre consultorios.
+// Symphomed — Persona compartida entre consultorios.
 //
 // Dos garantías, y las dos son de seguridad del paciente:
 //

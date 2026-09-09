@@ -1,4 +1,4 @@
-// Vitalis — Paquetes de idioma
+// Symphomed — Paquetes de idioma
 //
 // Los textos viven partidos por módulo: public/i18n/es/agenda.js tiene lo de
 // la pantalla de agenda, y así. Eso es para las personas —archivos chicos,

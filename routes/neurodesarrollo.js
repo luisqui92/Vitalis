@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Neurodesarrollo — perfil, perfil sensorial, objetivos y vigilancia
+// Symphomed Neurodesarrollo — perfil, perfil sensorial, objetivos y vigilancia
 // ═══════════════════════════════════════════════════════════════════════════
 // Ver db/models.js para el porqué de la forma de estos datos. En resumen:
 // acá el expediente no es un historial de enfermedad, es el mapa de una

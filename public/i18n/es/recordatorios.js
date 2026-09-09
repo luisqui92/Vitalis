@@ -1,4 +1,4 @@
-// Vitalis — Español · recordatorios y vinculación del celular.
+// Symphomed — Español · recordatorios y vinculación del celular.
 Object.assign(I18N.es, {
   "record.cargando": "Cargando recordatorios...",
   "record.error": "Error cargando los recordatorios",

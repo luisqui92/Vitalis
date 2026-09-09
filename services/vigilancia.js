@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Neurodesarrollo — plantillas de vigilancia de salud
+// Symphomed Neurodesarrollo — plantillas de vigilancia de salud
 // ═══════════════════════════════════════════════════════════════════════════
 // El síndrome de Down trae asociadas condiciones que NO aparecen solas: hay
 // que ir a buscarlas en momentos determinados. Si nadie lleva ese
@@ -8,7 +8,7 @@
 //
 // LÍMITE IMPORTANTE, y está acá arriba a propósito para que nadie lo pase
 // por alto: esto es un PUNTO DE PARTIDA basado en las guías de supervisión
-// de salud publicadas, no un protocolo. Vitalis no decide nada clínico. Los
+// de salud publicadas, no un protocolo. Symphomed no decide nada clínico. Los
 // ítems se crean sueltos en la ficha del paciente y el profesional los
 // edita, los borra o agrega los suyos: el protocolo que manda es el del
 // médico tratante y el de su país.

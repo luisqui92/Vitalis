@@ -1,4 +1,4 @@
-// Vitalis — Español · pestañas del Kardex y marca por especialidad
+// Symphomed — Español · pestañas del Kardex y marca por especialidad
 // (public/js/estado.js).
 //
 // Las pestañas se resuelven en CADA llamada a tabsKardexPara(), no al cargar
@@ -33,17 +33,17 @@ Object.assign(I18N.es, {
   "tab.instrumentos": "Instrumentos",
   "tab.salud": "Salud",
 
-  // La marca cambia según la especialidad. "Vitalis" es nombre propio y no
+  // La marca cambia según la especialidad. "Symphomed" es nombre propio y no
   // se traduce; lo que sigue, sí.
-  "marca.base": "Vitalis",
-  "marca.dental": "Vitalis Dental",
-  "marca.estetica": "Vitalis Face",
-  "marca.oftalmologia": "Vitalis Visión",
-  "marca.veterinaria": "Vitalis Veterinaria",
-  "marca.ginecologia": "Vitalis Obstetricia",
-  "marca.pediatria": "Vitalis Pediatría",
-  "marca.neuro": "Vitalis Neurodesarrollo",
+  "marca.base": "Symphomed",
+  "marca.dental": "Symphomed Dental",
+  "marca.estetica": "Symphomed Face",
+  "marca.oftalmologia": "Symphomed Visión",
+  "marca.veterinaria": "Symphomed Veterinaria",
+  "marca.ginecologia": "Symphomed Obstetricia",
+  "marca.pediatria": "Symphomed Pediatría",
+  "marca.neuro": "Symphomed Neurodesarrollo",
   "marca.subtitulo": "Kardex inteligente",
   "marca.subtituloVet": "Kardex inteligente para tu clínica veterinaria",
-  "marca.tituloVet": "Vitalis Veterinaria · Kardex inteligente",
+  "marca.tituloVet": "Symphomed Veterinaria · Kardex inteligente",
 });

@@ -1,4 +1,4 @@
-// Vitalis — Español · visor de imágenes con mediciones y calibración.
+// Symphomed — Español · visor de imágenes con mediciones y calibración.
 //
 // La regla del visor: sin calibración, píxeles. Nunca milímetros inventados.
 // Los avisos de abajo son parte de esa honestidad y no son decorativos —

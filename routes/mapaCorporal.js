@@ -1,4 +1,4 @@
-// Vitalis Vet — Mapa corporal: lesiones marcadas sobre la silueta del
+// Symphomed Vet — Mapa corporal: lesiones marcadas sobre la silueta del
 // animal, cada una con su historial de controles (descripción, tamaño y
 // foto por fecha), para poder ver si crece o cede.
 const { Paciente, MapaCorporal, Estudio, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO } = require("../db/models");

@@ -1,4 +1,4 @@
-// Vitalis — Que la segunda lectura nunca afirme que una placa está sana.
+// Symphomed — Que la segunda lectura nunca afirme que una placa está sana.
 //
 // El prompt se lo prohíbe, pero un prompt es una instrucción y no una
 // garantía: el modelo puede colar un "sin hallazgos" igual. Si eso llega a

@@ -1,4 +1,4 @@
-// Vitalis — Português · solicitações de conta (quem pediu para entrar).
+// Symphomed — Português · solicitações de conta (quem pediu para entrar).
 Object.assign(I18N.pt, {
   "cuentas.ninguna": "Não há solicitações de conta esperando.",
   "cuentas.titulo": "Solicitações de conta ({n})",

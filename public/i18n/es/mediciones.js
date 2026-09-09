@@ -1,4 +1,4 @@
-// Vitalis — Español · evolución clínica (signos vitales en el tiempo).
+// Symphomed — Español · evolución clínica (signos vitales en el tiempo).
 Object.assign(I18N.es, {
   // La clave ("presion", "glucosa") es lo que se guarda. La unidad NO se
   // traduce: mmHg, mg/dL y kg son las mismas en todos lados, y cambiarlas

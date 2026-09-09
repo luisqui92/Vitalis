@@ -1,13 +1,13 @@
-// Vitalis — Recetar por Memed (Brasil).
+// Symphomed — Recetar por Memed (Brasil).
 //
 // En Brasil una receta necesita firma digital ICP-Brasil, y esa firma la
 // emite el módulo de Memed. Así que acá no se dibuja un formulario de receta:
 // se carga SU módulo, se le pasa el paciente, y el médico prescribe adentro.
 //
-// Lo que Vitalis hace después es escuchar el evento de "receta emitida" y
+// Lo que Symphomed hace después es escuchar el evento de "receta emitida" y
 // guardar la referencia más una copia de los medicamentos — que son dato
 // clínico y los necesitan el hilo clínico y el brief. El documento firmado
-// vive en Memed, y Vitalis no finge que es suyo.
+// vive en Memed, y Symphomed no finge que es suyo.
 //
 // Prefijo memed* porque acá todo top-level es global y el último que carga
 // gana en silencio.
@@ -65,7 +65,7 @@ function memedEngancharEventos() {
     if (modulo.name !== "plataforma.prescricao") return;
 
     MdHub.event.add("prescricaoImpressa", async function (datos) {
-      // El paciente se toma de lo que Vitalis abrió, NO de lo que devuelve
+      // El paciente se toma de lo que Symphomed abrió, NO de lo que devuelve
       // el evento: es contenido de afuera, y dejar que decida en qué ficha
       // se guarda una receta sería dejar que escriba en la historia clínica
       // de quien quiera.
@@ -137,7 +137,7 @@ function memedEsperarHub(msMax = 8000) {
 // ─── LA CAJA EN LA PESTAÑA DE RECETAS ─────────────────────────────────────
 //
 // Si esta cuenta receta por Memed, esta caja REEMPLAZA al formulario de
-// receta de Vitalis. No convive con él: una receta sin firma digital no vale
+// receta de Symphomed. No convive con él: una receta sin firma digital no vale
 // en Brasil, y tener los dos botones es dejar puesta la trampa.
 async function memedPintarCaja(pacienteId) {
   const caja = document.getElementById("memedBox");
@@ -147,7 +147,7 @@ async function memedPintarCaja(pacienteId) {
   if (!e.corresponde) { caja.innerHTML = ""; return; }
   if (!caja.isConnected) return;
 
-  // Desde acá, la receta de Vitalis no se ofrece más en esta pantalla.
+  // Desde acá, la receta de Symphomed no se ofrece más en esta pantalla.
   const vieja = document.getElementById("recetaNuevaBox");
   if (vieja) vieja.remove();
 

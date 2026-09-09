@@ -1,4 +1,4 @@
-// Vitalis — Español · odontograma, mapa ocular, mapa ginecológico y mapa
+// Symphomed — Español · odontograma, mapa ocular, mapa ginecológico y mapa
 // corporal. Las cuatro pantallas siguen el mismo patrón: un esquema
 // clickeable, un estado por parte y su línea de tiempo.
 //

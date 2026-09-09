@@ -1,4 +1,4 @@
-// Vitalis — Português · pessoa compartilhada entre os consultórios de uma clínica.
+// Symphomed — Português · pessoa compartilhada entre os consultórios de uma clínica.
 Object.assign(I18N.pt, {
   "persona.alergias": "Alergias",
   "persona.titulo": "Pessoa da clínica",

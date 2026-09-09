@@ -1,9 +1,9 @@
-// Vitalis — Que la venta aparezca en el momento justo, y no antes.
+// Symphomed — Que la venta aparezca en el momento justo, y no antes.
 //
 // La caja de planes es donde se decide si un médico paga o se va. Y el error
 // más caro no es que falte: es que aparezca demasiado pronto.
 //
-// Un médico que abrió Vitalis hace diez minutos, con cuatro consultas
+// Un médico que abrió Symphomed hace diez minutos, con cuatro consultas
 // gratis por delante, no tiene que ver un cartel de precios. Todavía no sabe
 // si esto le sirve — venderle ahí es pedirle una decisión que no puede tomar,
 // y la respuesta natural a esa pregunta es "no".

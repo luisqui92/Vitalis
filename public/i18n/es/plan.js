@@ -1,4 +1,4 @@
-// Vitalis — Español · planes y consultas de cortesía.
+// Symphomed — Español · planes y consultas de cortesía.
 Object.assign(I18N.es, {
   "plan.titulo": "Tu plan",
   "plan.mensual": "Mensual",

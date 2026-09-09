@@ -1,4 +1,4 @@
-// Vitalis — Español · receta digital de Brasil (Memed).
+// Symphomed — Español · receta digital de Brasil (Memed).
 Object.assign(I18N.es, {
   "memed.titulo": "Receta digital",
   "memed.ayuda": "La receta se emite firmada digitalmente y le llega al paciente. Queda copiada en su ficha.",

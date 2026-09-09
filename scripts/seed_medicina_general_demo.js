@@ -1,4 +1,4 @@
-// Vitalis — Crea (o actualiza) una cuenta de medicina general de demo con
+// Symphomed — Crea (o actualiza) una cuenta de medicina general de demo con
 // 10 pacientes con historia clínica larga y real: varias consultas
 // espaciadas en el tiempo, medicamentos activos/pasados, vacunas,
 // evolución clínica (signos vitales con tendencia), estudios (con archivo

@@ -1,4 +1,4 @@
-// Vitalis — ¿El relay de la teleconsulta releva de verdad?
+// Symphomed — ¿El relay de la teleconsulta releva de verdad?
 //
 // ═══ POR QUÉ HACE FALTA ESTE PROGRAMA ══════════════════════════════════════
 //
@@ -269,7 +269,7 @@ async function principal() {
   const usuarioFijo = process.env.TURN_USUARIO;
   const claveFija = process.env.TURN_CLAVE;
 
-  console.log("\n\x1b[1mVitalis — prueba del relay de teleconsulta\x1b[0m\n");
+  console.log("\n\x1b[1mSymphomed — prueba del relay de teleconsulta\x1b[0m\n");
 
   if (!url) {
     console.log(rojo("No hay TURN_URL en el .env."));

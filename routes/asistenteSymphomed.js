@@ -1,11 +1,11 @@
-// Vitalis — "Preguntale a Vitalis": preguntas sobre cómo funciona el
+// Symphomed — "Preguntale a Symphomed": preguntas sobre cómo funciona el
 // sistema. No se guarda la conversación (el historial lo manda el navegador
 // para poder repreguntar), igual que la Memoria Clínica.
 const { log } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Cita, Recordatorio } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { preguntarAVitalis } = require("../services/asistenteVitalis");
+const { preguntarASymphomed } = require("../services/asistenteSymphomed");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
@@ -44,7 +44,7 @@ module.exports = function (app) {
     ]);
 
     try {
-      const respuesta = await preguntarAVitalis(pregunta, {
+      const respuesta = await preguntarASymphomed(pregunta, {
         tipoEspecialidad: medico?.tipoEspecialidad,
         historial: Array.isArray(req.body?.historial) ? req.body.historial : [],
         datos: {
@@ -55,7 +55,7 @@ module.exports = function (app) {
       });
       res.json({ respuesta });
     } catch (e) {
-      log.error("[ASISTENTE_VITALIS]", e.response?.data || e.message);
+      log.error("[ASISTENTE_SYMPHOMED]", e.response?.data || e.message);
       throw new ErrorHttp(502, "No se pudo responder ahora mismo. Probá de nuevo en un momento.");
     }
   }));

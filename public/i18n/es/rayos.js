@@ -1,4 +1,4 @@
-// Vitalis — Español · equipo de rayos (Vitalis Rayos) y bandeja DICOM.
+// Symphomed — Español · equipo de rayos (Symphomed Rayos) y bandeja DICOM.
 Object.assign(I18N.es, {
   "rx.invitacion": "🩻 ¿Tenés equipo de rayos digital?",
   "rx.invitacionLink": "Conectalo y las placas entran solas",
@@ -42,14 +42,14 @@ Object.assign(I18N.es, {
   "rx.copiado": "✅ Copiado",
   "rx.seleccionado": "Seleccionado — copialo con Ctrl+C",
   "rx.instalacion": "Instalación en la PC del consultorio",
-  "rx.instalacionAyuda": "Hacé esto <b>desde esa misma PC</b> — la que tiene el software del sensor.\n        Pegá abajo la carpeta donde ese software guarda las imágenes y Vitalis te\n        arma el archivo de configuración ya listo, con el token adentro.",
+  "rx.instalacionAyuda": "Hacé esto <b>desde esa misma PC</b> — la que tiene el software del sensor.\n        Pegá abajo la carpeta donde ese software guarda las imágenes y Symphomed te\n        arma el archivo de configuración ya listo, con el token adentro.",
   "rx.carpeta": "Carpeta donde el software guarda las imágenes",
   "rx.carpetaPlaceholder": "C:\\Ai-Dental\\Images",
   "rx.carpetaAyuda": "Copiala de la barra de direcciones del Explorador y pegala tal cual —\n        de las barras nos ocupamos nosotros.",
   "rx.bajarConfig": "⬇️ 1. Descargar config.json",
   "rx.bajarAgente": "⬇️ 2. Descargar agente.js",
-  "rx.pasosFinales": "Poné los dos archivos <b>en una misma carpeta nueva</b> (por ejemplo\n        <b>C:\\VitalisRayos</b>). Después abrí ahí una ventana de comandos y escribí:",
-  "rx.pasoFinal2": "Si dice <b>conectado a Vitalis</b>, ya está andando. Si dice que\n        <i>node</i> no se reconoce, instalá Node.js desde nodejs.org y volvé a intentar.",
+  "rx.pasosFinales": "Poné los dos archivos <b>en una misma carpeta nueva</b> (por ejemplo\n        <b>C:\\SymphomedRayos</b>). Después abrí ahí una ventana de comandos y escribí:",
+  "rx.pasoFinal2": "Si dice <b>conectado a Symphomed</b>, ya está andando. Si dice que\n        <i>node</i> no se reconoce, instalá Node.js desde nodejs.org y volvé a intentar.",
   "rx.errCarpeta": "Falta la carpeta — sin eso el agente no sabe dónde mirar.",
 
   "dicom.cargando": "Cargando bandeja...",

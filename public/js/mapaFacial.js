@@ -1,4 +1,4 @@
-// Vitalis Face — Mapa anatómico y análisis de simetría a partir de UNA foto
+// Symphomed Face — Mapa anatómico y análisis de simetría a partir de UNA foto
 // frontal. Corre entero en el navegador (MediaPipe Face Landmarker,
 // autohospedado en /vendor/mediapipe — nada de CDN externo, respeta la CSP
 // igual que el visor 3D del odontograma). No hay hardware de profundidad
@@ -25,7 +25,7 @@ function cargarFaceLandmarker() {
         runningMode: "IMAGE",
         numFaces: 1,
       });
-      landmarker.__vitalisModo = "IMAGE";
+      landmarker.__symphomedModo = "IMAGE";
       return { FaceLandmarker, landmarker };
     })();
   }
@@ -38,9 +38,9 @@ function cargarFaceLandmarker() {
 // alcanza con una sola instancia que cambia de modo según quién la pida.
 async function landmarkerEnModo(modo) {
   const { FaceLandmarker, landmarker } = await cargarFaceLandmarker();
-  if (landmarker.__vitalisModo !== modo) {
+  if (landmarker.__symphomedModo !== modo) {
     await landmarker.setOptions({ runningMode: modo });
-    landmarker.__vitalisModo = modo;
+    landmarker.__symphomedModo = modo;
   }
   return { FaceLandmarker, landmarker };
 }
@@ -210,7 +210,7 @@ function cajaOvaloFacial(lm, FaceLandmarker) {
 // que nunca dispare y el médico termine igual tocando "Capturar" a mano,
 // que sigue siempre disponible como respaldo.
 // Proxy geométrico de cuánto giró la cabeza (para la sesión guiada de los 5
-// ángulos de Vitalis Face), usando solo las regiones que ya calculamos con
+// ángulos de Symphomed Face), usando solo las regiones que ya calculamos con
 // las constantes propias de MediaPipe (nada de índices "mágicos" sueltos):
 // cuando la cara está de frente, el centro de los ojos cae más o menos en
 // el medio del óvalo facial; al girar, ese centro se corre hacia uno de los

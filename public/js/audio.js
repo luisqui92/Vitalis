@@ -1,9 +1,9 @@
-// Vitalis — grabación de audio: onda de voz en vivo, subida de consultas, y
+// Symphomed — grabación de audio: onda de voz en vivo, subida de consultas, y
 // vista previa de transcripción en vivo (WebSocket a AssemblyAI). Lo usan
 // tanto la grabación local (consultas.js) como el celular vinculado
 // (vinculacion.js).
 
-// Hace "latir" el logo de Vitalis (círculo con anillos alrededor) en
+// Hace "latir" el logo de Symphomed (círculo con anillos alrededor) en
 // tiempo real según el volumen que capta el micrófono — reemplaza el
 // barrido de barras genérico por algo que se sienta parte de la marca:
 // cada vez que detecta voz, el logo pulsa más fuerte y los anillos se

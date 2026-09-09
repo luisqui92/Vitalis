@@ -1,4 +1,4 @@
-// Vitalis — Español · saldo prepago del médico.
+// Symphomed — Español · saldo prepago del médico.
 Object.assign(I18N.es, {
   "saldo.titulo": "Saldo de tu cuenta",
   "saldo.monto": "Bs {monto}",

@@ -1,4 +1,4 @@
-// Vitalis — Que en la teleconsulta se sepa quién habló, y no se adivine.
+// Symphomed — Que en la teleconsulta se sepa quién habló, y no se adivine.
 //
 // En la consulta presencial las dos voces entran por el mismo micrófono y lo
 // único que hay es la diarización: un modelo mirando timbres y decidiendo

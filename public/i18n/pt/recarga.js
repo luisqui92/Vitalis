@@ -1,4 +1,4 @@
-// Vitalis — Português · recarga de saldo vista pelo médico.
+// Symphomed — Português · recarga de saldo vista pelo médico.
 Object.assign(I18N.pt, {
   "recarga.precioMinimo": "Para recarregar, o mínimo é R$ {minimo}.",
   "recarga.quiero": "Quero recarregar",

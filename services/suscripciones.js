@@ -1,4 +1,4 @@
-// Vitalis — El plan mensual/anual, la otra forma de pagar.
+// Symphomed — El plan mensual/anual, la otra forma de pagar.
 //
 // ═══ DOS MODELOS, UNA CUENTA A LA VEZ ══════════════════════════════════════
 //
@@ -102,7 +102,7 @@ function estado(medico, ahora = new Date()) {
 //
 // Si el plan sigue vigente, el nuevo período arranca cuando termina el
 // anterior — no hoy. Si arrancara hoy, renovar antes de tiempo le REGALARÍA
-// días a Vitalis y se los sacaría al médico, que es exactamente lo que uno
+// días a Symphomed y se los sacaría al médico, que es exactamente lo que uno
 // no quiere que descubra alguien que pagó por adelantado.
 //
 // Si ya venció, arranca ahora: los días que estuvo sin plan no se cobran.

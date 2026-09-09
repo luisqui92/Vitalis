@@ -1,4 +1,4 @@
-// Vitalis — Una clínica de demo completa, con varios consultorios y datos
+// Symphomed — Una clínica de demo completa, con varios consultorios y datos
 // en cada uno.
 //
 // Los seeds que ya existían arman UN médico con una historia clínica
@@ -112,7 +112,7 @@ function hoyALas(hora, minuto = 0) {
 
 async function main() {
   const phoneAdmin = String(process.argv[2] || "79000000").trim();
-  const nombreClinica = String(process.argv[3] || "Clínica Vitalis Demo").trim();
+  const nombreClinica = String(process.argv[3] || "Clínica Symphomed Demo").trim();
   const passwordDada = String(process.argv[4] || "").trim();
   const password = passwordDada || crypto.randomBytes(9).toString("base64url");
 

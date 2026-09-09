@@ -1,11 +1,11 @@
-// Vitalis — Português · assistente de ajuda e Memória Clínica.
+// Symphomed — Português · assistente de ajuda e Memória Clínica.
 Object.assign(I18N.pt, {
-  "asistente.titulo": "Pergunte ao Vitalis",
+  "asistente.titulo": "Pergunte ao Symphomed",
   "asistente.sub": "Dúvidas sobre como usar o sistema",
   "asistente.cerrar": "Fechar",
   "asistente.placeholder": "Escreva sua pergunta...",
   "asistente.enviar": "Enviar",
-  "asistente.vacio": "Pergunte o que precisar sobre o Vitalis: onde fica cada coisa, como se faz algo, ou os números do seu consultório.",
+  "asistente.vacio": "Pergunte o que precisar sobre o Symphomed: onde fica cada coisa, como se faz algo, ou os números do seu consultório.",
   "asistente.errResponder": "Não consegui responder agora. Tente de novo em instantes.",
   "asistente.sug.1": "Como gravo uma consulta?",
   "asistente.sug.2": "Como configuro meu horário de atendimento?",

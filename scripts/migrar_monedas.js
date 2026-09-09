@@ -1,4 +1,4 @@
-// Vitalis — Ponerle moneda a las cuentas y a los movimientos que ya existen.
+// Symphomed — Ponerle moneda a las cuentas y a los movimientos que ya existen.
 //
 // Hasta ahora el saldo era un número sin unidad: funcionaba porque todos
 // cobraban en bolivianos. Con el primer médico en Brasil dejó de alcanzar —

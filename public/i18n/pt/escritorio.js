@@ -1,9 +1,9 @@
-// Vitalis — Português · painel de desktop (menu lateral + início).
+// Symphomed — Português · painel de desktop (menu lateral + início).
 Object.assign(I18N.pt, {
   "escr.nav.inicio": "Início",
   "escr.nav.pacientes": "Pacientes",
   "escr.nav.agenda": "Agenda",
-  "escr.nav.voz": "Vitalis Voice",
+  "escr.nav.voz": "Symphomed Voice",
   "escr.nav.indicaciones": "Orientações",
   "escr.nav.estudios": "Exames e imagens",
   "escr.nav.reportes": "Relatórios",
@@ -42,8 +42,8 @@ Object.assign(I18N.pt, {
 // ─── As 4 telas próprias do desktop (escritorioExtra.js) ────────────────
 Object.assign(I18N.pt, {
   "voz.cargando": "Carregando ligações...",
-  "voz.error": "Erro ao carregar o Vitalis Voice",
-  "voz.titulo": "📞 Vitalis Voice",
+  "voz.error": "Erro ao carregar o Symphomed Voice",
+  "voz.titulo": "📞 Symphomed Voice",
   "voz.ayuda": "Consultas agendadas ou canceladas pelo atendente de voz (ligações), últimos 60 dias e próximos 30.",
   "voz.vacio": "Ainda não há nenhuma ligação atendida pelo assistente de voz.",
   "cita.estado.confirmada": "Confirmada",
@@ -73,7 +73,7 @@ Object.assign(I18N.pt, {
 
   "fin.cargando": "Carregando financeiro...",
   "fin.error": "Erro ao carregar financeiro",
-  "fin.sinPlanes": "O Financeiro só acompanha os planos de tratamento (Odontologia, Vitalis Face e Vitalis Visão) — sua especialidade não os usa, então estes números vão ficar em zero.",
+  "fin.sinPlanes": "O Financeiro só acompanha os planos de tratamento (Odontologia, Symphomed Face e Symphomed Visão) — sua especialidade não os usa, então estes números vão ficar em zero.",
   "fin.facturado": "Faturado",
   "fin.cobrado": "Recebido",
   "fin.saldo": "Saldo pendente",

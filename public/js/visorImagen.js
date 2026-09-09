@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — Visor de imágenes clínicas
+// Symphomed — Visor de imágenes clínicas
 // ═══════════════════════════════════════════════════════════════════════════
 // Zoom, giro, espejo, brillo, contraste, negativo y mediciones sobre la
-// radiografía, sin salir de Vitalis y sin bajar el archivo a ninguna parte.
+// radiografía, sin salir de Symphomed y sin bajar el archivo a ninguna parte.
 //
 // Dos reglas que atraviesan todo el módulo:
 //

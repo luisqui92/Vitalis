@@ -1,4 +1,4 @@
-// Vitalis — Suscripción del navegador a las notificaciones (Web Push).
+// Symphomed — Suscripción del navegador a las notificaciones (Web Push).
 // El navegador se suscribe solo contra el servicio de push de su fabricante
 // (Google/Mozilla/Apple) y nos deja acá el "endpoint" que resultó, que es
 // por donde después le llegamos. Ver services/push.js para el envío.
@@ -61,7 +61,7 @@ module.exports = function (app) {
   // esperar a que un paciente reserve.
   app.post("/medico/push/probar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const r = await notificarMedico(req.adminUser.usuario, {
-      titulo: "Vitalis",
+      titulo: "Symphomed",
       cuerpo: "Las notificaciones están activadas. Así vas a ver las reservas nuevas.",
       url: "/",
     });

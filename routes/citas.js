@@ -92,7 +92,7 @@ module.exports = function (app) {
     if (medico?.googleCalendarId) {
       const eventId = await crearEvento(medico.googleCalendarId, cita);
       if (eventId) { cita.googleEventId = eventId; await cita.save(); }
-      else avisoCalendario = "La cita se guardó bien en Vitalis, pero no se pudo crear en Google Calendar.";
+      else avisoCalendario = "La cita se guardó bien en Symphomed, pero no se pudo crear en Google Calendar.";
     }
 
     // Si se cargó un teléfono, avisamos por WhatsApp igual que cuando la
@@ -146,7 +146,7 @@ module.exports = function (app) {
 
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
     // El calendario es un espejo (no la fuente de verdad, ver
-    // services/googleCalendar.js) — si esto falla la cita en Vitalis ya
+    // services/googleCalendar.js) — si esto falla la cita en Symphomed ya
     // quedó bien guardada igual, pero antes el médico nunca se enteraba: el
     // evento viejo seguía "ocupando" ese horario en Google Calendar para
     // siempre. Se avisa en la respuesta para que lo revise a mano ahí.
@@ -155,7 +155,7 @@ module.exports = function (app) {
       const sincronizo = cita.estado === "cancelada"
         ? await eliminarEvento(medico.googleCalendarId, cita.googleEventId)
         : await actualizarEvento(medico.googleCalendarId, cita.googleEventId, cita);
-      if (!sincronizo) avisoCalendario = "La cita se guardó bien en Vitalis, pero no se pudo actualizar en Google Calendar — revisalo ahí a mano.";
+      if (!sincronizo) avisoCalendario = "La cita se guardó bien en Symphomed, pero no se pudo actualizar en Google Calendar — revisalo ahí a mano.";
     }
     res.json({ ok: true, cita, avisoCalendario });
   }));
@@ -169,7 +169,7 @@ module.exports = function (app) {
     let avisoCalendario = null;
     if (medico?.googleCalendarId && cita.googleEventId) {
       const sincronizo = await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
-      if (!sincronizo) avisoCalendario = "La cita se borró de Vitalis, pero no se pudo borrar en Google Calendar — revisalo ahí a mano.";
+      if (!sincronizo) avisoCalendario = "La cita se borró de Symphomed, pero no se pudo borrar en Google Calendar — revisalo ahí a mano.";
     }
     res.json({ ok: true, avisoCalendario });
   }));

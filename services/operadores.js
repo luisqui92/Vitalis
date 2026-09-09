@@ -1,4 +1,4 @@
-// Vitalis — Quién puede administrar los pagos.
+// Symphomed — Quién puede administrar los pagos.
 //
 // Vive aparte porque lo necesitan dos archivos: routes/operadorSaldo.js para
 // dejar entrar, y routes/recargas.js para saber a quién avisarle cuando un
@@ -7,7 +7,7 @@
 //
 // La lista está en el ENTORNO y no en la base de datos a propósito — ver el
 // encabezado de routes/operadorSaldo.js. Vacía por defecto: si alguien
-// despliega Vitalis sin configurarla, nadie puede emitir saldo, en vez de que
+// despliega Symphomed sin configurarla, nadie puede emitir saldo, en vez de que
 // pueda cualquiera.
 const { log } = require("../config");
 

@@ -1,9 +1,9 @@
-// Vitalis — Español · panel de escritorio (sidebar + inicio).
+// Symphomed — Español · panel de escritorio (sidebar + inicio).
 Object.assign(I18N.es, {
   "escr.nav.inicio": "Inicio",
   "escr.nav.pacientes": "Pacientes",
   "escr.nav.agenda": "Agenda",
-  "escr.nav.voz": "Vitalis Voice",
+  "escr.nav.voz": "Symphomed Voice",
   "escr.nav.indicaciones": "Indicaciones",
   "escr.nav.estudios": "Estudios e imágenes",
   "escr.nav.reportes": "Reportes",
@@ -42,8 +42,8 @@ Object.assign(I18N.es, {
 // ─── Las 4 pantallas propias del escritorio (escritorioExtra.js) ─────────
 Object.assign(I18N.es, {
   "voz.cargando": "Cargando llamadas...",
-  "voz.error": "Error cargando Vitalis Voice",
-  "voz.titulo": "📞 Vitalis Voice",
+  "voz.error": "Error cargando Symphomed Voice",
+  "voz.titulo": "📞 Symphomed Voice",
   "voz.ayuda": "Citas agendadas o canceladas por el recepcionista de voz (llamadas telefónicas), últimos 60 días y próximos 30.",
   "voz.vacio": "Todavía no se registró ninguna llamada gestionada por el asistente de voz.",
   "cita.estado.confirmada": "Confirmada",
@@ -73,7 +73,7 @@ Object.assign(I18N.es, {
 
   "fin.cargando": "Cargando finanzas...",
   "fin.error": "Error cargando finanzas",
-  "fin.sinPlanes": "Finanzas todavía solo lleva el detalle de los planes de tratamiento (Odontología, Vitalis Face y Vitalis Visión) — tu especialidad no los usa, así que estos números van a quedar en cero.",
+  "fin.sinPlanes": "Finanzas todavía solo lleva el detalle de los planes de tratamiento (Odontología, Symphomed Face y Symphomed Visión) — tu especialidad no los usa, así que estos números van a quedar en cero.",
   "fin.facturado": "Facturado",
   "fin.cobrado": "Cobrado",
   "fin.saldo": "Saldo pendiente",

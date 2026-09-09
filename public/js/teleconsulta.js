@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — La sala de video vista por el paciente
+// Symphomed — La sala de video vista por el paciente
 // ═══════════════════════════════════════════════════════════════════════════
 // Lo que se abre al tocar el enlace que le mandó su médico. Sin cuenta, sin
 // contraseña, sin instalar nada.
@@ -35,7 +35,7 @@ function tarjetaTele(contenido) {
 
 async function renderTeleconsulta() {
   const token = RUTA_TELE[1];
-  document.title = "Tu consulta · Vitalis";
+  document.title = "Tu consulta · Symphomed";
   limpiarArmazonDelMedico();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>Abriendo tu consulta...</div>`;
 

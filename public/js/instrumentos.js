@@ -1,12 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Instrumentos aplicados — ADOS-2, ADI-R, Vineland, WISC y compañía
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis NO administra ni puntúa estos instrumentos, y la pantalla lo dice
+// Symphomed NO administra ni puntúa estos instrumentos, y la pantalla lo dice
 // con todas las letras. El ADOS-2 y la mayoría de los demás son propiedad de
 // sus editoriales y exigen entrenamiento formal: acá se registra el
 // resultado que el profesional obtuvo con sus propios materiales.
 //
-// Es la misma idea que el resto de Vitalis: no reemplazar el criterio de
+// Es la misma idea que el resto de Symphomed: no reemplazar el criterio de
 // quien sabe, sino que lo que decidió quede escrito, fechado, firmado y
 // encontrable dentro de dos años cuando haya que reaplicar.
 
@@ -41,7 +41,7 @@ function pintarInstrumentos(pacienteId, aplicados) {
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">Registrar un instrumento</div>
       <div class="hint" style="margin-bottom:10px">
-        Vitalis <b>no aplica ni puntúa</b> el instrumento — eso lo hacés vos con tus
+        Symphomed <b>no aplica ni puntúa</b> el instrumento — eso lo hacés vos con tus
         materiales y tu entrenamiento. Acá queda el resultado, fechado y firmado,
         para el informe y para cuando haya que reaplicar.
       </div>

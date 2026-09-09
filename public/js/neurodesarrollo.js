@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Neurodesarrollo — perfil, mapa sensorial, objetivos y vigilancia
+// Symphomed Neurodesarrollo — perfil, mapa sensorial, objetivos y vigilancia
 // ═══════════════════════════════════════════════════════════════════════════
 // Tres pantallas dentro del Kardex:
 //   · Perfil    — quién es, qué apoyos necesita, qué le gusta, y el mapa

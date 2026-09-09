@@ -1,4 +1,4 @@
-// Vitalis — El código Pix, generado acá.
+// Symphomed — El código Pix, generado acá.
 //
 // ═══ EL PROBLEMA QUE RESUELVE ══════════════════════════════════════════════
 //
@@ -70,7 +70,7 @@ function limpiar(texto, max) {
 }
 
 // El monto va con punto decimal y dos decimales, siempre. Se recibe en
-// centavos porque es como viaja la plata en todo Vitalis: un float acá sería
+// centavos porque es como viaja la plata en todo Symphomed: un float acá sería
 // la única parte del sistema donde el dinero es aproximado.
 function montoDesdeCentavos(centavos) {
   const n = Math.round(Number(centavos) || 0);

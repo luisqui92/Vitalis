@@ -1,4 +1,4 @@
-// Vitalis Obstetricia — control de embarazo: FUM/FPP y su historial. Un
+// Symphomed Obstetricia — control de embarazo: FUM/FPP y su historial. Un
 // embarazo "activo" por paciente a la vez (no tiene sentido tener dos
 // abiertos juntos); los controles prenatales en sí (peso materno, altura
 // uterina, frecuencia cardíaca fetal) van por el módulo de Mediciones ya

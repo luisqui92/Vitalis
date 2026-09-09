@@ -1,4 +1,4 @@
-// Vitalis — Vista de escritorio: mismo backend y las mismas pantallas de
+// Symphomed — Vista de escritorio: mismo backend y las mismas pantallas de
 // siempre (renderDashboard, renderAgenda, renderSeguridad...), pero en
 // pantallas anchas se arma un shell fijo de sidebar + barra superior en vez
 // del layout de una sola columna centrada (pensado para el celular). Ninguna

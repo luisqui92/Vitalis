@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Caja Vitalis — los estudios DICOM entran solos, y las imágenes se quedan
+// Caja Symphomed — los estudios DICOM entran solos, y las imágenes se quedan
 // ═══════════════════════════════════════════════════════════════════════════
 // El ecógrafo, el tomógrafo y el panorámico sí hablan un protocolo: DICOM.
-// La Caja Vitalis es una máquina en la clínica que los escucha (Orthanc
+// La Caja Symphomed es una máquina en la clínica que los escucha (Orthanc
 // recibiendo C-STORE), guarda el .dcm original en su propio disco y le
-// manda a Vitalis nada más que dos cosas: la metadata y una vista previa.
+// manda a Symphomed nada más que dos cosas: la metadata y una vista previa.
 //
 // Tres decisiones que valen la pena mirar antes del código:
 //
@@ -49,7 +49,7 @@ const previaRaw = express.raw({ type: ["image/png", "image/jpeg"], limit: "25mb"
 // porque hay reconstrucción. El visor lo avisa en vez de que se olvide.
 const MODALIDADES_PROYECCIONALES = new Set(["DX", "CR", "RF", "MG", "PX", "XA", "IO"]);
 
-// Qué tipo de estudio de Vitalis le corresponde a cada modalidad DICOM.
+// Qué tipo de estudio de Symphomed le corresponde a cada modalidad DICOM.
 const TIPO_POR_MODALIDAD = {
   DX: "radiografia", CR: "radiografia", PX: "radiografia", IO: "radiografia",
   MG: "radiografia", RF: "radiografia", XA: "radiografia",
@@ -119,7 +119,7 @@ function leerMeta(req) {
   };
 }
 
-// La escala que se guarda es la de la imagen que Vitalis TIENE (la previa),
+// La escala que se guarda es la de la imagen que Symphomed TIENE (la previa),
 // no la del original que se quedó en la caja. Si la previa se achicó, cada
 // píxel de la previa cubre más milímetros — y si esto no se dividiera, toda
 // medición sobre una panorámica achicada saldría corta, en silencio.
@@ -174,7 +174,7 @@ module.exports = function (app) {
     let paciente = null;
     let via = "";
 
-    // 1. El técnico tipeó el código de paciente de Vitalis en el equipo.
+    // 1. El técnico tipeó el código de paciente de Symphomed en el equipo.
     //    Es el mejor caso: el estudio se archiva solo, sin que nadie toque
     //    nada, y es exactamente para lo que existe ese código.
     if (meta.pacienteIdDicom) {

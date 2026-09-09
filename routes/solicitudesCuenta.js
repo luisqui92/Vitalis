@@ -1,4 +1,4 @@
-// Vitalis — La fila de entrada: quién pidió cuenta y quién decide.
+// Symphomed — La fila de entrada: quién pidió cuenta y quién decide.
 //
 // ═══ POR QUÉ HAY UNA FILA ══════════════════════════════════════════════════
 //
@@ -7,9 +7,9 @@
 //
 //   · el saldo arranca en cero pero el bloqueo recién entra a las cinco
 //     consultas en negativo, así que cada cuenta falsa se llevaba cinco
-//     transcripciones pagadas por Vitalis;
+//     transcripciones pagadas por Symphomed;
 //
-//   · y cualquiera podía cargar pacientes REALES en esta base. Vitalis queda
+//   · y cualquiera podía cargar pacientes REALES en esta base. Symphomed queda
 //     como responsable del tratamiento de historias clínicas subidas por
 //     gente que nunca nadie verificó. Eso no es un problema de costos.
 //
@@ -32,7 +32,7 @@ const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { log } = require("../config");
 
 // Igual que el panel de pagos: acá entra también una cuenta administrativa,
-// porque quien administra Vitalis no tiene por qué ser médico.
+// porque quien administra Symphomed no tiene por qué ser médico.
 const requireSesion = requireAuth(["medico", "admin"]);
 
 // El mismo doble candado que routes/operadorSaldo.js: estar en la lista del

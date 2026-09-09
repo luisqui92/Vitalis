@@ -1,8 +1,8 @@
-// Vitalis — Notificaciones del navegador (Web Push).
+// Symphomed — Notificaciones del navegador (Web Push).
 //
 // Sirve para avisarle al médico de cosas que pasan sin que él esté mirando
 // la pantalla: hoy, que le entró una reserva. A diferencia del WebSocket de
-// tiempo real (services/realtime.js), esto llega aunque tenga Vitalis
+// tiempo real (services/realtime.js), esto llega aunque tenga Symphomed
 // cerrado, porque quien despierta al navegador es el service worker.
 const webpush = require("web-push");
 const { SuscripcionPush } = require("../db/models");

@@ -1,8 +1,8 @@
-// Vitalis — Recetar en Brasil: Memed.
+// Symphomed — Recetar en Brasil: Memed.
 //
-// ═══ POR QUÉ NO ALCANZA LA RECETA DE VITALIS ═══════════════════════════════
+// ═══ POR QUÉ NO ALCANZA LA RECETA DE SYMPHOMED ═══════════════════════════════
 //
-// La receta de Vitalis (routes/recetas.js) es un documento que se imprime.
+// La receta de Symphomed (routes/recetas.js) es un documento que se imprime.
 // En Bolivia eso funciona. En Brasil no: una prescripción necesita firma
 // digital ICP-Brasil para tener validez legal, y un PDF lindo sin firmar no
 // es una receta — es un papel.
@@ -15,13 +15,13 @@
 // ═══ ESTO NO ES UNA API QUE DEVUELVE UN PDF ════════════════════════════════
 //
 // Memed es un módulo que se embebe: el médico prescribe DENTRO de la pantalla
-// de Memed, que Vitalis muestra. El reparto es:
+// de Memed, que Symphomed muestra. El reparto es:
 //
 //   · el backend (este archivo) registra al médico con la API Key y la
 //     Secret Key, y recibe un token propio de ese médico;
 //   · el navegador carga el módulo de Memed con ese token y le pasa el
 //     paciente;
-//   · la receta firmada QUEDA EN MEMED. Vitalis guarda la referencia y una
+//   · la receta firmada QUEDA EN MEMED. Symphomed guarda la referencia y una
 //     copia de los medicamentos —que son dato clínico y los necesita el hilo
 //     clínico y el brief—, pero el documento legal no es suyo y no finge
 //     serlo.
@@ -112,7 +112,7 @@ async function tokenDeMedico(medico) {
     data: {
       type: "usuarios",
       attributes: {
-        // external_id ata el médico de Vitalis con el de Memed. Se usa el
+        // external_id ata el médico de Symphomed con el de Memed. Se usa el
         // teléfono porque es la identidad de una cuenta acá: es único, no
         // cambia solo, y es lo mismo que usa el resto del sistema.
         external_id: String(medico.phone),
@@ -155,7 +155,7 @@ async function tokenDeMedico(medico) {
   return token;
 }
 
-// ═══ LO QUE VITALIS SE QUEDA DE UNA RECETA EMITIDA ═════════════════════════
+// ═══ LO QUE SYMPHOMED SE QUEDA DE UNA RECETA EMITIDA ═════════════════════════
 //
 // El navegador manda lo que Memed le entregó en el evento prescricaoImpressa.
 // Eso viene de afuera, así que se saca solo lo que hace falta y con la forma

@@ -1,4 +1,4 @@
-// Vitalis — Rate Limiting en memoria (sin dependencias externas)
+// Symphomed — Rate Limiting en memoria (sin dependencias externas)
 const { log } = require("../config");
 // Solo para saber DE QUIÉN es el pedido antes de contarlo — ver
 // claveDeMedico(). auth.js no importa nada de acá, así que no hay ciclo.

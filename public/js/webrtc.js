@@ -1,4 +1,4 @@
-// Vitalis — La videollamada, navegador a navegador.
+// Symphomed — La videollamada, navegador a navegador.
 //
 // Lo usan las dos pantallas: la del médico (teleconsultaMedico.js) y la del
 // paciente (teleconsulta.js). El audio y el video van DIRECTO de uno al

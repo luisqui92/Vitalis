@@ -1,4 +1,4 @@
-// Vitalis Gineco — Mapa ginecológico: la ficha de cada paciente órgano por
+// Symphomed Gineco — Mapa ginecológico: la ficha de cada paciente órgano por
 // órgano (útero, endometrio, cuello, ovarios, trompas, mamas). Se crea solo,
 // con los 9 órganos en "normal", la primera vez que se abre — mismo criterio
 // que el odontograma y el mapa ocular.

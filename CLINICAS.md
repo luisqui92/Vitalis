@@ -1,4 +1,4 @@
-# Vitalis para clínicas
+# Symphomed para clínicas
 
 Cómo poner en marcha una clínica de varios consultorios, qué ve cada quien y
 qué decisiones ya están tomadas (con el porqué, para que nadie las deshaga
@@ -8,7 +8,7 @@ sin querer).
 
 ## 1. La idea en una frase
 
-Un médico solo usa Vitalis igual que siempre y no ve nada de esto. Una
+Un médico solo usa Symphomed igual que siempre y no ve nada de esto. Una
 clínica suma dos cosas encima: **un panel para quien administra** y **una
 persona compartida entre los consultorios**.
 
@@ -91,7 +91,7 @@ cambiar el consultorio o el vínculo, y **Sacar de la clínica**.
 
 ### 4.4 Unir las fichas que son la misma persona
 
-Solo si los médicos ya venían usando Vitalis por separado y ahora se juntan.
+Solo si los médicos ya venían usando Symphomed por separado y ahora se juntan.
 
 ```bash
 node scripts/proponer_personas.js <telefonoAdmin>              # solo mira
@@ -113,7 +113,7 @@ Corré primero sin `--aplicar` y leé la salida. Siempre.
 
 ## 5. La persona compartida
 
-Cuando un médico da de alta un paciente, Vitalis mira si esa persona ya viene
+Cuando un médico da de alta un paciente, Symphomed mira si esa persona ya viene
 a la clínica por otro consultorio y lo ofrece. **Nunca vincula solo**, y lo
 confirma el médico.
 

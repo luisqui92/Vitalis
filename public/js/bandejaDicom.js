@@ -128,7 +128,7 @@ function pintarBandejaDicom(entrantes) {
 
   document.querySelectorAll("[data-descartar]").forEach(btn => {
     btn.onclick = async () => {
-      // Descartar borra la vista previa de Vitalis. El DICOM original sigue
+      // Descartar borra la vista previa de Symphomed. El DICOM original sigue
       // en la caja de la clínica, así que no se pierde el estudio — pero
       // conviene decirlo, porque desde acá parece que se borra todo.
       if (!confirm(t("dicom.confirmarDescartar"))) return;

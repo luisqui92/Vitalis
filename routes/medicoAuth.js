@@ -24,7 +24,7 @@ const requireMedico = requireAuth(["medico", "admin"]);
 
 // Le avisa a quien aprueba que hay alguien esperando. Sin esto la fila
 // existe pero nadie la mira, y el médico que pidió cuenta se queda sin
-// respuesta pensando que Vitalis no anda.
+// respuesta pensando que Symphomed no anda.
 async function avisarSolicitudPendiente(medico) {
   const aprobadores = todosLosOperadores();
   if (!aprobadores.length) {
@@ -138,7 +138,7 @@ module.exports = function (app) {
     // Se busca SIN filtrar por activo, y el estado de la cuenta se mira
     // DESPUÉS de verificar la contraseña. El orden es la parte que importa:
     // si se dijera "tu cuenta está pendiente" a quien no sabe la contraseña,
-    // cualquiera podría averiguar qué teléfonos tienen cuenta en Vitalis
+    // cualquiera podría averiguar qué teléfonos tienen cuenta en Symphomed
     // probando números. Primero probás que sos vos; recién ahí te contamos
     // en qué estado está lo tuyo.
     const medico = await Medico.findOne({ phone });
@@ -239,7 +239,7 @@ module.exports = function (app) {
     const secreto = generarSecreto();
     medico.dosFA.secretoPendiente = secreto;
     await medico.save();
-    const uri = generarUriOtpAuth(secreto, medico.phone, "Vitalis");
+    const uri = generarUriOtpAuth(secreto, medico.phone, "Symphomed");
     const qr = await QRCode.toDataURL(uri);
     res.json({ secreto, qr });
   }));

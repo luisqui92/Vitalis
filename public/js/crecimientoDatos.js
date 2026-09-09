@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Pediatría — Patrones de crecimiento de la OMS (parámetros L, M, S)
+// Symphomed Pediatría — Patrones de crecimiento de la OMS (parámetros L, M, S)
 // ═══════════════════════════════════════════════════════════════════════════
 // Generado desde las tablas oficiales publicadas por la Organización Mundial
 // de la Salud. NO editar a mano: un valor mal tipeado acá no rompe nada

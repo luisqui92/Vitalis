@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Rayos — la radiografía entra sola a la ficha
+// Symphomed Rayos — la radiografía entra sola a la ficha
 // ═══════════════════════════════════════════════════════════════════════════
 // Dos pantallas:
 //   1. El bloque de captura dentro de la pestaña Estudios del paciente —
@@ -330,7 +330,7 @@ function mostrarTokenEquipo(token, { desplazar = true } = {}) {
   };
 
   // El config.json se arma acá, en el navegador, y no en el servidor: el
-  // token en claro no existe del lado de Vitalis (guardamos solo su hash),
+  // token en claro no existe del lado de Symphomed (guardamos solo su hash),
   // así que este es el único lugar del mundo donde se lo puede meter en el
   // archivo. JSON.stringify escapa solo las barras de Windows, que es
   // justo lo que se escribe mal cuando se hace a mano.

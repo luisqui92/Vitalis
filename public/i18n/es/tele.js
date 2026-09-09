@@ -1,4 +1,4 @@
-// Vitalis — Español · teleconsulta (consulta por video).
+// Symphomed — Español · teleconsulta (consulta por video).
 Object.assign(I18N.es, {
   "tele.titulo": "Consulta por video",
   "tele.ayuda": "Generá un enlace y mandáselo. Entra desde el celular, sin instalar nada.",

@@ -1,4 +1,4 @@
-// Vitalis — Crea una clínica y le pone un administrador.
+// Symphomed — Crea una clínica y le pone un administrador.
 //
 // El administrador NO es médico: no ve ninguna ficha. Si además atiende
 // pacientes, usá --rol director en vez de admin.

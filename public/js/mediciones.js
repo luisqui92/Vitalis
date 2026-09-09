@@ -1,4 +1,4 @@
-// Vitalis — Evolución Clínica: signos vitales del paciente en el tiempo
+// Symphomed — Evolución Clínica: signos vitales del paciente en el tiempo
 // (presión, glucosa, peso, saturación...) con gráfico de tendencia simple
 // dibujado a mano en <canvas>, sin librerías externas.
 
@@ -16,17 +16,17 @@ const MEDICIONES_META = {
   colesterol:          { unidad: "mg/dL" },
   temperatura:         { unidad: "°C" },
   frecuenciaCardiaca:  { unidad: "lpm" },
-  // Vitalis Visión (oftalmología): presión intraocular por ojo — el
+  // Symphomed Visión (oftalmología): presión intraocular por ojo — el
   // umbral de alerta (>21 mmHg, o tendencia en alza) es el estándar
   // clínico para sospecha de glaucoma.
   presionIntraocularOD: { unidad: "mmHg", alertaUmbral: 21 },
   presionIntraocularOI: { unidad: "mmHg", alertaUmbral: 21 },
-  // Vitalis Pediatría: van al gráfico normal de evolución como cualquier
+  // Symphomed Pediatría: van al gráfico normal de evolución como cualquier
   // otra medición, pero además son la materia prima de las curvas de
   // crecimiento (ver crecimiento.js), donde se leen contra la OMS.
   talla:               { unidad: "cm" },
   perimetroCefalico:   { unidad: "cm" },
-  // Vitalis Obstetricia: controles prenatales, control a control.
+  // Symphomed Obstetricia: controles prenatales, control a control.
   pesoMaterno:         { unidad: "kg" },
   alturaUterina:       { unidad: "cm" },
   fcf:                 { unidad: "lpm" },

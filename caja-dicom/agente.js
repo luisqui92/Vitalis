@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════════════════
-// Caja Vitalis — el puente entre Orthanc y Vitalis
+// Caja Symphomed — el puente entre Orthanc y Symphomed
 // ═══════════════════════════════════════════════════════════════════════════
 // Corre en la caja de la clínica, al lado de Orthanc. Orthanc recibe los
 // estudios de los equipos por C-STORE y los guarda en el disco local; este
-// programa mira lo que va llegando y le manda a Vitalis dos cosas:
+// programa mira lo que va llegando y le manda a Symphomed dos cosas:
 //
 //   · la metadata (unos cientos de bytes)
 //   · una vista previa en PNG
@@ -46,6 +46,10 @@ const cfg = (() => {
     catch (e) { salirCon(`config.json no es JSON válido: ${e.message}`); }
   }
   return {
+    // VITALIS_URL y vitalisUrl conservan el nombre viejo a propósito: viven en
+    // los config.json de los agentes YA instalados en las clínicas. Renombrarlos
+    // deja de leer la configuración sin dar ningún error, y el equipo se queda
+    // mudo hasta que alguien note que falta un estudio.
     vitalisUrl: process.env.VITALIS_URL || base.vitalisUrl || "",
     token: process.env.TOKEN || base.token || "",
     orthanc: process.env.ORTHANC_URL || base.orthanc || "http://127.0.0.1:8042",
@@ -64,8 +68,8 @@ function salirCon(msg) {
   console.error("\n  ✖ " + msg + "\n");
   process.exit(1);
 }
-if (!cfg.vitalisUrl) salirCon("Falta la dirección de Vitalis (vitalisUrl en config.json o VITALIS_URL).");
-if (!cfg.token) salirCon("Falta el token del equipo (token en config.json o TOKEN). Se saca de Vitalis → Equipos de rayos.");
+if (!cfg.vitalisUrl) salirCon("Falta la dirección de Symphomed (vitalisUrl en config.json o VITALIS_URL).");
+if (!cfg.token) salirCon("Falta el token del equipo (token en config.json o TOKEN). Se saca de Symphomed → Equipos de rayos.");
 
 const ARCHIVO_SUBIDOS = path.join(DIR, "subidos.json");
 const UNA_VUELTA = process.argv.includes("--una-vuelta") || process.env.UNA_VUELTA === "1";
@@ -80,7 +84,7 @@ let subidos = new Set();
 function cargarSubidos() {
   if (!fs.existsSync(ARCHIVO_SUBIDOS)) return;
   try { subidos = new Set(JSON.parse(fs.readFileSync(ARCHIVO_SUBIDOS, "utf8"))); }
-  catch { log("⚠ subidos.json ilegible, se arranca de cero (puede haber reenvíos; Vitalis los descarta igual)"); }
+  catch { log("⚠ subidos.json ilegible, se arranca de cero (puede haber reenvíos; Symphomed los descarta igual)"); }
 }
 let guardadoPendiente = null;
 function anotarSubido(uid) {
@@ -132,7 +136,7 @@ async function orthancBinario(ruta) {
 }
 
 // ─── LECTURA DE LOS TAGS ──────────────────────────────────────────────────
-// De todo lo que trae un DICOM, esto es lo que Vitalis necesita. El resto se
+// De todo lo que trae un DICOM, esto es lo que Symphomed necesita. El resto se
 // queda en el archivo, que es donde tiene que estar.
 function primerNumero(v) {
   if (v == null) return null;
@@ -248,10 +252,10 @@ async function subirInstancia(idOrthanc) {
     log(`✔ ${meta.modalidad} ${meta.columnas}×${meta.filas} ${dónde}${d.milimetros ? " · con escala" : " · sin escala"}`);
     return d.destino;
   }
-  if (r.estado === 401) salirCon("Vitalis rechazó el token del equipo. Revisá el token en config.json.");
+  if (r.estado === 401) salirCon("Symphomed rechazó el token del equipo. Revisá el token en config.json.");
   // Cualquier otra cosa: no se anota como subida, se reintenta en la próxima
   // vuelta. Perder un estudio en silencio no es una opción.
-  log(`⚠ Vitalis respondió ${r.estado} — se reintenta: ${String(r.cuerpo).slice(0, 160)}`);
+  log(`⚠ Symphomed respondió ${r.estado} — se reintenta: ${String(r.cuerpo).slice(0, 160)}`);
   return "error";
 }
 
@@ -290,10 +294,10 @@ async function revisar() {
 async function arrancar() {
   cargarSubidos();
   console.log("\n  ┌──────────────────────────────────────────┐");
-  console.log("  │  Caja Vitalis · puente DICOM             │");
+  console.log("  │  Caja Symphomed · puente DICOM             │");
   console.log("  └──────────────────────────────────────────┘\n");
   log("Orthanc:", cfg.orthanc);
-  log("Vitalis:", cfg.vitalisUrl);
+  log("Symphomed:", cfg.vitalisUrl);
   log("Revisando cada", cfg.segundos, "segundos · ya subidos:", subidos.size);
 
   try {
@@ -309,7 +313,7 @@ async function arrancar() {
   if (UNA_VUELTA) {
     // Se espera a que termine de escribirse subidos.json antes de salir: si
     // el proceso se va con el guardado en el aire, la próxima vuelta reenvía
-    // todo (Vitalis lo descarta igual, pero es tráfico y ruido al pedo).
+    // todo (Symphomed lo descarta igual, pero es tráfico y ruido al pedo).
     if (guardadoPendiente) { clearTimeout(guardadoPendiente); guardadoPendiente = null; }
     fs.writeFileSync(ARCHIVO_SUBIDOS, JSON.stringify([...subidos]));
     log("una vuelta hecha — saliendo");

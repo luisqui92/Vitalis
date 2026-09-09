@@ -1,8 +1,8 @@
-// Vitalis — Un solo portero para todos los WebSocket.
+// Symphomed — Un solo portero para todos los WebSocket.
 //
 // ═══ EL ERROR QUE ESTO ARREGLA ═════════════════════════════════════════════
 //
-// Vitalis tiene dos WebSocket sobre el mismo servidor HTTP: /ws (el tiempo
+// Symphomed tiene dos WebSocket sobre el mismo servidor HTTP: /ws (el tiempo
 // real, para que un cambio hecho en el celular aparezca solo en la compu) y
 // /ws-tele (la señalización de la teleconsulta).
 //

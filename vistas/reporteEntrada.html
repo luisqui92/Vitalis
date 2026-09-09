@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Reporte · Vitalis</title>
+<title>Reporte · Symphomed</title>
 <style>
-/* Sin fuentes externas: la CSP de Vitalis solo admite 'self' y las dos
+/* Sin fuentes externas: la CSP de Symphomed solo admite 'self' y las dos
    variables ya están alojadas para el resto de la aplicación. */
 @font-face {
   font-family: "Fraunces"; src: url("/fonts/fraunces-variable.woff2") format("woff2");
@@ -58,7 +58,7 @@ a { color:var(--rojo); }
 </head>
 <body>
   <div class="caja">
-    <div class="marca">Vitalis</div>
+    <div class="marca">Symphomed</div>
     <h1>Reporte financiero</h1>
     <p>Proyecciones a 36 meses, Brasil y Bolivia.</p>
     <div class="cargando" id="estado">Buscando tu sesión…</div>
@@ -88,7 +88,7 @@ a { color:var(--rojo); }
     });
   }
 
-  // La sesión de Vitalis ya está en el navegador si el operador entró a la
+  // La sesión de Symphomed ya está en el navegador si el operador entró a la
   // aplicación. Acá no se pide contraseña de nuevo: reusar la sesión evita
   // tener una segunda pantalla de login que mantener —y que asegurar—.
   var token = null;
@@ -96,7 +96,7 @@ a { color:var(--rojo); }
 
   if (!token) {
     noPasa('<strong>No hay ninguna sesión abierta en este navegador.</strong><br><br>' +
-      'Entrá primero a <a href="/">Vitalis</a> con tu cuenta y volvé a esta página.<br><br>' +
+      'Entrá primero a <a href="/">Symphomed</a> con tu cuenta y volvé a esta página.<br><br>' +
       'Si te compartieron un enlace de invitación, abrí ese enlace directamente: no necesita cuenta.');
     return;
   }
@@ -110,11 +110,11 @@ a { color:var(--rojo); }
   fetch("/report/pase", { method: "POST", headers: { Authorization: "Bearer " + token } })
     .then(function (r) {
       if (r.status === 401) {
-        // "Entrá de nuevo a Vitalis" NO alcanza y es una trampa: abrir la
+        // "Entrá de nuevo a Symphomed" NO alcanza y es una trampa: abrir la
         // aplicación con el token vencido todavía guardado no lo renueva.
         // Hay que cerrar sesión de verdad, y por eso el botón lo hace acá.
         throw new Error('<strong>Tu sesión venció.</strong><br><br>' +
-          'Los tokens duran 8 horas. Abrir Vitalis no alcanza: hay que cerrar sesión ' +
+          'Los tokens duran 8 horas. Abrir Symphomed no alcanza: hay que cerrar sesión ' +
           'y volver a entrar con usuario y contraseña.<br><br>' +
           '<button class="boton" id="reentrar">Cerrar sesión y entrar</button>');
       }

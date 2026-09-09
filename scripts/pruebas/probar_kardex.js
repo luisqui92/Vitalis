@@ -171,13 +171,19 @@ function comparar(nombre, viejo, nuevoBruto) {
   }
 }
 
+// El código de main todavía dice "Vitalis": el producto se renombró a
+// Symphomed. Se normaliza la marca del lado VIEJO en vez de aflojar la
+// comparación, así esta prueba sigue haciendo lo único que vino a hacer —
+// detectar que el marcado cambió— y no se vuelve ciega al resto.
+const marcaVieja = (s) => s.replace(/Vitalis/g, "Symphomed");
+
 const pacViejo = execSync(`git -C ${RAIZ} show main:public/js/pacientes.js`, { encoding: "utf8" });
 const pacNuevo = fs.readFileSync(`${RAIZ}/public/js/pacientes.js`, "utf8");
 const conViejo = execSync(`git -C ${RAIZ} show main:public/js/consultas.js`, { encoding: "utf8" });
 const conNuevo = fs.readFileSync(`${RAIZ}/public/js/consultas.js`, "utf8");
 
-comparar("pacientes", pintarPacientes(pacViejo, null), pintarPacientes(pacNuevo, "es"));
-comparar("consultas", pintarConsultas(conViejo, null), pintarConsultas(conNuevo, "es"));
+comparar("pacientes", pintarPacientes(marcaVieja(pacViejo), null), pintarPacientes(pacNuevo, "es"));
+comparar("consultas", pintarConsultas(marcaVieja(conViejo), null), pintarConsultas(conNuevo, "es"));
 
 // Y que el portugués realmente cambie.
 console.log("");

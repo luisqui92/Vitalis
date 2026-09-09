@@ -1,8 +1,8 @@
-// Vitalis — Recetar en Brasil pasa por Memed, y solo por Memed.
+// Symphomed — Recetar en Brasil pasa por Memed, y solo por Memed.
 //
 // En Brasil una receta necesita firma digital ICP-Brasil. La receta de
-// Vitalis se imprime y no la tiene, así que allá no vale. Por eso en cuentas
-// brasileñas la receta de Vitalis NO CONVIVE con la de Memed: desaparece.
+// Symphomed se imprime y no la tiene, así que allá no vale. Por eso en cuentas
+// brasileñas la receta de Symphomed NO CONVIVE con la de Memed: desaparece.
 // Dos botones de recetar —uno con validez legal y otro sin ella— es una
 // trampa esperando a que alguien apurado use el equivocado.
 //
@@ -153,7 +153,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   verificar("  ...con el token del médico", sesion.cuerpo?.token === "token-del-medico-falso");
   const comoTexto = JSON.stringify(sesion.cuerpo);
   // Lo único que puede viajar al navegador es el token de ese médico. Las
-  // llaves de la integración abren la cuenta de Vitalis entera en Memed.
+  // llaves de la integración abren la cuenta de Symphomed entera en Memed.
   verificar("la API key NO viaja al navegador", !comoTexto.includes("llave-de-prueba"));
   verificar("la secret key TAMPOCO", !comoTexto.includes("secreto-de-prueba"));
   verificar("  ...y el paciente va con su CPF", sesion.cuerpo?.paciente?.cpf === "52998224725");
@@ -188,7 +188,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
 
   const enBase = await Receta.findOne({ "memed.prescriptionUuid": "uuid-receta-1" }).lean();
   verificar("queda marcada como firmada por Memed", enBase?.origen === "memed");
-  verificar("  ...en la ficha del paciente que Vitalis abrió", String(enBase?.pacienteId) === String(pacBr._id));
+  verificar("  ...en la ficha del paciente que Symphomed abrió", String(enBase?.pacienteId) === String(pacBr._id));
   verificar("  ...con el medicamento y su posología", enBase?.medicamentos[0]?.dosis === "1 comprimido a cada 6 horas");
   verificar("  ...descartando el que venía sin nombre", enBase?.medicamentos.length === 1);
 
@@ -207,11 +207,11 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
     { prescricao: { prescriptionUuid: "uuid-2", medicamentos: [] } });
   verificar("se rechaza", vacia.estado === 400);
 
-  console.log("\n── 10. La receta de Vitalis desaparece en Brasil ──");
+  console.log("\n── 10. La receta de Symphomed desaparece en Brasil ──");
   // No convive: se elimina la caja del formulario de siempre. Si conviviera,
   // tarde o temprano alguien apurado emite la que no vale.
   const front = fs.readFileSync(path.join(RAIZ, "public", "js", "memed.js"), "utf8");
-  verificar("memed.js quita la caja de la receta de Vitalis",
+  verificar("memed.js quita la caja de la receta de Symphomed",
     /getElementById\("recetaNuevaBox"\)[\s\S]{0,120}remove\(\)/.test(front));
 
   console.log("\n── 11. La CSP deja pasar a Memed, y solo a Memed ──");
@@ -224,7 +224,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   verificar("  ...y esa lista incluye el dominio del módulo",
     dominios.includes("https://integrations.memed.com.br"));
   verificar("scriptSrc también", /scriptSrc:[^\]]*DOMINIOS_MEMED/.test(indice));
-  verificar("frameAncestors sigue en 'none' (nadie embebe a Vitalis)",
+  verificar("frameAncestors sigue en 'none' (nadie embebe a Symphomed)",
     /frameAncestors:\s*\["'none'"\]/.test(indice));
 
   servidor.close();

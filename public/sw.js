@@ -1,6 +1,6 @@
-// Vitalis — Service worker: lo único que hace es recibir las notificaciones
+// Symphomed — Service worker: lo único que hace es recibir las notificaciones
 // del navegador y abrir la app cuando el médico las toca. No cachea nada a
-// propósito: Vitalis es una app médica, mostrar datos viejos de un paciente
+// propósito: Symphomed es una app médica, mostrar datos viejos de un paciente
 // sería peor que no mostrar nada.
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -11,11 +11,11 @@ self.addEventListener("push", (event) => {
   try {
     datos = event.data ? event.data.json() : {};
   } catch {
-    datos = { titulo: "Vitalis", cuerpo: event.data ? event.data.text() : "" };
+    datos = { titulo: "Symphomed", cuerpo: event.data ? event.data.text() : "" };
   }
 
   event.waitUntil(
-    self.registration.showNotification(datos.titulo || "Vitalis", {
+    self.registration.showNotification(datos.titulo || "Symphomed", {
       body: datos.cuerpo || "",
       icon: "/logo.png",
       badge: "/logo.png",
@@ -35,7 +35,7 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ventanas) => {
-      // Si Vitalis ya está abierto en alguna pestaña, se trae esa al frente
+      // Si Symphomed ya está abierto en alguna pestaña, se trae esa al frente
       // en vez de abrir otra más.
       for (const v of ventanas) {
         if (v.url.includes(self.location.origin) && "focus" in v) {

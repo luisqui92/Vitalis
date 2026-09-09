@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Vitalis · Kardex inteligente</title>
+<title>Symphomed · Kardex inteligente</title>
 <link rel="icon" href="/logo.png">
 <!-- Manifest + apple-touch-icon: en iPhone las notificaciones del navegador
-     solo funcionan si el médico agregó Vitalis a la pantalla de inicio, y
+     solo funcionan si el médico agregó Symphomed a la pantalla de inicio, y
      para eso hace falta esto. -->
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/logo.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Vitalis">
+<meta name="apple-mobile-web-app-title" content="Symphomed">
 <meta name="theme-color" content="#0f1720">
 <link rel="preload" href="/fonts/fraunces-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
@@ -27,14 +27,14 @@
 
 <div class="header no-imprimir" id="headerMobile">
   <div class="brand">
-    <img src="/logo.png" alt="Vitalis" class="logo">
+    <img src="/logo.png" alt="Symphomed" class="logo">
     <div>
-      <h1>Vitalis</h1>
+      <h1>Symphomed</h1>
       <p id="headerSub">Kardex inteligente</p>
     </div>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button id="btnAsistente" class="btn-ayuda" style="display:none" title="Preguntale a Vitalis" aria-label="Preguntale a Vitalis">?</button>
+    <button id="btnAsistente" class="btn-ayuda" style="display:none" title="Preguntale a Symphomed" aria-label="Preguntale a Symphomed">?</button>
     <button id="btnLogout" style="display:none">Salir</button>
   </div>
 </div>
@@ -43,7 +43,7 @@
   <div class="loading"><div class="spinner"></div>Cargando...</div>
 </div>
 
-<div class="footer no-imprimir">Vitalis SmartKardex</div>
+<div class="footer no-imprimir">Symphomed SmartKardex</div>
 
 <!-- Vista de escritorio (≥1024px, solo con sesión activa): sidebar fijo +
      barra superior, el contenido de cada pantalla se pinta en
@@ -52,8 +52,8 @@
 <div class="escr-shell no-imprimir" id="escritorioShell" style="display:none">
   <aside class="escr-sidebar">
     <div class="escr-marca">
-      <img src="/logo.png" alt="Vitalis" class="escr-logo">
-      <span id="escrMarcaTexto">Vitalis</span>
+      <img src="/logo.png" alt="Symphomed" class="escr-logo">
+      <span id="escrMarcaTexto">Symphomed</span>
     </div>
     <nav class="escr-nav" id="escrNav"></nav>
     <button class="escr-salir" id="escrBtnLogout">⏻ Salir</button>
@@ -103,7 +103,7 @@
 <script src="/js/mapaFacial.js"></script>
 <script src="/js/simuladorFacial.js"></script>
 <script src="/js/simulador25d.js"></script>
-<script src="/js/vitalisFace.js"></script>
+<script src="/js/symphomedFace.js"></script>
 <script src="/js/rayos.js"></script>
 <script src="/js/bandejaDicom.js"></script>
 <script src="/js/visorImagen.js"></script>

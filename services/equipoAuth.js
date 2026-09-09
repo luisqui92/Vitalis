@@ -1,8 +1,8 @@
-// Vitalis — Autenticación de los equipos que suben imágenes solos
+// Symphomed — Autenticación de los equipos que suben imágenes solos
 //
 // Hay dos clases de equipo y las dos entran por la misma puerta: el agente
 // que vigila una carpeta en la PC del consultorio (agente-rayos/) y la Caja
-// Vitalis, que recibe DICOM de los aparatos por C-STORE (caja-dicom/).
+// Symphomed, que recibe DICOM de los aparatos por C-STORE (caja-dicom/).
 // Comparten el modelo EquipoRayos y este par de funciones; vive acá y no
 // dentro de una ruta porque las dos rutas lo necesitan.
 const crypto = require("crypto");

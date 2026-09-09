@@ -1,4 +1,4 @@
-// Vitalis — Crea la cuenta de quien administra los pagos.
+// Symphomed — Crea la cuenta de quien administra los pagos.
 //
 // ═══ POR QUÉ EXISTE ESTE SCRIPT Y NO ALCANZA CON UNA CUENTA DE MÉDICO ══════
 //

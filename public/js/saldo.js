@@ -1,4 +1,4 @@
-// Vitalis — El saldo prepago, en pantalla.
+// Symphomed — El saldo prepago, en pantalla.
 //
 // Dos cosas viven acá:
 //

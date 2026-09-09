@@ -1,4 +1,4 @@
-// Vitalis — Página pública de reserva (sin login). El link viene del
+// Symphomed — Página pública de reserva (sin login). El link viene del
 // WhatsApp con un token que ya identifica al paciente, así que acá no hay
 // que pedir teléfono ni contraseña: solo elegir día, hora, nombre y motivo.
 const app = document.getElementById("app");

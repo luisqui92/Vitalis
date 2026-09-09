@@ -1,4 +1,4 @@
-// Vitalis — Revisa las correcciones que los médicos le hicieron a las
+// Symphomed — Revisa las correcciones que los médicos le hicieron a las
 // sugerencias de la IA (reconsulta, tratamientos por voz, mapa ocular),
 // agrupadas por tipo y campo, para ver en qué se equivoca más y afinar
 // los prompts. Es de solo lectura, no cambia nada.

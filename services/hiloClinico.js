@@ -1,4 +1,4 @@
-// Vitalis — El hilo clínico: qué de antes tiene que ver con lo de hoy.
+// Symphomed — El hilo clínico: qué de antes tiene que ver con lo de hoy.
 //
 // ═══ QUÉ FALTABA, SI YA EXISTÍA EL BRIEF ═══════════════════════════════════
 //

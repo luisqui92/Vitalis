@@ -1,4 +1,4 @@
-// Vitalis — Tiempo real: si un médico tiene la sesión abierta en dos
+// Symphomed — Tiempo real: si un médico tiene la sesión abierta en dos
 // dispositivos a la vez (celular y compu, por ejemplo), un cambio hecho en
 // uno se refleja solo en el otro, sin que tenga que tocar nada.
 //

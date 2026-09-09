@@ -1,4 +1,4 @@
-// Vitalis — La persona compartida, en pantalla.
+// Symphomed — La persona compartida, en pantalla.
 //
 // Dos cosas viven acá:
 //

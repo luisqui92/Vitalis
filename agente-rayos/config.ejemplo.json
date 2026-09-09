@@ -1,6 +1,6 @@
 {
   "servidor": "https://salud.chatgo.ia.bo",
-  "token": "PEGA_ACA_EL_TOKEN_QUE_TE_DIO_VITALIS",
+  "token": "PEGA_ACA_EL_TOKEN_QUE_TE_DIO_SYMPHOMED",
   "carpeta": "C:\\Ai-Dental\\Images",
   "incluirSubcarpetas": true,
   "segundosRevision": 3,

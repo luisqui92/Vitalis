@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Rayos — la radiografía entra sola a la ficha del paciente
+// Symphomed Rayos — la radiografía entra sola a la ficha del paciente
 // ═══════════════════════════════════════════════════════════════════════════
 // El equipo de rayos (un Woodpecker Mini Ray, por ejemplo) no habla con
 // nadie: solo dispara. La imagen la produce el sensor y la recibe el
@@ -13,7 +13,7 @@
 //
 // El problema difícil no es mover el archivo, es saber DE QUÉ PACIENTE es.
 // En vez de intentar cruzar nombres entre dos sistemas (que se escriben
-// distinto y se equivocan), Vitalis usa una "ventana de captura": el médico
+// distinto y se equivocan), Symphomed usa una "ventana de captura": el médico
 // abre la ficha del paciente, toca "Capturar radiografía", y durante los
 // minutos siguientes todo lo que llegue del equipo se guarda ahí. Cero
 // tipeo, cero ambigüedad, y si se olvidó de abrirla el agente guarda la
@@ -49,8 +49,8 @@ const MINUTOS_VENTANA = 10;
 const MINUTOS_VENTANA_MAX = 60;
 
 // Los tokens del equipo y la autenticación viven en services/equipoAuth.js:
-// los comparte con la Caja Vitalis (routes/cajaDicom.js), que se autentica
-// igual porque para Vitalis también es un equipo que sube imágenes solo.
+// los comparte con la Caja Symphomed (routes/cajaDicom.js), que se autentica
+// igual porque para Symphomed también es un equipo que sube imágenes solo.
 
 module.exports = function (app) {
   // ─── DESCARGA DEL AGENTE ─────────────────────────────────────────────────

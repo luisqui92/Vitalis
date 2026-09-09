@@ -1,9 +1,9 @@
-// Vitalis — Español · pantalla de operador (acreditar recargas).
+// Symphomed — Español · pantalla de operador (acreditar recargas).
 Object.assign(I18N.es, {
   "op.titulo": "Acreditar recargas",
   "op.ayuda": "Buscá al médico, verificá el pago en el banco y acreditá. La recarga mínima es Bs {minimo}.",
   "op.falta2fa": "Para acreditar saldo necesitás la verificación en dos pasos activa. Activala más abajo y volvé a entrar.",
-  "op.faltaPermiso": "Esta cuenta todavía no tiene el permiso para aprobar pagos. Hay que agregar su teléfono a OPERADORES_SALDO en el servidor y reiniciar Vitalis. Avisale a quien administra el servidor.",
+  "op.faltaPermiso": "Esta cuenta todavía no tiene el permiso para aprobar pagos. Hay que agregar su teléfono a OPERADORES_SALDO en el servidor y reiniciar Symphomed. Avisale a quien administra el servidor.",
   "op.noPudimosVerificar": "No pudimos verificar el permiso de esta cuenta con el servidor ({detalle}). No es necesariamente que falte el permiso: puede ser un problema momentáneo. Probá de nuevo en un minuto.",
   "op.buscar": "Buscar médico",
   "op.buscarPlaceholder": "Nombre o teléfono",

@@ -1,4 +1,4 @@
-// Vitalis — WhatsApp de reservas vía la API oficial de Meta (Cloud API):
+// Symphomed — WhatsApp de reservas vía la API oficial de Meta (Cloud API):
 // el webhook que recibe los mensajes entrantes (verificación + mensajes
 // reales) y el estado que ve el médico desde la Agenda. Reemplaza al
 // esquema anterior con Baileys (QR + sesión vinculada) — acá no hay nada

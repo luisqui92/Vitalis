@@ -1,6 +1,6 @@
-# Copias de seguridad de Vitalis
+# Copias de seguridad de Symphomed
 
-Vitalis hace una copia por día, sola, y **la verifica restaurándola de
+Symphomed hace una copia por día, sola, y **la verifica restaurándola de
 verdad** en una base aparte antes de darla por buena. Una copia que nunca se
 restauró no es una copia.
 
@@ -45,7 +45,7 @@ pm2 restart vitalis --update-env
 borrado por error, no de que el disco se muera, que es el caso que uno
 realmente teme.
 
-Vitalis no se ata a ningún proveedor: ejecuta el comando que le pongas.
+Symphomed no se ata a ningún proveedor: ejecuta el comando que le pongas.
 
 Con [rclone](https://rclone.org) (funciona con Backblaze B2, Cloudflare R2,
 Google Drive, S3, lo que sea):
@@ -61,14 +61,14 @@ Y en el `.env`:
 BACKUP_COMANDO_SUBIDA=rclone copy {archivo} respaldos:vitalis-respaldos/
 ```
 
-`{archivo}` lo reemplaza Vitalis por la ruta de cada archivo.
+`{archivo}` lo reemplaza Symphomed por la ruta de cada archivo.
 
-Si el respaldo **no está cifrado, Vitalis se niega a subirlo** aunque esto
+Si el respaldo **no está cifrado, Symphomed se niega a subirlo** aunque esto
 esté configurado. Son datos de pacientes.
 
 ## 3. Comprobar que anda
 
-En Vitalis: **Panel → Seguridad**. Ahí abajo está el estado: cuándo fue la
+En Symphomed: **Panel → Seguridad**. Ahí abajo está el estado: cuándo fue la
 última, si pasó la verificación, cuánto ocupa, y si se está mandando afuera.
 Se pone en rojo sola si pasan más de 48 horas o si una falla.
 
@@ -166,7 +166,7 @@ Para que quede dicho y no se descubra el día equivocado:
 
 - **La copia afuera hay que configurarla.** Mientras no lo esté, todo vive en
   el mismo disco.
-- **Nadie prueba una restauración completa periódicamente.** Vitalis verifica
+- **Nadie prueba una restauración completa periódicamente.** Symphomed verifica
   cada respaldo, pero probar el procedimiento entero —incluidos los archivos y
   el reinicio— conviene hacerlo a mano una vez cada tanto. Media hora, dos
   veces al año.

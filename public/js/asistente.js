@@ -1,4 +1,4 @@
-// Vitalis — "Preguntale a Vitalis": el asistente que explica cómo usar el
+// Symphomed — "Preguntale a Symphomed": el asistente que explica cómo usar el
 // sistema. Se abre desde el "?" del encabezado, así está a mano desde
 // cualquier pantalla sin ocupar un lugar en la fila de accesos.
 //

@@ -9,12 +9,12 @@
 // LA LÍNEA QUE NO SE CRUZA: acá se registra el RESULTADO, nunca el
 // instrumento. El ADOS-2 es propiedad de WPS —ítems, hojas de codificación,
 // algoritmo y tablas de conversión— y exige calificación y entrenamiento
-// formal para administrarlo. Ponerlo adentro de Vitalis sería una
+// formal para administrarlo. Ponerlo adentro de Symphomed sería una
 // infracción de copyright, y algo peor: invitaría a que alguien sin
 // entrenamiento lo "aplique" leyendo una pantalla, que es exactamente el
 // modo en que un instrumento bueno da un resultado malo.
 //
-// El profesional lo aplica con sus materiales y su licencia; Vitalis anota
+// El profesional lo aplica con sus materiales y su licencia; Symphomed anota
 // qué hizo y qué le dio, igual que anota una glucemia sin ser el
 // laboratorio.
 const { Paciente, InstrumentoAplicado, INSTRUMENTOS_NEURO, Estudio } = require("../db/models");

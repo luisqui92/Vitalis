@@ -1,4 +1,4 @@
-// Vitalis — Español · grabar una consulta y ver su detalle (public/js/consultas.js).
+// Symphomed — Español · grabar una consulta y ver su detalle (public/js/consultas.js).
 Object.assign(I18N.es, {
   // ─── Grabar ───────────────────────────────────────────────────────────
   "consulta.volver": "← Volver",
@@ -19,7 +19,7 @@ Object.assign(I18N.es, {
   // ─── Grabar desde el celular vinculado ────────────────────────────────
   "consulta.cargando": "Cargando...",
   "consulta.errVinculacion": "Error cargando la vinculación",
-  "consulta.remota.sinVincular": "Todavía no vinculaste tu celular hoy. Abrí Vitalis en el celular, tocá \"Vincular como micrófono\" e ingresá este código:",
+  "consulta.remota.sinVincular": "Todavía no vinculaste tu celular hoy. Abrí Symphomed en el celular, tocá \"Vincular como micrófono\" e ingresá este código:",
   "consulta.remota.esperando": "Esta pantalla se actualiza sola apenas lo vincules.",
   "consulta.remota.listo": "📱 Celular vinculado y listo, apoyado con la pantalla prendida.",
   "consulta.remota.iniciar": "🎙️ Iniciar grabación remota",

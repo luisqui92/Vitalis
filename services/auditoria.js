@@ -1,4 +1,4 @@
-// Vitalis — Log de auditoría: quién accedió a qué y cuándo. Nunca debe
+// Symphomed — Log de auditoría: quién accedió a qué y cuándo. Nunca debe
 // romper ni frenar el pedido real que la disparó (si falla, se loguea el
 // error y listo — perder un registro de auditoría es mejor que tirar abajo
 // la app por eso).

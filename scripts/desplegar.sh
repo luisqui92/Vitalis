@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vitalis — Desplegar una rama en el servidor.
+# Symphomed — Desplegar una rama en el servidor.
 #
 # Hace los controles que uno se saltea cuando tiene apuro, y se PLANTA si
 # alguno falla en vez de seguir de largo:

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — Informes con membrete
+// Symphomed — Informes con membrete
 // ═══════════════════════════════════════════════════════════════════════════
 // Tres pantallas:
 //   · Lista de informes del paciente

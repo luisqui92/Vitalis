@@ -1,4 +1,4 @@
-// Vitalis — Português · Central de Exames (envio, câmera guiada, comparador).
+// Symphomed — Português · Central de Exames (envio, câmera guiada, comparador).
 Object.assign(I18N.pt, {
   "est.tipo.laboratorio": "🧪 Laboratório",
   "est.tipo.radiografia": "🦴 Radiografia",
@@ -28,7 +28,7 @@ Object.assign(I18N.pt, {
   "est.25d.titulo": "Simulação 2.5D",
   "est.25d.ayuda": "{n} vistas carregadas. Gire entre elas e veja a mesma cirurgia de cada ângulo — cada posição é uma foto real do paciente.",
   "est.25d.girar": "🔄 Girar as {n} vistas",
-  "est.face": "🧠 Abrir o Vitalis Face — análise completa",
+  "est.face": "🧠 Abrir o Symphomed Face — análise completa",
   "est.subir.titulo": "Enviar exame",
   "est.subir.nombre": "Título (ex: Hemograma completo)",
   "est.fecha": "Data",

@@ -1,4 +1,4 @@
-// Vitalis Face — Crea (o actualiza) una cuenta de estética/dermatología/
+// Symphomed Face — Crea (o actualiza) una cuenta de estética/dermatología/
 // plástica de demo con catálogo de procedimientos, pacientes con plan de
 // tratamiento (con pagos parciales, para mostrar el saldo), fotos clínicas
 // guiadas por ángulo (con archivo real, se pueden abrir y comparar antes/

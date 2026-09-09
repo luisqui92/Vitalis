@@ -1,6 +1,6 @@
-// Vitalis — Notificaciones del navegador (Web Push) para el médico.
+// Symphomed — Notificaciones del navegador (Web Push) para el médico.
 // Se activan desde Seguridad. Cuando entra una reserva, el aviso le llega
-// al celular aunque tenga Vitalis cerrado (lo despierta el service worker,
+// al celular aunque tenga Symphomed cerrado (lo despierta el service worker,
 // public/sw.js).
 
 // La clave pública viene del servidor en base64url; la API del navegador la

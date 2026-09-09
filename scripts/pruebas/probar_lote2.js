@@ -84,7 +84,7 @@ const deMain = (ruta) => execSync(`git -C ${RAIZ} show main:${ruta}`, { encoding
 const sinCajasNuevas = (html) => html
   .replace(/\n?\s*<!-- En Brasil se receta por Memed[\s\S]*?-->/g, "")
   .replace(/\n?\s*<div id="memedBox"><\/div>/g, "")
-  // El id que le da nombre a la caja de la receta de Vitalis, para poder
+  // El id que le da nombre a la caja de la receta de Symphomed, para poder
   // sacarla cuando la cuenta receta por Memed. Es un id, no un cambio de
   // dibujo: no se ve.
   .replace(/<div class="card" id="recetaNuevaBox">/g, '<div class="card">');

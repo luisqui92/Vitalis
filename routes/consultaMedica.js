@@ -155,7 +155,7 @@ module.exports = function (app) {
           const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
             .select("nombre").lean();
 
-          // Solo para odontología y estética (Vitalis Face): le pasamos el
+          // Solo para odontología y estética (Symphomed Face): le pasamos el
           // catálogo de precios del consultorio para que la IA pueda
           // emparejar tratamientos mencionados ("hay que sellar esto",
           // "hay que hacer un relleno acá") con el ítem correcto.
@@ -165,7 +165,7 @@ module.exports = function (app) {
             const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
             catalogoTratamientos = catalogo.map(c => c.nombre);
           }
-          // Solo para oftalmología (Vitalis Visión): la lista de estructuras
+          // Solo para oftalmología (Symphomed Visión): la lista de estructuras
           // oculares válidas, para que la IA narre el examen por ojo.
           const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
           const esOdontologia = medico?.tipoEspecialidad === "odontologia";
@@ -219,7 +219,7 @@ module.exports = function (app) {
             }
           }
 
-          // Vitalis Odonto: mismo patrón — el odontograma se actualiza solo
+          // Symphomed Odonto: mismo patrón — el odontograma se actualiza solo
           // apenas termina la nota, con fuente:"voz" en el historial de la
           // pieza para que quede claro que vino de la consulta.
           const hallazgosOdonto = consulta.notaClinica?.odontogramaSugerido;
@@ -244,7 +244,7 @@ module.exports = function (app) {
             }
           }
 
-          // Vitalis Gineco: mismo patrón, por órgano.
+          // Symphomed Gineco: mismo patrón, por órgano.
           const hallazgosGineco = consulta.notaClinica?.ginecoSugerido;
           if (esGinecologia && hallazgosGineco?.length) {
             try {
@@ -614,7 +614,7 @@ module.exports = function (app) {
     res.json({ ok: true });
   }));
 
-  // ─── TRATAMIENTOS SUGERIDOS (Vitalis Odonto): agregar al presupuesto o
+  // ─── TRATAMIENTOS SUGERIDOS (Symphomed Odonto): agregar al presupuesto o
   // descartar. Igual que la reconsulta, el odontólogo siempre revisa y
   // puede corregir nombre/precio/pieza antes de que se cree el ítem real —
   // la IA solo emparejó con el catálogo, nunca facturó sola. ─────────────

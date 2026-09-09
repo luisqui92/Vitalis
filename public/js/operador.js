@@ -1,4 +1,4 @@
-// Vitalis — Pantalla de operador: acreditar recargas desde el celular.
+// Symphomed — Pantalla de operador: acreditar recargas desde el celular.
 //
 // Solo la ve quien está en OPERADORES_SALDO (ver routes/operadorSaldo.js).
 // Para todos los demás esta sección no existe: no aparece atenuada ni con un
@@ -647,7 +647,7 @@ async function pintarDatosDePago() {
 
 // ─── SOLICITUDES DE CUENTA ────────────────────────────────────────────────
 //
-// Quién pidió entrar a Vitalis y todavía está esperando. Va en el mismo panel
+// Quién pidió entrar a Symphomed y todavía está esperando. Va en el mismo panel
 // que los pagos porque es la misma clase de decisión —quién está adentro— y
 // la toma la misma persona, con el mismo segundo factor.
 //

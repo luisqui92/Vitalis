@@ -1,8 +1,8 @@
-// Vitalis — Dónde y cómo se guardan en disco los archivos de estudios
+// Symphomed — Dónde y cómo se guardan en disco los archivos de estudios
 // (radiografías, laboratorios, fotos clínicas). Vive acá y no dentro de
 // routes/estudios.js porque hay dos caminos de entrada al mismo lugar: el
 // médico subiendo un archivo a mano desde el navegador, y el agente de
-// Vitalis Rayos subiendo la radiografía sola desde la PC del consultorio.
+// Symphomed Rayos subiendo la radiografía sola desde la PC del consultorio.
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");

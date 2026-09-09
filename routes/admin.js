@@ -1,4 +1,4 @@
-// Vitalis — Panel de clínica: varios consultorios, una sola vista de arriba.
+// Symphomed — Panel de clínica: varios consultorios, una sola vista de arriba.
 //
 // ═══ LO QUE ESTE ARCHIVO NO HACE ═══════════════════════════════════════════
 //

@@ -17,7 +17,7 @@
 img { max-width: 100%; }
 [hidden] { display: none !important; }
 </style>
-<title>Modelo Financiero Vitalis</title>
+<title>Modelo Financiero Symphomed</title>
 
 <style>
 /* ─────────────────────────────────────────────────────────────
@@ -229,14 +229,14 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
 
   <header class="tapa">
     <div class="tapa-alto">
-      <h1>Modelo financiero<br>Vitalis</h1>
+      <h1>Modelo financiero<br>Symphomed</h1>
       <div style="text-align:right">
         <div class="rotulo">Brasil · Bolivia</div>
         <div class="rotulo" style="color:var(--rojo)">36 meses · 3 escenarios</div>
       </div>
     </div>
     <p class="tesis">
-      Un prontuario que se escribe solo: el médico graba la consulta, Vitalis la transcribe
+      Un prontuario que se escribe solo: el médico graba la consulta, Symphomed la transcribe
       y devuelve la nota clínica, la receta y el kardex. <em>Ya está en producción, en dos países,
       con médicos atendiendo.</em> El desarrollo ya está pagado. Lo que sigue es qué hace falta
       para que esto crezca — y cuánto deja.
@@ -621,7 +621,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
   <section>
     <div class="sec-cab"><span class="sec-num">09</span><h2>Lo que ya está pagado</h2></div>
     <p class="prosa" style="margin-bottom:24px;color:var(--tinta-2)">
-      Vitalis no es un proyecto que empieza: es uno que ya se construyó y está funcionando.
+      Symphomed no es un proyecto que empieza: es uno que ya se construyó y está funcionando.
       El desarrollo representa <strong>US$ 85.000</strong> de trabajo de ingeniería ya
       ejecutado y financiado por el fundador. No es una estimación de lo que costaría: es lo
       que costó, valuado a la tarifa a la que se hizo, y repartido por disciplina para que se
@@ -679,7 +679,7 @@ input[type="text"]:focus-visible { outline: 2px solid var(--rojo); outline-offse
         <p class="nota bien" id="notaCapital">—</p>
         <p style="font-size:.93rem;color:var(--tinta-2)">Cuatro cosas que un inversor va a preguntar y conviene contestar antes:</p>
         <div class="lista">
-          <div class="item"><span class="cifra">01</span><p><strong>El nombre.</strong> «Vitalis» colisiona con marcas de salud en Brasil y los dominios están tomados. El cambio está resuelto técnicamente y sin ejecutar: es un costo conocido, no una sorpresa.</p></div>
+          <div class="item"><span class="cifra">01</span><p><strong>El nombre.</strong> «Symphomed» colisiona con marcas de salud en Brasil y los dominios están tomados. El cambio está resuelto técnicamente y sin ejecutar: es un costo conocido, no una sorpresa.</p></div>
           <div class="item"><span class="cifra">02</span><p><strong>Datos clínicos.</strong> El sistema guarda historias médicas. El cifrado de respaldos y la política de datos bajo LGPD tienen que cerrarse antes de escalar, no después.</p></div>
           <div class="item"><span class="cifra">03</span><p><strong>Dependencia de Meta.</strong> El aviso al paciente viaja por WhatsApp Business: es un canal alquilado. El plan de contingencia por SMS y correo está diseñado y sin construir.</p></div>
           <div class="item"><span class="cifra">04</span><p><strong>Bolivia en moneda dura.</strong> La facturación boliviana vale lo que valga el cambio al que se pueda convertir. Está modelada al paralelo, con descuento, a propósito.</p></div>
@@ -1713,10 +1713,10 @@ grupo("gEscTabla",  "data-esct",    function (v) { sel.escTabla = v; });
 
 /* Comodidad de quien mira: si movió las palancas, las encuentra igual al volver. */
 function guardar() {
-  try { localStorage.setItem("modeloVitalis3", JSON.stringify({ P:P, G:G })); } catch (e) {}
+  try { localStorage.setItem("modeloSymphomed3", JSON.stringify({ P:P, G:G })); } catch (e) {}
 }
 try {
-  var crudo = localStorage.getItem("modeloVitalis3");
+  var crudo = localStorage.getItem("modeloSymphomed3");
   if (crudo) {
     var g = JSON.parse(crudo);
     if (g && g.P) Object.keys(P).forEach(function (mk) {

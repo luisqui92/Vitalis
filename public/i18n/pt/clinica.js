@@ -1,4 +1,4 @@
-// Vitalis — Português · painel da clínica (vários consultórios).
+// Symphomed — Português · painel da clínica (vários consultórios).
 Object.assign(I18N.pt, {
   "clin.cargando": "Carregando a clínica...",
   "clin.error": "Erro ao carregar a clínica",

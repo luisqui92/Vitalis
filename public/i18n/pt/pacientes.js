@@ -1,4 +1,4 @@
-// Vitalis — Português · painel, cadastro de paciente e Kardex.
+// Symphomed — Português · painel, cadastro de paciente e Kardex.
 //
 // Traducción de interfaz, no de prosa clínica. Los rótulos de la ficha
 // ("Antecedentes familiares", "Diagnóstico") sí son términos médicos y un
@@ -42,7 +42,7 @@ Object.assign(I18N.pt, {
   "pacientes.nuevo.duenoPlaceholder": "Ex: Maria Silva",
   "pacientes.nuevo.semanasGesta": "Semanas de gestação ao nascer (opcional)",
   "pacientes.nuevo.semanasGestaPlaceholder": "Ex: 32 — deixe vazio se nasceu a termo",
-  "pacientes.nuevo.avisoPrematuro": "Se nasceu prematuro, o Vitalis usa a idade corrigida nas curvas até os 2 anos.",
+  "pacientes.nuevo.avisoPrematuro": "Se nasceu prematuro, o Symphomed usa a idade corrigida nas curvas até os 2 anos.",
   "pacientes.nuevo.tutor": "Mãe, pai ou responsável (opcional)",
   "pacientes.nuevo.parentesco": "Parentesco (opcional)",
   "pacientes.nuevo.parentescoPlaceholder": "Ex: Mãe",

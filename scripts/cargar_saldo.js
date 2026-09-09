@@ -1,4 +1,4 @@
-// Vitalis — Acreditar una transferencia o un QR al saldo de un médico.
+// Symphomed — Acreditar una transferencia o un QR al saldo de un médico.
 //
 // Lo corre una persona que YA vio el comprobante. Por eso pide contra qué
 // referencia se acredita: una carga sin comprobante es plata que apareció de

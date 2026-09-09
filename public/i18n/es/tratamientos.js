@@ -1,4 +1,4 @@
-// Vitalis — Español · plan de tratamiento, presupuesto y pagos.
+// Symphomed — Español · plan de tratamiento, presupuesto y pagos.
 Object.assign(I18N.es, {
   // Moneda. El monto se arma con el mismo formato de siempre y solo cambia
   // el símbolo y el separador decimal — Bolivia usa punto, Brasil coma.

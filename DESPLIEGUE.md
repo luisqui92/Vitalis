@@ -21,7 +21,7 @@ El riesgo real de este despliegue **no es la clínica: es el i18n**. La clínica
 es código nuevo que nadie usa todavía. El i18n reescribió pantallas que hoy
 usan médicos de verdad.
 
-Faltan 12 archivos por convertir (Vitalis Face, crecimiento, neurodesarrollo,
+Faltan 12 archivos por convertir (Symphomed Face, crecimiento, neurodesarrollo,
 embarazo, instrumentos y algunos más). **Eso no rompe nada**: esas pantallas
 siguen en español, tal cual están hoy.
 
@@ -64,7 +64,7 @@ node scripts/pruebas/probar_arranque.js
 `probar_arranque.js` es el control más importante antes de desplegar: levanta
 `index.js` de verdad y comprueba que **los paquetes de idioma se arman al
 arrancar**. Están en `.gitignore`, así que en el servidor no existen hasta que
-Vitalis los genera; si eso falla, la app queda desplegada sin un solo texto y
+Symphomed los genera; si eso falla, la app queda desplegada sin un solo texto y
 ninguna otra prueba lo ve.
 
 ---
@@ -74,7 +74,7 @@ ninguna otra prueba lo ve.
 **No sigas sin esto.** Es un despliegue grande y es lo único que hace que
 volver atrás sea barato.
 
-Con Vitalis todavía corriendo, entrá a **Panel → Seguridad** y apretá el
+Con Symphomed todavía corriendo, entrá a **Panel → Seguridad** y apretá el
 botón de hacer un respaldo a mano. Ahí mismo se ve cuándo fue, si pasó la
 verificación y cuánto ocupa (ver `RESPALDOS.md`).
 
@@ -114,7 +114,7 @@ En los logs tenés que ver, **antes** de dar por buena la cosa:
 ```
 [IDIOMAS] es (21 módulos, … KB) · pt (21 módulos, … KB)
 ✅ MongoDB conectado
-🚀 Vitalis corriendo en puerto 3000
+🚀 Symphomed corriendo en puerto 3000
 ```
 
 **Si no aparece la línea `[IDIOMAS]`, volvé atrás.** Significa que los
@@ -171,7 +171,7 @@ node scripts/crear_clinica.js "Nombre de la clínica" <telefonoAdmin>
 node scripts/vincular_medico.js <telefonoAdmin> <telefonoMedico> [empleado|alquila] "Consultorio 3"
 ```
 
-Y si esos médicos ya venían usando Vitalis por separado:
+Y si esos médicos ya venían usando Symphomed por separado:
 
 ```bash
 node scripts/proponer_personas.js <telefonoAdmin>            # solo mira

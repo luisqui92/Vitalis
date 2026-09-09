@@ -1,4 +1,4 @@
-// Vitalis — La videollamada, sin proveedor en el medio.
+// Symphomed — La videollamada, sin proveedor en el medio.
 //
 // ═══ POR QUÉ NO HAY UN SERVICIO DE VIDEO ACÁ ═══════════════════════════════
 //
@@ -37,7 +37,7 @@ const TURN_SECRET = String(process.env.TURN_SECRET || "").trim();
 const TURN_USUARIO = String(process.env.TURN_USUARIO || "").trim();
 const TURN_CLAVE = String(process.env.TURN_CLAVE || "").trim();
 
-// Vitalis no necesita un proveedor para funcionar, así que esto es siempre
+// Symphomed no necesita un proveedor para funcionar, así que esto es siempre
 // true. Queda como función porque las rutas ya preguntan, y porque el día
 // que haga falta un requisito nuevo se pone acá y no en cinco lugares.
 function configurado() {
@@ -81,7 +81,7 @@ function iceServers() {
 //
 // No da acceso a datos: da derecho a entrar a UNA sala de señalización y
 // hablar con el otro extremo. Se firma con el mismo mecanismo que el resto
-// de Vitalis (HMAC con JWT_SECRET) para no inventar un segundo esquema de
+// de Symphomed (HMAC con JWT_SECRET) para no inventar un segundo esquema de
 // firma que después nadie audita.
 //
 // Vive poco: es para entrar ahora, no para guardar.

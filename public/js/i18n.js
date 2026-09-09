@@ -1,10 +1,10 @@
-// Vitalis — Idioma de la interfaz.
+// Symphomed — Idioma de la interfaz.
 //
 // Se carga ANTES que estado.js: de acá en adelante, cualquier texto que el
 // médico vea en pantalla sale de t(), no de un literal suelto en el medio
 // del HTML.
 //
-// Por qué un diccionario y no dos copias del código: un solo Vitalis que
+// Por qué un diccionario y no dos copias del código: un solo Symphomed que
 // habla dos idiomas se arregla una vez. Dos copias se arreglan dos veces, y
 // la segunda vez alguien se olvida. En un sistema clínico "alguien se
 // olvidó" significa que los médicos de un país siguen viendo un número mal

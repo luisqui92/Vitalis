@@ -1,4 +1,4 @@
-// Vitalis — Prueba de carga completa.
+// Symphomed — Prueba de carga completa.
 //
 // Todos los módulos del frontend comparten un solo scope global (no hay
 // build step ni imports). Eso significa que si un archivo renombra una
@@ -132,7 +132,7 @@ const pantallas = [
   ["pestañas del Kardex", `tabsKardexPara("odontologia")`],
   ["tipos de recordatorio", `tiposRecordatorio()`],
   ["sugerencias del asistente", `sugerenciasAsistente()`],
-  ["Vitalis Voice", `pintarVozEscritorio([{ _id: "c1", pacienteNombre: "Juan", fecha: new Date().toISOString(), estado: "confirmada", motivo: "Control" }])`],
+  ["Symphomed Voice", `pintarVozEscritorio([{ _id: "c1", pacienteNombre: "Juan", fecha: new Date().toISOString(), estado: "confirmada", motivo: "Control" }])`],
   ["indicaciones", `pintarIndicacionesEscritorio([{ _id: "r1", fecha: new Date().toISOString(), pacienteId: { _id: "p1", nombre: "Juan" }, medicamentos: [{ nombre: "Amoxicilina" }], indicaciones: "Reposo" }])`],
   ["estudios (escritorio)", `pintarEstudiosEscritorio([{ _id: "e1", nombre: "Radiografía", tipo: "radiografia", fecha: new Date().toISOString(), pacienteId: { _id: "p1", nombre: "Juan" } }])`],
   ["reportes", `pintarReportesEscritorio({ totalConsultas: 10, porcentajeConsultasCompletadas: 80, totalCitas: 12, citasCanceladas: 1, consultasPorMes: {}, citasPorMes: {}, pacientesNuevosPorMes: {} })`],

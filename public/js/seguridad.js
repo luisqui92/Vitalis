@@ -1,4 +1,4 @@
-// Vitalis — Pantalla de Seguridad: activar/desactivar 2FA y ver el
+// Symphomed — Pantalla de Seguridad: activar/desactivar 2FA y ver el
 // registro de auditoría de la propia cuenta (quién entró, qué pacientes se
 // vieron, etc.)
 

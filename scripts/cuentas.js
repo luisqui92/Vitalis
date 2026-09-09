@@ -1,4 +1,4 @@
-// Vitalis — TODAS las cuentas que existen, y cómo ponerles contraseña nueva.
+// Symphomed — TODAS las cuentas que existen, y cómo ponerles contraseña nueva.
 //
 // Lista todas, no solo las de demostración: las que se crearon con los
 // scripts de seed, las que se registró un médico solo, y las que alguien
@@ -36,7 +36,7 @@ const DEMOS_CONOCIDAS = {
   "78811001": "Medicina general",
   "78811002": "Ginecología y obstetricia",
   "78811005": "Neurodesarrollo",
-  "78822001": "Estética · Vitalis Face",
+  "78822001": "Estética · Symphomed Face",
   "78822010": "Estética · simulador",
   "78833001": "Oftalmología",
   "78844001": "Veterinaria",

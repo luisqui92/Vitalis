@@ -1,4 +1,4 @@
-// Vitalis — Dashboard (lista de pacientes) y el Kardex de cada paciente
+// Symphomed — Dashboard (lista de pacientes) y el Kardex de cada paciente
 // (pestañas: Paciente, Consultas, Medicación, Antecedentes, Vacunas).
 
 // La barra de pestañas del celular — la pantalla que el médico ve primero y

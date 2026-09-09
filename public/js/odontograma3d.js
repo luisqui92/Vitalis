@@ -1,4 +1,4 @@
-// Vitalis Odonto — Vista 3D del odontograma (Three.js). Se carga solo
+// Symphomed Odonto — Vista 3D del odontograma (Three.js). Se carga solo
 // cuando el odontólogo elige "Vista 3D" (import dinámico desde
 // odontograma.js), así el resto de la app nunca paga el costo de estas
 // librerías. Modelo: public/models/dentadura.glb — 32 piezas permanentes

@@ -1,6 +1,6 @@
-// Vitalis — Uma conta brasileira de demonstração, com Pix e pacientes.
+// Symphomed — Uma conta brasileira de demonstração, com Pix e pacientes.
 //
-// Sirve para mostrar Vitalis como lo ve un médico en Brasil: la interfaz en
+// Sirve para mostrar Symphomed como lo ve un médico en Brasil: la interfaz en
 // portugués, el saldo en reales, y la pantalla de recarga apuntando a la
 // cuenta Pix — no a la boliviana.
 //
@@ -101,7 +101,7 @@ async function main() {
       // una preferencia de pantalla; la moneda decide bajo qué reglas trabaja:
       // en qué moneda se registran sus recargas en el libro mayor, y que
       // recete por Memed —en Brasil una receta necesita firma digital, y la de
-      // Vitalis no la tiene (ver services/memed.js).
+      // Symphomed no la tiene (ver services/memed.js).
       //
       // Faltaba, y el síntoma no era un error: era una cuenta que se veía
       // brasileña, cobraba por Pix, y no podía recetar.

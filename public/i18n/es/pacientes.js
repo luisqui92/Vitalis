@@ -1,4 +1,4 @@
-// Vitalis — Español · panel, alta de paciente y Kardex (public/js/pacientes.js).
+// Symphomed — Español · panel, alta de paciente y Kardex (public/js/pacientes.js).
 Object.assign(I18N.es, {
   // ─── Panel (lista de pacientes) ───────────────────────────────────────
   "pacientes.saludo": "Hola, {nombre}",
@@ -37,7 +37,7 @@ Object.assign(I18N.es, {
   "pacientes.nuevo.duenoPlaceholder": "Ej: María Pérez",
   "pacientes.nuevo.semanasGesta": "Semanas de gestación al nacer (opcional)",
   "pacientes.nuevo.semanasGestaPlaceholder": "Ej: 32 — dejalo vacío si nació a término",
-  "pacientes.nuevo.avisoPrematuro": "Si nació prematuro, Vitalis usa la edad corregida en las curvas hasta los 2 años.",
+  "pacientes.nuevo.avisoPrematuro": "Si nació prematuro, Symphomed usa la edad corregida en las curvas hasta los 2 años.",
   "pacientes.nuevo.tutor": "Madre, padre o tutor (opcional)",
   "pacientes.nuevo.parentesco": "Parentesco (opcional)",
   "pacientes.nuevo.parentescoPlaceholder": "Ej: Madre",

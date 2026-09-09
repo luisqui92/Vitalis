@@ -1,4 +1,4 @@
-// Vitalis — le suma historia clínica larga a los pacientes de demo que ya
+// Symphomed — le suma historia clínica larga a los pacientes de demo que ya
 // existen (los que creó antes scripts/seed_pacientes_demo.js): más
 // consultas espaciadas en el tiempo, medicamentos activos/pasados, vacunas,
 // evolución clínica (signos vitales con tendencia), estudios (con archivo

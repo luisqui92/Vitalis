@@ -1,8 +1,8 @@
-// Vitalis Neurodesarrollo — Crea (o actualiza) una cuenta de psicología
+// Symphomed Neurodesarrollo — Crea (o actualiza) una cuenta de psicología
 // infantil de demo con 6 pacientes: autismo en distintos perfiles, síndrome
 // de Down, un diagnóstico dual y un TDAH con trastorno del lenguaje.
 //
-// La demo está armada para que se vean las cosas que Vitalis hace y los
+// La demo está armada para que se vean las cosas que Symphomed hace y los
 // cuadernos no:
 //
 //  · Los DOS EJES del DSM-5 por separado. Sofía necesita nivel 1 de apoyo en
@@ -648,7 +648,7 @@ async function crearPaciente(medicoPhone, d) {
   }
 
   // ─── Instrumentos aplicados ────────────────────────────────────────────
-  // Vitalis registra el RESULTADO, no el instrumento: el ADOS-2 y la mayoría
+  // Symphomed registra el RESULTADO, no el instrumento: el ADOS-2 y la mayoría
   // de estos son propiedad de sus editoriales y requieren entrenamiento
   // formal. Lo que se guarda es lo que la profesional obtuvo con sus propios
   // materiales, igual que se guarda una glucemia sin ser el laboratorio.
@@ -693,7 +693,7 @@ async function crearPaciente(medicoPhone, d) {
   const password = process.argv[4] || "demo12345";
 
   await mongoose.connect(CONFIG.MONGODB_URI);
-  console.log("\n  Vitalis Neurodesarrollo — demo de psicología infantil\n");
+  console.log("\n  Symphomed Neurodesarrollo — demo de psicología infantil\n");
 
   let medico = await Medico.findOne({ phone });
   if (medico) {

@@ -1,4 +1,4 @@
-// Vitalis Odonto — Plan de tratamiento y presupuesto: catálogo reutilizable
+// Symphomed Odonto — Plan de tratamiento y presupuesto: catálogo reutilizable
 // (nombre + precio) y, por paciente, una lista de ítems opcionalmente
 // ligados a una pieza del odontograma, con pagos registrados contra cada
 // uno. Saldo = precio - suma de pagos, siempre calculado al vuelo.
@@ -17,7 +17,7 @@ function estadoTratamientoInfo() {
   return salida;
 }
 
-// Vitalis Face: en vez de pieza FDI (odontología), un tratamiento se
+// Symphomed Face: en vez de pieza FDI (odontología), un tratamiento se
 // ubica en una región del rostro — mismas etiquetas que el mapa anatómico
 // de la referencia de diseño.
 const REGIONES_FACIALES = [

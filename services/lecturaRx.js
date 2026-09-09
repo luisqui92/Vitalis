@@ -1,4 +1,4 @@
-// Vitalis — Segunda lectura de una radiografía dental.
+// Symphomed — Segunda lectura de una radiografía dental.
 //
 // ═══ ESTO NO DIAGNOSTICA, Y NO ES UNA FORMA DE HABLAR ══════════════════════
 //
@@ -29,7 +29,7 @@
 //
 // ═══ ESTADO: SIN VALIDAR ═══════════════════════════════════════════════════
 //
-// gpt-4o-mini —el modelo del resto de Vitalis— no es un modelo de
+// gpt-4o-mini —el modelo del resto de Symphomed— no es un modelo de
 // radiología, y ninguno de los generalistas lo es. Mirando una placa no
 // dicen "no sé": inventan hallazgos con lenguaje seguro.
 //
@@ -41,7 +41,7 @@ const axios = require("axios");
 const { CONFIG } = require("../config");
 
 // Configurable porque en Fase 0 hay que poder comparar modelos, y porque el
-// del resto de Vitalis (mini) es el más flojo justo en visión.
+// del resto de Symphomed (mini) es el más flojo justo en visión.
 const MODELO = process.env.MODELO_LECTURA_RX || "gpt-4o";
 
 const PROMPT = `Sos un asistente que DESCRIBE radiografías dentales (periapicales y bitewing) para un odontólogo que ya hizo su propia lectura. Tu texto es una segunda mirada, no un informe.

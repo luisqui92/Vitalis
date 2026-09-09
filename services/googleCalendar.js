@@ -1,4 +1,4 @@
-// ChatGo Salud — Google Calendar: refleja las citas de Vitalis en el
+// ChatGo Salud — Google Calendar: refleja las citas de Symphomed en el
 // calendario del médico. Usa una cuenta de servicio (no OAuth por médico):
 // el médico comparte SU calendario con el email de la cuenta de servicio
 // ("hacer cambios en eventos") y listo — mucho más simple que un flujo de
@@ -6,7 +6,7 @@
 //
 // Si GOOGLE_SERVICE_ACCOUNT_JSON no está configurado, o el médico no cargó
 // su googleCalendarId, todas las funciones no hacen nada (no rompen la
-// creación de la cita en Vitalis — el calendario es un espejo, no la fuente
+// creación de la cita en Symphomed — el calendario es un espejo, no la fuente
 // de verdad).
 const crypto = require("crypto");
 const axios = require("axios");
@@ -82,10 +82,10 @@ async function crearEvento(calendarId, cita) {
 }
 
 // Devuelven true/false (se sincronizó o no) — el calendario sigue sin ser
-// la fuente de verdad (si esto falla, la cita en Vitalis ya quedó guardada
+// la fuente de verdad (si esto falla, la cita en Symphomed ya quedó guardada
 // igual), pero antes esto se perdía en silencio: un evento que no se pudo
 // borrar/mover en Google Calendar seguía figurando "ocupado" ahí para
-// siempre, bloqueando horarios que en Vitalis ya estaban libres, sin que
+// siempre, bloqueando horarios que en Symphomed ya estaban libres, sin que
 // nadie se entere. Ahora el caller puede avisar.
 async function actualizarEvento(calendarId, eventId, cita) {
   if (!calendarId || !eventId) return false;
@@ -122,8 +122,8 @@ async function eliminarEvento(calendarId, eventId) {
 
 // Franjas ocupadas del calendario REAL del médico en un rango (incluye
 // eventos que el médico cargó directo en Google Calendar, no solo los que
-// vinieron de Vitalis) — para no ofrecer un horario que ya está tomado ahí
-// aunque en Vitalis no haya ninguna Cita registrada todavía.
+// vinieron de Symphomed) — para no ofrecer un horario que ya está tomado ahí
+// aunque en Symphomed no haya ninguna Cita registrada todavía.
 // Devuelve [{ inicio: Date, fin: Date }, ...], o [] si no está configurado.
 async function obtenerOcupadoEnRango(calendarId, desde, hasta) {
   if (!calendarId) return [];

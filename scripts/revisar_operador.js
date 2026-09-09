@@ -1,4 +1,4 @@
-// Vitalis — ¿Por qué no veo el panel de Pagos?
+// Symphomed — ¿Por qué no veo el panel de Pagos?
 //
 // El panel de Pagos aparece cuando se cumplen TRES cosas a la vez, y ninguna
 // de las tres se ve desde la pantalla:

@@ -1,4 +1,4 @@
-// Vitalis — Códigos correlativos por consultorio
+// Symphomed — Códigos correlativos por consultorio
 //
 // Cortos y dictables por teléfono: P-0001 para un paciente, INF-0001 para un
 // informe. No son adorno — el código del paciente es lo que el técnico tipea

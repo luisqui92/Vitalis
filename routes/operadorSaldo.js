@@ -1,4 +1,4 @@
-// Vitalis — Pantalla de operador: acreditar recargas sin entrar por SSH.
+// Symphomed — Pantalla de operador: acreditar recargas sin entrar por SSH.
 //
 // ═══ ESTE ES EL ENDPOINT MÁS PELIGROSO DEL SISTEMA ═════════════════════════
 //
@@ -50,7 +50,7 @@ const { log } = require("../config");
 // manejar cobranzas no se podía ni configurar.
 //
 // Una cuenta con rol "admin" es exactamente lo contrario: es la cuenta
-// administrativa que ya existe en Vitalis y que las 30 rutas clínicas
+// administrativa que ya existe en Symphomed y que las 30 rutas clínicas
 // rechazan solas (ver el comentario de tokenDeMedico en medicoAuth.js). No
 // tiene pacientes, no puede abrir una ficha, no consume saldo. Es la cuenta
 // correcta para esto.

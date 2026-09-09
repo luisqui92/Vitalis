@@ -63,7 +63,7 @@ module.exports = function (app) {
     res.json({ ok: true });
   }));
 
-  // ─── RECETA ÓPTICA (Vitalis Visión) — esfera/cilindro/eje/adición por ojo,
+  // ─── RECETA ÓPTICA (Symphomed Visión) — esfera/cilindro/eje/adición por ojo,
   // distinta a una receta de medicamentos. Mismo criterio: crearla ya es la
   // aprobación del médico. ──────────────────────────────────────────────
   function ladoOjoDesdeBody(body) {

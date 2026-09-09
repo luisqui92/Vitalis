@@ -1,4 +1,4 @@
-// Vitalis Visión — Mapa ocular: diagrama 2D (corte esquemático, no 3D — la
+// Symphomed Visión — Mapa ocular: diagrama 2D (corte esquemático, no 3D — la
 // vuelta 3D queda pendiente hasta tener un modelo con licencia y estructuras
 // separadas, mismo criterio que se usó para el odontograma). Cada ojo (OD/OI)
 // se dibuja aparte, con sus 12 estructuras clickeables y su propio timeline.

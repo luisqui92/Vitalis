@@ -1,4 +1,4 @@
-// Vitalis Odonto — Catálogo de tratamientos (reutilizable, con precio) y
+// Symphomed Odonto — Catálogo de tratamientos (reutilizable, con precio) y
 // plan de tratamiento por paciente (ítems opcionalmente ligados a una
 // pieza del odontograma, con pagos registrados contra cada uno).
 const { Paciente, CatalogoTratamiento, TratamientoPlan } = require("../db/models");

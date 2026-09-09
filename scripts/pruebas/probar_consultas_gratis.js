@@ -1,4 +1,4 @@
-// Vitalis — Las consultas de cortesía: ni una de más, ni una de menos.
+// Symphomed — Las consultas de cortesía: ni una de más, ni una de menos.
 //
 // Cada cuenta nueva tiene 4 consultas gratis. Es lo que permite que un médico
 // sepa si esto le sirve antes de pagar — para la cuarta ya sabe si le ahorra

@@ -1,4 +1,4 @@
-// Vitalis — Que el reporte financiero no se le escape a nadie.
+// Symphomed — Que el reporte financiero no se le escape a nadie.
 //
 // Acá adentro están los números del negocio: lo que factura cada país, los
 // márgenes, cuánta plata hace falta. No es información clínica, así que no
@@ -37,7 +37,7 @@ verificar("  ...y tampoco hay una copia suelta en public/",
 
 const vista = fs.readFileSync(path.join(RAIZ, "vistas", "reporte.html"), "utf8");
 console.log("\n── 2. La página no depende de nada de afuera ──");
-// La CSP de Vitalis solo admite 'self'. Una fuente de Google no rompe nada
+// La CSP de Symphomed solo admite 'self'. Una fuente de Google no rompe nada
 // visible: cae en silencio y la página queda con la tipografía del sistema.
 verificar("no pide fuentes a Google", !/fonts\.googleapis|fonts\.gstatic/.test(vista));
 verificar("usa las fuentes ya alojadas", /\/fonts\/(fraunces|inter)-variable\.woff2/.test(vista));

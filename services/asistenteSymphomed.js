@@ -1,16 +1,16 @@
-// Vitalis — "Preguntale a Vitalis": el asistente que explica cómo funciona
+// Symphomed — "Preguntale a Symphomed": el asistente que explica cómo funciona
 // el sistema. Distinto de services/memoriaClinica.js, que responde sobre la
 // historia de UN paciente; este responde sobre la app: dónde está cada
 // cosa, cómo se hace tal tarea, qué significa tal función.
 //
 // La clave está en el manual de abajo: la IA responde SOLO con eso. Sin un
-// manual escrito a mano, un modelo general inventa funciones que Vitalis no
+// manual escrito a mano, un modelo general inventa funciones que Symphomed no
 // tiene ("andá a Configuración > Exportar a PDF") y el médico termina
 // buscando botones que no existen — peor que no responder.
 const axios = require("axios");
 const { CONFIG } = require("../config");
 
-const PROMPT_SISTEMA = `Sos el asistente de Vitalis, un sistema de historia clínica para
+const PROMPT_SISTEMA = `Sos el asistente de Symphomed, un sistema de historia clínica para
 consultorios. Un médico o su secretaria te preguntan cómo usar el sistema y
 vos respondés en español, con el "vos" rioplatense/boliviano.
 
@@ -31,10 +31,10 @@ Reglas, en orden de importancia:
   decilo con amabilidad y ofrecé ayuda con el sistema.`;
 
 // ─── MANUAL ───────────────────────────────────────────────────────────────
-// Lo que Vitalis REALMENTE hace hoy. Cuando se agrega una función al
+// Lo que Symphomed REALMENTE hace hoy. Cuando se agrega una función al
 // sistema, hay que sumarla acá o el asistente va a decir que no existe.
 const MANUAL_GENERAL = `
-QUÉ ES VITALIS
+QUÉ ES SYMPHOMED
 Un sistema de historia clínica pensado para consultorios: graba la consulta,
 la transcribe, arma la nota clínica con IA y guarda todo en la ficha del
 paciente (el SmartKardex). Se usa desde el navegador, en el celular o en la
@@ -56,10 +56,10 @@ Al entrar se ve la lista de pacientes y una fila de accesos rápidos:
   de actividad de la cuenta.
 Arriba hay un buscador para filtrar pacientes por nombre.
 En pantallas grandes (computadora) aparece además un menú lateral con
-Inicio, Pacientes, Agenda, Vitalis Voice, Indicaciones, Estudios e
+Inicio, Pacientes, Agenda, Symphomed Voice, Indicaciones, Estudios e
 imágenes, Reportes, Finanzas y Configuración.
 
-GRABAR UNA CONSULTA (Vitalis Voice)
+GRABAR UNA CONSULTA (Symphomed Voice)
 1. Entrá al paciente y andá a la pestaña "Consultas".
 2. Tocá "Nueva consulta" y después el botón de grabar.
 3. Mientras grabás, el logo late con la voz y aparece una vista previa del
@@ -121,16 +121,16 @@ AGENDA Y RESERVAS
 En Agenda se configura el horario de atención, cuánto dura cada consulta y,
 si se quiere, el calendario de Google donde se reflejan las citas (nunca
 ofrece un horario que ya esté ocupado ahí, aunque la cita no sea de
-Vitalis). Las citas se pueden cargar a mano o llegar solas: el paciente
+Symphomed). Las citas se pueden cargar a mano o llegar solas: el paciente
 escribe al WhatsApp del consultorio y un asistente lo guía para reservar,
 cancelar o responder preguntas sobre horarios. También existe un link de
 reserva que el paciente abre y elige el horario que le queda mejor.
 
 AVISOS DE RESERVAS
 En Seguridad se activan las notificaciones del navegador: cuando entra una
-reserva llega un aviso al dispositivo aunque Vitalis esté cerrado. Se activa
+reserva llega un aviso al dispositivo aunque Symphomed esté cerrado. Se activa
 por dispositivo y hay un botón para mandarse una de prueba. En iPhone
-primero hay que agregar Vitalis a la pantalla de inicio (Compartir →
+primero hay que agregar Symphomed a la pantalla de inicio (Compartir →
 Agregar a inicio) y abrirlo desde ahí.
 
 RECORDATORIOS
@@ -139,11 +139,11 @@ paciente, tipo y fecha. Se marcan como hechos o se eliminan.
 
 GRABAR DESDE EL CELULAR (micrófono remoto)
 Si la computadora no tiene micrófono, en "Vincular celular" aparece un
-código; se abre Vitalis en el celular, se ingresa ese código y desde ahí se
+código; se abre Symphomed en el celular, se ingresa ese código y desde ahí se
 graba la consulta, que llega igual a la ficha del paciente.
 
 TIEMPO REAL
-Si se tiene Vitalis abierto en el celular y en la computadora a la vez, lo
+Si se tiene Symphomed abierto en el celular y en la computadora a la vez, lo
 que se carga en uno aparece solo en el otro, sin recargar.
 
 SEGURIDAD
@@ -153,17 +153,17 @@ con fecha e IP.
 
 VISOR DE IMÁGENES
 - Cualquier imagen del Centro de Estudios (radiografías, ecografías, fotos)
-  se abre dentro de Vitalis con zoom, giro, espejo, negativo, brillo y
+  se abre dentro de Symphomed con zoom, giro, espejo, negativo, brillo y
   contraste. Los PDF se abren aparte, como siempre.
 - Se puede medir distancias y ángulos encima de la imagen. Las mediciones se
   guardan en la ficha del paciente y vuelven a aparecer al reabrir el
   estudio, incluso desde otro dispositivo.
 - IMPORTANTE sobre las distancias: una imagen JPEG o PNG no trae el tamaño
-  real del píxel (eso solo viene en DICOM), así que Vitalis las muestra en
+  real del píxel (eso solo viene en DICOM), así que Symphomed las muestra en
   PÍXELES hasta que se calibre. Para calibrar se marca una distancia
   conocida (por ejemplo el largo del sensor intraoral) y se escribe cuánto
   mide en milímetros; de ahí en adelante todas las mediciones de esa imagen
-  salen en milímetros. Vitalis nunca muestra milímetros sin calibrar.
+  salen en milímetros. Symphomed nunca muestra milímetros sin calibrar.
 - Los ángulos sí se muestran siempre en grados: no dependen de la escala.
 - El archivo original NUNCA se modifica. El brillo, el contraste y el giro
   son solo formas de mirarlo, y se guardan aparte.
@@ -171,7 +171,7 @@ VISOR DE IMÁGENES
 
 const MANUAL_POR_ESPECIALIDAD = {
   odontologia: `
-ODONTOLOGÍA (Vitalis Odonto)
+ODONTOLOGÍA (Symphomed Odonto)
 - Odontograma: la arcada completa con las 32 piezas. Se toca cada una y se
   carga su estado: sano, caries, obturado, corona, endodoncia, implante,
   sellante, fractura, ausente. Y los tratamientos indicados pero todavía no
@@ -191,7 +191,7 @@ ODONTOLOGÍA (Vitalis Odonto)
   puesto — se revisa antes de confirmar.`,
 
   oftalmologia: `
-OFTALMOLOGÍA (Vitalis Visión)
+OFTALMOLOGÍA (Symphomed Visión)
 - Mapa ocular: un esquema de cada ojo (derecho e izquierdo) con sus
   estructuras —córnea, iris, pupila, cristalino, esclerótica, conjuntiva,
   cámara anterior, retina, mácula, nervio óptico, vasos y vítreo—. Se toca
@@ -204,7 +204,7 @@ OFTALMOLOGÍA (Vitalis Visión)
   sistema avisa si el último valor pasa de 21 mmHg o si viene en alza.`,
 
   ginecologia: `
-GINECOLOGÍA Y OBSTETRICIA (Vitalis Gineco)
+GINECOLOGÍA Y OBSTETRICIA (Symphomed Gineco)
 - Embarazo: se carga la fecha de última menstruación y calcula solo la fecha
   probable de parto, las semanas y días de gestación y el trimestre. Muestra
   una silueta cuya panza crece con las semanas, el tamaño del bebé comparado
@@ -221,7 +221,7 @@ GINECOLOGÍA Y OBSTETRICIA (Vitalis Gineco)
 - Los estudios se muestran como "Ecografías" en la ficha.`,
 
   neurodesarrollo: `
-NEURODESARROLLO (Vitalis Neurodesarrollo) — autismo, síndrome de Down y otras
+NEURODESARROLLO (Symphomed Neurodesarrollo) — autismo, síndrome de Down y otras
 - Acá la ficha NO es un historial de enfermedad: es el mapa de una persona.
   Por eso no hay un campo "diagnóstico" con una etiqueta única.
 - Perfil: se marcan una o varias condiciones (autismo, síndrome de Down,
@@ -246,20 +246,20 @@ NEURODESARROLLO (Vitalis Neurodesarrollo) — autismo, síndrome de Down y otras
   qué toca ahora y qué está al día. Las plantillas son un punto de partida
   basado en guías publicadas, NO un protocolo: todo se puede editar y borrar,
   el criterio que manda es el del profesional.
-- Vitalis no diagnostica ni puntúa riesgo en esta rama. Registra y muestra.`,
+- Symphomed no diagnostica ni puntúa riesgo en esta rama. Registra y muestra.`,
 
   pediatria: `
-PEDIATRÍA (Vitalis Pediatría)
+PEDIATRÍA (Symphomed Pediatría)
 - Curvas de crecimiento con los patrones oficiales de la OMS: peso para la
   edad (hasta los 10 años), talla para la edad (hasta los 19), perímetro
   cefálico (hasta los 5) e IMC para la edad (hasta los 19). Cada control se
   dibuja sobre las bandas de la OMS y se muestra el percentil y el z-score.
-  Fuera de esos rangos Vitalis no calcula percentil: lo dice, no lo inventa.
+  Fuera de esos rangos Symphomed no calcula percentil: lo dice, no lo inventa.
 - El IMC no se carga a mano: se calcula solo cuando se cargan peso y talla
   en el mismo control.
 - Compara cada control con el anterior y avisa cuando el chico se movió de
   carril hacia abajo (media desviación estándar o más). Es un aviso para
-  mirar, no un diagnóstico: Vitalis nunca dice "desnutrido".
+  mirar, no un diagnóstico: Symphomed nunca dice "desnutrido".
 - Edad corregida para prematuros: si se cargan las semanas de gestación al
   nacer, hasta los 2 años los percentiles se calculan descontando lo que le
   faltó para llegar a término. Sin eso, un prematuro se lee como un retraso
@@ -272,7 +272,7 @@ PEDIATRÍA (Vitalis Pediatría)
   su parentesco — el teléfono de contacto es el de esa persona.`,
 
   estetica: `
-ESTÉTICA (Vitalis Face)
+ESTÉTICA (Symphomed Face)
 - Las pestañas propias son "Procedimientos" (el plan de tratamiento) y
   "Fotos".
 - Procedimientos: el plan con precio por ítem, pagos parciales y saldo (el
@@ -290,7 +290,7 @@ ESTÉTICA (Vitalis Face)
   medición con hardware de profundidad.`,
 
   veterinaria: `
-VETERINARIA (Vitalis Vet)
+VETERINARIA (Symphomed Vet)
 - La ficha es de la mascota: nombre, especie, raza y los datos del dueño.
 - El resto funciona igual que en medicina general: consultas grabadas,
   medicación, vacunas, controles y estudios.`,
@@ -319,7 +319,7 @@ function construirDatosPropios(datos) {
   return partes.length ? `\n\nDATOS ACTUALES DE ESTE CONSULTORIO:\n${partes.join("\n")}` : "";
 }
 
-async function preguntarAVitalis(pregunta, { tipoEspecialidad, datos, historial }) {
+async function preguntarASymphomed(pregunta, { tipoEspecialidad, datos, historial }) {
   const contexto = construirManual(tipoEspecialidad) + construirDatosPropios(datos);
 
   // Se manda el ida y vuelta anterior para que se pueda repreguntar ("¿y
@@ -334,7 +334,7 @@ async function preguntarAVitalis(pregunta, { tipoEspecialidad, datos, historial 
     {
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: PROMPT_SISTEMA + "\n\n=== MANUAL DE VITALIS ===\n" + contexto },
+        { role: "system", content: PROMPT_SISTEMA + "\n\n=== MANUAL DE SYMPHOMED ===\n" + contexto },
         ...mensajesPrevios,
         { role: "user", content: pregunta },
       ],
@@ -346,4 +346,4 @@ async function preguntarAVitalis(pregunta, { tipoEspecialidad, datos, historial 
   return res.data.choices[0].message.content.trim();
 }
 
-module.exports = { preguntarAVitalis };
+module.exports = { preguntarASymphomed };

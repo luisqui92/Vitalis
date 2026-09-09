@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Pediatría — Curvas de crecimiento
+// Symphomed Pediatría — Curvas de crecimiento
 // ═══════════════════════════════════════════════════════════════════════════
 // Un pediatra sin curvas no tiene ficha. Lo que importa no es el peso de hoy
 // sino por qué carril viene el chico: uno que siempre estuvo en el percentil
@@ -10,7 +10,7 @@
 // Acá está solo el cálculo y el dibujo — a propósito separados, para que
 // nadie toque los números por acomodar un gráfico.
 //
-// Postura, igual que en el resto de Vitalis: esto calcula y muestra. No
+// Postura, igual que en el resto de Symphomed: esto calcula y muestra. No
 // diagnostica, no dice "desnutrido". Marca cuándo un valor cae fuera de lo
 // esperado y el pediatra decide qué significa.
 

@@ -1,4 +1,4 @@
-// Vitalis — Autenticación JWT + hash de contraseñas para médicos.
+// Symphomed — Autenticación JWT + hash de contraseñas para médicos.
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 
@@ -6,7 +6,7 @@ const COSTO_BCRYPT = 12;
 
 // JWT_SECRET es obligatorio para evitar tokens predecibles
 if (!process.env.JWT_SECRET) {
-  console.error("❌ JWT_SECRET no está definido en variables de entorno. Vitalis no puede autenticar médicos de forma segura.");
+  console.error("❌ JWT_SECRET no está definido en variables de entorno. Symphomed no puede autenticar médicos de forma segura.");
   console.error("   Generá uno con: openssl rand -hex 32");
 }
 

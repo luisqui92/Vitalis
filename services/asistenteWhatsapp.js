@@ -12,7 +12,7 @@ const { CONFIG, log } = require("../config");
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
-// El horario de atención ya está cargado en Vitalis (los checkboxes de
+// El horario de atención ya está cargado en Symphomed (los checkboxes de
 // Agenda → Configurar horario) — el asistente lo usa solo, sin que el
 // médico tenga que volver a escribirlo en el campo de texto libre.
 function formatearHorarioAtencion(horarioAtencion) {

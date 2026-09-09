@@ -1,4 +1,4 @@
-// Vitalis — Português · laudos assinados e papel timbrado.
+// Symphomed — Português · laudos assinados e papel timbrado.
 //
 // Um laudo assinado é documento: depois de assinado não se edita. Traduzir
 // os rótulos não muda o valor legal dele — para o Brasil é preciso revisar o

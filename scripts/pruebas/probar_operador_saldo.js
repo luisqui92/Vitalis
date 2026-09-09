@@ -1,4 +1,4 @@
-// Vitalis — Los candados de la pantalla que fabrica dinero.
+// Symphomed — Los candados de la pantalla que fabrica dinero.
 //
 // Todo lo demás del sistema lee o escribe datos clínicos. Esto EMITE SALDO:
 // quien llegue puede darse plata infinita, y el fraude no se ve como un error

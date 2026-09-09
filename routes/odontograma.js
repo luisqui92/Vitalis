@@ -1,4 +1,4 @@
-// Vitalis Odonto — Odontograma: la ficha dental de cada paciente, pieza por
+// Symphomed Odonto — Odontograma: la ficha dental de cada paciente, pieza por
 // pieza (numeración FDI). Se crea solo, con las 32 piezas permanentes en
 // "sano", la primera vez que un odontólogo la abre para un paciente —
 // así nunca hay que dar de alta nada a mano antes de poder usarlo.

@@ -1,4 +1,4 @@
-// Vitalis — Português · textos compartilhados por várias telas.
+// Symphomed — Português · textos compartilhados por várias telas.
 Object.assign(I18N.pt, {
   "dia.corto.0": "Dom",
   "dia.corto.1": "Seg",

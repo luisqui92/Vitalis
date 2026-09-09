@@ -1,4 +1,4 @@
-// Vitalis — Las dos formas de pagar, y que no se pisen.
+// Symphomed — Las dos formas de pagar, y que no se pisen.
 //
 // Prepago: carga saldo y cada consulta descuenta.
 // Plan:    paga por mes o por año y las consultas no descuentan.
@@ -61,7 +61,7 @@ verificar("  ...y dice cuántos quedan", suscripciones.estado(conPlanHasta("2026
 
 console.log("\n── 5. Renovar no le come días al que pagó adelantado ──");
 // Si el período nuevo arrancara HOY, renovar antes de tiempo le regalaría
-// días a Vitalis y se los sacaría al médico. Es de las cosas que el que pagó
+// días a Symphomed y se los sacaría al médico. Es de las cosas que el que pagó
 // por adelantado SÍ descubre.
 const vigenteHasta = conPlanHasta("2026-10-07T12:00:00Z");
 const renovado = suscripciones.nuevoVencimiento(vigenteHasta, "mensual", HOY);

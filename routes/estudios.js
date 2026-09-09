@@ -129,7 +129,7 @@ module.exports = function (app) {
         : { mmPorPixel: null, mmPorPixelY: null, referencia: "", fecha: null, origen: "", planoDetector: false };
     }
 
-    // Los puntos del perfil marcados a mano (Vitalis Face). Se exige la lista
+    // Los puntos del perfil marcados a mano (Symphomed Face). Se exige la lista
     // COMPLETA: si falta uno, los índices se corren y el ángulo nasolabial
     // pasa a calcularse sobre el labio equivocado — un número creíble y mal,
     // que es la peor clase de número. El largo lo fija el cliente
@@ -143,7 +143,7 @@ module.exports = function (app) {
         : [];
     }
 
-    // Anotaciones de Vitalis Face. Se guarda la lista completa que manda el
+    // Anotaciones de Symphomed Face. Se guarda la lista completa que manda el
     // cliente: es lo que el médico ve en pantalla, y mezclarla con la que ya
     // estaba dejaría duplicados al reabrir.
     if (Array.isArray(req.body?.anotaciones)) {

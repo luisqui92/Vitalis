@@ -1,8 +1,8 @@
-# Caja Vitalis · puente DICOM
+# Caja Symphomed · puente DICOM
 
 Los equipos de imagen (ecógrafo, tomógrafo, panorámico) hablan DICOM. La Caja
-Vitalis es una máquina en la clínica que los escucha, guarda el estudio
-original en su propio disco, y le manda a Vitalis solo dos cosas: la metadata
+Symphomed es una máquina en la clínica que los escucha, guarda el estudio
+original en su propio disco, y le manda a Symphomed solo dos cosas: la metadata
 y una vista previa.
 
 **El `.dcm` original no sale de la clínica.** Es todo el punto: subir una
@@ -16,7 +16,7 @@ mundo, y el médico la necesita ahora.
 Dos cosas, en la misma máquina:
 
 1. **Orthanc** — recibe los estudios de los equipos por C-STORE.
-2. **Este agente** — mira lo que va llegando y lo sube a Vitalis.
+2. **Este agente** — mira lo que va llegando y lo sube a Symphomed.
 
 ### Orthanc
 
@@ -47,14 +47,14 @@ cp config.ejemplo.json config.json
 node agente.js
 ```
 
-El **token** se saca de Vitalis: ficha de cualquier paciente → pestaña
+El **token** se saca de Symphomed: ficha de cualquier paciente → pestaña
 Estudios → *Administrar* → dar de alta un equipo. Se muestra **una sola vez**.
 
 Para que arranque solo con la máquina, en Linux con systemd:
 
 ```ini
 [Unit]
-Description=Caja Vitalis - puente DICOM
+Description=Caja Symphomed - puente DICOM
 After=network-online.target docker.service
 
 [Service]
@@ -86,7 +86,7 @@ Conviene tenerlos grabados en la cara trasera de la caja.
 
 ## Lo que hace que un estudio se archive solo
 
-Cuando llega una imagen, Vitalis decide de quién es en este orden:
+Cuando llega una imagen, Symphomed decide de quién es en este orden:
 
 1. **El técnico tipeó el código del paciente** (`P-0147`) en el campo
    *Patient ID* del equipo → se archiva solo, sin que nadie toque nada. Es el
@@ -94,7 +94,7 @@ Cuando llega una imagen, Vitalis decide de quién es en este orden:
 2. **Hay una ventana de captura abierta** — el médico entró a la ficha y tocó
    *Capturar radiografía*. Es el flujo del consultorio con un sillón.
 3. **Nadie sabe** → va a la bandeja de entrada, con el nombre que el técnico
-   escribió, y el médico lo asigna desde Vitalis.
+   escribió, y el médico lo asigna desde Symphomed.
 
 **Que la bandeja esté vacía es el caso bueno**, no el raro.
 
@@ -116,7 +116,7 @@ peor forma de estar mal.
 
 **Si algo falla, no se pierde nada.** Lo que no se pudo subir se reintenta en
 la vuelta siguiente. Lo que ya subió queda anotado en `subidos.json`; si se
-borra ese archivo, se reenvía todo y Vitalis lo descarta por duplicado.
+borra ese archivo, se reenvía todo y Symphomed lo descarta por duplicado.
 
 ---
 

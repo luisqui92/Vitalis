@@ -1,4 +1,4 @@
-// Vitalis — El reporte financiero, y a quién se le muestra.
+// Symphomed — El reporte financiero, y a quién se le muestra.
 //
 // ═══ POR QUÉ EL ARCHIVO NO VIVE EN public/ ═════════════════════════════════
 //
@@ -25,13 +25,13 @@
 //
 // ═══ LA CSP SE REESCRIBE ACÁ, Y MÁS ESTRICTA ═══════════════════════════════
 //
-// La CSP global de Vitalis (index.js) permite scripts de 'self' pero no
+// La CSP global de Symphomed (index.js) permite scripts de 'self' pero no
 // inline, y el reporte es una página con su script adentro. En vez de
 // aflojar la política de toda la aplicación para una pantalla, se manda una
 // CSP propia en esta respuesta, con un nonce por pedido — y de paso más
 // cerrada que la global: ni conexiones salientes, ni frames, ni formularios.
 //
-// Van también dos cabeceras que en el resto de Vitalis no hacen falta:
+// Van también dos cabeceras que en el resto de Symphomed no hacen falta:
 // no-store, porque un reporte financiero no puede quedar en el disco de una
 // notebook prestada, y noindex, porque un enlace de invitación que llegue a
 // un buscador deja de ser una invitación.
@@ -61,7 +61,7 @@ try {
   log.warn(`[REPORTE] No se pudieron leer las vistas: ${e.message}`);
 }
 
-// La CSP de esta pantalla. Más cerrada que la de Vitalis: el reporte no
+// La CSP de esta pantalla. Más cerrada que la de Symphomed: el reporte no
 // habla con nadie afuera, así que no hay por qué permitírselo.
 function blindar(res, nonce) {
   res.setHeader("Content-Security-Policy", [

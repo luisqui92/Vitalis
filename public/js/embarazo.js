@@ -1,4 +1,4 @@
-// Vitalis Obstetricia — control de embarazo: FUM/FPP y semanas de
+// Symphomed Obstetricia — control de embarazo: FUM/FPP y semanas de
 // gestación (calculadas al vuelo, nunca guardadas, para no desincronizarse
 // con el paso de los días). Los controles control a control (peso
 // materno, altura uterina, frecuencia cardíaca fetal) viven en la pestaña

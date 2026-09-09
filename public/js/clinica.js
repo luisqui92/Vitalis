@@ -1,4 +1,4 @@
-// Vitalis — Panel de clínica: varios consultorios vistos desde arriba.
+// Symphomed — Panel de clínica: varios consultorios vistos desde arriba.
 //
 // Lo que esta pantalla NO muestra es tan parte del diseño como lo que sí:
 // no hay una consulta, ni un diagnóstico, ni un motivo de consulta. Un

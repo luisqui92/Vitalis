@@ -1,4 +1,4 @@
-// Vitalis — Suma un médico ya registrado a una clínica.
+// Symphomed — Suma un médico ya registrado a una clínica.
 //
 // No crea la cuenta: el médico se registra él mismo, con su propia
 // contraseña. Esto solo lo asocia a la clínica.

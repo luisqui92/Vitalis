@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Agente de Vitalis Rayos — corre en la PC del consultorio
+// Agente de Symphomed Rayos — corre en la PC del consultorio
 // ═══════════════════════════════════════════════════════════════════════════
 // Vigila la carpeta donde el software del sensor (Ai-Dental, DBSWIN, VixWin,
-// CS Imaging...) deja las radiografías, y sube cada imagen nueva a Vitalis,
+// CS Imaging...) deja las radiografías, y sube cada imagen nueva a Symphomed,
 // que la guarda en la ficha del paciente que el médico dejó esperando.
 //
 // Sin dependencias: solo módulos de Node. En una PC de consultorio no se
@@ -193,7 +193,7 @@ function estaCompleto(archivo) {
 }
 
 // ─── DIAGNÓSTICO DE LA CARPETA ────────────────────────────────────────────
-// Muchos sensores dentales guardan en .bmp o .tif, que Vitalis no acepta.
+// Muchos sensores dentales guardan en .bmp o .tif, que Symphomed no acepta.
 // Sin este aviso, una carpeta llena de .bmp se ve EXACTAMENTE igual que una
 // carpeta vacía: el agente dice "conectado", no sube nada, y no hay forma de
 // saber por qué. Es el primer lugar donde alguien va a perder una mañana.
@@ -227,8 +227,8 @@ function revisarFormatosDeLaCarpeta() {
   }
   if (soportados === 0 && otros.size > 0) {
     const lista = [...otros].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([e, n]) => `${n} ${e}`).join(", ");
-    log("✗", `en esa carpeta hay ${lista}, y Vitalis solo acepta ${EXTENSIONES.join(" ")}`);
-    log("→", "configurá el software del sensor para que exporte JPG o PNG, o avisanos y lo resolvemos del lado de Vitalis");
+    log("✗", `en esa carpeta hay ${lista}, y Symphomed solo acepta ${EXTENSIONES.join(" ")}`);
+    log("→", "configurá el software del sensor para que exporte JPG o PNG, o avisanos y lo resolvemos del lado de Symphomed");
     return;
   }
   if (otros.size > 0) {
@@ -277,7 +277,7 @@ async function subir(archivo, buffer, mime, hash) {
   }
 
   if (res.status === 401) {
-    log("✗", "el token del equipo no sirve — regeneralo en Vitalis y actualizá config.json");
+    log("✗", "el token del equipo no sirve — regeneralo en Symphomed y actualizá config.json");
     return false;
   }
 
@@ -293,7 +293,7 @@ async function reintentarEspera() {
   for (const [hash, item] of [...enEspera]) {
     if (Date.now() - item.desde > MINUTOS_REINTENTO * 60 * 1000) {
       enEspera.delete(hash);
-      log("✗", `${path.basename(item.archivo)} se dejó de intentar (${MINUTOS_REINTENTO} min sin que nadie la esperara) — subila a mano desde Vitalis`);
+      log("✗", `${path.basename(item.archivo)} se dejó de intentar (${MINUTOS_REINTENTO} min sin que nadie la esperara) — subila a mano desde Symphomed`);
       continue;
     }
     if (Date.now() < item.proximoIntento) continue;
@@ -309,7 +309,7 @@ function podarEspera() {
   for (const [hash, item] of [...enEspera]) {
     if (Date.now() - item.desde > MINUTOS_REINTENTO * 60 * 1000) {
       enEspera.delete(hash);
-      log("✗", `${path.basename(item.archivo)} se dejó de intentar (${MINUTOS_REINTENTO} min sin que nadie la esperara) — subila a mano desde Vitalis`);
+      log("✗", `${path.basename(item.archivo)} se dejó de intentar (${MINUTOS_REINTENTO} min sin que nadie la esperara) — subila a mano desde Symphomed`);
     }
   }
 }
@@ -325,7 +325,7 @@ function dejarEnEspera(archivo, buffer, mime, hash) {
 // ─── LÍNEA DE BASE DEL PRIMER ARRANQUE ────────────────────────────────────
 // Todo lo que ya estaba en la carpeta el día que se instala el agente es
 // historial viejo y NO se sube: si no, el primer arranque le mandaría a
-// Vitalis años de radiografías de otros pacientes, todas a la ficha del
+// Symphomed años de radiografías de otros pacientes, todas a la ficha del
 // que justo esté esperando. Se hace de una sola vez y aparte de la vuelta
 // normal, porque ahí ningún archivo cuenta todavía como "estable" (no hay
 // con qué comparar el tamaño) y la línea de base quedaría vacía.
@@ -361,7 +361,7 @@ async function revisar() {
 
     if (res.status === 401) {
       if (ultimoEstadoConexion !== "401") {
-        log("✗", "token inválido — regeneralo en Vitalis (Ajustes → Equipo de rayos) y actualizá config.json");
+        log("✗", "token inválido — regeneralo en Symphomed (Ajustes → Equipo de rayos) y actualizá config.json");
         ultimoEstadoConexion = "401";
       }
       return;
@@ -374,7 +374,7 @@ async function revisar() {
       return;
     }
     if (ultimoEstadoConexion !== "ok") {
-      log("✓", "conectado a Vitalis");
+      log("✓", "conectado a Symphomed");
       ultimoEstadoConexion = "ok";
     }
 
@@ -420,7 +420,7 @@ async function revisar() {
     }
   } catch (e) {
     if (ultimoEstadoConexion !== "sinred") {
-      log("!", "sin conexión con Vitalis: " + e.message);
+      log("!", "sin conexión con Symphomed: " + e.message);
       ultimoEstadoConexion = "sinred";
     }
   } finally {
@@ -431,7 +431,7 @@ async function revisar() {
 // ─── ARRANQUE ─────────────────────────────────────────────────────────────
 console.log("");
 console.log("  ╔══════════════════════════════════════════════╗");
-console.log("  ║   Vitalis Rayos — puente del consultorio      ║");
+console.log("  ║   Symphomed Rayos — puente del consultorio      ║");
 console.log("  ╚══════════════════════════════════════════════╝");
 console.log("");
 log("→", `carpeta vigilada: ${cfg.carpeta}`);
@@ -449,7 +449,7 @@ setInterval(revisar, SEGUNDOS_REVISION * 1000);
 // Si el software del sensor guarda una imagen justo después de una
 // revisión, esto la agarra en el acto en vez de esperar el intervalo.
 // fs.watch no es confiable en todas las máquinas (por eso igual revisamos
-// por reloj), pero cuando anda hace que la radiografía aparezca en Vitalis
+// por reloj), pero cuando anda hace que la radiografía aparezca en Symphomed
 // casi al instante.
 try {
   fs.watch(cfg.carpeta, { recursive: cfg.incluirSubcarpetas !== false }, () => {

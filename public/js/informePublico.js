@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — El informe visto por el paciente
+// Symphomed — El informe visto por el paciente
 // ═══════════════════════════════════════════════════════════════════════════
 // Lo que se abre al tocar el enlace de WhatsApp. Sin cuenta, sin contraseña,
 // sin instalar nada: el paciente toca y ve su informe con el membrete del
 // centro, y puede imprimirlo o guardarlo.
 //
-// Es la única pantalla de Vitalis que ve alguien que no es el médico, así
+// Es la única pantalla de Symphomed que ve alguien que no es el médico, así
 // que no muestra nada más que ESE informe: ni el resto de sus estudios, ni
 // su teléfono, ni su historia. Tener el enlace no abre la ficha.
 
@@ -17,7 +17,7 @@ function esPaginaInformePublico() {
 
 async function renderInformePublico() {
   const token = RUTA_INFORME[1];
-  document.title = "Tu informe · Vitalis";
+  document.title = "Tu informe · Symphomed";
   // El encabezado, el pie y el armazón de escritorio no van: esta pantalla
   // es del paciente, no del médico. Se BORRAN del documento en vez de
   // esconderse — escondidos siguen estando ahí, y un lector de pantalla (o

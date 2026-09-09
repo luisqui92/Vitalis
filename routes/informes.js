@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis — Informes con membrete
+// Symphomed — Informes con membrete
 // ═══════════════════════════════════════════════════════════════════════════
 // En un centro de imagen el informe ES el producto: el paciente no paga por
 // la placa, paga por la lectura del médico. Por eso tiene código propio,
@@ -34,7 +34,7 @@ const { CONFIG, log } = require("../config");
 const requireMedico = requireAuth(["medico"]);
 
 // El enlace del paciente es público (sin sesión), así que tiene su propio
-// límite: es la única puerta de Vitalis que cualquiera puede tocar.
+// límite: es la única puerta de Symphomed que cualquiera puede tocar.
 const limitPublico = rateLimit("informePublico", 40, 60 * 1000, "Demasiadas peticiones. Esperá un momento.");
 
 const DIAS_VALIDEZ_ENLACE = 90;
@@ -49,7 +49,7 @@ async function membreteDe(medicoPhone) {
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
     m = await Membrete.create({
       medicoPhone,
-      // Se arranca con lo que Vitalis ya sabe, para que el primer informe
+      // Se arranca con lo que Symphomed ya sabe, para que el primer informe
       // salga presentable sin que nadie configure nada.
       nombreCentro: medico?.nombre || "",
       profesionalNombre: medico?.nombre || "",
@@ -233,7 +233,7 @@ module.exports = function (app) {
       await enviarTexto(destino, texto);
     } catch (e) {
       // El error más común, y hay que decirlo con todas las letras porque
-      // si no parece que Vitalis está roto: fuera de la ventana de 24 h
+      // si no parece que Symphomed está roto: fuera de la ventana de 24 h
       // Meta solo deja mandar plantillas aprobadas.
       log.error("[INFORME] falló el envío por WhatsApp:", e.response?.data?.error?.message || e.message);
       throw new ErrorHttp(502,
@@ -325,7 +325,7 @@ module.exports = function (app) {
 
   // ─── VERIFICAR UN INFORME POR SU CÓDIGO ──────────────────────────────────
   // Cualquiera con el informe en la mano puede comprobar que es auténtico y
-  // que dice lo mismo que dice Vitalis. Es lo que le da valor a la firma:
+  // que dice lo mismo que dice Symphomed. Es lo que le da valor a la firma:
   // una imagen pegada la copia cualquiera, esto no.
   app.get("/informe-publico/:token/verificar", limitPublico, asyncRoute(async (req, res) => {
     const r = await porToken(req.params.token);

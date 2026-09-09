@@ -1,4 +1,4 @@
-// Vitalis — Propone qué fichas de una clínica son la misma persona.
+// Symphomed — Propone qué fichas de una clínica son la misma persona.
 //
 // ═══ POR QUÉ ESTO SOLO PROPONE ═════════════════════════════════════════════
 //

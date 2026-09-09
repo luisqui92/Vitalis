@@ -79,10 +79,15 @@ function correr(codigoAgenda, dicts) {
 }
 
 // ─── La comparación ────────────────────────────────────────────────────────
+// El código de main todavía dice "Vitalis": el producto se renombró a
+// Symphomed. Se normaliza la marca del lado VIEJO en vez de aflojar la
+// comparación, así esta prueba sigue haciendo lo único que vino a hacer —
+// detectar que el marcado cambió— y no se vuelve ciega al resto.
+const marcaVieja = (s) => s.replace(/Vitalis/g, "Symphomed");
 const antes = execSync(`git -C ${RAIZ} show main:public/js/agenda.js`, { encoding: "utf8", maxBuffer: 1 << 24 });
 const ahora = fs.readFileSync(`${RAIZ}/public/js/agenda.js`, "utf8");
 
-const viejo = correr(antes, null);
+const viejo = correr(marcaVieja(antes), null);
 const nuevo = correr(ahora, "es");
 
 let fallos = 0;

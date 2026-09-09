@@ -1,4 +1,4 @@
-// Vitalis — En qué moneda cobra cada médico.
+// Symphomed — En qué moneda cobra cada médico.
 //
 // ═══ POR QUÉ NO SE DEDUCE DEL IDIOMA ═══════════════════════════════════════
 //

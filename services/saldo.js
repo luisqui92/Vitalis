@@ -1,4 +1,4 @@
-// Vitalis — Saldo prepago del médico.
+// Symphomed — Saldo prepago del médico.
 //
 // El médico carga plata (transferencia o QR) y cada consulta transcrita le
 // descuenta el precio. Acá viven las reglas, que son pocas pero ninguna es
@@ -103,7 +103,7 @@ async function estadoDe(medicoPhone) {
     // "te queda poco saldo" y podría quedar bloqueado.
     // Tampoco se avisa mientras le queden de cortesía: una cuenta nueva
     // arranca en cero y vería "te queda poco saldo" antes de haber usado
-    // Vitalis una sola vez.
+    // Symphomed una sola vez.
     bajo: !plan.activa && gratisRestantes === 0 && consultasRestantes <= AVISAR_DESDE,
     // Si ya no puede ni empezar otra consulta.
     bloqueado: !plan.activa && gratisRestantes === 0 && saldoCentavos <= limiteNegativo,

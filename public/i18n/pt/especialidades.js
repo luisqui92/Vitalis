@@ -1,4 +1,4 @@
-// Vitalis — Português · odontograma, mapa ocular, mapa ginecológico e mapa
+// Symphomed — Português · odontograma, mapa ocular, mapa ginecológico e mapa
 // corporal.
 //
 // Isto é terminologia clínica, não rótulo de interface: "Endodontia",

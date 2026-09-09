@@ -1,4 +1,4 @@
-// Vitalis Visión — Crea (o actualiza) una cuenta de oftalmología de demo
+// Symphomed Visión — Crea (o actualiza) una cuenta de oftalmología de demo
 // con mapa ocular (varias estructuras con hallazgos, historial con
 // fuente "voz"/"manual"), recetas ópticas, procedimientos (cirugía de
 // catarata, láser...) y un Brief Clínico ya armado.

@@ -1,4 +1,4 @@
-// Vitalis — Português · abas do Kardex e marca por especialidade.
+// Symphomed — Português · abas do Kardex e marca por especialidade.
 Object.assign(I18N.pt, {
   "tab.paciente": "Paciente",
   "tab.consultas": "Consultas",
@@ -28,15 +28,15 @@ Object.assign(I18N.pt, {
   "tab.instrumentos": "Instrumentos",
   "tab.salud": "Saúde",
 
-  "marca.base": "Vitalis",
-  "marca.dental": "Vitalis Dental",
-  "marca.estetica": "Vitalis Face",
-  "marca.oftalmologia": "Vitalis Visão",
-  "marca.veterinaria": "Vitalis Veterinária",
-  "marca.ginecologia": "Vitalis Obstetrícia",
-  "marca.pediatria": "Vitalis Pediatria",
-  "marca.neuro": "Vitalis Neurodesenvolvimento",
+  "marca.base": "Symphomed",
+  "marca.dental": "Symphomed Dental",
+  "marca.estetica": "Symphomed Face",
+  "marca.oftalmologia": "Symphomed Visão",
+  "marca.veterinaria": "Symphomed Veterinária",
+  "marca.ginecologia": "Symphomed Obstetrícia",
+  "marca.pediatria": "Symphomed Pediatria",
+  "marca.neuro": "Symphomed Neurodesenvolvimento",
   "marca.subtitulo": "Prontuário inteligente",
   "marca.subtituloVet": "Prontuário inteligente para sua clínica veterinária",
-  "marca.tituloVet": "Vitalis Veterinária · Prontuário inteligente",
+  "marca.tituloVet": "Symphomed Veterinária · Prontuário inteligente",
 });

@@ -1,4 +1,4 @@
-// Vitalis — Português · lembretes e vínculo do celular.
+// Symphomed — Português · lembretes e vínculo do celular.
 Object.assign(I18N.pt, {
   "record.cargando": "Carregando lembretes...",
   "record.error": "Erro ao carregar os lembretes",

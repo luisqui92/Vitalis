@@ -1,4 +1,4 @@
-// Vitalis — Recepcionista de voz (Vapi): las acciones que el asistente de
+// Symphomed — Recepcionista de voz (Vapi): las acciones que el asistente de
 // voz puede ejecutar durante una llamada. Reusan la MISMA lógica de
 // disponibilidad/reserva que ya usan WhatsApp y la reserva pública por link
 // (services/agenda.js, services/crearCita.js) — acá no hay una máquina de

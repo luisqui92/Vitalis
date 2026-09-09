@@ -11,7 +11,7 @@
 // modelo que entiende medicamentos, dosis y procedimientos.
 //   https://www.assemblyai.com/docs/pre-recorded-audio/medical-mode
 //
-// O sea que en portugués perdemos justamente lo que Vitalis vende. Lo único
+// O sea que en portugués perdemos justamente lo que Symphomed vende. Lo único
 // que queda para compensar es keyterms_prompt, que sí funciona en cualquier
 // idioma. Por eso el vocabulario de abajo no es un extra en portugués: es lo
 // principal.

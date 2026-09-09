@@ -1,4 +1,4 @@
-// Vitalis — Reserva de citas por WhatsApp: conversación guiada con listas y
+// Symphomed — Reserva de citas por WhatsApp: conversación guiada con listas y
 // botones interactivos de la API oficial de Meta (no texto numerado — eso
 // era necesario con Baileys/texto plano, la API de Meta permite algo más
 // prolijo). Sigue siendo una máquina de estados (no IA libre): para algo
@@ -93,7 +93,7 @@ async function resumenHistorialPaciente(medicoPhone, numero) {
 // alcanza con sembrarla una sola vez al elegir).
 const ETIQUETA_ESPECIALIDAD = {
   odontologia: "🦷 Odontología",
-  estetica: "✨ Estética (Vitalis Face)",
+  estetica: "✨ Estética (Symphomed Face)",
   oftalmologia: "👁️ Oftalmología",
   veterinaria: "🐾 Veterinaria",
   ginecologia: "🤰 Ginecología y Obstetricia",

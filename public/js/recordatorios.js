@@ -1,4 +1,4 @@
-// Vitalis — Recordatorios Médicos: una sola lista de "qué se viene" en todo
+// Symphomed — Recordatorios Médicos: una sola lista de "qué se viene" en todo
 // el panel del médico (no por paciente), visible en el Dashboard.
 
 // Las claves ("control", "vacuna"...) son lo que se guarda en la base y no

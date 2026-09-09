@@ -1,4 +1,4 @@
-// Vitalis — Cobertura de traducción
+// Symphomed — Cobertura de traducción
 //
 // Dice qué falta traducir, por idioma y por módulo. Sin esto, agregar un
 // tercer idioma significa que alguien compare a mano 900 claves contra otras

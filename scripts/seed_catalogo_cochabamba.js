@@ -1,4 +1,4 @@
-// Vitalis Odonto — Carga el catálogo de tratamientos de un odontólogo con el
+// Symphomed Odonto — Carga el catálogo de tratamientos de un odontólogo con el
 // arancel de referencia del Colegio de Odontólogos de Cochabamba (folleto
 // físico, agosto 2018), para no tener que tipear cada tratamiento a mano.
 //

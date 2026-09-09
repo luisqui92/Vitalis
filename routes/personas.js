@@ -1,4 +1,4 @@
-// Vitalis — Persona compartida entre los consultorios de una clínica.
+// Symphomed — Persona compartida entre los consultorios de una clínica.
 //
 // El mismo señor que va al clínico y al odontólogo es una persona con dos
 // fichas. Estas rutas dejan que el médico las reconozca como la misma, sin

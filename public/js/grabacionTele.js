@@ -1,4 +1,4 @@
-// Vitalis — Grabar la teleconsulta en dos canales.
+// Symphomed — Grabar la teleconsulta en dos canales.
 //
 // ═══ POR QUÉ NO ES UNA GRABACIÓN MÁS ═══════════════════════════════════════
 //

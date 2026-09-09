@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Vitalis Telemedicina — la consulta por video
+// Symphomed Telemedicina — la consulta por video
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // El médico genera un enlace y se lo manda al paciente por WhatsApp. El

@@ -1,4 +1,4 @@
-// Vitalis — 2FA con TOTP (RFC 6238), compatible con Google Authenticator /
+// Symphomed — 2FA con TOTP (RFC 6238), compatible con Google Authenticator /
 // Authy / cualquier app estándar. Sin librería externa: es HMAC-SHA1 +
 // truncamiento dinámico (RFC 4226) sobre el tiempo actual — Node ya trae
 // todo lo necesario en el módulo "crypto".
@@ -68,7 +68,7 @@ function verificarCodigo(secretoBase32, codigo, ventana = 1) {
   return false;
 }
 
-function generarUriOtpAuth(secretoBase32, cuenta, emisor = "Vitalis") {
+function generarUriOtpAuth(secretoBase32, cuenta, emisor = "Symphomed") {
   const etiqueta = encodeURIComponent(`${emisor}:${cuenta}`);
   const params = new URLSearchParams({
     secret: secretoBase32,

@@ -1,4 +1,4 @@
-// Vitalis — Receta Digital: se arma desde una consulta o a mano, y se
+// Symphomed — Receta Digital: se arma desde una consulta o a mano, y se
 // imprime/descarga como PDF con el diálogo nativo del navegador (sin sumar
 // una librería de PDF en el servidor solo para esto).
 
@@ -44,7 +44,7 @@ function tabRecetasHtml(recetas) {
   `;
 }
 
-// ─── RECETA ÓPTICA (Vitalis Visión) — esfera/cilindro/eje/adición por ojo,
+// ─── RECETA ÓPTICA (Symphomed Visión) — esfera/cilindro/eje/adición por ojo,
 // completamente distinta a una receta de medicamentos. ──────────────────
 function campoOjoOpticaHtml(prefijo, label) {
   return `

@@ -1,4 +1,4 @@
-// Vitalis — Português · gravar uma consulta e ver seu detalhe.
+// Symphomed — Português · gravar uma consulta e ver seu detalhe.
 //
 // Los rótulos de la nota clínica de acá abajo son los que un médico
 // brasileño lee en cada consulta. Están en portugués correcto, pero la
@@ -27,7 +27,7 @@ Object.assign(I18N.pt, {
   // ─── Gravar pelo celular vinculado ────────────────────────────────────
   "consulta.cargando": "Carregando...",
   "consulta.errVinculacion": "Erro ao carregar o vínculo",
-  "consulta.remota.sinVincular": "Você ainda não vinculou seu celular hoje. Abra o Vitalis no celular, toque em \"Vincular como microfone\" e digite este código:",
+  "consulta.remota.sinVincular": "Você ainda não vinculou seu celular hoje. Abra o Symphomed no celular, toque em \"Vincular como microfone\" e digite este código:",
   "consulta.remota.esperando": "Esta tela se atualiza sozinha assim que você vincular.",
   "consulta.remota.listo": "📱 Celular vinculado e pronto, apoiado com a tela ligada.",
   "consulta.remota.iniciar": "🎙️ Iniciar gravação remota",

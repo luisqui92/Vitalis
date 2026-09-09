@@ -2,7 +2,7 @@
 // cruzando su horario de atención configurado contra las citas ya
 // confirmadas Y contra su Google Calendar real (si lo tiene conectado) —
 // así no se ofrece un horario que el médico ya ocupó directo en su
-// calendario, sin pasar por Vitalis. Lo usan tanto la web (para armar una
+// calendario, sin pasar por Symphomed. Lo usan tanto la web (para armar una
 // cita a mano) como la reserva conversacional por WhatsApp.
 const { Medico, Cita } = require("../db/models");
 const { obtenerOcupadoEnRango } = require("./googleCalendar");
@@ -63,13 +63,13 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
         if (cursor.getTime() > Date.now()) {
           const inicioSlot = cursor.getTime();
           const finSlot = inicioSlot + duracion * 60000;
-          const ocupadoEnVitalis = citasOcupadas.some(c => {
+          const ocupadoEnSymphomed = citasOcupadas.some(c => {
             const inicioC = new Date(c.fecha).getTime();
             const finC = inicioC + (c.duracionMinutos || 30) * 60000;
             return seSuperponen(inicioSlot, finSlot, inicioC, finC);
           });
           const ocupadoEnCalendar = ocupadoCalendar.some(b => seSuperponen(inicioSlot, finSlot, b.inicio.getTime(), b.fin.getTime()));
-          if (!ocupadoEnVitalis && !ocupadoEnCalendar) slots.push(new Date(cursor));
+          if (!ocupadoEnSymphomed && !ocupadoEnCalendar) slots.push(new Date(cursor));
         }
         cursor = new Date(cursor.getTime() + duracion * 60000);
       }
@@ -84,7 +84,7 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
 
 // Un horario puntual sigue libre? (se revalida antes de confirmar una
 // reserva, por si se ocupó entre que se mostró la lista y se eligió — ya
-// sea en Vitalis o directo en el Google Calendar del médico).
+// sea en Symphomed o directo en el Google Calendar del médico).
 async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
   const inicio = new Date(fecha).getTime();
   const fin = inicio + (duracionMinutos || 30) * 60000;
@@ -98,12 +98,12 @@ async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
     Medico.findOne({ phone: medicoPhone }).select("googleCalendarId").lean(),
   ]);
 
-  const ocupadoEnVitalis = citas.some(c => {
+  const ocupadoEnSymphomed = citas.some(c => {
     const inicioC = new Date(c.fecha).getTime();
     const finC = inicioC + (c.duracionMinutos || 30) * 60000;
     return seSuperponen(inicio, fin, inicioC, finC);
   });
-  if (ocupadoEnVitalis) return false;
+  if (ocupadoEnSymphomed) return false;
 
   if (medico?.googleCalendarId) {
     const ocupadoCalendar = await obtenerOcupadoEnRango(medico.googleCalendarId, new Date(inicio - margen), new Date(fin + margen));

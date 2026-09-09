@@ -1,11 +1,11 @@
-// Vitalis — Fase 0 de la segunda lectura de radiografías.
+// Symphomed — Fase 0 de la segunda lectura de radiografías.
 //
 // Antes de que esto le aparezca a un odontólogo en una ficha, hay que saber
 // si sirve. Este script es para averiguarlo, y para nada más.
 //
 // ═══ QUÉ HACE Y QUÉ NO ═════════════════════════════════════════════════════
 //
-// Lee las radiografías que YA están en Vitalis (las que subió el agente), le
+// Lee las radiografías que YA están en Symphomed (las que subió el agente), le
 // pide al modelo su descripción, y la imprime. NO escribe una sola línea en
 // la base: ninguna ficha se toca, ningún paciente ve nada, nada queda en una
 // historia clínica.

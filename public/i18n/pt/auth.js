@@ -1,4 +1,4 @@
-// Vitalis — Português · login e cadastro (public/js/auth.js).
+// Symphomed — Português · login e cadastro (public/js/auth.js).
 Object.assign(I18N.pt, {
   // Estas SÍ están traducidas, y a propósito: es la primera pantalla que ve
   // un médico brasileño, y verla en español es exactamente la impresión que
@@ -28,7 +28,7 @@ Object.assign(I18N.pt, {
   "auth.reg.especialidadPlaceholderVet": "Medicina veterinária geral",
   "auth.reg.password": "Senha (mínimo 8 caracteres)",
   "auth.reg.paso1Titulo": "Crie sua conta",
-  "auth.reg.paso1Bajada": "O Vitalis escuta sua consulta e escreve a nota clínica por você.",
+  "auth.reg.paso1Bajada": "O Symphomed escuta sua consulta e escreve a nota clínica por você.",
   "auth.reg.paso2Titulo": "Conte sobre sua profissão",
   "auth.reg.paso2Bajada": "Aqui se guardam prontuários de pessoas reais. Por isso revisamos cada solicitação à mão antes de abrir a porta.",
   "auth.reg.telefonoAyuda": "É com este número que você vai entrar. Inclua o código do país.",
@@ -44,7 +44,7 @@ Object.assign(I18N.pt, {
   "auth.reg.matriculaAyuda": "É o que nos permite confirmar que você é quem diz ser. Não mostramos a ninguém.",
   "auth.reg.errMatricula": "Precisamos do seu registro profissional para revisar a solicitação",
   "auth.reg.mensaje": "Algo que queira nos contar (opcional)",
-  "auth.reg.mensajePlaceholder": "Onde você atende, quantos pacientes por dia, o que espera do Vitalis…",
+  "auth.reg.mensajePlaceholder": "Onde você atende, quantos pacientes por dia, o que espera do Symphomed…",
   "auth.reg.enviando": "Enviando…",
   "auth.reg.enviadaTitulo": "Pronto, {nombre}. Recebemos sua solicitação.",
   "auth.reg.enviadaBajada": "Sua conta já existe, mas ainda não está aberta.",

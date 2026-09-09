@@ -1,4 +1,4 @@
-// Vitalis — WhatsApp de reservas vía la API oficial de Meta (Cloud API), en
+// Symphomed — WhatsApp de reservas vía la API oficial de Meta (Cloud API), en
 // vez de Baileys (cliente no oficial, sesión por QR). Reemplaza por completo
 // a services/baileysWhatsapp.js: acá no hay sesión que vincular ni QR que
 // escanear — la autenticación es un token de Meta, y los mensajes salen por
