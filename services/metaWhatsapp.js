@@ -15,6 +15,22 @@ function headers() {
   return { Authorization: `Bearer ${CONFIG.WHATSAPP_TOKEN}`, "Content-Type": "application/json" };
 }
 
+// Los códigos de Meta que NO son bugs nuestros, con qué hacer en cada caso.
+// Están acá y no en un README porque el momento en que hacen falta es cuando
+// alguien está mirando el log a las once de la noche.
+const PISTAS = {
+  131030: "La app está en modo DESARROLLO: solo escribe a los números de la lista de prueba. " +
+          "Pasala a Activa en developers.facebook.com → tu app → selector Desarrollo/Activa.",
+  131047: "Pasaron más de 24 h desde el último mensaje del paciente: ya no se puede mandar texto libre, " +
+          "hay que usar una plantilla aprobada.",
+  131026: "Ese número no tiene WhatsApp o no puede recibir mensajes.",
+  132000: "La plantilla no existe o los parámetros no coinciden con los que se aprobaron.",
+  132001: "La plantilla no existe con ese nombre y en ese idioma.",
+  133010: "El número no está registrado en la API. Revisá WHATSAPP_PHONE_NUMBER_ID.",
+  190: "El token venció o fue revocado. Generá uno nuevo en Meta y actualizá WHATSAPP_TOKEN.",
+  100: "Parámetro inválido — suele ser un WHATSAPP_PHONE_NUMBER_ID que no corresponde al token.",
+};
+
 async function mandar(body) {
   if (!CONFIG.WHATSAPP_TOKEN || !CONFIG.WHATSAPP_PHONE_NUMBER_ID) {
     log.warn("[WHATSAPP] No configurado — no se mandó el mensaje a", body.to);
@@ -24,7 +40,17 @@ async function mandar(body) {
     const res = await axios.post(urlMensajes(), { messaging_product: "whatsapp", recipient_type: "individual", ...body }, { headers: headers(), timeout: 15000 });
     return res.data;
   } catch (e) {
-    log.error("[WHATSAPP] Falló el envío:", e.response?.data?.error?.message || e.message);
+    const err = e.response?.data?.error || {};
+    const codigo = err.code ?? err.error_subcode ?? "";
+    // El mensaje de Meta describe el síntoma; el CÓDIGO dice si hay que tocar
+    // código o tocar la consola de Meta. Sin esa distinción, un problema de
+    // configuración se investiga como si fuera un bug — que es exactamente lo
+    // que pasó con el 131030: los recordatorios fallaban en silencio porque la
+    // app estaba en modo Desarrollo, y en el log parecía un error de envío.
+    const pista = PISTAS[codigo];
+    log.error(`[WHATSAPP] Falló el envío a ${body.to} (código ${codigo || "?"}): ` +
+      (err.message || e.message));
+    if (pista) log.error(`[WHATSAPP] → ${pista}`);
     throw e;
   }
 }

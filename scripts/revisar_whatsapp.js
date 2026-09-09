@@ -1,0 +1,127 @@
+// Symphomed — Qué le está pasando de verdad al WhatsApp.
+//
+// El panel de Meta muestra media docena de pantallas y ninguna contesta la
+// pregunta que importa: "¿el número que está usando ESTE servidor puede
+// escribirle a cualquier paciente, o solo a la lista de prueba?".
+//
+// Peor: cuando no puede, el envío falla con el código 131030 y el paciente
+// simplemente no recibe nada. Nadie se entera hasta que un médico avisa que
+// sus pacientes dejaron de recibir recordatorios — y para entonces ya pasaron
+// semanas.
+//
+// Este script le pregunta a Meta directamente, con las credenciales que el
+// servidor tiene puestas ahora mismo. Eso es lo que lo hace útil: no dice qué
+// hay configurado en el panel, dice qué está usando el proceso que corre.
+//
+//   node scripts/revisar_whatsapp.js
+//
+// Y opcionalmente, la prueba definitiva — mandar un mensaje real a un número
+// que NO esté en la lista de prueba:
+//
+//   node scripts/revisar_whatsapp.js 59170123456
+require("dotenv").config();
+const axios = require("axios");
+const { CONFIG } = require("../config");
+
+const VERDE = (t) => `\x1b[32m${t}\x1b[0m`;
+const ROJO = (t) => `\x1b[31m${t}\x1b[0m`;
+const AMBAR = (t) => `\x1b[33m${t}\x1b[0m`;
+const GRIS = (t) => `\x1b[90m${t}\x1b[0m`;
+
+const API = "https://graph.facebook.com/v21.0";
+
+async function pedir(ruta, params = {}) {
+  const r = await axios.get(`${API}/${ruta}`, {
+    params: { access_token: CONFIG.WHATSAPP_TOKEN, ...params },
+    timeout: 15000,
+  });
+  return r.data;
+}
+
+(async () => {
+  console.log("\n── Lo que tiene puesto ESTE servidor ──\n");
+
+  if (!CONFIG.WHATSAPP_TOKEN || !CONFIG.WHATSAPP_PHONE_NUMBER_ID) {
+    console.log(ROJO("  Falta WHATSAPP_TOKEN o WHATSAPP_PHONE_NUMBER_ID en el .env."));
+    console.log("  Sin eso no se manda ni un mensaje, y el log solo dice 'No configurado'.\n");
+    process.exit(1);
+  }
+  console.log(`  Phone Number ID : ${CONFIG.WHATSAPP_PHONE_NUMBER_ID}`);
+  console.log(`  Token           : ${GRIS(CONFIG.WHATSAPP_TOKEN.slice(0, 12) + "…")}`);
+
+  // ─── El número ───────────────────────────────────────────────────────────
+  let numero;
+  try {
+    numero = await pedir(CONFIG.WHATSAPP_PHONE_NUMBER_ID, {
+      fields: "display_phone_number,verified_name,quality_rating,code_verification_status,name_status,platform_type,throughput",
+    });
+  } catch (e) {
+    const err = e.response?.data?.error || {};
+    console.log("\n" + ROJO(`  Meta rechazó la consulta (código ${err.code ?? "?"}): ${err.message || e.message}`));
+    if (err.code === 190) console.log("  El token venció o fue revocado. Generá uno nuevo y actualizá WHATSAPP_TOKEN.");
+    if (err.code === 100) console.log("  El PHONE_NUMBER_ID no corresponde a este token — suelen ser de apps distintas.");
+    console.log("");
+    process.exit(1);
+  }
+
+  console.log("\n── El número, según Meta ──\n");
+  console.log(`  Número visible  : ${numero.display_phone_number || "—"}`);
+  console.log(`  Nombre visible  : ${numero.verified_name || "—"}`);
+  console.log(`  Estado nombre   : ${numero.name_status || "—"}`);
+  console.log(`  Verificación    : ${numero.code_verification_status || "—"}`);
+  console.log(`  Calidad         : ${numero.quality_rating || "—"}`);
+
+  if (numero.name_status && numero.name_status !== "APPROVED") {
+    console.log("\n  " + AMBAR(`El nombre visible está en estado ${numero.name_status}.`));
+    console.log("  Mientras no esté aprobado, el paciente ve el número pelado en vez de la marca.");
+  }
+
+  // ─── La pregunta que importa ─────────────────────────────────────────────
+  console.log("\n── ¿Puede escribirle a cualquiera? ──\n");
+  const destino = String(process.argv[2] || "").replace(/\D/g, "");
+
+  if (!destino) {
+    console.log("  " + AMBAR("No se puede saber sin intentarlo."));
+    console.log("  Meta no expone si la app está en modo Desarrollo: la única forma de");
+    console.log("  averiguarlo es mandarle un mensaje a un número que NO esté en la lista");
+    console.log("  de prueba y ver si lo rechaza.\n");
+    console.log("  " + GRIS("node scripts/revisar_whatsapp.js 59170123456"));
+    console.log("  " + GRIS("(usá un celular tuyo que no hayas agregado como número de prueba)\n"));
+    process.exit(0);
+  }
+
+  console.log(`  Mandando un mensaje real a ${destino}…\n`);
+  try {
+    await axios.post(`${API}/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: destino,
+      type: "text",
+      text: { body: "Prueba de Symphomed. Si te llegó esto, los recordatorios a pacientes funcionan." },
+    }, {
+      headers: { Authorization: `Bearer ${CONFIG.WHATSAPP_TOKEN}`, "Content-Type": "application/json" },
+      timeout: 15000,
+    });
+    console.log("  " + VERDE("Aceptado por Meta."));
+    console.log("  Si el mensaje llega al celular, la app está Activa y los recordatorios");
+    console.log("  a pacientes funcionan. Si NO llega, revisá que el número tenga WhatsApp.\n");
+  } catch (e) {
+    const err = e.response?.data?.error || {};
+    console.log("  " + ROJO(`Rechazado (código ${err.code ?? "?"}): ${err.message || e.message}`));
+    if (err.code === 131030) {
+      console.log("\n  " + ROJO("Ese es el código que importa: la app está en modo DESARROLLO."));
+      console.log("  Solo escribe a los números de la lista de prueba. Con médicos reales,");
+      console.log("  los recordatorios a pacientes fallan EN SILENCIO.\n");
+      console.log("  Se arregla en developers.facebook.com → tu app → el selector");
+      console.log("  Desarrollo/Activa arriba a la izquierda. Necesita la verificación del");
+      console.log("  negocio hecha, que ya la tenés si el número quedó aprobado.\n");
+    } else if (err.code === 131047) {
+      console.log("\n  Pasaron más de 24 h desde el último mensaje de ese número: para escribir");
+      console.log("  primero hay que usar una plantilla aprobada. Probá con un número que te");
+      console.log("  haya escrito recién, o mandá una plantilla.\n");
+    } else {
+      console.log("");
+    }
+    process.exit(1);
+  }
+})().catch((e) => { console.error(e.message); process.exit(1); });
