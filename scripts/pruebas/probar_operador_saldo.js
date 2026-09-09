@@ -404,6 +404,7 @@ async function main() {
   const guardadoBr = await PUT("/medico/operador/datos-pago", tk.operador, {
     pais: "br", banco: "Pix", cuenta: "ff439919-4119-405d-838a-6c3e3efd8b55",
     titular: "BRLA DIGITAL LTDA", documento: "12345678000199",
+    ciudad: "Curitiba",
   });
   verificar("el operador puede cargar la cuenta de Brasil", guardadoBr.estado === 200);
   verificar("  ...y queda guardada aparte, sin pisar la de Bolivia",
@@ -412,6 +413,11 @@ async function main() {
   const brCargada = await GET("/medico/recargas/datos-pago", tk.brasil);
   verificar("ahora la médica de Brasil ve SU cuenta",
     brCargada.cuerpo?.cuenta === "ff439919-4119-405d-838a-6c3e3efd8b55");
+  // La ciudad se descartaba al guardar: el esquema la tenía, el generador la
+  // usaba —el estándar Pix la exige en el campo 60— y la función que graba la
+  // tiraba. Todos los códigos salían diciendo "SAO PAULO", que es el valor por
+  // defecto de services/pix.js, y era correcto solo por casualidad.
+  verificar("  ...y la ciudad, que el código Pix exige", brCargada.cuerpo?.ciudad === "Curitiba");
 
   // Y lo simétrico, que es la mitad que se olvida: cargar Brasil no puede
   // haberle cambiado la cuenta a los médicos de Bolivia.

@@ -110,10 +110,13 @@ async function datosDePago(pais = "bo") {
   const titular = tomar("titular");
   const documento = tomar("documento");
   const whatsapp = tomar("whatsapp").replace(/\D/g, "");
+  // Solo la usa Brasil, para el campo 60 del código Pix. Se devuelve siempre
+  // para no tener dos formas distintas de leer estos datos según el país.
+  const ciudad = tomar("ciudad");
 
   return {
     pais: p,
-    qr, banco, cuenta, titular, documento, whatsapp,
+    qr, banco, cuenta, titular, documento, whatsapp, ciudad,
     // Con esto la pantalla decide si mostrar la tarjeta o avisar que todavía
     // no hay dónde pagar, en vez de dejar al médico adivinando. Es por país:
     // que Bolivia esté configurada no significa que Brasil lo esté.
@@ -130,6 +133,12 @@ async function guardarDatosDePago(campos, quien, pais = "bo") {
     titular: String(campos.titular || "").trim().slice(0, 80),
     documento: String(campos.documento || "").trim().slice(0, 40),
     whatsapp: String(campos.whatsapp || "").replace(/\D/g, "").slice(0, 20),
+    // Solo Brasil, pero se guarda siempre: el estándar del código Pix EXIGE
+    // la ciudad del que cobra (campo 60) y algunos bancos se la muestran al
+    // pagador. Sin esto no había forma de cargarla desde el panel y todos los
+    // códigos salían diciendo "SAO PAULO", que es el valor por defecto de
+    // services/pix.js — correcto solo por casualidad.
+    ciudad: String(campos.ciudad || "").trim().slice(0, 40),
     actualizadoPor: quien,
   };
   await ConfigPago.findOneAndUpdate({ clave: CLAVE[p] }, { $set: limpio }, { upsert: true, new: true });
