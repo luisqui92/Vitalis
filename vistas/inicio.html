@@ -9,10 +9,6 @@
 <meta property="og:type" content="website">
 <style>
 @font-face {
-  font-family: "Fraunces"; src: url("/fonts/fraunces-variable.woff2") format("woff2");
-  font-weight: 100 900; font-display: swap;
-}
-@font-face {
   font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
   font-weight: 100 900; font-display: swap;
 }
@@ -25,36 +21,42 @@ img { max-width: 100%; }
 
 <style>
 /* ─────────────────────────────────────────────────────────────
-   Symphomed — la voz se vuelve partitura.
-   Dos estados en toda la página: lo HABLADO va en ámbar, suelto,
-   con la tipografía de texto; lo ESCRITO va en tinta petróleo,
-   estructurado, con etiquetas de formulario clínico. El sello
-   granate aparece una vez por sección y nada más.
+   Symphomed — la página tiene la estructura de una historia
+   clínica: bloques con encabezado rotulado, campos con etiqueta,
+   valores en monoespaciada, y la línea de electrocardiograma
+   como separador. Azul clínico, blanco de formulario.
    ───────────────────────────────────────────────────────────── */
 :root {
-  --papel:    #EEF1EF;
-  --carta:    #FAFBF9;
-  --tinta:    #10222A;
-  --tinta-2:  #4A6068;
-  --tinta-3:  #7E9199;
-  --linea:    #D6DCD9;
-  --linea-2:  #B5C0BC;
-  --sello:    #8C2F39;
-  --voz:      #8A5E18;
-  --voz-piso: #F3EADA;
-  --r: 4px;
+  --azul-900: #0B3A4A;
+  --azul-700: #12607B;
+  --azul-400: #3E9CB8;
+  --azul-050: #E7F0F4;
+  --verde:    #1B7A5A;
+  --verde-050:#E4F1EC;
+  --rojo:     #B3352C;
+  --rojo-050: #F8E9E7;
+  --papel:    #EFF4F6;
+  --carta:    #FFFFFF;
+  --tinta:    #12222B;
+  --tinta-2:  #4C6672;
+  --tinta-3:  #7B939E;
+  --linea:    #D7E2E7;
+  --linea-2:  #B9CBD3;
+  --r: 5px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --papel:#0B171C; --carta:#122630; --tinta:#E4EBE8; --tinta-2:#9DB0B6;
-    --tinta-3:#6E858D; --linea:#22343C; --linea-2:#3A4F58;
-    --sello:#D4737D; --voz:#D9A94E; --voz-piso:#231C10;
+    --azul-900:#A9D4E4; --azul-700:#6FB6CE; --azul-400:#3E9CB8; --azul-050:#12303C;
+    --verde:#63C4A0; --verde-050:#123028; --rojo:#E08279; --rojo-050:#331E1C;
+    --papel:#0A171E; --carta:#102530; --tinta:#E6EEF1; --tinta-2:#A3BAC4;
+    --tinta-3:#728B96; --linea:#1E3742; --linea-2:#2E4B58;
   }
 }
 :root[data-theme="dark"] {
-  --papel:#0B171C; --carta:#122630; --tinta:#E4EBE8; --tinta-2:#9DB0B6;
-  --tinta-3:#6E858D; --linea:#22343C; --linea-2:#3A4F58;
-  --sello:#D4737D; --voz:#D9A94E; --voz-piso:#231C10;
+  --azul-900:#A9D4E4; --azul-700:#6FB6CE; --azul-400:#3E9CB8; --azul-050:#12303C;
+  --verde:#63C4A0; --verde-050:#123028; --rojo:#E08279; --rojo-050:#331E1C;
+  --papel:#0A171E; --carta:#102530; --tinta:#E6EEF1; --tinta-2:#A3BAC4;
+  --tinta-3:#728B96; --linea:#1E3742; --linea-2:#2E4B58;
 }
 
 * { box-sizing: border-box; }
@@ -62,190 +64,193 @@ body {
   background: var(--papel);
   color: var(--tinta);
   font-family: InterVar, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 17px;
-  line-height: 1.6;
+  font-size: 16px; line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  padding-inline: 20px;
+  padding-inline: 16px;
 }
-.env { max-width: 1080px; margin: 0 auto; }
-.prosa { max-width: 62ch; }
+.env { max-width: 1060px; margin: 0 auto; }
+.prosa { max-width: 64ch; }
 
-h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; text-wrap: balance; margin: 0; }
-h1 { font-size: clamp(2.3rem, 6vw, 4rem); line-height: 1.02; letter-spacing: -.025em; }
-h2 { font-size: clamp(1.6rem, 3.4vw, 2.3rem); line-height: 1.12; letter-spacing: -.015em; }
-h3 { font-size: 1.08rem; line-height: 1.3; }
+h1, h2, h3 { margin: 0; font-weight: 700; text-wrap: balance; letter-spacing: -.018em; }
+h1 { font-size: clamp(1.95rem, 4.6vw, 2.9rem); line-height: 1.14; }
+h2 { font-size: clamp(1.3rem, 2.6vw, 1.7rem); line-height: 1.2; }
+h3 { font-size: 1rem; line-height: 1.35; font-weight: 600; letter-spacing: -.008em; }
 p { margin: 0; }
 
-.mono, .campo {
+.dato { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.etiqueta {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
-}
-.rotulo {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: .69rem; letter-spacing: .15em; text-transform: uppercase; color: var(--tinta-3);
+  font-size: .67rem; letter-spacing: .11em; text-transform: uppercase; color: var(--tinta-3);
+  font-weight: 500;
 }
 
-/* ── El pentagrama: divisor estructural, no adorno ─────────── */
-.pauta { display: flex; flex-direction: column; gap: 3px; padding-block: 4px; }
-.pauta i { display: block; height: 1px; background: var(--linea); }
-.pauta i:nth-child(2) { background: var(--linea-2); }
-
-/* ── Encabezado ────────────────────────────────────────────── */
+/* ── Barra superior, como el encabezado de una ficha ────────── */
 .barra {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 20px; padding-block: 26px 0; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding-block: 14px; border-bottom: 2px solid var(--azul-700); flex-wrap: wrap;
 }
-.marca { font-family: Fraunces, Georgia, serif; font-size: 1.32rem; font-weight: 600; letter-spacing: -.01em; }
-.marca span { color: var(--sello); }
-.barra .rotulo { color: var(--tinta-2); }
+.logo { display: flex; align-items: center; gap: 9px; }
+.logo-marca { font-size: 1.2rem; font-weight: 700; letter-spacing: -.02em; color: var(--tinta); }
+.logo svg { display: block; color: var(--azul-700); }
+.barra-dcha { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.enlace-barra { font-size: .88rem; color: var(--tinta-2); text-decoration: none; font-weight: 500; }
+.enlace-barra:hover { color: var(--azul-700); }
+
+/* ── Bloque: la unidad de toda la página ───────────────────────
+   Es un formulario clínico: barra con rótulo arriba, contenido
+   en blanco abajo, borde fino. Todo se compone con esto. */
+.bloque {
+  background: var(--carta); border: 1px solid var(--linea);
+  border-radius: var(--r); overflow: hidden;
+}
+.bloque-cab {
+  background: var(--azul-050); border-bottom: 1px solid var(--linea);
+  padding: 9px 16px; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.bloque-cab .etiqueta { color: var(--azul-700); }
+.bloque-cuerpo { padding: 18px 16px; }
 
 /* ── Héroe ─────────────────────────────────────────────────── */
-.heroe { padding-block: 56px 12px; display: flex; flex-direction: column; gap: 22px; }
-.bajada { font-size: 1.18rem; line-height: 1.55; color: var(--tinta-2); max-width: 54ch; }
+.heroe { padding-block: 40px 8px; display: flex; flex-direction: column; gap: 18px; }
+.bajada { font-size: 1.08rem; color: var(--tinta-2); max-width: 58ch; }
 .bajada b { color: var(--tinta); font-weight: 600; }
 
-.acciones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding-top: 6px; }
+.acciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .boton {
-  display: inline-block; background: var(--sello); color: #FBF7F7;
-  border: 0; border-radius: var(--r); padding: 14px 22px;
-  font-family: InterVar, sans-serif; font-size: .96rem; font-weight: 600;
-  text-decoration: none; transition: opacity .15s;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--azul-700); color: #fff; border: 1px solid var(--azul-700);
+  border-radius: var(--r); padding: 11px 18px;
+  font-family: InterVar, sans-serif; font-size: .93rem; font-weight: 600;
+  text-decoration: none; cursor: pointer; transition: background .15s;
 }
-.boton:hover { opacity: .9; }
-.boton.calmo { background: transparent; color: var(--tinta); border: 1px solid var(--linea-2); }
-.boton:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
-.al-lado { font-size: .88rem; color: var(--tinta-3); }
-
-/* ── La transformación: el producto en una imagen ──────────── */
-.mesa {
-  display: grid; grid-template-columns: 1fr auto 1fr; gap: 0;
-  border: 1px solid var(--linea-2); border-radius: var(--r);
-  background: var(--carta); overflow: hidden; margin-top: 12px;
+.boton:hover { background: var(--azul-900); border-color: var(--azul-900); }
+.boton.calmo { background: var(--carta); color: var(--azul-700); border-color: var(--linea-2); }
+.boton.calmo:hover { background: var(--azul-050); }
+.boton:focus-visible { outline: 2px solid var(--azul-400); outline-offset: 2px; }
+.al-lado { font-size: .85rem; color: var(--tinta-3); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .boton { color: #08222C; }
 }
-.lado { padding: 24px 26px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.lado.hablado { background: var(--voz-piso); }
-.flecha {
-  display: flex; align-items: center; justify-content: center;
-  padding-inline: 6px; border-inline: 1px solid var(--linea);
-  color: var(--tinta-3);
+:root[data-theme="dark"] .boton { color: #08222C; }
+
+/* ── La consulta: dos fichas, antes y después ──────────────── */
+.consulta { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.audio-fila { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.onda { display: flex; align-items: center; gap: 2px; height: 24px; flex: 1; min-width: 0; }
+.onda i { display: block; width: 3px; border-radius: 1px; background: var(--azul-400); opacity: .4; transition: opacity .2s; }
+.onda.activa i.sonando { opacity: 1; }
+.reloj { font-size: .78rem; color: var(--tinta-3); white-space: nowrap; }
+
+.dialogo { display: flex; flex-direction: column; gap: 11px; }
+.dialogo p { font-size: .89rem; color: var(--tinta-2); line-height: 1.5; transition: opacity .3s; }
+.dialogo b {
+  display: block; font-size: .67rem; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--azul-700); font-weight: 600; margin-bottom: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-.flecha svg { display: block; }
+.dialogo.reproduciendo p { opacity: .16; }
+.dialogo.reproduciendo p.dicho { opacity: 1; }
 
-/* Las ondas: lo que se dijo, antes de tener forma. */
-.onda { display: flex; align-items: center; gap: 2px; height: 26px; }
-.onda i { display: block; width: 3px; border-radius: 2px; background: var(--voz); opacity: .55; }
+.ficha { display: flex; flex-direction: column; }
+.ficha .campo {
+  display: grid; grid-template-columns: 96px 1fr; gap: 12px;
+  padding-block: 9px; border-bottom: 1px solid var(--linea);
+  align-items: baseline; transition: opacity .3s;
+}
+.ficha .campo:last-child { border-bottom: 0; padding-bottom: 0; }
+.ficha .campo span:last-child { font-size: .89rem; line-height: 1.45; }
+.ficha.reproduciendo .campo { opacity: .16; }
+.ficha.reproduciendo .campo.dicho { opacity: 1; }
+.alto { color: var(--rojo); font-weight: 600; }
 
-.lado-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .repetir {
   appearance: none; background: transparent; border: 1px solid var(--linea-2);
-  border-radius: var(--r); padding: 5px 11px; cursor: pointer; color: var(--tinta-2);
-  font-family: InterVar, Inter, sans-serif; font-size: .78rem; font-weight: 500;
-  transition: color .15s, border-color .15s;
+  border-radius: var(--r); padding: 4px 10px; cursor: pointer; color: var(--tinta-2);
+  font-family: InterVar, sans-serif; font-size: .76rem; font-weight: 500;
 }
-.repetir:hover { color: var(--tinta); border-color: var(--tinta-2); }
+.repetir:hover { color: var(--azul-700); border-color: var(--azul-400); }
 .repetir:disabled { opacity: .45; cursor: default; }
-.repetir:focus-visible { outline: 2px solid var(--sello); outline-offset: 2px; }
+.repetir:focus-visible { outline: 2px solid var(--azul-400); outline-offset: 2px; }
 
-/* Durante la reproducción las líneas aparecen de a una. Arrancan visibles y
-   el script las oculta: si el JavaScript no corre, la página queda entera. */
-.dialogo p, .ficha .campo-fila { transition: opacity .35s ease; }
-.dialogo.reproduciendo p, .ficha.reproduciendo .campo-fila { opacity: .12; }
-.dialogo.reproduciendo p.dicho, .ficha.reproduciendo .campo-fila.dicho { opacity: 1; }
-.onda i { transition: opacity .25s, background-color .25s; }
-.onda.activa i.sonando { opacity: 1; }
-
-.dialogo { display: flex; flex-direction: column; gap: 9px; font-size: .93rem; line-height: 1.5; }
-.dialogo p { color: var(--tinta-2); }
-.dialogo b { color: var(--voz); font-weight: 600; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; display: block; margin-bottom: 1px; }
-
-.ficha { display: flex; flex-direction: column; gap: 12px; }
-.campo-fila { display: flex; flex-direction: column; gap: 2px; }
-.campo-fila .rotulo { color: var(--tinta-3); }
-.campo-fila span:last-child { font-size: .93rem; line-height: 1.45; }
-.vital { color: var(--sello); font-weight: 600; }
+/* ── El separador: trazo de electrocardiograma ─────────────── */
+.ecg { display: block; width: 100%; height: 26px; color: var(--linea-2); margin-block: 44px 0; }
+.ecg svg { display: block; width: 100%; height: 26px; }
 
 /* ── Secciones ─────────────────────────────────────────────── */
-section { padding-block: 60px 0; }
-.sec-cab { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+section { padding-top: 34px; }
+.sec-cab { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.sec-cab p { color: var(--tinta-2); font-size: .97rem; }
 
-.pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 30px; }
-.paso { display: flex; flex-direction: column; gap: 9px; }
-.paso-n {
-  font-family: ui-monospace, monospace; font-size: .72rem; letter-spacing: .12em;
-  color: var(--sello); font-weight: 600;
-}
-.paso p { color: var(--tinta-2); font-size: .96rem; }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.item-cuerpo { display: flex; flex-direction: column; gap: 6px; }
+.item-cuerpo p { font-size: .9rem; color: var(--tinta-2); }
 
-/* Lista de capacidades: filas con regla, no tarjetas. */
-.capacidades { display: flex; flex-direction: column; }
-.cap {
-  display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 20px;
-  padding-block: 18px; border-top: 1px solid var(--linea); align-items: baseline;
+/* Lista tipo hoja de indicaciones */
+.indicaciones { display: flex; flex-direction: column; }
+.ind {
+  display: grid; grid-template-columns: 22px minmax(140px, 200px) 1fr; gap: 14px;
+  padding: 13px 16px; border-bottom: 1px solid var(--linea); align-items: baseline;
 }
-.cap:last-child { border-bottom: 1px solid var(--linea); }
-.cap p { color: var(--tinta-2); font-size: .96rem; }
+.indicaciones .ind:last-child { border-bottom: 0; }
+.ind-tic { color: var(--verde); line-height: 1; padding-top: 2px; }
+.ind p { font-size: .9rem; color: var(--tinta-2); }
 
-/* ── El apartado de prueba ─────────────────────────────────── */
-.prueba { display: flex; flex-direction: column; gap: 4px; }
-.prueba-que {
-  display: flex; align-items: center; gap: 22px;
-  padding: 24px 26px; background: var(--carta);
-  border: 1px solid var(--linea-2); border-radius: var(--r);
+/* ── Prueba ────────────────────────────────────────────────── */
+.prueba-tope {
+  display: flex; align-items: center; gap: 18px; padding: 18px 16px;
+  background: var(--verde-050); border-bottom: 1px solid var(--linea);
 }
-.prueba-n {
-  font-family: Fraunces, Georgia, serif; font-size: 3.4rem; line-height: 1;
-  color: var(--sello); font-weight: 600; letter-spacing: -.03em;
-}
-.prueba-que h3 { font-size: 1.24rem; }
-.prueba-que p { color: var(--tinta-2); font-size: .95rem; margin-top: 3px; }
+.prueba-n { font-size: 2.6rem; font-weight: 700; line-height: 1; color: var(--verde); letter-spacing: -.03em; }
+.prueba-tope p { font-size: .9rem; color: var(--tinta-2); margin-top: 2px; }
 
 /* ── Precios ───────────────────────────────────────────────── */
-.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; }
-.plan {
-  border: 1px solid var(--linea-2); border-radius: var(--r); background: var(--carta);
-  padding: 26px; display: flex; flex-direction: column; gap: 14px;
-}
-.plan.elegido { border-color: var(--sello); border-width: 1.5px; }
-.plan-precio { font-family: Fraunces, Georgia, serif; font-size: 2.2rem; line-height: 1; letter-spacing: -.02em; }
-.plan-precio small { font-family: InterVar, sans-serif; font-size: .88rem; color: var(--tinta-3); font-weight: 400; letter-spacing: 0; }
-.plan ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; color: var(--tinta-2); font-size: .93rem; }
-.plan-nota { font-size: .84rem; color: var(--tinta-3); }
+.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 14px; }
+.plan-precio { font-size: 2rem; font-weight: 700; line-height: 1; letter-spacing: -.025em; }
+.plan-precio small { font-size: .85rem; font-weight: 400; color: var(--tinta-3); letter-spacing: 0; }
+.plan-lista { margin: 12px 0 0; padding-left: 17px; display: flex; flex-direction: column; gap: 6px; color: var(--tinta-2); font-size: .89rem; }
+.plan-pie { font-size: .82rem; color: var(--tinta-3); margin-top: 12px; }
+.destacado .bloque-cab { background: var(--verde-050); }
+.destacado .bloque-cab .etiqueta { color: var(--verde); }
+.destacado { border-color: var(--verde); }
 
-.regalo {
-  border-left: 2px solid var(--sello); padding: 4px 0 4px 18px;
-  color: var(--tinta-2); font-size: 1rem; max-width: 58ch;
+.aviso {
+  display: flex; gap: 12px; padding: 14px 16px; background: var(--azul-050);
+  border: 1px solid var(--linea); border-radius: var(--r); font-size: .92rem;
+  color: var(--tinta-2); margin-top: 14px;
 }
-.regalo b { color: var(--tinta); }
-
-/* ── Confianza ─────────────────────────────────────────────── */
-.garantias { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 26px; }
-.gar { display: flex; flex-direction: column; gap: 7px; }
-.gar p { color: var(--tinta-2); font-size: .94rem; }
+.aviso b { color: var(--tinta); }
 
 /* ── Cierre ────────────────────────────────────────────────── */
 .cierre {
-  background: var(--tinta); color: var(--papel);
-  border-radius: var(--r); padding: 46px 34px;
-  display: flex; flex-direction: column; gap: 18px; align-items: flex-start;
-  margin-top: 64px;
+  background: var(--azul-900); border-radius: var(--r); padding: 34px 26px;
+  display: flex; flex-direction: column; gap: 14px; align-items: flex-start; margin-top: 44px;
 }
-.cierre h2 { color: var(--papel); }
-.cierre p { color: var(--linea-2); max-width: 50ch; }
-.cierre .boton { background: var(--papel); color: var(--tinta); }
+.cierre h2, .cierre p { color: #EAF3F6; }
+.cierre p { max-width: 52ch; font-size: .97rem; opacity: .88; }
+.cierre .boton { background: #fff; color: var(--azul-900); border-color: #fff; }
+.cierre .boton:hover { background: #EAF3F6; border-color: #EAF3F6; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .cierre { background: var(--azul-050); }
+  :root:not([data-theme="light"]) .cierre h2, :root:not([data-theme="light"]) .cierre p { color: var(--tinta); }
+}
+:root[data-theme="dark"] .cierre { background: var(--azul-050); }
+:root[data-theme="dark"] .cierre h2, :root[data-theme="dark"] .cierre p { color: var(--tinta); }
 
 .pie {
-  padding-block: 34px 48px; margin-top: 22px;
-  display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap;
-  font-size: .84rem; color: var(--tinta-3); border-top: 1px solid var(--linea);
+  padding-block: 26px 40px; margin-top: 20px; border-top: 1px solid var(--linea);
+  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  font-size: .83rem; color: var(--tinta-3);
 }
 .pie a { color: var(--tinta-2); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-@media (max-width: 720px) {
-  .mesa { grid-template-columns: 1fr; }
-  .flecha { border-inline: 0; border-block: 1px solid var(--linea); padding-block: 8px; transform: rotate(90deg); }
-  .cap { grid-template-columns: 1fr; gap: 6px; }
-  .cierre { padding: 34px 24px; }
+@media (max-width: 760px) {
+  .consulta { grid-template-columns: 1fr; }
+  .ind { grid-template-columns: 22px 1fr; }
+  .ind h3 { grid-column: 2; }
+  .ind p { grid-column: 2; }
+  .ficha .campo { grid-template-columns: 84px 1fr; gap: 10px; }
 }
 </style>
 
@@ -254,356 +259,393 @@ section { padding-block: 60px 0; }
 <div class="env">
 
   <header class="barra">
-    <div class="marca">Sympho<span>med</span></div>
-    <div class="rotulo">Historia clínica · Bolivia y Brasil</div>
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="24" height="24" rx="5" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M5 13h3l2-5 3 10 2.5-6 1.5 3h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="logo-marca">Symphomed</span>
+    </div>
+    <div class="barra-dcha">
+      <a class="enlace-barra" href="#probar">Prueba gratis</a>
+      <a class="enlace-barra" href="#precios">Precios</a>
+      <a class="enlace-barra" href="/">Ingresar</a>
+    </div>
   </header>
 
   <div class="heroe">
-    <h1>Terminá la consulta con<br>la historia ya escrita.</h1>
+    <h1>Terminá la consulta con la historia ya escrita</h1>
     <p class="bajada">
       Symphomed escucha la consulta y redacta la nota clínica, la receta y el control siguiente.
       <b>El médico no escribe nada</b> — y el paciente tiene toda su atención, no la nuca de
       alguien tecleando.
     </p>
 
-    <!-- Lo que hace el producto, mostrado en vez de descrito. -->
-    <div class="mesa">
-      <div class="lado hablado">
-        <div class="lado-cab">
-          <span class="rotulo" style="color:var(--voz)">Lo que se habló · 4 min 12 s</span>
+    <div class="consulta">
+      <div class="bloque">
+        <div class="bloque-cab">
+          <span class="etiqueta">Consulta · audio</span>
           <button class="repetir" id="repetir" type="button">Ver cómo se escribe</button>
         </div>
-        <div class="onda" id="onda" aria-hidden="true"></div>
-        <div class="dialogo">
-          <p><b>Médica</b>¿Está tomando el losartán y la hidroclorotiazida todos los días?</p>
-          <p><b>Paciente</b>El losartán sí, pero la otra la dejé hace tres semanas porque me hacía ir mucho al baño de noche.</p>
-          <p><b>Médica</b>Le tomo la presión… ciento cincuenta sobre noventa y cinco. Está alta otra vez.</p>
+        <div class="bloque-cuerpo">
+          <div class="audio-fila">
+            <div class="onda" id="onda" aria-hidden="true"></div>
+            <span class="reloj dato" id="reloj">04:12</span>
+          </div>
+          <div class="dialogo" id="dialogo">
+            <p><b>Médica</b>¿Está tomando el losartán y la hidroclorotiazida todos los días?</p>
+            <p><b>Paciente</b>El losartán sí, pero la otra la dejé hace tres semanas porque me hacía ir mucho al baño de noche.</p>
+            <p><b>Médica</b>Le tomo la presión… ciento cincuenta sobre noventa y cinco. Está alta otra vez.</p>
+          </div>
         </div>
       </div>
 
-      <div class="flecha" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-          <path d="M4 11h13m0 0-4.5-4.5M17 11l-4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-
-      <div class="lado">
-        <span class="rotulo" id="rotuloEscrito">Lo que quedó escrito · 40 s después</span>
-        <div class="ficha" id="ficha">
-          <div class="campo-fila">
-            <span class="rotulo">Motivo</span>
-            <span>Control de hipertensión arterial. Cefalea matinal de diez días.</span>
-          </div>
-          <div class="campo-fila">
-            <span class="rotulo">Adherencia</span>
-            <span>Suspendió hidroclorotiazida hace 3 semanas por nicturia. Losartán sin interrupciones.</span>
-          </div>
-          <div class="campo-fila">
-            <span class="rotulo">Examen</span>
-            <span class="campo vital">PA 150/95 mmHg · +2 kg desde el control previo</span>
-          </div>
-          <div class="campo-fila">
-            <span class="rotulo">Plan</span>
-            <span>Reiniciar hidroclorotiazida 12,5 mg en la mañana. Losartán 50 mg. Dieta hiposódica. Creatinina y electrolitos. Control en 3 semanas.</span>
+      <div class="bloque">
+        <div class="bloque-cab">
+          <span class="etiqueta">Nota clínica</span>
+          <span class="etiqueta" id="estado">Generada en 38 s</span>
+        </div>
+        <div class="bloque-cuerpo">
+          <div class="ficha" id="ficha">
+            <div class="campo">
+              <span class="etiqueta">Motivo</span>
+              <span>Control de hipertensión arterial. Cefalea matinal de diez días.</span>
+            </div>
+            <div class="campo">
+              <span class="etiqueta">Adherencia</span>
+              <span>Suspendió hidroclorotiazida hace 3 semanas por nicturia. Losartán sin interrupciones.</span>
+            </div>
+            <div class="campo">
+              <span class="etiqueta">Examen</span>
+              <span class="dato alto">PA 150/95 mmHg &nbsp;·&nbsp; +2 kg</span>
+            </div>
+            <div class="campo">
+              <span class="etiqueta">Plan</span>
+              <span>Reiniciar hidroclorotiazida 12,5 mg en la mañana. Losartán 50 mg. Dieta hiposódica. Creatinina y electrolitos.</span>
+            </div>
+            <div class="campo">
+              <span class="etiqueta">Control</span>
+              <span class="dato">En 3 semanas</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="acciones">
-      <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Pedir una demostración</a>
-      <a class="boton calmo" href="#probar">Probar gratis</a>
-      <span class="al-lado">Las primeras 4 consultas no se cobran.</span>
+    <div class="acciones" style="padding-top:6px">
+      <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Probar con 4 consultas gratis</a>
+      <a class="boton calmo" href="#precios">Ver precios</a>
     </div>
   </div>
 
+  <div class="ecg" aria-hidden="true"></div>
+
   <!-- ── Cómo funciona ─────────────────────────────────────── -->
   <section>
-    <div class="pauta"><i></i><i></i><i></i><i></i></div>
-    <div class="sec-cab" style="padding-top:30px">
+    <div class="sec-cab">
       <h2>Tres pasos, y ninguno es escribir</h2>
     </div>
-    <div class="pasos">
-      <div class="paso">
-        <span class="paso-n">PASO 1</span>
-        <h3>Apretás grabar y atendés</h3>
-        <p>Como siempre. El paciente autoriza la grabación una vez, en la primera consulta — sin ese permiso Symphomed no graba nada.</p>
+    <div class="rejilla">
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Paso 1</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>Apretás grabar y atendés</h3>
+          <p>Como siempre. El paciente autoriza la grabación una vez, en la primera consulta — sin ese permiso Symphomed no graba nada.</p>
+        </div>
       </div>
-      <div class="paso">
-        <span class="paso-n">PASO 2</span>
-        <h3>Symphomed escucha y escribe</h3>
-        <p>Transcribe con vocabulario médico y arma la nota: motivo, antecedentes, examen, diagnóstico, plan y próximo control. Tarda menos de un minuto.</p>
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Paso 2</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>Symphomed escucha y escribe</h3>
+          <p>Transcribe con vocabulario médico y arma la nota: motivo, antecedentes, examen, diagnóstico, plan y próximo control. Menos de un minuto.</p>
+        </div>
       </div>
-      <div class="paso">
-        <span class="paso-n">PASO 3</span>
-        <h3>Revisás y confirmás</h3>
-        <p>Corregís lo que quieras y queda guardado. Nada se archiva sin que el médico lo apruebe: la firma es suya y la responsabilidad también.</p>
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Paso 3</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>Revisás y confirmás</h3>
+          <p>Corregís lo que quieras y queda guardado. Nada se archiva sin que el médico lo apruebe: la firma es suya y la responsabilidad también.</p>
+        </div>
       </div>
     </div>
   </section>
+
+  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Qué más queda hecho ───────────────────────────────── -->
   <section>
-    <div class="pauta"><i></i><i></i><i></i><i></i></div>
-    <div class="sec-cab" style="padding-top:30px">
+    <div class="sec-cab">
       <h2>Y todo lo demás también queda hecho</h2>
-      <p class="prosa" style="color:var(--tinta-2)">
-        La nota es lo que más se nota. Pero de la misma consulta salen la receta, el
-        recordatorio al paciente y el kardex actualizado.
-      </p>
+      <p class="prosa">De la misma consulta salen la receta, el recordatorio al paciente y el kardex actualizado.</p>
     </div>
-    <div class="capacidades">
-      <div class="cap">
-        <h3>Kardex del paciente</h3>
-        <p>Toda la historia en una pantalla: consultas anteriores, medicación activa, vacunas, y los signos vitales graficados en el tiempo. Antes de entrar ya sabés en qué quedó la última vez.</p>
-      </div>
-      <div class="cap">
-        <h3>Recetas</h3>
-        <p>Salen armadas de lo que se conversó, con la dosis y la frecuencia. Se imprimen o se mandan por WhatsApp. En Brasil, con receta digital válida.</p>
-      </div>
-      <div class="cap">
-        <h3>Agenda y recordatorios</h3>
-        <p>El paciente reserva desde un enlace y recibe el aviso por WhatsApp. Menos ausencias, y la secretaria deja de contar horarios por teléfono.</p>
-      </div>
-      <div class="cap">
-        <h3>Teleconsulta</h3>
-        <p>Video desde el navegador, sin instalar nada y sin que el paciente cree una cuenta. Se transcribe igual que una consulta presencial.</p>
-      </div>
-      <div class="cap">
-        <h3>Estudios e imágenes</h3>
-        <p>Laboratorios, ecografías y radiografías quedan en la ficha. Las imágenes se abren con un visor que permite medir sobre ellas.</p>
-      </div>
-      <div class="cap">
-        <h3>Varios consultorios</h3>
-        <p>Si trabajás con más médicos, cada uno ve lo suyo y el director ve el conjunto. Los permisos se reparten por persona, no por computadora.</p>
+    <div class="bloque">
+      <div class="bloque-cab"><span class="etiqueta">Incluido en todos los planes</span></div>
+      <div class="indicaciones">
+        <div class="ind">
+          <span class="ind-tic">✚</span>
+          <h3>Kardex del paciente</h3>
+          <p>Consultas anteriores, medicación activa, vacunas y signos vitales graficados en el tiempo. Antes de entrar ya sabés en qué quedó la última vez.</p>
+        </div>
+        <div class="ind">
+          <span class="ind-tic">✚</span>
+          <h3>Recetas</h3>
+          <p>Salen armadas de lo que se conversó, con dosis y frecuencia. Se imprimen o se mandan por WhatsApp. En Brasil, con receta digital válida.</p>
+        </div>
+        <div class="ind">
+          <span class="ind-tic">✚</span>
+          <h3>Agenda y recordatorios</h3>
+          <p>El paciente reserva desde un enlace y recibe el aviso por WhatsApp. Menos ausencias, y la secretaria deja de contar horarios por teléfono.</p>
+        </div>
+        <div class="ind">
+          <span class="ind-tic">✚</span>
+          <h3>Teleconsulta</h3>
+          <p>Video desde el navegador, sin instalar nada y sin que el paciente cree una cuenta. Se transcribe igual que una consulta presencial.</p>
+        </div>
+        <div class="ind">
+          <span class="ind-tic">✚</span>
+          <h3>Estudios e imágenes</h3>
+          <p>Laboratorios, ecografías y radiografías quedan en la ficha. Las imágenes se abren con un visor que permite medir sobre ellas.</p>
+        </div>
+        <div class="ind">
+          <span class="ind-tic">✚</span>
+          <h3>Varios consultorios</h3>
+          <p>Cada médico ve lo suyo y el director ve el conjunto. Los permisos se reparten por persona, no por computadora.</p>
+        </div>
       </div>
     </div>
   </section>
 
+  <div class="ecg" aria-hidden="true"></div>
 
-  <!-- ── Probarlo ──────────────────────────────────────────── -->
+  <!-- ── Prueba ────────────────────────────────────────────── -->
   <section id="probar">
-    <div class="pauta"><i></i><i></i><i></i><i></i></div>
-    <div class="sec-cab" style="padding-top:30px">
+    <div class="sec-cab">
       <h2>Probalo con tus propios pacientes</h2>
-      <p class="prosa" style="color:var(--tinta-2)">
-        No con una cuenta de demostración ni con casos de ejemplo. Con las consultas de verdad
-        que vas a atender esta semana, en tu consultorio.
-      </p>
+      <p class="prosa">No con una cuenta de demostración ni con casos de ejemplo. Con las consultas que vas a atender esta semana, en tu consultorio.</p>
     </div>
-
-    <div class="prueba">
-      <div class="prueba-que">
-        <div class="prueba-n">4</div>
+    <div class="bloque">
+      <div class="prueba-tope">
+        <span class="prueba-n">4</span>
         <div>
           <h3>consultas sin cargo</h3>
           <p>Completas: se transcriben, sale la nota, la receta y el kardex. No es una versión recortada.</p>
         </div>
       </div>
-
-      <div class="capacidades" style="margin-top:6px">
-        <div class="cap">
+      <div class="indicaciones">
+        <div class="ind">
+          <span class="ind-tic">✚</span>
           <h3>Sin tarjeta</h3>
           <p>No se pide ningún medio de pago para empezar. Cuando se acaban las cuatro, elegís si seguís y cómo pagás — y si no, no pasa nada.</p>
         </div>
-        <div class="cap">
+        <div class="ind">
+          <span class="ind-tic">✚</span>
           <h3>Sin instalar nada</h3>
           <p>Se abre en el navegador del consultorio o del celular. No hay programa que instalar ni computadora que cambiar.</p>
         </div>
-        <div class="cap">
+        <div class="ind">
+          <span class="ind-tic">✚</span>
           <h3>Las historias son tuyas</h3>
           <p>Si decidís no seguir, te llevás lo que cargaste. Nada queda secuestrado adentro.</p>
         </div>
       </div>
-
-      <div class="acciones" style="padding-top:22px">
-        <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Empezar la prueba</a>
-        <span class="al-lado">Te acompañamos en la primera consulta, para que no la pierdas aprendiendo.</span>
-      </div>
+    </div>
+    <div class="acciones" style="padding-top:16px">
+      <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Empezar la prueba</a>
+      <span class="al-lado">Te acompañamos en la primera consulta, para que no la pierdas aprendiendo.</span>
     </div>
   </section>
+
+  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Precios ───────────────────────────────────────────── -->
   <section id="precios">
-    <div class="pauta"><i></i><i></i><i></i><i></i></div>
-    <div class="sec-cab" style="padding-top:30px">
+    <div class="sec-cab">
       <h2>Precios sin letra chica</h2>
-      <p class="prosa" style="color:var(--tinta-2)">
-        Dos formas de pagar. La que te conviene depende de cuántos pacientes atendés, y podés
-        cambiarte cuando quieras.
-      </p>
+      <p class="prosa">Dos formas de pagar. La que te conviene depende de cuántos pacientes atendés, y podés cambiarte cuando quieras.</p>
     </div>
-
     <div class="planes">
-      <div class="plan">
-        <span class="rotulo">Por consulta</span>
-        <div class="plan-precio">Bs 12 <small>cada consulta</small></div>
-        <ul>
-          <li>Pagás solo lo que usás</li>
-          <li>Sin cuota mensual ni permanencia</li>
-          <li>Todas las funciones incluidas</li>
-        </ul>
-        <span class="plan-nota">Para quien atiende pocos pacientes o está probando.</span>
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Por consulta</span></div>
+        <div class="bloque-cuerpo">
+          <div class="plan-precio dato">Bs 12 <small>cada consulta</small></div>
+          <ul class="plan-lista">
+            <li>Pagás solo lo que usás</li>
+            <li>Sin cuota mensual ni permanencia</li>
+            <li>Todas las funciones incluidas</li>
+          </ul>
+          <p class="plan-pie">Para quien atiende pocos pacientes o está probando.</p>
+        </div>
       </div>
-
-      <div class="plan elegido">
-        <span class="rotulo" style="color:var(--sello)">Plan mensual</span>
-        <div class="plan-precio">Bs 900 <small>por mes</small></div>
-        <ul>
-          <li>Consultas sin límite</li>
-          <li>Conviene desde 75 consultas al mes</li>
-          <li>Todas las funciones incluidas</li>
-          <li>El plan anual trae un mes de regalo</li>
-        </ul>
-        <span class="plan-nota">Para consultorios con agenda llena todos los días.</span>
+      <div class="bloque destacado">
+        <div class="bloque-cab"><span class="etiqueta">Plan mensual</span></div>
+        <div class="bloque-cuerpo">
+          <div class="plan-precio dato">Bs 900 <small>por mes</small></div>
+          <ul class="plan-lista">
+            <li>Consultas sin límite</li>
+            <li>Conviene desde 75 consultas al mes</li>
+            <li>Todas las funciones incluidas</li>
+            <li>El plan anual trae un mes de regalo</li>
+          </ul>
+          <p class="plan-pie">Para consultorios con agenda llena todos los días.</p>
+        </div>
       </div>
     </div>
-
-    <p class="regalo" style="margin-top:26px">
-      <b>Las primeras 4 consultas no se cobran</b>, en cualquiera de los dos planes. Para la
-      cuarta ya sabés si te ahorra tiempo — y recién ahí la decisión es honesta.
-    </p>
-    <p class="plan-nota" style="margin-top:14px">
-      En Brasil: R$ 10 por consulta o R$ 400 al mes. Los precios se muestran en la moneda de
-      cada país, no convertidos.
-    </p>
+    <div class="aviso">
+      <span class="ind-tic">✚</span>
+      <span><b>Las primeras 4 consultas no se cobran</b>, en cualquiera de los dos planes. Para la cuarta ya sabés si te ahorra tiempo — y recién ahí la decisión es honesta. En Brasil: R$ 10 por consulta o R$ 400 al mes.</span>
+    </div>
   </section>
+
+  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Confianza ─────────────────────────────────────────── -->
   <section>
-    <div class="pauta"><i></i><i></i><i></i><i></i></div>
-    <div class="sec-cab" style="padding-top:30px">
+    <div class="sec-cab">
       <h2>La historia clínica es del médico y del paciente</h2>
     </div>
-    <div class="garantias">
-      <div class="gar">
-        <h3>El paciente autoriza, o no se graba</h3>
-        <p>El consentimiento es la llave, no una casilla que se tilda. Sin autorización explícita del paciente, Symphomed no graba ni transcribe.</p>
+    <div class="rejilla">
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Consentimiento</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>El paciente autoriza, o no se graba</h3>
+          <p>Sin autorización explícita del paciente, Symphomed no graba ni transcribe. No es una casilla que se tilda: es la llave.</p>
+        </div>
       </div>
-      <div class="gar">
-        <h3>Nadie más lee las consultas</h3>
-        <p>Cada médico ve solo sus pacientes. Los datos no se venden, no se comparten y no se usan para publicidad.</p>
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Confidencialidad</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>Nadie más lee las consultas</h3>
+          <p>Cada médico ve solo sus pacientes. Los datos no se venden, no se comparten y no se usan para publicidad.</p>
+        </div>
       </div>
-      <div class="gar">
-        <h3>Te podés ir con todo</h3>
-        <p>Si un día decidís dejarlo, te llevás las historias completas. No hay forma de quedar atrapado adentro.</p>
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">Portabilidad</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>Te podés ir con todo</h3>
+          <p>Si un día decidís dejarlo, te llevás las historias completas. No hay forma de quedar atrapado adentro.</p>
+        </div>
       </div>
-      <div class="gar">
-        <h3>Está funcionando hoy</h3>
-        <p>No es una promesa ni una lista de espera. Hay médicos atendiendo con Symphomed en Bolivia y en Brasil.</p>
+      <div class="bloque">
+        <div class="bloque-cab"><span class="etiqueta">En producción</span></div>
+        <div class="bloque-cuerpo item-cuerpo">
+          <h3>Está funcionando hoy</h3>
+          <p>No es una promesa ni una lista de espera. Hay médicos atendiendo con Symphomed en Bolivia y en Brasil.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ── Cierre ────────────────────────────────────────────── -->
   <div class="cierre">
     <h2>Empezá con una consulta</h2>
-    <p>
-      Escribinos por WhatsApp y te mostramos cómo funciona con un caso real, en quince minutos.
-      Si te sirve, seguís; si no, no perdiste nada.
-    </p>
+    <p>Escribinos por WhatsApp y te mostramos cómo funciona con un caso real, en quince minutos. Si te sirve, seguís; si no, no perdiste nada.</p>
     <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escribir por WhatsApp</a>
   </div>
 
   <footer class="pie">
     <span>Symphomed · Historia clínica asistida · Bolivia y Brasil</span>
-    <span><a href="https://wa.me/59164637067">WhatsApp</a></span>
+    <span><a href="https://wa.me/59164637067">WhatsApp</a> · <a href="/">Ingresar</a></span>
   </footer>
 </div>
 
 <script nonce="__NONCE__">
 "use strict";
-// Las barras del audio. Se generan acá y no como SVG a mano para que la
-// silueta sea la de una conversación —picos donde alguien habla, valles en
-// las pausas— y no una decoración uniforme.
-var ALTURAS = [
-  4, 7, 11, 16, 22, 18, 13, 9, 6, 4, 3, 5, 9, 15, 21, 25, 20, 14, 8, 5,
-  3, 4, 8, 13, 19, 24, 26, 21, 15, 10, 6, 4, 3, 6, 12, 18, 23, 17, 11, 7,
-  4, 3, 5, 10, 16, 22, 19, 12, 8, 5, 3, 4, 7, 12, 17, 14, 9, 6, 4, 3,
-];
 
+// El trazo de electrocardiograma que separa las secciones. Se dibuja con
+// código y no a mano porque hay que repetir el ciclo hasta cubrir el ancho,
+// y un path escrito a mano quedaría fijo a una sola medida de pantalla.
 (function () {
+  var CICLO = 120, ALTO = 26, m = ALTO / 2;
+  // Un latido: línea de base, P, complejo QRS, T. Las proporciones son las
+  // de un trazo normal, no una zigzag decorativa.
+  var d = "M0 " + m + " h26 l5 -3 l5 3 h10 l4 8 l5 -20 l5 16 l4 -4 h12 q6 -7 12 0 h" + (CICLO - 88);
+  document.querySelectorAll(".ecg").forEach(function (caja) {
+    caja.innerHTML =
+      '<svg viewBox="0 0 ' + CICLO + " " + ALTO + '" preserveAspectRatio="none" fill="none">' +
+      '<path d="' + d + '" stroke="currentColor" stroke-width="1.4" ' +
+      'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';
+  });
+})();
+
+// La reproducción de la consulta.
+(function () {
+  var ALTURAS = [
+    4, 7, 11, 16, 22, 18, 13, 9, 6, 4, 3, 5, 9, 15, 21, 24, 20, 14, 8, 5,
+    3, 4, 8, 13, 19, 23, 24, 21, 15, 10, 6, 4, 3, 6, 12, 18, 22, 17, 11, 7,
+    4, 3, 5, 10, 16, 21, 19, 12, 8, 5, 3, 4, 7, 12, 17, 14, 9, 6, 4, 3,
+  ];
   var onda = document.getElementById("onda");
-  var dialogo = document.querySelector(".dialogo");
+  var dialogo = document.getElementById("dialogo");
   var ficha = document.getElementById("ficha");
   var boton = document.getElementById("repetir");
-  var rotulo = document.getElementById("rotuloEscrito");
+  var estado = document.getElementById("estado");
+  var reloj = document.getElementById("reloj");
   if (!onda || !dialogo || !ficha || !boton) return;
 
-  onda.innerHTML = ALTURAS.map(function (h) {
-    return '<i style="height:' + h + 'px"></i>';
-  }).join("");
+  onda.innerHTML = ALTURAS.map(function (h) { return '<i style="height:' + h + 'px"></i>'; }).join("");
 
   var barras = [].slice.call(onda.children);
   var lineas = [].slice.call(dialogo.children);
   var campos = [].slice.call(ficha.children);
-  var textoRotulo = rotulo ? rotulo.textContent : "";
+  var estadoQuieto = estado ? estado.textContent : "";
+  var relojQuieto = reloj ? reloj.textContent : "";
   var relojes = [];
 
-  // Con movimiento reducido la reproducción no aporta nada y molesta: la
-  // página ya muestra el resultado completo, que es lo que importa.
-  var quieto = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (quieto) { boton.hidden = true; return; }
-
-  function limpiar() {
-    relojes.forEach(clearTimeout);
-    relojes = [];
+  // Con movimiento reducido no se ofrece: el resultado ya está entero a la
+  // vista y la animación solo estorbaría.
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    boton.hidden = true;
+    return;
   }
-  function luego(ms, fn) { relojes.push(setTimeout(fn, ms)); }
 
+  function luego(ms, fn) { relojes.push(setTimeout(fn, ms)); }
   function reposo() {
-    limpiar();
+    relojes.forEach(clearTimeout); relojes = [];
     dialogo.classList.remove("reproduciendo");
     ficha.classList.remove("reproduciendo");
     onda.classList.remove("activa");
-    lineas.forEach(function (l) { l.classList.remove("dicho"); });
-    campos.forEach(function (c) { c.classList.remove("dicho"); });
+    lineas.concat(campos).forEach(function (e) { e.classList.remove("dicho"); });
     barras.forEach(function (b) { b.classList.remove("sonando"); });
-    if (rotulo) rotulo.textContent = textoRotulo;
+    if (estado) estado.textContent = estadoQuieto;
+    if (reloj) reloj.textContent = relojQuieto;
     boton.disabled = false;
     boton.textContent = "Ver cómo se escribe";
   }
 
   function reproducir() {
-    limpiar();
+    relojes.forEach(clearTimeout); relojes = [];
     boton.disabled = true;
     boton.textContent = "Escuchando…";
     dialogo.classList.add("reproduciendo");
     ficha.classList.add("reproduciendo");
     onda.classList.add("activa");
-    lineas.forEach(function (l) { l.classList.remove("dicho"); });
-    campos.forEach(function (c) { c.classList.remove("dicho"); });
+    lineas.concat(campos).forEach(function (e) { e.classList.remove("dicho"); });
     barras.forEach(function (b) { b.classList.remove("sonando"); });
-    if (rotulo) rotulo.textContent = "Todavía nada escrito";
+    if (estado) estado.textContent = "Escuchando…";
 
-    // La consulta: cada línea aparece cuando "se dice", y las barras se
-    // encienden hasta donde va la conversación.
     var porLinea = 1500;
     lineas.forEach(function (linea, i) {
       luego(300 + i * porLinea, function () {
         linea.classList.add("dicho");
         var hasta = Math.round(barras.length * (i + 1) / lineas.length);
         barras.slice(0, hasta).forEach(function (b) { b.classList.add("sonando"); });
+        if (reloj) reloj.textContent = ["01:24", "02:47", "04:12"][i] || relojQuieto;
       });
     });
 
-    var finHabla = 300 + lineas.length * porLinea;
-
-    luego(finHabla, function () {
+    var fin = 300 + lineas.length * porLinea;
+    luego(fin, function () {
       boton.textContent = "Escribiendo…";
-      if (rotulo) rotulo.textContent = "Redactando la nota…";
+      if (estado) estado.textContent = "Redactando…";
     });
-
-    // Y la nota se arma campo por campo. Es más lento que el habla a
-    // propósito: así se ve que primero se escuchó todo y después se escribió.
+    // La nota se arma más lento que el habla, a propósito: así se ve que
+    // primero se escuchó todo y recién después se escribió.
     campos.forEach(function (campo, i) {
-      luego(finHabla + 700 + i * 520, function () { campo.classList.add("dicho"); });
+      luego(fin + 700 + i * 460, function () { campo.classList.add("dicho"); });
     });
-
-    luego(finHabla + 700 + campos.length * 520 + 400, function () {
+    luego(fin + 700 + campos.length * 460 + 400, function () {
       dialogo.classList.remove("reproduciendo");
       ficha.classList.remove("reproduciendo");
-      if (rotulo) rotulo.textContent = textoRotulo;
+      if (estado) estado.textContent = estadoQuieto;
       boton.disabled = false;
       boton.textContent = "Verlo de nuevo";
     });
