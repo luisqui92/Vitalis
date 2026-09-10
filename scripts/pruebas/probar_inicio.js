@@ -31,18 +31,32 @@ verificar("vive en vistas/, no en public/",
   !fs.existsSync(path.join(RAIZ, "public", "inicio.html")));
 
 console.log("\n── 2. Dice lo que hay que decir ──");
-// No es corrección de estilo: son las tres cosas sin las cuales la página no
-// hace su trabajo, y las tres se borran fácil en una edición apurada.
+// No es corrección de estilo: son las cuatro cosas sin las cuales la página no
+// hace su trabajo, y las cuatro se borran fácil en una edición apurada.
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));
 verificar("dice los precios", /Bs\s*12/.test(vista) && /Bs\s*900/.test(vista));
 verificar("y las 4 consultas de cortesía", /4 consultas/.test(vista));
-verificar("tiene el apartado de prueba", /id="probar"/.test(vista) && /Empezar la prueba/.test(vista));
+verificar("tiene el apartado de prueba", /Empezar la prueba/.test(vista));
 
-console.log("\n── 2b. La demostración arranca mostrando el resultado ──");
-// Si las líneas nacieran ocultas y el script no corriera, la página quedaría
-// con dos paneles vacíos. Se ocultan DESDE el script, nunca desde el HTML.
-verificar("nada nace oculto en el marcado", !/class="[^"]*\breproduciendo\b/.test(vista));
-verificar("el botón de repetir existe", /id="repetir"/.test(vista));
+console.log("\n── 2b. Las tres preguntas y el resultado ──");
+// La página ya no es un texto que se lee: es un cuestionario de tres pasos. Si
+// falta una pantalla, el script revienta al pedirla por id y no se ve NADA.
+[1, 2, 3, 4].forEach(p => verificar(`existe la pantalla ${p}`, vista.includes(`id="e${p}"`)));
+verificar("la primera NO nace oculta", /id="e1"(?![^>]*\bhidden\b)/.test(vista));
+verificar("las otras tres sí", ["e2", "e3", "e4"].every(
+  id => new RegExp(`id="${id}"[^>]*\\bhidden\\b`).test(vista)));
+
+// Las opciones las escribe el script desde sus listas. Si se borran las listas
+// la página se ve entera pero sin nada que elegir, y el botón queda apagado
+// para siempre — un fallo que no rompe nada visible y no se nota hasta que
+// pasan las semanas y nadie escribió por WhatsApp.
+verificar("las especialidades salen de una lista", /ESPECIALIDADES\s*=\s*\[/.test(vista));
+verificar("los minutos también", /MINUTOS\s*=\s*\[/.test(vista));
+verificar("y hay dónde ponerlas", /id="ops-esp"/.test(vista) && /id="ops-min"/.test(vista));
+
+// Esta ya se rompió una vez: .progreso es flex, y sin esta regla el atributo
+// hidden no le hace nada. La barra de progreso se quedaba encima del resultado.
+verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*!important/.test(vista));
 
 (async () => {
   const express = require("express");
@@ -63,7 +77,7 @@ verificar("el botón de repetir existe", /id="repetir"/.test(vista));
     req.end();
   });
 
-  const esLanding = (r) => /Escribirla, diez/.test(r.texto);
+  const esLanding = (r) => /¿En qué atendés\?/.test(r.texto);
   const esApp = (r) => /LA APLICACION/.test(r.texto);
 
   console.log("\n── 3. La raíz, según el dominio ──");

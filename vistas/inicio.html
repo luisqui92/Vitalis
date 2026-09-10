@@ -3,581 +3,484 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#131110">
-<meta name="description" content="Symphomed escucha la consulta y la deja escrita: la nota clínica, la receta y el control siguiente. El médico no escribe nada.">
-<meta property="og:title" content="Symphomed — una consulta dura cuatro minutos. Escribirla, diez.">
-<meta property="og:description" content="La consulta se transcribe sola y queda la nota clínica, la receta y el kardex. Las primeras 4 consultas no se cobran.">
+<meta name="theme-color" content="#F4F3EF">
+<meta name="description" content="Tres preguntas y Symphomed te dice cuántas horas por semana perdés escribiendo historias clínicas, y cuánto costaría dejar de hacerlo.">
+<meta property="og:title" content="Symphomed — ¿cuánto tiempo perdés escribiendo historias?">
+<meta property="og:description" content="Tres preguntas, treinta segundos, y ves tus propios números. Las primeras 4 consultas no se cobran.">
 <meta property="og:type" content="website">
 <style>
 @font-face {
   font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
   font-weight: 100 900; font-display: swap;
 }
-/* La página se compromete con un solo mundo visual: es una sala de grabación.
-   Se declara dark para que el navegador pinte de oscuro los controles y las
-   barras, en vez de dejar destellos claros alrededor. */
-:root { color-scheme: dark; }
+/* Esta página SÍ acompaña el tema del sistema: se abre desde un WhatsApp, en
+   el celular de un médico, y no hay razón para imponerle un modo. */
+:root { color-scheme: light dark; }
 body { margin: 0; }
 img { max-width: 100%; }
-[hidden] { display: none !important; }
 </style>
 <title>Symphomed</title>
 
 <style>
 /* ─────────────────────────────────────────────────────────────
-   Symphomed — la página ES una consulta, de 00:00 al final del día.
-   La columna de tiempo a la izquierda es la estructura: cada
-   momento es una sección, y el argumento se cuenta en minutos
-   porque el producto se vende en minutos.
-   Oscuro y cálido, como una sala donde se está grabando.
+   Symphomed — no es una página, es una herramienta.
+   Tres preguntas, una pantalla cada una, y al final los números
+   del médico que la está usando: sus horas, su plata, y una nota
+   clínica de SU especialidad.
+   Pensada para el pulgar: esto se abre desde un WhatsApp.
    ───────────────────────────────────────────────────────────── */
 :root {
-  --fondo:   #131110;
-  --fondo-2: #1C1917;
-  --fondo-3: #241F1C;
-  --tinta:   #F4EFE7;
-  --tinta-2: #A79C8D;
-  --tinta-3: #6B6358;
-  --linea:   #2A2522;
-  --señal:   #D8A64B;
-  --alerta:  #E0674C;
-  --verde:   #7BB98A;
-  --r: 10px;
+  --lienzo:  #F4F3EF;
+  --carta:   #FFFFFF;
+  --tinta:   #15191B;
+  --tinta-2: #5A6468;
+  --tinta-3: #8E979B;
+  --linea:   #E2E0D9;
+  --pino:    #14614A;
+  --pino-2:  #0E4B39;
+  --pino-050:#E4EFEA;
+  --sol:     #E4A11B;
+  --alerta:  #B3402F;
+  --r: 14px;
+  --r-chico: 10px;
 }
-/* Compromiso deliberado con un solo mundo visual: esto es una sala de
-   grabación, y en claro deja de serlo. Se pinta todo explícitamente para
-   que no tome nada del fondo del navegador. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --lienzo:#101413; --carta:#181D1C; --tinta:#EDF1EF; --tinta-2:#A3AFAC;
+    --tinta-3:#77837F; --linea:#262E2C; --pino:#5FBF9B; --pino-2:#7ED0AF;
+    --pino-050:#152A24; --sol:#E8B54A; --alerta:#E28471;
+  }
+}
+:root[data-theme="dark"] {
+  --lienzo:#101413; --carta:#181D1C; --tinta:#EDF1EF; --tinta-2:#A3AFAC;
+  --tinta-3:#77837F; --linea:#262E2C; --pino:#5FBF9B; --pino-2:#7ED0AF;
+  --pino-050:#152A24; --sol:#E8B54A; --alerta:#E28471;
+}
 
 * { box-sizing: border-box; }
+/* Sin esto, .progreso { display:flex } le gana al atributo hidden y la barra
+   se queda puesta en la pantalla del resultado. */
+[hidden] { display: none !important; }
 body {
-  background: var(--fondo);
-  color: var(--tinta);
+  margin: 0; background: var(--lienzo); color: var(--tinta);
   font-family: InterVar, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 17px; line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  padding-inline: 20px;
+  font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased;
 }
-.env { max-width: 1060px; margin: 0 auto; }
+.mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
-h1, h2, h3 { margin: 0; font-weight: 300; letter-spacing: -.028em; text-wrap: balance; }
-h1 { font-size: clamp(2.5rem, 6.4vw, 4.6rem); line-height: 1.03; font-weight: 200; }
-h2 { font-size: clamp(1.75rem, 3.8vw, 2.7rem); line-height: 1.12; font-weight: 200; }
-h3 { font-size: 1.1rem; line-height: 1.35; font-weight: 500; letter-spacing: -.012em; }
+/* ── El marco: una sola columna, pensada para el pulgar ─────── */
+.app {
+  max-width: 560px; margin: 0 auto; min-height: 100svh;
+  display: flex; flex-direction: column; padding: 0 18px 26px;
+}
+
+.techo { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-block: 20px 6px; }
+.logo { display: flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: -.02em; font-size: 1.06rem; }
+.logo svg { display: block; color: var(--pino); }
+.saltar { background: none; border: 0; padding: 6px; color: var(--tinta-3); font: inherit; font-size: .86rem; cursor: pointer; }
+.saltar:hover { color: var(--tinta-2); }
+
+/* El progreso: tres tramos, no una barra genérica. */
+.progreso { display: flex; gap: 5px; padding-block: 10px 26px; }
+.progreso i { height: 3px; flex: 1; border-radius: 2px; background: var(--linea); transition: background-color .3s; }
+.progreso i.hecho { background: var(--pino); }
+
+.escena { flex: 1; display: flex; flex-direction: column; }
+.escena[hidden] { display: none; }
+
+h1 { margin: 0; font-size: clamp(1.75rem, 6vw, 2.3rem); line-height: 1.14; letter-spacing: -.028em; font-weight: 600; text-wrap: balance; }
+h2 { margin: 0; font-size: 1.28rem; line-height: 1.25; letter-spacing: -.02em; font-weight: 600; }
+h3 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
 p { margin: 0; }
-b, strong { font-weight: 500; color: var(--tinta); }
+.sub { color: var(--tinta-2); font-size: 1.02rem; margin-top: 12px; }
+.pregunta { margin-top: 4px; }
+.pista { color: var(--tinta-3); font-size: .88rem; margin-top: 9px; }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
+/* ── Opciones: botones grandes, uno debajo del otro ─────────── */
+.opciones { display: flex; flex-direction: column; gap: 9px; margin-top: 26px; }
+.opcion {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left; background: var(--carta); color: var(--tinta);
+  border: 1.5px solid var(--linea); border-radius: var(--r-chico);
+  padding: 16px 18px; font: inherit; font-weight: 500; cursor: pointer;
+  transition: border-color .15s, background-color .15s;
 }
+.opcion:hover { border-color: var(--pino); }
+.opcion[aria-pressed="true"] { border-color: var(--pino); background: var(--pino-050); }
+.opcion:focus-visible { outline: 2px solid var(--pino); outline-offset: 2px; }
+.opcion small { color: var(--tinta-3); font-weight: 400; font-size: .86rem; }
 
-/* ── Barra ─────────────────────────────────────────────────── */
-.barra {
+/* ── El contador de pacientes ──────────────────────────────── */
+.contador {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding-block: 22px; flex-wrap: wrap;
-  border-bottom: 1px solid var(--linea);
+  background: var(--carta); border: 1.5px solid var(--linea); border-radius: var(--r);
+  padding: 20px; margin-top: 26px;
 }
-.logo { display: flex; align-items: center; gap: 10px; font-size: 1.12rem; font-weight: 500; letter-spacing: -.02em; }
-.logo i {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--alerta);
-  display: block; flex: none;
+.paso-btn {
+  width: 52px; height: 52px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--linea); background: var(--lienzo); color: var(--tinta);
+  font-size: 1.5rem; line-height: 1; cursor: pointer; transition: border-color .15s;
 }
-.barra-dcha { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-.barra a { color: var(--tinta-2); text-decoration: none; font-size: .9rem; }
-.barra a:hover { color: var(--tinta); }
+.paso-btn:hover { border-color: var(--pino); }
+.paso-btn:focus-visible { outline: 2px solid var(--pino); outline-offset: 2px; }
+.contador-n { font-size: 3.2rem; font-weight: 600; letter-spacing: -.04em; line-height: 1; }
+.contador-d { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.contador-d small { color: var(--tinta-3); font-size: .84rem; }
 
-/* ── El reloj de la izquierda: la estructura de la página ──── */
-.cinta { display: grid; grid-template-columns: 104px 1fr; gap: 0; }
-.marca-t {
-  position: relative; padding-top: 4px;
-  border-right: 1px solid var(--linea);
-}
-.marca-t .t {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums;
-  font-size: .82rem; color: var(--tinta-3); letter-spacing: .02em;
-  position: sticky; top: 20px; display: block;
-}
-.marca-t.hito .t { color: var(--señal); }
-.marca-t::after {
-  content: ""; position: absolute; right: -3.5px; top: 10px;
-  width: 6px; height: 6px; border-radius: 50%; background: var(--linea);
-}
-.marca-t.hito::after { background: var(--señal); }
-.tramo { padding: 0 0 78px 30px; min-width: 0; }
-.tramo:last-child { padding-bottom: 0; }
-.rotulo {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: .69rem; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--tinta-3); display: block; margin-bottom: 14px;
-}
-.tramo > h1, .tramo > h2 { margin-bottom: 18px; }
-.dice { color: var(--tinta-2); font-size: 1.06rem; max-width: 54ch; }
-.dice + .dice { margin-top: 14px; }
-
-/* ── Botones ───────────────────────────────────────────────── */
+/* ── Botón principal, pegado abajo ─────────────────────────── */
+.abajo { margin-top: auto; padding-top: 30px; display: flex; flex-direction: column; gap: 10px; }
 .boton {
-  display: inline-flex; align-items: center; gap: 9px;
-  background: var(--señal); color: #1A1509; border: 1px solid var(--señal);
-  border-radius: 999px; padding: 13px 26px;
-  font-size: .96rem; font-weight: 500; text-decoration: none; cursor: pointer;
-  transition: filter .18s;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; background: var(--pino); color: #F4FBF8;
+  border: 0; border-radius: var(--r-chico); padding: 17px 24px;
+  font: inherit; font-size: 1.02rem; font-weight: 600; text-decoration: none;
+  cursor: pointer; transition: background-color .15s;
 }
-.boton:hover { filter: brightness(1.1); }
-.boton.calmo { background: transparent; color: var(--tinta); border-color: var(--linea); }
-.boton.calmo:hover { border-color: var(--tinta-3); filter: none; }
-.boton:focus-visible { outline: 2px solid var(--señal); outline-offset: 3px; }
-.acciones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 26px; }
-.al-lado { font-size: .89rem; color: var(--tinta-3); }
-
-/* ── La grabación ──────────────────────────────────────────── */
-.grabador {
-  background: var(--fondo-2); border-radius: var(--r); padding: 22px 24px;
-  display: flex; flex-direction: column; gap: 18px;
+.boton:hover { background: var(--pino-2); }
+.boton:disabled { opacity: .4; cursor: default; }
+.boton:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
+.boton.fino { background: transparent; color: var(--tinta-2); border: 1.5px solid var(--linea); }
+.boton.fino:hover { background: var(--carta); color: var(--tinta); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .boton { color: #0B1A15; }
 }
-.grab-cab { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-.rec { display: flex; align-items: center; gap: 9px; font-size: .78rem; color: var(--tinta-2); letter-spacing: .1em; text-transform: uppercase; }
-.rec i { width: 8px; height: 8px; border-radius: 50%; background: var(--alerta); display: block; }
-.onda { display: flex; align-items: center; gap: 2px; height: 30px; }
-.onda i { display: block; width: 3px; border-radius: 2px; background: var(--tinta-3); transition: background-color .22s; }
-.onda.activa i.sonando { background: var(--señal); }
-.dialogo { display: flex; flex-direction: column; gap: 15px; }
-.dialogo p { font-size: .95rem; color: var(--tinta-2); line-height: 1.55; transition: opacity .3s; }
-.dialogo q { quotes: none; }
-.dialogo b {
-  display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-3);
-  margin-bottom: 4px; font-weight: 400;
+:root[data-theme="dark"] .boton { color: #0B1A15; }
+
+/* ── El resultado ──────────────────────────────────────────── */
+.titular {
+  background: var(--pino); color: #F4FBF8; border-radius: var(--r);
+  padding: 26px 24px; display: flex; flex-direction: column; gap: 4px; margin-top: 22px;
 }
-.dialogo.reproduciendo p { opacity: .2; }
-.dialogo.reproduciendo p.dicho { opacity: 1; }
-.repetir {
-  appearance: none; background: transparent; border: 1px solid var(--linea);
-  border-radius: 999px; padding: 6px 15px; cursor: pointer; color: var(--tinta-2);
-  font-family: InterVar, sans-serif; font-size: .81rem;
+.titular .n { font-size: 3.4rem; font-weight: 700; line-height: 1; letter-spacing: -.045em; }
+.titular .d { font-size: 1.02rem; opacity: .9; }
+.titular .p { font-size: .9rem; opacity: .75; margin-top: 8px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .titular { color: #0B1A15; }
 }
-.repetir:hover { color: var(--tinta); border-color: var(--tinta-3); }
-.repetir:disabled { opacity: .4; cursor: default; }
-.repetir:focus-visible { outline: 2px solid var(--señal); outline-offset: 2px; }
+:root[data-theme="dark"] .titular { color: #0B1A15; }
 
-/* ── La bifurcación: el momento en que se decide todo ──────── */
-.bifurca { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.rama { border-radius: var(--r); padding: 24px; display: flex; flex-direction: column; gap: 12px; }
-.rama.sin { background: var(--fondo-2); }
-.rama.con { background: var(--fondo-3); box-shadow: inset 0 0 0 1px var(--señal); }
-.rama-t { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .69rem; letter-spacing: .14em; text-transform: uppercase; color: var(--tinta-3); }
-.rama.con .rama-t { color: var(--señal); }
-.rama-n { font-size: 2.7rem; font-weight: 200; line-height: 1; letter-spacing: -.04em; }
-.rama.sin .rama-n { color: var(--alerta); }
-.rama.con .rama-n { color: var(--verde); }
-.rama p { font-size: .93rem; color: var(--tinta-2); }
-
-/* ── La nota ───────────────────────────────────────────────── */
-.nota { background: var(--fondo-2); border-radius: var(--r); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-.campo { display: flex; flex-direction: column; gap: 4px; transition: opacity .3s; }
-.campo .k {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .67rem; letter-spacing: .14em;
-  text-transform: uppercase; color: var(--tinta-3);
+.cuentas { display: flex; flex-direction: column; margin-top: 4px; }
+.cuenta-fila {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+  padding-block: 13px; border-bottom: 1px solid var(--linea); font-size: .96rem;
 }
-.campo .v { font-size: .95rem; line-height: 1.5; color: var(--tinta); }
-.nota.reproduciendo .campo { opacity: .2; }
-.nota.reproduciendo .campo.dicho { opacity: 1; }
-.alto { color: var(--alerta); }
+.cuenta-fila:last-child { border-bottom: 0; }
+.cuenta-fila span:first-child { color: var(--tinta-2); }
+.cuenta-fila b { font-weight: 600; }
+.cuenta-fila b.bien { color: var(--pino); }
 
-/* ── La cuenta del día ─────────────────────────────────────── */
-.cuenta { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2px; background: var(--linea); border-radius: var(--r); overflow: hidden; }
-.celda { background: var(--fondo-2); padding: 22px 20px; display: flex; flex-direction: column; gap: 5px; }
-.celda .n { font-size: 2rem; font-weight: 200; line-height: 1; letter-spacing: -.035em; }
-.celda .n.grande { color: var(--señal); }
-.celda .d { font-size: .85rem; color: var(--tinta-2); }
-
-/* ── Listas ────────────────────────────────────────────────── */
-.puntos { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 28px 26px; }
-.punto { display: flex; flex-direction: column; gap: 7px; }
-.punto p { font-size: .94rem; color: var(--tinta-2); }
-.punto .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .67rem; letter-spacing: .14em; text-transform: uppercase; color: var(--señal); }
-
-.filas { display: flex; flex-direction: column; }
-.fila { display: grid; grid-template-columns: minmax(150px, 210px) 1fr; gap: 24px; padding-block: 19px; border-top: 1px solid var(--linea); align-items: baseline; }
-.filas .fila:last-child { border-bottom: 1px solid var(--linea); }
-.fila p { font-size: .94rem; color: var(--tinta-2); }
-
-/* ── Precios ───────────────────────────────────────────────── */
-.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 16px; }
-.plan { background: var(--fondo-2); border-radius: var(--r); padding: 26px; display: flex; flex-direction: column; gap: 6px; }
-.plan.elegido { box-shadow: inset 0 0 0 1px var(--señal); }
-.plan .k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .67rem; letter-spacing: .14em; text-transform: uppercase; color: var(--tinta-3); }
-.plan.elegido .k { color: var(--señal); }
-.precio { font-size: 2.3rem; font-weight: 200; line-height: 1; letter-spacing: -.035em; margin-block: 10px 4px; }
-.precio small { font-size: .84rem; color: var(--tinta-3); font-weight: 400; letter-spacing: 0; }
-.plan ul { margin: 12px 0 0; padding-left: 17px; display: flex; flex-direction: column; gap: 7px; color: var(--tinta-2); font-size: .92rem; }
-.plan .pie { font-size: .84rem; color: var(--tinta-3); margin-top: 14px; }
-
-.regalo { background: var(--fondo-2); border-radius: var(--r); padding: 22px 24px; margin-top: 16px; font-size: .98rem; color: var(--tinta-2); max-width: 68ch; }
-
-/* ── Cierre ────────────────────────────────────────────────── */
-.cierre { padding-block: 78px 20px; display: flex; flex-direction: column; gap: 20px; align-items: flex-start; border-top: 1px solid var(--linea); margin-top: 60px; }
-.cierre p { color: var(--tinta-2); max-width: 48ch; font-size: 1.05rem; }
-.pie { padding-block: 34px 48px; display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; font-size: .85rem; color: var(--tinta-3); }
-.pie a { color: var(--tinta-2); }
-
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-@media (max-width: 760px) {
-  .cinta { grid-template-columns: 1fr; }
-  .marca-t { border-right: 0; padding-top: 0; margin-bottom: 10px; }
-  .marca-t .t { position: static; }
-  .marca-t::after { display: none; }
-  .tramo { padding: 0 0 54px 0; border-left: 1px solid var(--linea); padding-left: 18px; }
-  .bifurca { grid-template-columns: 1fr; }
-  .fila { grid-template-columns: 1fr; gap: 6px; }
+.muestra {
+  background: var(--carta); border: 1px solid var(--linea); border-radius: var(--r);
+  overflow: hidden; margin-top: 22px;
 }
+.muestra-cab {
+  padding: 13px 18px; border-bottom: 1px solid var(--linea);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.muestra-cab .k { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); font-weight: 500; }
+.muestra-cuerpo { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.campo { display: flex; flex-direction: column; gap: 3px; }
+.campo .k { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); font-weight: 500; }
+.campo .v { font-size: .93rem; line-height: 1.5; }
+.campo .v.dato { color: var(--alerta); font-weight: 500; }
+
+.oferta {
+  background: var(--carta); border: 1px solid var(--linea); border-radius: var(--r);
+  padding: 20px; margin-top: 22px; display: flex; flex-direction: column; gap: 12px;
+}
+.oferta-tope { display: flex; align-items: baseline; gap: 14px; }
+.oferta-n { font-size: 2.6rem; font-weight: 700; line-height: 1; color: var(--pino); letter-spacing: -.04em; }
+.oferta-tope p { color: var(--tinta-2); font-size: .93rem; margin-top: 3px; }
+.oferta ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--tinta-2); font-size: .92rem; }
+.precio-linea { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--linea); font-size: .92rem; color: var(--tinta-2); }
+.precio-linea b { color: var(--tinta); font-weight: 600; }
+
+.legal { color: var(--tinta-3); font-size: .82rem; text-align: center; margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
 </head>
 <body>
-<div class="env">
+<div class="app">
 
-  <header class="barra">
-    <span class="logo"><i></i>Symphomed</span>
-    <span class="barra-dcha">
-      <a href="#probar">Prueba gratis</a>
-      <a href="#precios">Precios</a>
-      <a href="/">Ingresar</a>
+  <header class="techo">
+    <span class="logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <path d="M2 11h3l1.8-5.4L10.4 17l2.6-8 1.6 3.5H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Symphomed
     </span>
+    <button class="saltar" id="saltar" type="button">Saltar</button>
   </header>
 
-  <div class="cinta">
+  <div class="progreso" id="progreso" aria-hidden="true"><i></i><i></i><i></i></div>
 
-    <!-- 00:00 ─────────────────────────────────────────────── -->
-    <div class="marca-t"><span class="t">00:00</span></div>
-    <div class="tramo" style="padding-top:56px">
-      <span class="rotulo">Entra el paciente</span>
-      <h1>Una consulta dura cuatro minutos.<br>Escribirla, diez.</h1>
-      <p class="dice">
-        Symphomed escucha la consulta y la deja escrita: la nota clínica, la receta y el control
-        siguiente. <b>El médico no escribe nada.</b>
-      </p>
-      <p class="dice">
-        Esta página es una consulta de verdad, de principio a fin. Bajá y mirá el reloj.
-      </p>
-      <div class="acciones">
-        <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Probar con 4 consultas gratis</a>
-        <a class="boton calmo" href="#precios">Ver precios</a>
-      </div>
+  <!-- ── 1. Especialidad ─────────────────────────────────── -->
+  <div class="escena" id="e1">
+    <h1>¿Cuánto tiempo perdés escribiendo historias?</h1>
+    <p class="sub">Tres preguntas y te doy tu número. Treinta segundos.</p>
+    <p class="pregunta sub" style="margin-top:28px"><b>¿En qué atendés?</b></p>
+    <div class="opciones" id="ops-esp"></div>
+    <div class="abajo">
+      <button class="boton" id="b1" type="button" disabled>Seguir</button>
     </div>
-
-    <!-- 00:04 ─────────────────────────────────────────────── -->
-    <div class="marca-t hito"><span class="t">00:04</span></div>
-    <div class="tramo">
-      <span class="rotulo">Apretás grabar y atendés</span>
-      <div class="grabador">
-        <div class="grab-cab">
-          <span class="rec"><i></i>Grabando</span>
-          <button class="repetir" id="repetir" type="button">Ver cómo se escribe</button>
-        </div>
-        <div class="onda" id="onda" aria-hidden="true"></div>
-        <div class="dialogo" id="dialogo">
-          <p><b>Médica</b><q>¿Está tomando el losartán y la hidroclorotiazida todos los días?</q></p>
-          <p><b>Paciente</b><q>El losartán sí, pero la otra la dejé hace tres semanas porque me hacía ir mucho al baño de noche.</q></p>
-          <p><b>Médica</b><q>Le tomo la presión… ciento cincuenta sobre noventa y cinco. Está alta otra vez.</q></p>
-        </div>
-      </div>
-      <p class="dice" style="margin-top:18px">
-        El paciente autoriza la grabación una vez, en la primera consulta. Sin ese permiso,
-        Symphomed no graba nada.
-      </p>
-    </div>
-
-    <!-- 04:12 ─────────────────────────────────────────────── -->
-    <div class="marca-t hito"><span class="t">04:12</span></div>
-    <div class="tramo">
-      <span class="rotulo">Termina la consulta</span>
-      <h2>Acá es donde se decide todo</h2>
-      <p class="dice" style="margin-bottom:22px">
-        El paciente se va. Y empieza la otra parte del trabajo, la que nadie te paga.
-      </p>
-      <div class="bifurca">
-        <div class="rama sin">
-          <span class="rama-t">Sin Symphomed</span>
-          <span class="rama-n mono">+10 min</span>
-          <p>Escribís la nota de memoria, mientras el siguiente paciente espera. Algo se pierde: lo que no anotaste, no pasó.</p>
-        </div>
-        <div class="rama con">
-          <span class="rama-t">Con Symphomed</span>
-          <span class="rama-n mono">0 min</span>
-          <p>Te levantás y llamás al siguiente. La nota se está escribiendo sola mientras tanto.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 04:50 ─────────────────────────────────────────────── -->
-    <div class="marca-t hito"><span class="t">04:50</span></div>
-    <div class="tramo">
-      <span class="rotulo">La nota ya está escrita</span>
-      <div class="nota" id="nota">
-        <div class="campo">
-          <span class="k">Motivo</span>
-          <span class="v">Control de hipertensión arterial. Cefalea matinal de diez días.</span>
-        </div>
-        <div class="campo">
-          <span class="k">Adherencia</span>
-          <span class="v">Suspendió hidroclorotiazida hace 3 semanas por nicturia. Losartán sin interrupciones.</span>
-        </div>
-        <div class="campo">
-          <span class="k">Examen</span>
-          <span class="v mono alto">PA 150/95 mmHg · +2 kg desde el control previo</span>
-        </div>
-        <div class="campo">
-          <span class="k">Plan</span>
-          <span class="v">Reiniciar hidroclorotiazida 12,5 mg en la mañana. Losartán 50 mg. Dieta hiposódica. Creatinina y electrolitos.</span>
-        </div>
-        <div class="campo">
-          <span class="k">Control</span>
-          <span class="v mono">En 3 semanas</span>
-        </div>
-      </div>
-      <p class="dice" style="margin-top:18px">
-        La revisás, corregís lo que quieras y la confirmás. <b>Nada se archiva sin que el médico
-        lo apruebe</b>: la firma es suya y la responsabilidad también.
-      </p>
-    </div>
-
-    <!-- 04:51 ─────────────────────────────────────────────── -->
-    <div class="marca-t"><span class="t">04:51</span></div>
-    <div class="tramo">
-      <span class="rotulo">Y todo lo demás también salió</span>
-      <div class="filas">
-        <div class="fila">
-          <h3>La receta</h3>
-          <p>Armada de lo que se conversó, con dosis y frecuencia. Se imprime o se manda por WhatsApp. En Brasil, con receta digital válida.</p>
-        </div>
-        <div class="fila">
-          <h3>El aviso al paciente</h3>
-          <p>El recordatorio del control en tres semanas ya quedó programado. Menos ausencias, y la secretaria deja de contar horarios por teléfono.</p>
-        </div>
-        <div class="fila">
-          <h3>El kardex</h3>
-          <p>La presión de hoy se sumó a las anteriores y ya se grafica en el tiempo. La próxima vez, antes de entrar, sabés en qué quedó.</p>
-        </div>
-        <div class="fila">
-          <h3>Los estudios pedidos</h3>
-          <p>Creatinina y electrolitos quedan anotados como pendientes. Cuando lleguen, se guardan en la ficha y se abren con un visor que permite medir.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- FIN DEL DÍA ───────────────────────────────────────── -->
-    <div class="marca-t hito"><span class="t">19:00</span></div>
-    <div class="tramo">
-      <span class="rotulo">Fin del día</span>
-      <h2>Veinte pacientes después</h2>
-      <p class="dice" style="margin-bottom:22px">
-        Diez minutos por consulta no se sienten. Al final de la semana, sí.
-      </p>
-      <div class="cuenta">
-        <div class="celda">
-          <span class="n mono">20</span>
-          <span class="d">pacientes en el día</span>
-        </div>
-        <div class="celda">
-          <span class="n mono">3 h 20</span>
-          <span class="d">escribiendo, cada día</span>
-        </div>
-        <div class="celda">
-          <span class="n mono grande">16 h</span>
-          <span class="d">por semana, de vuelta</span>
-        </div>
-        <div class="celda">
-          <span class="n mono">Bs 240</span>
-          <span class="d">lo que cuesta ese día</span>
-        </div>
-      </div>
-      <p class="dice" style="margin-top:18px">
-        Dos días de trabajo por semana, devueltos. Y a Bs 12 la consulta, ese día completo
-        cuesta menos que una sola consulta particular.
-      </p>
-    </div>
-
-    <!-- LA PRUEBA ─────────────────────────────────────────── -->
-    <div class="marca-t hito" id="probar"><span class="t">→</span></div>
-    <div class="tramo">
-      <span class="rotulo">Probarlo</span>
-      <h2>Las primeras cuatro no se cobran</h2>
-      <p class="dice" style="margin-bottom:24px">
-        Con tus pacientes de verdad, no con una cuenta de demostración. Para la cuarta ya sabés
-        si te ahorra tiempo, y recién ahí la decisión es honesta.
-      </p>
-      <div class="puntos">
-        <div class="punto">
-          <span class="k">01</span>
-          <h3>Sin tarjeta</h3>
-          <p>No se pide ningún medio de pago para empezar. Cuando se acaban, elegís si seguís — y si no, no pasa nada.</p>
-        </div>
-        <div class="punto">
-          <span class="k">02</span>
-          <h3>Sin instalar nada</h3>
-          <p>Se abre en el navegador del consultorio o del celular. No hay programa que instalar ni computadora que cambiar.</p>
-        </div>
-        <div class="punto">
-          <span class="k">03</span>
-          <h3>Las historias son tuyas</h3>
-          <p>Si decidís no seguir, te llevás lo que cargaste. No hay forma de quedar atrapado adentro.</p>
-        </div>
-      </div>
-      <div class="acciones">
-        <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Empezar la prueba</a>
-        <span class="al-lado">Te acompañamos en la primera consulta.</span>
-      </div>
-    </div>
-
-    <!-- PRECIOS ───────────────────────────────────────────── -->
-    <div class="marca-t" id="precios"><span class="t">Bs</span></div>
-    <div class="tramo">
-      <span class="rotulo">Precios</span>
-      <h2>Dos formas de pagar</h2>
-      <p class="dice" style="margin-bottom:24px">
-        La que te conviene depende de cuántos pacientes atendés, y podés cambiarte cuando quieras.
-      </p>
-      <div class="planes">
-        <div class="plan">
-          <span class="k">Por consulta</span>
-          <div class="precio mono">Bs 12 <small>cada una</small></div>
-          <ul>
-            <li>Pagás solo lo que usás</li>
-            <li>Sin cuota mensual ni permanencia</li>
-            <li>Todas las funciones incluidas</li>
-          </ul>
-          <p class="pie">Para quien atiende pocos pacientes o está probando.</p>
-        </div>
-        <div class="plan elegido">
-          <span class="k">Plan mensual</span>
-          <div class="precio mono">Bs 900 <small>por mes</small></div>
-          <ul>
-            <li>Consultas sin límite</li>
-            <li>Conviene desde 75 consultas al mes</li>
-            <li>Todas las funciones incluidas</li>
-            <li>El plan anual trae un mes de regalo</li>
-          </ul>
-          <p class="pie">Para consultorios con agenda llena todos los días.</p>
-        </div>
-      </div>
-      <p class="regalo">
-        En Brasil: <span class="mono">R$ 10</span> por consulta o <span class="mono">R$ 400</span>
-        al mes. Los precios se muestran en la moneda de cada país, sin convertir.
-      </p>
-    </div>
-
-    <!-- CONFIANZA ─────────────────────────────────────────── -->
-    <div class="marca-t"><span class="t">✓</span></div>
-    <div class="tramo">
-      <span class="rotulo">La historia clínica es del médico y del paciente</span>
-      <div class="puntos">
-        <div class="punto">
-          <h3>El paciente autoriza, o no se graba</h3>
-          <p>Sin autorización explícita, Symphomed no graba ni transcribe. No es una casilla que se tilda: es la llave.</p>
-        </div>
-        <div class="punto">
-          <h3>Nadie más lee las consultas</h3>
-          <p>Cada médico ve solo sus pacientes. Los datos no se venden, no se comparten y no se usan para publicidad.</p>
-        </div>
-        <div class="punto">
-          <h3>Está funcionando hoy</h3>
-          <p>No es una promesa ni una lista de espera. Hay médicos atendiendo con Symphomed en Bolivia y en Brasil.</p>
-        </div>
-      </div>
-    </div>
-
   </div>
 
-  <div class="cierre">
-    <h2>Empezá con una consulta</h2>
-    <p>Escribinos por WhatsApp y te mostramos cómo funciona con un caso real, en quince minutos. Si te sirve, seguís; si no, no perdiste nada.</p>
-    <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escribir por WhatsApp</a>
+  <!-- ── 2. Pacientes por día ────────────────────────────── -->
+  <div class="escena" id="e2" hidden>
+    <h1>¿Cuántos pacientes ves en un día?</h1>
+    <p class="sub">Un día normal, no el peor ni el mejor.</p>
+    <div class="contador">
+      <button class="paso-btn" id="menos" type="button" aria-label="Menos pacientes">−</button>
+      <span class="contador-d">
+        <span class="contador-n mono" id="nPacientes">18</span>
+        <small>pacientes por día</small>
+      </span>
+      <button class="paso-btn" id="mas" type="button" aria-label="Más pacientes">+</button>
+    </div>
+    <div class="abajo">
+      <button class="boton" id="b2" type="button">Seguir</button>
+      <button class="boton fino" id="atras2" type="button">Volver</button>
+    </div>
   </div>
 
-  <footer class="pie">
-    <span>Symphomed · Historia clínica asistida · Bolivia y Brasil</span>
-    <span><a href="https://wa.me/59164637067">WhatsApp</a> · <a href="/">Ingresar</a></span>
-  </footer>
+  <!-- ── 3. Minutos por historia ─────────────────────────── -->
+  <div class="escena" id="e3" hidden>
+    <h1>¿Cuánto tardás en dejar escrita cada historia?</h1>
+    <p class="sub">Contando lo que escribís después, no durante.</p>
+    <div class="opciones" id="ops-min"></div>
+    <div class="abajo">
+      <button class="boton" id="b3" type="button" disabled>Ver mi resultado</button>
+      <button class="boton fino" id="atras3" type="button">Volver</button>
+    </div>
+  </div>
+
+  <!-- ── 4. Resultado ────────────────────────────────────── -->
+  <div class="escena" id="e4" hidden>
+    <h1 id="tituloRes">Tu número</h1>
+    <div class="titular">
+      <span class="n mono" id="horas">—</span>
+      <span class="d" id="horasTexto">—</span>
+      <span class="p" id="horasPie">—</span>
+    </div>
+
+    <div class="cuentas">
+      <div class="cuenta-fila"><span id="dPacientes">—</span><b id="vPacientes">—</b></div>
+      <div class="cuenta-fila"><span>Escribiendo, cada día</span><b id="vDia">—</b></div>
+      <div class="cuenta-fila"><span>Al mes</span><b id="vMes">—</b></div>
+      <div class="cuenta-fila"><span>Lo que costaría Symphomed ese mes</span><b class="bien" id="vCosto">—</b></div>
+    </div>
+
+    <div class="muestra">
+      <div class="muestra-cab">
+        <span class="k">Ejemplo · <span id="espNombre">medicina general</span></span>
+        <span class="k mono">38 s</span>
+      </div>
+      <div class="muestra-cuerpo" id="muestraCuerpo"></div>
+    </div>
+
+    <div class="oferta">
+      <div class="oferta-tope">
+        <span class="oferta-n">4</span>
+        <div>
+          <h3>consultas sin cargo</h3>
+          <p>Completas, con tus pacientes de verdad. Sin tarjeta y sin instalar nada.</p>
+        </div>
+      </div>
+      <ul>
+        <li>Si no te sirve, no pasa nada y te llevás lo que cargaste</li>
+        <li>Te acompañamos en la primera consulta</li>
+      </ul>
+      <div class="precio-linea">
+        <span>Después: <b>Bs 12</b> por consulta</span>
+        <span>o <b>Bs 900</b> al mes sin límite</span>
+      </div>
+    </div>
+
+    <div class="abajo">
+      <a class="boton" id="waFinal" href="#">Empezar la prueba por WhatsApp</a>
+      <button class="boton fino" id="reiniciar" type="button">Volver a calcular</button>
+      <p class="legal">Symphomed · Bolivia y Brasil · <a href="/" style="color:inherit">Ingresar</a></p>
+    </div>
+  </div>
+
 </div>
 
 <script nonce="__NONCE__">
 "use strict";
-(function () {
-  var ALTURAS = [
-    4, 8, 13, 18, 24, 20, 14, 9, 6, 4, 3, 6, 11, 17, 23, 28, 22, 15, 9, 5,
-    3, 5, 9, 15, 21, 27, 29, 23, 16, 11, 6, 4, 3, 7, 13, 20, 26, 19, 12, 8,
-    4, 3, 6, 11, 18, 25, 21, 13, 9, 5, 3, 4, 8, 13, 19, 15, 10, 6, 4, 3,
-    5, 9, 14, 20, 24, 18, 12, 7, 4, 3, 5, 10, 16, 22, 18, 11, 7, 4, 3, 4,
-  ];
-  var onda = document.getElementById("onda");
-  var dialogo = document.getElementById("dialogo");
-  var nota = document.getElementById("nota");
-  var boton = document.getElementById("repetir");
-  if (!onda || !dialogo || !nota || !boton) return;
 
-  onda.innerHTML = ALTURAS.map(function (h) { return '<i style="height:' + h + 'px"></i>'; }).join("");
-  var barras = [].slice.call(onda.children);
-  var lineas = [].slice.call(dialogo.children);
-  var campos = [].slice.call(nota.children);
-  var relojes = [];
+// ── Las notas de ejemplo, una por especialidad ─────────────────
+// Que el médico vea SU tipo de consulta y no una genérica es lo que hace que
+// la muestra convenza: una nota de hipertensión no le dice nada a un
+// odontólogo.
+var ESPECIALIDADES = [
+  {
+    id: "general", nombre: "medicina general", etiqueta: "Medicina general",
+    nota: [
+      ["Motivo", "Control de hipertensión arterial. Cefalea matinal de diez días."],
+      ["Adherencia", "Suspendió hidroclorotiazida hace 3 semanas por nicturia."],
+      ["Examen", "PA 150/95 mmHg · +2 kg desde el control previo", true],
+      ["Plan", "Reiniciar hidroclorotiazida 12,5 mg. Losartán 50 mg. Control en 3 semanas."],
+    ],
+  },
+  {
+    id: "pediatria", nombre: "pediatría", etiqueta: "Pediatría",
+    nota: [
+      ["Motivo", "Tos de cinco días y fiebre de 38,4 °C desde anoche."],
+      ["Antecedentes", "Esquema de vacunación completo. Sin internaciones previas."],
+      ["Examen", "T 38,1 °C · SatO₂ 97 % · Peso 14,2 kg (p50)", true],
+      ["Plan", "Paracetamol 15 mg/kg cada 6 h. Control en 48 h o antes si empeora."],
+    ],
+  },
+  {
+    id: "gineco", nombre: "ginecología", etiqueta: "Ginecología",
+    nota: [
+      ["Motivo", "Control prenatal. Gesta 2, para 1. Semana 28."],
+      ["Antecedentes", "Cesárea previa. Sin diabetes gestacional en gesta anterior."],
+      ["Examen", "PA 118/74 mmHg · AU 27 cm · FCF 142 lpm", true],
+      ["Plan", "Curva de tolerancia a la glucosa. Hierro y ácido fólico. Control en 3 semanas."],
+    ],
+  },
+  {
+    id: "odonto", nombre: "odontología", etiqueta: "Odontología",
+    nota: [
+      ["Motivo", "Dolor en molar inferior derecho al masticar, hace una semana."],
+      ["Examen", "Pieza 46 con caries oclusal profunda. Percusión positiva.", true],
+      ["Diagnóstico", "Pulpitis irreversible sintomática en pieza 46."],
+      ["Plan", "Tratamiento de conducto en dos sesiones. Ibuprofeno 400 mg si duele."],
+    ],
+  },
+  {
+    id: "otra", nombre: "tu especialidad", etiqueta: "Otra especialidad",
+    nota: [
+      ["Motivo", "Lo que el paciente vino a consultar, en sus palabras."],
+      ["Antecedentes", "Lo relevante de la historia, sin repetir lo que ya estaba escrito."],
+      ["Examen", "Los signos y las medidas, con sus unidades", true],
+      ["Plan", "Indicaciones, estudios pedidos y cuándo volver."],
+    ],
+  },
+];
 
-  // Con movimiento reducido no se ofrece: el resultado ya está entero a la
-  // vista y la animación solo estorbaría.
-  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    boton.hidden = true;
-    return;
-  }
+var MINUTOS = [
+  { v: 5, etiqueta: "Menos de 5 minutos", nota: "Escribo lo justo" },
+  { v: 10, etiqueta: "Unos 10 minutos", nota: "Lo habitual" },
+  { v: 15, etiqueta: "Unos 15 minutos", nota: "Escribo completo" },
+  { v: 25, etiqueta: "Más de 20 minutos", nota: "O me las llevo a casa" },
+];
 
-  function luego(ms, fn) { relojes.push(setTimeout(fn, ms)); }
-  function reposo() {
-    relojes.forEach(clearTimeout); relojes = [];
-    dialogo.classList.remove("reproduciendo");
-    nota.classList.remove("reproduciendo");
-    onda.classList.remove("activa");
-    lineas.concat(campos).forEach(function (e) { e.classList.remove("dicho"); });
-    barras.forEach(function (b) { b.classList.remove("sonando"); });
-    boton.disabled = false;
-    boton.textContent = "Ver cómo se escribe";
-  }
+var estado = { esp: null, pacientes: 18, minutos: null, escena: 1 };
 
-  function reproducir() {
-    relojes.forEach(clearTimeout); relojes = [];
-    boton.disabled = true;
-    boton.textContent = "Escuchando…";
-    dialogo.classList.add("reproduciendo");
-    nota.classList.add("reproduciendo");
-    onda.classList.add("activa");
-    lineas.concat(campos).forEach(function (e) { e.classList.remove("dicho"); });
-    barras.forEach(function (b) { b.classList.remove("sonando"); });
+var $ = function (id) { return document.getElementById(id); };
+var fNum = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 0 });
 
-    var porLinea = 1500;
-    lineas.forEach(function (linea, i) {
-      luego(300 + i * porLinea, function () {
-        linea.classList.add("dicho");
-        var hasta = Math.round(barras.length * (i + 1) / lineas.length);
-        barras.slice(0, hasta).forEach(function (b) { b.classList.add("sonando"); });
-      });
+// ── Las pantallas ─────────────────────────────────────────────
+function mostrar(n) {
+  estado.escena = n;
+  [1, 2, 3, 4].forEach(function (i) { $("e" + i).hidden = i !== n; });
+  var barras = $("progreso").children;
+  for (var i = 0; i < barras.length; i++) barras[i].classList.toggle("hecho", i < Math.min(n, 3));
+  $("progreso").hidden = n === 4;
+  $("saltar").hidden = n === 4;
+  window.scrollTo(0, 0);
+}
+
+function opciones(caja, lista, elegida, alElegir) {
+  caja.innerHTML = lista.map(function (o) {
+    return '<button class="opcion" type="button" data-v="' + o.valor + '" aria-pressed="' +
+      (o.valor === elegida ? "true" : "false") + '"><span>' + o.titulo + "</span>" +
+      (o.nota ? "<small>" + o.nota + "</small>" : "") + "</button>";
+  }).join("");
+  caja.querySelectorAll(".opcion").forEach(function (b) {
+    b.addEventListener("click", function () {
+      caja.querySelectorAll(".opcion").forEach(function (o) { o.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      alElegir(b.getAttribute("data-v"));
     });
+  });
+}
 
-    var fin = 300 + lineas.length * porLinea;
-    luego(fin, function () { boton.textContent = "Escribiendo…"; });
-    // La nota se arma más lento que el habla, a propósito: así se ve que
-    // primero se escuchó todo y recién después se escribió.
-    campos.forEach(function (campo, i) {
-      luego(fin + 700 + i * 470, function () { campo.classList.add("dicho"); });
-    });
-    luego(fin + 700 + campos.length * 470 + 400, function () {
-      dialogo.classList.remove("reproduciendo");
-      nota.classList.remove("reproduciendo");
-      boton.disabled = false;
-      boton.textContent = "Verlo de nuevo";
-    });
-  }
+opciones($("ops-esp"), ESPECIALIDADES.map(function (e) { return { valor: e.id, titulo: e.etiqueta }; }), null,
+  function (v) { estado.esp = v; $("b1").disabled = false; });
 
-  boton.addEventListener("click", reproducir);
-  reposo();
-})();
+opciones($("ops-min"), MINUTOS.map(function (m) { return { valor: String(m.v), titulo: m.etiqueta, nota: m.nota }; }), null,
+  function (v) { estado.minutos = Number(v); $("b3").disabled = false; });
+
+// ── El contador ───────────────────────────────────────────────
+function pintarContador() { $("nPacientes").textContent = estado.pacientes; }
+$("mas").addEventListener("click", function () {
+  estado.pacientes = Math.min(60, estado.pacientes + 1); pintarContador();
+});
+$("menos").addEventListener("click", function () {
+  estado.pacientes = Math.max(1, estado.pacientes - 1); pintarContador();
+});
+pintarContador();
+
+// "5 h 0 min" delata que el número lo escribió una fórmula. Y por debajo de
+// una hora, "0 h 45 min" es peor todavía.
+function duracion(min) {
+  var h = Math.floor(min / 60), m = min % 60;
+  if (!h) return m + " min";
+  return h + " h" + (m ? " " + m + " min" : "");
+}
+
+// ── El resultado ──────────────────────────────────────────────
+function calcular() {
+  var esp = ESPECIALIDADES.filter(function (e) { return e.id === estado.esp; })[0] || ESPECIALIDADES[0];
+  var minDia = estado.pacientes * estado.minutos;
+  var horasSemana = minDia * 5 / 60;
+  var horasMes = minDia * 22 / 60;
+  // El plan conviene desde 75 consultas al mes; abajo de eso, el prepago.
+  var consultasMes = estado.pacientes * 22;
+  var costo = consultasMes >= 75 ? 900 : consultasMes * 12;
+
+  $("horas").textContent = horasSemana >= 10 ? fNum.format(Math.round(horasSemana)) : horasSemana.toFixed(1);
+  $("horasTexto").textContent = "horas por semana escribiendo";
+  $("horasPie").textContent = horasSemana >= 8
+    ? "Es un día entero de trabajo, todas las semanas."
+    : "Son " + fNum.format(Math.round(horasMes)) + " horas al mes.";
+
+  $("dPacientes").textContent = "Pacientes por día";
+  $("vPacientes").textContent = estado.pacientes;
+  $("vDia").textContent = duracion(minDia);
+  $("vMes").textContent = fNum.format(Math.round(horasMes)) + " horas";
+  $("vCosto").textContent = consultasMes >= 75
+    ? "Bs 900 · plan sin límite"
+    : "Bs " + fNum.format(costo) + " · " + fNum.format(consultasMes) + " consultas";
+
+  $("tituloRes").textContent = horasSemana >= 8
+    ? "Perdés un día entero por semana"
+    : "Esto es lo que te cuesta escribir";
+  $("espNombre").textContent = esp.nombre;
+  $("muestraCuerpo").innerHTML = esp.nota.map(function (c) {
+    return '<div class="campo"><span class="k">' + c[0] + '</span>' +
+      '<span class="v' + (c[2] ? " dato mono" : "") + '">' + c[1] + "</span></div>";
+  }).join("");
+
+  var msg = "Hola, soy de " + esp.nombre + ", veo " + estado.pacientes +
+    " pacientes por día y pierdo unas " + Math.round(horasSemana) +
+    " horas por semana escribiendo historias. Quiero probar Symphomed.";
+  $("waFinal").href = "https://wa.me/59164637067?text=" + encodeURIComponent(msg);
+}
+
+// ── Navegación ────────────────────────────────────────────────
+$("b1").addEventListener("click", function () { mostrar(2); });
+$("b2").addEventListener("click", function () { mostrar(3); });
+$("b3").addEventListener("click", function () { calcular(); mostrar(4); });
+$("atras2").addEventListener("click", function () { mostrar(1); });
+$("atras3").addEventListener("click", function () { mostrar(2); });
+$("reiniciar").addEventListener("click", function () { mostrar(1); });
+
+// Saltar el cuestionario: quien ya sabe lo que busca no tiene por qué
+// contestar tres preguntas para llegar al precio y al WhatsApp.
+$("saltar").addEventListener("click", function () {
+  if (!estado.esp) estado.esp = "general";
+  if (!estado.minutos) estado.minutos = 10;
+  calcular();
+  mostrar(4);
+});
+
+mostrar(1);
 </script>
-
 </body>
 </html>
