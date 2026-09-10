@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Symphomed escucha la consulta y redacta la nota clínica, la receta y el control siguiente. El médico no escribe nada.">
+<meta name="description" content="Symphomed escucha la consulta y redacta la nota clínica, la receta y el control siguiente. El médico no escribe nada. Las primeras 4 consultas no se cobran.">
 <meta property="og:title" content="Symphomed — terminá la consulta con la historia ya escrita">
-<meta property="og:description" content="La consulta se transcribe sola y queda la nota clínica, la receta y el kardex. Las primeras 4 consultas no se cobran.">
+<meta property="og:description" content="La consulta se transcribe sola y queda la nota clínica, la receta y el kardex. Probalo con 4 consultas sin cargo.">
 <meta property="og:type" content="website">
 <style>
 @font-face {
@@ -19,6 +19,7 @@
 :root { color-scheme: light dark; }
 body { margin: 0; }
 img { max-width: 100%; }
+[hidden] { display: none !important; }
 </style>
 <title>Symphomed</title>
 
@@ -134,6 +135,25 @@ p { margin: 0; }
 .onda { display: flex; align-items: center; gap: 2px; height: 26px; }
 .onda i { display: block; width: 3px; border-radius: 2px; background: var(--voz); opacity: .55; }
 
+.lado-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.repetir {
+  appearance: none; background: transparent; border: 1px solid var(--linea-2);
+  border-radius: var(--r); padding: 5px 11px; cursor: pointer; color: var(--tinta-2);
+  font-family: InterVar, Inter, sans-serif; font-size: .78rem; font-weight: 500;
+  transition: color .15s, border-color .15s;
+}
+.repetir:hover { color: var(--tinta); border-color: var(--tinta-2); }
+.repetir:disabled { opacity: .45; cursor: default; }
+.repetir:focus-visible { outline: 2px solid var(--sello); outline-offset: 2px; }
+
+/* Durante la reproducción las líneas aparecen de a una. Arrancan visibles y
+   el script las oculta: si el JavaScript no corre, la página queda entera. */
+.dialogo p, .ficha .campo-fila { transition: opacity .35s ease; }
+.dialogo.reproduciendo p, .ficha.reproduciendo .campo-fila { opacity: .12; }
+.dialogo.reproduciendo p.dicho, .ficha.reproduciendo .campo-fila.dicho { opacity: 1; }
+.onda i { transition: opacity .25s, background-color .25s; }
+.onda.activa i.sonando { opacity: 1; }
+
 .dialogo { display: flex; flex-direction: column; gap: 9px; font-size: .93rem; line-height: 1.5; }
 .dialogo p { color: var(--tinta-2); }
 .dialogo b { color: var(--voz); font-weight: 600; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; display: block; margin-bottom: 1px; }
@@ -164,6 +184,20 @@ section { padding-block: 60px 0; }
 }
 .cap:last-child { border-bottom: 1px solid var(--linea); }
 .cap p { color: var(--tinta-2); font-size: .96rem; }
+
+/* ── El apartado de prueba ─────────────────────────────────── */
+.prueba { display: flex; flex-direction: column; gap: 4px; }
+.prueba-que {
+  display: flex; align-items: center; gap: 22px;
+  padding: 24px 26px; background: var(--carta);
+  border: 1px solid var(--linea-2); border-radius: var(--r);
+}
+.prueba-n {
+  font-family: Fraunces, Georgia, serif; font-size: 3.4rem; line-height: 1;
+  color: var(--sello); font-weight: 600; letter-spacing: -.03em;
+}
+.prueba-que h3 { font-size: 1.24rem; }
+.prueba-que p { color: var(--tinta-2); font-size: .95rem; margin-top: 3px; }
 
 /* ── Precios ───────────────────────────────────────────────── */
 .planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; }
@@ -235,7 +269,10 @@ section { padding-block: 60px 0; }
     <!-- Lo que hace el producto, mostrado en vez de descrito. -->
     <div class="mesa">
       <div class="lado hablado">
-        <span class="rotulo" style="color:var(--voz)">Lo que se habló · 4 min 12 s</span>
+        <div class="lado-cab">
+          <span class="rotulo" style="color:var(--voz)">Lo que se habló · 4 min 12 s</span>
+          <button class="repetir" id="repetir" type="button">Ver cómo se escribe</button>
+        </div>
         <div class="onda" id="onda" aria-hidden="true"></div>
         <div class="dialogo">
           <p><b>Médica</b>¿Está tomando el losartán y la hidroclorotiazida todos los días?</p>
@@ -251,8 +288,8 @@ section { padding-block: 60px 0; }
       </div>
 
       <div class="lado">
-        <span class="rotulo">Lo que quedó escrito · 40 s después</span>
-        <div class="ficha">
+        <span class="rotulo" id="rotuloEscrito">Lo que quedó escrito · 40 s después</span>
+        <div class="ficha" id="ficha">
           <div class="campo-fila">
             <span class="rotulo">Motivo</span>
             <span>Control de hipertensión arterial. Cefalea matinal de diez días.</span>
@@ -275,7 +312,7 @@ section { padding-block: 60px 0; }
 
     <div class="acciones">
       <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Pedir una demostración</a>
-      <a class="boton calmo" href="#precios">Ver precios</a>
+      <a class="boton calmo" href="#probar">Probar gratis</a>
       <span class="al-lado">Las primeras 4 consultas no se cobran.</span>
     </div>
   </div>
@@ -339,6 +376,49 @@ section { padding-block: 60px 0; }
       <div class="cap">
         <h3>Varios consultorios</h3>
         <p>Si trabajás con más médicos, cada uno ve lo suyo y el director ve el conjunto. Los permisos se reparten por persona, no por computadora.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ── Probarlo ──────────────────────────────────────────── -->
+  <section id="probar">
+    <div class="pauta"><i></i><i></i><i></i><i></i></div>
+    <div class="sec-cab" style="padding-top:30px">
+      <h2>Probalo con tus propios pacientes</h2>
+      <p class="prosa" style="color:var(--tinta-2)">
+        No con una cuenta de demostración ni con casos de ejemplo. Con las consultas de verdad
+        que vas a atender esta semana, en tu consultorio.
+      </p>
+    </div>
+
+    <div class="prueba">
+      <div class="prueba-que">
+        <div class="prueba-n">4</div>
+        <div>
+          <h3>consultas sin cargo</h3>
+          <p>Completas: se transcriben, sale la nota, la receta y el kardex. No es una versión recortada.</p>
+        </div>
+      </div>
+
+      <div class="capacidades" style="margin-top:6px">
+        <div class="cap">
+          <h3>Sin tarjeta</h3>
+          <p>No se pide ningún medio de pago para empezar. Cuando se acaban las cuatro, elegís si seguís y cómo pagás — y si no, no pasa nada.</p>
+        </div>
+        <div class="cap">
+          <h3>Sin instalar nada</h3>
+          <p>Se abre en el navegador del consultorio o del celular. No hay programa que instalar ni computadora que cambiar.</p>
+        </div>
+        <div class="cap">
+          <h3>Las historias son tuyas</h3>
+          <p>Si decidís no seguir, te llevás lo que cargaste. Nada queda secuestrado adentro.</p>
+        </div>
+      </div>
+
+      <div class="acciones" style="padding-top:22px">
+        <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Empezar la prueba</a>
+        <span class="al-lado">Te acompañamos en la primera consulta, para que no la pierdas aprendiendo.</span>
       </div>
     </div>
   </section>
@@ -436,17 +516,101 @@ section { padding-block: 60px 0; }
 // Las barras del audio. Se generan acá y no como SVG a mano para que la
 // silueta sea la de una conversación —picos donde alguien habla, valles en
 // las pausas— y no una decoración uniforme.
+var ALTURAS = [
+  4, 7, 11, 16, 22, 18, 13, 9, 6, 4, 3, 5, 9, 15, 21, 25, 20, 14, 8, 5,
+  3, 4, 8, 13, 19, 24, 26, 21, 15, 10, 6, 4, 3, 6, 12, 18, 23, 17, 11, 7,
+  4, 3, 5, 10, 16, 22, 19, 12, 8, 5, 3, 4, 7, 12, 17, 14, 9, 6, 4, 3,
+];
+
 (function () {
   var onda = document.getElementById("onda");
-  if (!onda) return;
-  var alturas = [
-    4, 7, 11, 16, 22, 18, 13, 9, 6, 4, 3, 5, 9, 15, 21, 25, 20, 14, 8, 5,
-    3, 4, 8, 13, 19, 24, 26, 21, 15, 10, 6, 4, 3, 6, 12, 18, 23, 17, 11, 7,
-    4, 3, 5, 10, 16, 22, 19, 12, 8, 5, 3, 4, 7, 12, 17, 14, 9, 6, 4, 3,
-  ];
-  onda.innerHTML = alturas.map(function (h) {
+  var dialogo = document.querySelector(".dialogo");
+  var ficha = document.getElementById("ficha");
+  var boton = document.getElementById("repetir");
+  var rotulo = document.getElementById("rotuloEscrito");
+  if (!onda || !dialogo || !ficha || !boton) return;
+
+  onda.innerHTML = ALTURAS.map(function (h) {
     return '<i style="height:' + h + 'px"></i>';
   }).join("");
+
+  var barras = [].slice.call(onda.children);
+  var lineas = [].slice.call(dialogo.children);
+  var campos = [].slice.call(ficha.children);
+  var textoRotulo = rotulo ? rotulo.textContent : "";
+  var relojes = [];
+
+  // Con movimiento reducido la reproducción no aporta nada y molesta: la
+  // página ya muestra el resultado completo, que es lo que importa.
+  var quieto = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (quieto) { boton.hidden = true; return; }
+
+  function limpiar() {
+    relojes.forEach(clearTimeout);
+    relojes = [];
+  }
+  function luego(ms, fn) { relojes.push(setTimeout(fn, ms)); }
+
+  function reposo() {
+    limpiar();
+    dialogo.classList.remove("reproduciendo");
+    ficha.classList.remove("reproduciendo");
+    onda.classList.remove("activa");
+    lineas.forEach(function (l) { l.classList.remove("dicho"); });
+    campos.forEach(function (c) { c.classList.remove("dicho"); });
+    barras.forEach(function (b) { b.classList.remove("sonando"); });
+    if (rotulo) rotulo.textContent = textoRotulo;
+    boton.disabled = false;
+    boton.textContent = "Ver cómo se escribe";
+  }
+
+  function reproducir() {
+    limpiar();
+    boton.disabled = true;
+    boton.textContent = "Escuchando…";
+    dialogo.classList.add("reproduciendo");
+    ficha.classList.add("reproduciendo");
+    onda.classList.add("activa");
+    lineas.forEach(function (l) { l.classList.remove("dicho"); });
+    campos.forEach(function (c) { c.classList.remove("dicho"); });
+    barras.forEach(function (b) { b.classList.remove("sonando"); });
+    if (rotulo) rotulo.textContent = "Todavía nada escrito";
+
+    // La consulta: cada línea aparece cuando "se dice", y las barras se
+    // encienden hasta donde va la conversación.
+    var porLinea = 1500;
+    lineas.forEach(function (linea, i) {
+      luego(300 + i * porLinea, function () {
+        linea.classList.add("dicho");
+        var hasta = Math.round(barras.length * (i + 1) / lineas.length);
+        barras.slice(0, hasta).forEach(function (b) { b.classList.add("sonando"); });
+      });
+    });
+
+    var finHabla = 300 + lineas.length * porLinea;
+
+    luego(finHabla, function () {
+      boton.textContent = "Escribiendo…";
+      if (rotulo) rotulo.textContent = "Redactando la nota…";
+    });
+
+    // Y la nota se arma campo por campo. Es más lento que el habla a
+    // propósito: así se ve que primero se escuchó todo y después se escribió.
+    campos.forEach(function (campo, i) {
+      luego(finHabla + 700 + i * 520, function () { campo.classList.add("dicho"); });
+    });
+
+    luego(finHabla + 700 + campos.length * 520 + 400, function () {
+      dialogo.classList.remove("reproduciendo");
+      ficha.classList.remove("reproduciendo");
+      if (rotulo) rotulo.textContent = textoRotulo;
+      boton.disabled = false;
+      boton.textContent = "Verlo de nuevo";
+    });
+  }
+
+  boton.addEventListener("click", reproducir);
+  reposo();
 })();
 </script>
 

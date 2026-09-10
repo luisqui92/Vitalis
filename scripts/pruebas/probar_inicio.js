@@ -36,6 +36,13 @@ console.log("\n── 2. Dice lo que hay que decir ──");
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));
 verificar("dice los precios", /Bs\s*12/.test(vista) && /Bs\s*900/.test(vista));
 verificar("y las 4 consultas de cortesía", /4 consultas/.test(vista));
+verificar("tiene el apartado de prueba", /id="probar"/.test(vista) && /Empezar la prueba/.test(vista));
+
+console.log("\n── 2b. La demostración arranca mostrando el resultado ──");
+// Si las líneas nacieran ocultas y el script no corriera, la página quedaría
+// con dos paneles vacíos. Se ocultan DESDE el script, nunca desde el HTML.
+verificar("nada nace oculto en el marcado", !/class="[^"]*\breproduciendo\b/.test(vista));
+verificar("el botón de repetir existe", /id="repetir"/.test(vista));
 
 (async () => {
   const express = require("express");
