@@ -74,8 +74,10 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
   const app = express();
   process.env.DOMINIOS_LANDING = "symphomed.com,www.symphomed.com";
   require(path.join(RAIZ, "routes", "inicio"))(app);
-  // Lo que haría index.js después: la aplicación de siempre en la raíz.
-  app.get("/", (_q, res) => res.type("html").send("<!doctype html><title>LA APLICACION</title>"));
+  // Lo que haría index.js después: la aplicación de siempre en la raíz, y
+  // ahora también en /app. Esto es un doble — que acá funcione no prueba que
+  // index.js lo tenga, por eso se comprueba aparte más abajo.
+  app.get(["/", "/app", "/veterinaria"], (_q, res) => res.type("html").send("<!doctype html><title>LA APLICACION</title>"));
 
   const servidor = http.createServer(app);
   await new Promise(r => servidor.listen(0, "127.0.0.1", r));
@@ -99,6 +101,16 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
   verificar("salud.chatgo.ia.bo SIGUE mostrando la aplicación", esApp(await pedir("/", "salud.chatgo.ia.bo")));
   verificar("  ...y cualquier otro dominio también", esApp(await pedir("/", "otracosa.com")));
 
+  console.log("\n── 3b. La puerta del médico en el dominio nuevo ──");
+  // En symphomed.com la raíz la ocupa la página de venta, así que sin /app un
+  // médico NO tiene por dónde iniciar sesión: le sale marketing y nada más.
+  // El enlace "Ingresar" del pie apunta acá; mientras apuntó a "/" recargaba
+  // la misma página de venta, en un bucle que solo se ve en el dominio nuevo.
+  verificar("/app muestra la aplicación en symphomed.com", esApp(await pedir("/app", "symphomed.com")));
+  verificar("  ...y también en el dominio viejo", esApp(await pedir("/app", "salud.chatgo.ia.bo")));
+  verificar("el enlace de Ingresar lleva ahí y no a la raíz",
+    /href="\/app"[^>]*>\s*Ingresar/.test(vista) && !/href="\/"[^>]*>\s*Ingresar/.test(vista));
+
   console.log("\n── 4. /inicio anda en cualquier dominio ──");
   // Para poder verla antes de que el DNS apunte a este servidor.
   verificar("desde el dominio viejo", esLanding(await pedir("/inicio", "salud.chatgo.ia.bo")));
@@ -118,6 +130,15 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
   verificar("y se deja cachear", /max-age/.test(r.cab["cache-control"] || ""));
 
   servidor.close();
+
+  console.log("\n── 6. Y que index.js sirva /app de verdad ──");
+  // El servidor de arriba es un doble armado en esta prueba. Sin esta
+  // comprobación, /app podría andar en la prueba y no existir en producción:
+  // el médico entra a symphomed.com/app y le sale el 404 de los estáticos.
+  const indice = fs.readFileSync(path.join(RAIZ, "index.js"), "utf8");
+  verificar("index.js registra /app junto a la raíz",
+    /app\.get\(\[[^\]]*"\/app"[^\]]*\]/.test(indice));
+
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
   process.exit(fallos === 0 ? 0 : 1);
 })();

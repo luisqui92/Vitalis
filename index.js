@@ -218,7 +218,19 @@ app.use(express.static(PUBLICO, {
 // dominio llama a next() y sigue de largo. Ver routes/inicio.js.
 require("./routes/inicio")(app);
 
-app.get(["/", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+// "/app" es la puerta del médico en symphomed.com, donde la raíz la ocupa la
+// página de venta. Sin esto, un médico que entra a symphomed.com no tiene por
+// dónde iniciar sesión: la raíz le muestra marketing y no hay otra pantalla.
+//
+// Anda en los dos dominios a propósito. En salud.chatgo.ia.bo es un alias que
+// no le saca nada a nadie, y permite probar la puerta nueva antes de que el
+// DNS apunte.
+//
+// El JS no necesita saber nada de esta ruta: estado.js solo mira si el camino
+// es "/veterinaria", e informePublico.js y teleconsulta.js buscan sus propios
+// patrones con token. "/app" no matchea ninguno, así que cae en la pantalla
+// de login de siempre — que es exactamente lo que se quiere.
+app.get(["/", "/app", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 // La sala del paciente: mismo frontend, el JS detecta la ruta (ver
 // public/js/teleconsulta.js) y muestra el consentimiento en vez del login.
