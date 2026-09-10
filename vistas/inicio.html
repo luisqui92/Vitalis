@@ -9,6 +9,10 @@
 <meta property="og:type" content="website">
 <style>
 @font-face {
+  font-family: "Fraunces"; src: url("/fonts/fraunces-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+@font-face {
   font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
   font-weight: 100 900; font-display: swap;
 }
@@ -21,236 +25,196 @@ img { max-width: 100%; }
 
 <style>
 /* ─────────────────────────────────────────────────────────────
-   Symphomed — la página tiene la estructura de una historia
-   clínica: bloques con encabezado rotulado, campos con etiqueta,
-   valores en monoespaciada, y la línea de electrocardiograma
-   como separador. Azul clínico, blanco de formulario.
+   Symphomed — papel crema, coral cálido, mucho aire.
+   Poco borde y poca caja: el orden lo hace el espacio, no las
+   líneas. El coral aparece en los botones y en un dato por
+   pantalla, nunca en dos cosas seguidas.
    ───────────────────────────────────────────────────────────── */
 :root {
-  --azul-900: #0B3A4A;
-  --azul-700: #12607B;
-  --azul-400: #3E9CB8;
-  --azul-050: #E7F0F4;
-  --verde:    #1B7A5A;
-  --verde-050:#E4F1EC;
-  --rojo:     #B3352C;
-  --rojo-050: #F8E9E7;
-  --papel:    #EFF4F6;
-  --carta:    #FFFFFF;
-  --tinta:    #12222B;
-  --tinta-2:  #4C6672;
-  --tinta-3:  #7B939E;
-  --linea:    #D7E2E7;
-  --linea-2:  #B9CBD3;
-  --r: 5px;
+  --crema:    #F0EEE6;
+  --crema-2:  #E7E4D9;
+  --blanco:   #FCFBF7;
+  --tinta:    #1F1E1C;
+  --tinta-2:  #5E5B54;
+  --tinta-3:  #918D82;
+  --linea:    #DFDACD;
+  --coral:    #C96442;
+  --coral-2:  #B05434;
+  --coral-050:#F6E7DF;
+  --r: 12px;
+  --r-chico: 8px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --azul-900:#A9D4E4; --azul-700:#6FB6CE; --azul-400:#3E9CB8; --azul-050:#12303C;
-    --verde:#63C4A0; --verde-050:#123028; --rojo:#E08279; --rojo-050:#331E1C;
-    --papel:#0A171E; --carta:#102530; --tinta:#E6EEF1; --tinta-2:#A3BAC4;
-    --tinta-3:#728B96; --linea:#1E3742; --linea-2:#2E4B58;
+    --crema:#232220; --crema-2:#2C2B28; --blanco:#2A2926;
+    --tinta:#F0EEE6; --tinta-2:#B5B1A6; --tinta-3:#8A8578;
+    --linea:#3A3833; --coral:#E08163; --coral-2:#EC9377; --coral-050:#37281F;
   }
 }
 :root[data-theme="dark"] {
-  --azul-900:#A9D4E4; --azul-700:#6FB6CE; --azul-400:#3E9CB8; --azul-050:#12303C;
-  --verde:#63C4A0; --verde-050:#123028; --rojo:#E08279; --rojo-050:#331E1C;
-  --papel:#0A171E; --carta:#102530; --tinta:#E6EEF1; --tinta-2:#A3BAC4;
-  --tinta-3:#728B96; --linea:#1E3742; --linea-2:#2E4B58;
+  --crema:#232220; --crema-2:#2C2B28; --blanco:#2A2926;
+  --tinta:#F0EEE6; --tinta-2:#B5B1A6; --tinta-3:#8A8578;
+  --linea:#3A3833; --coral:#E08163; --coral-2:#EC9377; --coral-050:#37281F;
 }
 
 * { box-sizing: border-box; }
 body {
-  background: var(--papel);
+  background: var(--crema);
   color: var(--tinta);
   font-family: InterVar, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 16px; line-height: 1.55;
+  font-size: 17px; line-height: 1.62;
   -webkit-font-smoothing: antialiased;
-  padding-inline: 16px;
+  padding-inline: 22px;
 }
-.env { max-width: 1060px; margin: 0 auto; }
-.prosa { max-width: 64ch; }
+.env { max-width: 1000px; margin: 0 auto; }
+.prosa { max-width: 60ch; }
 
-h1, h2, h3 { margin: 0; font-weight: 700; text-wrap: balance; letter-spacing: -.018em; }
-h1 { font-size: clamp(1.95rem, 4.6vw, 2.9rem); line-height: 1.14; }
-h2 { font-size: clamp(1.3rem, 2.6vw, 1.7rem); line-height: 1.2; }
-h3 { font-size: 1rem; line-height: 1.35; font-weight: 600; letter-spacing: -.008em; }
+h1, h2, h3 {
+  margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 400;
+  text-wrap: balance; letter-spacing: -.012em;
+}
+h1 { font-size: clamp(2.4rem, 5.6vw, 3.7rem); line-height: 1.08; }
+h2 { font-size: clamp(1.7rem, 3.2vw, 2.35rem); line-height: 1.16; }
+h3 { font-size: 1.14rem; line-height: 1.35; font-weight: 500; }
 p { margin: 0; }
 
-.dato { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.dato { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .etiqueta {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: .67rem; letter-spacing: .11em; text-transform: uppercase; color: var(--tinta-3);
-  font-weight: 500;
+  font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--tinta-3); font-weight: 500;
 }
 
-/* ── Barra superior, como el encabezado de una ficha ────────── */
-.barra {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding-block: 14px; border-bottom: 2px solid var(--azul-700); flex-wrap: wrap;
-}
-.logo { display: flex; align-items: center; gap: 9px; }
-.logo-marca { font-size: 1.2rem; font-weight: 700; letter-spacing: -.02em; color: var(--tinta); }
-.logo svg { display: block; color: var(--azul-700); }
-.barra-dcha { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.enlace-barra { font-size: .88rem; color: var(--tinta-2); text-decoration: none; font-weight: 500; }
-.enlace-barra:hover { color: var(--azul-700); }
+/* ── Barra ─────────────────────────────────────────────────── */
+.barra { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-block: 26px; flex-wrap: wrap; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo svg { display: block; color: var(--coral); }
+.logo-marca { font-family: Fraunces, Georgia, serif; font-size: 1.3rem; font-weight: 500; letter-spacing: -.02em; }
+.barra-dcha { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.enlace-barra { font-size: .93rem; color: var(--tinta-2); text-decoration: none; }
+.enlace-barra:hover { color: var(--tinta); }
 
-/* ── Bloque: la unidad de toda la página ───────────────────────
-   Es un formulario clínico: barra con rótulo arriba, contenido
-   en blanco abajo, borde fino. Todo se compone con esto. */
-.bloque {
-  background: var(--carta); border: 1px solid var(--linea);
-  border-radius: var(--r); overflow: hidden;
-}
-.bloque-cab {
-  background: var(--azul-050); border-bottom: 1px solid var(--linea);
-  padding: 9px 16px; display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
-}
-.bloque-cab .etiqueta { color: var(--azul-700); }
-.bloque-cuerpo { padding: 18px 16px; }
-
-/* ── Héroe ─────────────────────────────────────────────────── */
-.heroe { padding-block: 40px 8px; display: flex; flex-direction: column; gap: 18px; }
-.bajada { font-size: 1.08rem; color: var(--tinta-2); max-width: 58ch; }
-.bajada b { color: var(--tinta); font-weight: 600; }
-
-.acciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+/* ── Botones ───────────────────────────────────────────────── */
 .boton {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--azul-700); color: #fff; border: 1px solid var(--azul-700);
-  border-radius: var(--r); padding: 11px 18px;
-  font-family: InterVar, sans-serif; font-size: .93rem; font-weight: 600;
-  text-decoration: none; cursor: pointer; transition: background .15s;
+  background: var(--coral); color: #FFF9F6; border: 1px solid var(--coral);
+  border-radius: 999px; padding: 13px 26px;
+  font-size: .97rem; font-weight: 500; text-decoration: none;
+  cursor: pointer; transition: background .18s, border-color .18s;
 }
-.boton:hover { background: var(--azul-900); border-color: var(--azul-900); }
-.boton.calmo { background: var(--carta); color: var(--azul-700); border-color: var(--linea-2); }
-.boton.calmo:hover { background: var(--azul-050); }
-.boton:focus-visible { outline: 2px solid var(--azul-400); outline-offset: 2px; }
-.al-lado { font-size: .85rem; color: var(--tinta-3); }
+.boton:hover { background: var(--coral-2); border-color: var(--coral-2); }
+.boton.calmo { background: transparent; color: var(--tinta); border-color: var(--linea); }
+.boton.calmo:hover { background: var(--crema-2); border-color: var(--tinta-3); }
+.boton:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .boton { color: #08222C; }
+  :root:not([data-theme="light"]) .boton { color: #241610; }
 }
-:root[data-theme="dark"] .boton { color: #08222C; }
+:root[data-theme="dark"] .boton { color: #241610; }
 
-/* ── La consulta: dos fichas, antes y después ──────────────── */
-.consulta { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.audio-fila { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.onda { display: flex; align-items: center; gap: 2px; height: 24px; flex: 1; min-width: 0; }
-.onda i { display: block; width: 3px; border-radius: 1px; background: var(--azul-400); opacity: .4; transition: opacity .2s; }
-.onda.activa i.sonando { opacity: 1; }
-.reloj { font-size: .78rem; color: var(--tinta-3); white-space: nowrap; }
+.acciones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.al-lado { font-size: .9rem; color: var(--tinta-3); }
 
-.dialogo { display: flex; flex-direction: column; gap: 11px; }
-.dialogo p { font-size: .89rem; color: var(--tinta-2); line-height: 1.5; transition: opacity .3s; }
-.dialogo b {
-  display: block; font-size: .67rem; letter-spacing: .09em; text-transform: uppercase;
-  color: var(--azul-700); font-weight: 600; margin-bottom: 2px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.dialogo.reproduciendo p { opacity: .16; }
+/* ── Héroe ─────────────────────────────────────────────────── */
+.heroe { padding-block: 46px 0; display: flex; flex-direction: column; gap: 26px; }
+.bajada { font-size: 1.2rem; line-height: 1.58; color: var(--tinta-2); max-width: 52ch; }
+.bajada b { color: var(--tinta); font-weight: 500; }
+
+/* ── La consulta ───────────────────────────────────────────── */
+.consulta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+.panel { background: var(--blanco); border-radius: var(--r); padding: 24px 26px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.audio-fila { display: flex; align-items: center; gap: 14px; }
+.onda { display: flex; align-items: center; gap: 2px; height: 22px; flex: 1; min-width: 0; }
+.onda i { display: block; width: 3px; border-radius: 2px; background: var(--coral); opacity: .3; transition: opacity .2s; }
+.onda.activa i.sonando { opacity: .95; }
+.reloj { font-size: .82rem; color: var(--tinta-3); white-space: nowrap; }
+
+.dialogo { display: flex; flex-direction: column; gap: 14px; }
+.dialogo p { font-size: .95rem; color: var(--tinta-2); line-height: 1.55; transition: opacity .3s; }
+.dialogo b { display: block; font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-3); font-weight: 500; margin-bottom: 3px; }
+.dialogo.reproduciendo p { opacity: .18; }
 .dialogo.reproduciendo p.dicho { opacity: 1; }
 
-.ficha { display: flex; flex-direction: column; }
-.ficha .campo {
-  display: grid; grid-template-columns: 96px 1fr; gap: 12px;
-  padding-block: 9px; border-bottom: 1px solid var(--linea);
-  align-items: baseline; transition: opacity .3s;
-}
-.ficha .campo:last-child { border-bottom: 0; padding-bottom: 0; }
-.ficha .campo span:last-child { font-size: .89rem; line-height: 1.45; }
-.ficha.reproduciendo .campo { opacity: .16; }
+.ficha { display: flex; flex-direction: column; gap: 15px; }
+.ficha .campo { display: flex; flex-direction: column; gap: 3px; transition: opacity .3s; }
+.ficha .campo span:last-child { font-size: .95rem; line-height: 1.5; }
+.ficha.reproduciendo .campo { opacity: .18; }
 .ficha.reproduciendo .campo.dicho { opacity: 1; }
-.alto { color: var(--rojo); font-weight: 600; }
+.alto { color: var(--coral); font-weight: 500; }
 
 .repetir {
-  appearance: none; background: transparent; border: 1px solid var(--linea-2);
-  border-radius: var(--r); padding: 4px 10px; cursor: pointer; color: var(--tinta-2);
-  font-family: InterVar, sans-serif; font-size: .76rem; font-weight: 500;
+  appearance: none; background: transparent; border: 1px solid var(--linea);
+  border-radius: 999px; padding: 6px 14px; cursor: pointer; color: var(--tinta-2);
+  font-family: InterVar, sans-serif; font-size: .82rem; transition: border-color .18s, color .18s;
 }
-.repetir:hover { color: var(--azul-700); border-color: var(--azul-400); }
+.repetir:hover { color: var(--tinta); border-color: var(--tinta-3); }
 .repetir:disabled { opacity: .45; cursor: default; }
-.repetir:focus-visible { outline: 2px solid var(--azul-400); outline-offset: 2px; }
+.repetir:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
 
-/* ── El separador: trazo de electrocardiograma ─────────────── */
-.ecg { display: block; width: 100%; height: 26px; color: var(--linea-2); margin-block: 44px 0; }
-.ecg svg { display: block; width: 100%; height: 26px; }
+/* ── Secciones: el orden lo hace el espacio ────────────────── */
+section { padding-top: 92px; }
+.sec-cab { display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; }
+.sec-cab p { color: var(--tinta-2); font-size: 1.05rem; }
 
-/* ── Secciones ─────────────────────────────────────────────── */
-section { padding-top: 34px; }
-.sec-cab { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
-.sec-cab p { color: var(--tinta-2); font-size: .97rem; }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 34px 30px; }
+.punto { display: flex; flex-direction: column; gap: 9px; }
+.punto p { font-size: .97rem; color: var(--tinta-2); }
+.punto .etiqueta { color: var(--coral); }
 
-.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
-.item-cuerpo { display: flex; flex-direction: column; gap: 6px; }
-.item-cuerpo p { font-size: .9rem; color: var(--tinta-2); }
-
-/* Lista tipo hoja de indicaciones */
-.indicaciones { display: flex; flex-direction: column; }
-.ind {
-  display: grid; grid-template-columns: 22px minmax(140px, 200px) 1fr; gap: 14px;
-  padding: 13px 16px; border-bottom: 1px solid var(--linea); align-items: baseline;
+/* Lista con regla fina: sin cajas, solo separación. */
+.lista { display: flex; flex-direction: column; }
+.fila {
+  display: grid; grid-template-columns: minmax(160px, 230px) 1fr; gap: 26px;
+  padding-block: 22px; border-top: 1px solid var(--linea); align-items: baseline;
 }
-.indicaciones .ind:last-child { border-bottom: 0; }
-.ind-tic { color: var(--verde); line-height: 1; padding-top: 2px; }
-.ind p { font-size: .9rem; color: var(--tinta-2); }
+.lista .fila:last-child { border-bottom: 1px solid var(--linea); }
+.fila p { font-size: .97rem; color: var(--tinta-2); }
 
 /* ── Prueba ────────────────────────────────────────────────── */
-.prueba-tope {
-  display: flex; align-items: center; gap: 18px; padding: 18px 16px;
-  background: var(--verde-050); border-bottom: 1px solid var(--linea);
+.tarjeta-prueba {
+  background: var(--blanco); border-radius: var(--r); padding: 38px 34px;
+  display: flex; flex-direction: column; gap: 28px;
 }
-.prueba-n { font-size: 2.6rem; font-weight: 700; line-height: 1; color: var(--verde); letter-spacing: -.03em; }
-.prueba-tope p { font-size: .9rem; color: var(--tinta-2); margin-top: 2px; }
+.prueba-tope { display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap; }
+.prueba-n { font-family: Fraunces, Georgia, serif; font-size: 3.6rem; line-height: .9; color: var(--coral); font-weight: 400; }
+.prueba-tope p { color: var(--tinta-2); font-size: 1rem; margin-top: 4px; max-width: 46ch; }
 
 /* ── Precios ───────────────────────────────────────────────── */
-.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 14px; }
-.plan-precio { font-size: 2rem; font-weight: 700; line-height: 1; letter-spacing: -.025em; }
-.plan-precio small { font-size: .85rem; font-weight: 400; color: var(--tinta-3); letter-spacing: 0; }
-.plan-lista { margin: 12px 0 0; padding-left: 17px; display: flex; flex-direction: column; gap: 6px; color: var(--tinta-2); font-size: .89rem; }
-.plan-pie { font-size: .82rem; color: var(--tinta-3); margin-top: 12px; }
-.destacado .bloque-cab { background: var(--verde-050); }
-.destacado .bloque-cab .etiqueta { color: var(--verde); }
-.destacado { border-color: var(--verde); }
+.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.plan { background: var(--blanco); border-radius: var(--r); padding: 30px 28px; display: flex; flex-direction: column; gap: 8px; }
+.plan.elegido { background: var(--coral-050); }
+.plan-precio { font-family: Fraunces, Georgia, serif; font-size: 2.5rem; line-height: 1; font-weight: 400; letter-spacing: -.02em; margin-block: 6px 4px; }
+.plan-precio small { font-family: InterVar, sans-serif; font-size: .88rem; color: var(--tinta-3); letter-spacing: 0; }
+.plan ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; color: var(--tinta-2); font-size: .95rem; }
+.plan-pie { font-size: .87rem; color: var(--tinta-3); margin-top: 14px; }
 
-.aviso {
-  display: flex; gap: 12px; padding: 14px 16px; background: var(--azul-050);
-  border: 1px solid var(--linea); border-radius: var(--r); font-size: .92rem;
-  color: var(--tinta-2); margin-top: 14px;
+.nota-precio {
+  margin-top: 26px; padding: 22px 26px; background: var(--crema-2);
+  border-radius: var(--r); font-size: 1rem; color: var(--tinta-2); max-width: 66ch;
 }
-.aviso b { color: var(--tinta); }
+.nota-precio b { color: var(--tinta); font-weight: 500; }
 
 /* ── Cierre ────────────────────────────────────────────────── */
 .cierre {
-  background: var(--azul-900); border-radius: var(--r); padding: 34px 26px;
-  display: flex; flex-direction: column; gap: 14px; align-items: flex-start; margin-top: 44px;
+  margin-top: 100px; padding: 64px 34px; text-align: center;
+  display: flex; flex-direction: column; gap: 20px; align-items: center;
 }
-.cierre h2, .cierre p { color: #EAF3F6; }
-.cierre p { max-width: 52ch; font-size: .97rem; opacity: .88; }
-.cierre .boton { background: #fff; color: var(--azul-900); border-color: #fff; }
-.cierre .boton:hover { background: #EAF3F6; border-color: #EAF3F6; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .cierre { background: var(--azul-050); }
-  :root:not([data-theme="light"]) .cierre h2, :root:not([data-theme="light"]) .cierre p { color: var(--tinta); }
-}
-:root[data-theme="dark"] .cierre { background: var(--azul-050); }
-:root[data-theme="dark"] .cierre h2, :root[data-theme="dark"] .cierre p { color: var(--tinta); }
+.cierre p { color: var(--tinta-2); max-width: 46ch; font-size: 1.06rem; }
 
 .pie {
-  padding-block: 26px 40px; margin-top: 20px; border-top: 1px solid var(--linea);
-  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
-  font-size: .83rem; color: var(--tinta-3);
+  padding-block: 40px 56px; border-top: 1px solid var(--linea); margin-top: 40px;
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font-size: .88rem; color: var(--tinta-3);
 }
 .pie a { color: var(--tinta-2); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media (max-width: 760px) {
   .consulta { grid-template-columns: 1fr; }
-  .ind { grid-template-columns: 22px 1fr; }
-  .ind h3 { grid-column: 2; }
-  .ind p { grid-column: 2; }
-  .ficha .campo { grid-template-columns: 84px 1fr; gap: 10px; }
+  .fila { grid-template-columns: 1fr; gap: 8px; }
+  section { padding-top: 68px; }
+  .cierre { margin-top: 72px; padding: 48px 20px; }
+  .tarjeta-prueba { padding: 30px 24px; }
 }
 </style>
 
@@ -261,8 +225,7 @@ section { padding-top: 34px; }
   <header class="barra">
     <div class="logo">
       <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-        <rect x="1" y="1" width="24" height="24" rx="5" stroke="currentColor" stroke-width="1.6"/>
-        <path d="M5 13h3l2-5 3 10 2.5-6 1.5 3h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 13h3.5l2.2-6.5L12.4 20l3-9.5 1.9 4.2H23" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="logo-marca">Symphomed</span>
     </div>
@@ -282,63 +245,53 @@ section { padding-top: 34px; }
     </p>
 
     <div class="consulta">
-      <div class="bloque">
-        <div class="bloque-cab">
-          <span class="etiqueta">Consulta · audio</span>
+      <div class="panel">
+        <div class="panel-cab">
+          <span class="etiqueta">La consulta</span>
           <button class="repetir" id="repetir" type="button">Ver cómo se escribe</button>
         </div>
-        <div class="bloque-cuerpo">
-          <div class="audio-fila">
-            <div class="onda" id="onda" aria-hidden="true"></div>
-            <span class="reloj dato" id="reloj">04:12</span>
-          </div>
-          <div class="dialogo" id="dialogo">
-            <p><b>Médica</b>¿Está tomando el losartán y la hidroclorotiazida todos los días?</p>
-            <p><b>Paciente</b>El losartán sí, pero la otra la dejé hace tres semanas porque me hacía ir mucho al baño de noche.</p>
-            <p><b>Médica</b>Le tomo la presión… ciento cincuenta sobre noventa y cinco. Está alta otra vez.</p>
-          </div>
+        <div class="audio-fila">
+          <div class="onda" id="onda" aria-hidden="true"></div>
+          <span class="reloj dato" id="reloj">04:12</span>
+        </div>
+        <div class="dialogo" id="dialogo">
+          <p><b>Médica</b>¿Está tomando el losartán y la hidroclorotiazida todos los días?</p>
+          <p><b>Paciente</b>El losartán sí, pero la otra la dejé hace tres semanas porque me hacía ir mucho al baño de noche.</p>
+          <p><b>Médica</b>Le tomo la presión… ciento cincuenta sobre noventa y cinco. Está alta otra vez.</p>
         </div>
       </div>
 
-      <div class="bloque">
-        <div class="bloque-cab">
-          <span class="etiqueta">Nota clínica</span>
-          <span class="etiqueta" id="estado">Generada en 38 s</span>
+      <div class="panel">
+        <div class="panel-cab">
+          <span class="etiqueta">Lo que quedó escrito</span>
+          <span class="etiqueta dato" id="estado">38 s</span>
         </div>
-        <div class="bloque-cuerpo">
-          <div class="ficha" id="ficha">
-            <div class="campo">
-              <span class="etiqueta">Motivo</span>
-              <span>Control de hipertensión arterial. Cefalea matinal de diez días.</span>
-            </div>
-            <div class="campo">
-              <span class="etiqueta">Adherencia</span>
-              <span>Suspendió hidroclorotiazida hace 3 semanas por nicturia. Losartán sin interrupciones.</span>
-            </div>
-            <div class="campo">
-              <span class="etiqueta">Examen</span>
-              <span class="dato alto">PA 150/95 mmHg &nbsp;·&nbsp; +2 kg</span>
-            </div>
-            <div class="campo">
-              <span class="etiqueta">Plan</span>
-              <span>Reiniciar hidroclorotiazida 12,5 mg en la mañana. Losartán 50 mg. Dieta hiposódica. Creatinina y electrolitos.</span>
-            </div>
-            <div class="campo">
-              <span class="etiqueta">Control</span>
-              <span class="dato">En 3 semanas</span>
-            </div>
+        <div class="ficha" id="ficha">
+          <div class="campo">
+            <span class="etiqueta">Motivo</span>
+            <span>Control de hipertensión arterial. Cefalea matinal de diez días.</span>
+          </div>
+          <div class="campo">
+            <span class="etiqueta">Adherencia</span>
+            <span>Suspendió hidroclorotiazida hace 3 semanas por nicturia. Losartán sin interrupciones.</span>
+          </div>
+          <div class="campo">
+            <span class="etiqueta">Examen</span>
+            <span class="dato alto">PA 150/95 mmHg · +2 kg</span>
+          </div>
+          <div class="campo">
+            <span class="etiqueta">Plan</span>
+            <span>Reiniciar hidroclorotiazida 12,5 mg en la mañana. Losartán 50 mg. Dieta hiposódica. Creatinina y electrolitos. Control en 3 semanas.</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="acciones" style="padding-top:6px">
+    <div class="acciones">
       <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Probar con 4 consultas gratis</a>
       <a class="boton calmo" href="#precios">Ver precios</a>
     </div>
   </div>
-
-  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Cómo funciona ─────────────────────────────────────── -->
   <section>
@@ -346,31 +299,23 @@ section { padding-top: 34px; }
       <h2>Tres pasos, y ninguno es escribir</h2>
     </div>
     <div class="rejilla">
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Paso 1</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>Apretás grabar y atendés</h3>
-          <p>Como siempre. El paciente autoriza la grabación una vez, en la primera consulta — sin ese permiso Symphomed no graba nada.</p>
-        </div>
+      <div class="punto">
+        <span class="etiqueta">Paso 1</span>
+        <h3>Apretás grabar y atendés</h3>
+        <p>Como siempre. El paciente autoriza la grabación una vez, en la primera consulta — sin ese permiso Symphomed no graba nada.</p>
       </div>
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Paso 2</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>Symphomed escucha y escribe</h3>
-          <p>Transcribe con vocabulario médico y arma la nota: motivo, antecedentes, examen, diagnóstico, plan y próximo control. Menos de un minuto.</p>
-        </div>
+      <div class="punto">
+        <span class="etiqueta">Paso 2</span>
+        <h3>Symphomed escucha y escribe</h3>
+        <p>Transcribe con vocabulario médico y arma la nota: motivo, antecedentes, examen, diagnóstico, plan y próximo control. Menos de un minuto.</p>
       </div>
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Paso 3</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>Revisás y confirmás</h3>
-          <p>Corregís lo que quieras y queda guardado. Nada se archiva sin que el médico lo apruebe: la firma es suya y la responsabilidad también.</p>
-        </div>
+      <div class="punto">
+        <span class="etiqueta">Paso 3</span>
+        <h3>Revisás y confirmás</h3>
+        <p>Corregís lo que quieras y queda guardado. Nada se archiva sin que el médico lo apruebe: la firma es suya y la responsabilidad también.</p>
       </div>
     </div>
   </section>
-
-  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Qué más queda hecho ───────────────────────────────── -->
   <section>
@@ -378,44 +323,33 @@ section { padding-top: 34px; }
       <h2>Y todo lo demás también queda hecho</h2>
       <p class="prosa">De la misma consulta salen la receta, el recordatorio al paciente y el kardex actualizado.</p>
     </div>
-    <div class="bloque">
-      <div class="bloque-cab"><span class="etiqueta">Incluido en todos los planes</span></div>
-      <div class="indicaciones">
-        <div class="ind">
-          <span class="ind-tic">✚</span>
-          <h3>Kardex del paciente</h3>
-          <p>Consultas anteriores, medicación activa, vacunas y signos vitales graficados en el tiempo. Antes de entrar ya sabés en qué quedó la última vez.</p>
-        </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
-          <h3>Recetas</h3>
-          <p>Salen armadas de lo que se conversó, con dosis y frecuencia. Se imprimen o se mandan por WhatsApp. En Brasil, con receta digital válida.</p>
-        </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
-          <h3>Agenda y recordatorios</h3>
-          <p>El paciente reserva desde un enlace y recibe el aviso por WhatsApp. Menos ausencias, y la secretaria deja de contar horarios por teléfono.</p>
-        </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
-          <h3>Teleconsulta</h3>
-          <p>Video desde el navegador, sin instalar nada y sin que el paciente cree una cuenta. Se transcribe igual que una consulta presencial.</p>
-        </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
-          <h3>Estudios e imágenes</h3>
-          <p>Laboratorios, ecografías y radiografías quedan en la ficha. Las imágenes se abren con un visor que permite medir sobre ellas.</p>
-        </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
-          <h3>Varios consultorios</h3>
-          <p>Cada médico ve lo suyo y el director ve el conjunto. Los permisos se reparten por persona, no por computadora.</p>
-        </div>
+    <div class="lista">
+      <div class="fila">
+        <h3>Kardex del paciente</h3>
+        <p>Consultas anteriores, medicación activa, vacunas y signos vitales graficados en el tiempo. Antes de entrar ya sabés en qué quedó la última vez.</p>
+      </div>
+      <div class="fila">
+        <h3>Recetas</h3>
+        <p>Salen armadas de lo que se conversó, con dosis y frecuencia. Se imprimen o se mandan por WhatsApp. En Brasil, con receta digital válida.</p>
+      </div>
+      <div class="fila">
+        <h3>Agenda y recordatorios</h3>
+        <p>El paciente reserva desde un enlace y recibe el aviso por WhatsApp. Menos ausencias, y la secretaria deja de contar horarios por teléfono.</p>
+      </div>
+      <div class="fila">
+        <h3>Teleconsulta</h3>
+        <p>Video desde el navegador, sin instalar nada y sin que el paciente cree una cuenta. Se transcribe igual que una consulta presencial.</p>
+      </div>
+      <div class="fila">
+        <h3>Estudios e imágenes</h3>
+        <p>Laboratorios, ecografías y radiografías quedan en la ficha. Las imágenes se abren con un visor que permite medir sobre ellas.</p>
+      </div>
+      <div class="fila">
+        <h3>Varios consultorios</h3>
+        <p>Cada médico ve lo suyo y el director ve el conjunto. Los permisos se reparten por persona, no por computadora.</p>
       </div>
     </div>
   </section>
-
-  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Prueba ────────────────────────────────────────────── -->
   <section id="probar">
@@ -423,7 +357,7 @@ section { padding-top: 34px; }
       <h2>Probalo con tus propios pacientes</h2>
       <p class="prosa">No con una cuenta de demostración ni con casos de ejemplo. Con las consultas que vas a atender esta semana, en tu consultorio.</p>
     </div>
-    <div class="bloque">
+    <div class="tarjeta-prueba">
       <div class="prueba-tope">
         <span class="prueba-n">4</span>
         <div>
@@ -431,31 +365,26 @@ section { padding-top: 34px; }
           <p>Completas: se transcriben, sale la nota, la receta y el kardex. No es una versión recortada.</p>
         </div>
       </div>
-      <div class="indicaciones">
-        <div class="ind">
-          <span class="ind-tic">✚</span>
+      <div class="rejilla">
+        <div class="punto">
           <h3>Sin tarjeta</h3>
           <p>No se pide ningún medio de pago para empezar. Cuando se acaban las cuatro, elegís si seguís y cómo pagás — y si no, no pasa nada.</p>
         </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
+        <div class="punto">
           <h3>Sin instalar nada</h3>
           <p>Se abre en el navegador del consultorio o del celular. No hay programa que instalar ni computadora que cambiar.</p>
         </div>
-        <div class="ind">
-          <span class="ind-tic">✚</span>
+        <div class="punto">
           <h3>Las historias son tuyas</h3>
           <p>Si decidís no seguir, te llevás lo que cargaste. Nada queda secuestrado adentro.</p>
         </div>
       </div>
-    </div>
-    <div class="acciones" style="padding-top:16px">
-      <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Empezar la prueba</a>
-      <span class="al-lado">Te acompañamos en la primera consulta, para que no la pierdas aprendiendo.</span>
+      <div class="acciones">
+        <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20probar%20Symphomed%20con%20mis%20pacientes">Empezar la prueba</a>
+        <span class="al-lado">Te acompañamos en la primera consulta.</span>
+      </div>
     </div>
   </section>
-
-  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Precios ───────────────────────────────────────────── -->
   <section id="precios">
@@ -464,39 +393,34 @@ section { padding-top: 34px; }
       <p class="prosa">Dos formas de pagar. La que te conviene depende de cuántos pacientes atendés, y podés cambiarte cuando quieras.</p>
     </div>
     <div class="planes">
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Por consulta</span></div>
-        <div class="bloque-cuerpo">
-          <div class="plan-precio dato">Bs 12 <small>cada consulta</small></div>
-          <ul class="plan-lista">
-            <li>Pagás solo lo que usás</li>
-            <li>Sin cuota mensual ni permanencia</li>
-            <li>Todas las funciones incluidas</li>
-          </ul>
-          <p class="plan-pie">Para quien atiende pocos pacientes o está probando.</p>
-        </div>
+      <div class="plan">
+        <span class="etiqueta">Por consulta</span>
+        <div class="plan-precio dato">Bs 12 <small>cada consulta</small></div>
+        <ul>
+          <li>Pagás solo lo que usás</li>
+          <li>Sin cuota mensual ni permanencia</li>
+          <li>Todas las funciones incluidas</li>
+        </ul>
+        <p class="plan-pie">Para quien atiende pocos pacientes o está probando.</p>
       </div>
-      <div class="bloque destacado">
-        <div class="bloque-cab"><span class="etiqueta">Plan mensual</span></div>
-        <div class="bloque-cuerpo">
-          <div class="plan-precio dato">Bs 900 <small>por mes</small></div>
-          <ul class="plan-lista">
-            <li>Consultas sin límite</li>
-            <li>Conviene desde 75 consultas al mes</li>
-            <li>Todas las funciones incluidas</li>
-            <li>El plan anual trae un mes de regalo</li>
-          </ul>
-          <p class="plan-pie">Para consultorios con agenda llena todos los días.</p>
-        </div>
+      <div class="plan elegido">
+        <span class="etiqueta" style="color:var(--coral)">Plan mensual</span>
+        <div class="plan-precio dato">Bs 900 <small>por mes</small></div>
+        <ul>
+          <li>Consultas sin límite</li>
+          <li>Conviene desde 75 consultas al mes</li>
+          <li>Todas las funciones incluidas</li>
+          <li>El plan anual trae un mes de regalo</li>
+        </ul>
+        <p class="plan-pie">Para consultorios con agenda llena todos los días.</p>
       </div>
     </div>
-    <div class="aviso">
-      <span class="ind-tic">✚</span>
-      <span><b>Las primeras 4 consultas no se cobran</b>, en cualquiera de los dos planes. Para la cuarta ya sabés si te ahorra tiempo — y recién ahí la decisión es honesta. En Brasil: R$ 10 por consulta o R$ 400 al mes.</span>
-    </div>
+    <p class="nota-precio">
+      <b>Las primeras 4 consultas no se cobran</b>, en cualquiera de los dos planes. Para la
+      cuarta ya sabés si te ahorra tiempo — y recién ahí la decisión es honesta.
+      En Brasil: R$ 10 por consulta o R$ 400 al mes.
+    </p>
   </section>
-
-  <div class="ecg" aria-hidden="true"></div>
 
   <!-- ── Confianza ─────────────────────────────────────────── -->
   <section>
@@ -504,33 +428,21 @@ section { padding-top: 34px; }
       <h2>La historia clínica es del médico y del paciente</h2>
     </div>
     <div class="rejilla">
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Consentimiento</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>El paciente autoriza, o no se graba</h3>
-          <p>Sin autorización explícita del paciente, Symphomed no graba ni transcribe. No es una casilla que se tilda: es la llave.</p>
-        </div>
+      <div class="punto">
+        <h3>El paciente autoriza, o no se graba</h3>
+        <p>Sin autorización explícita del paciente, Symphomed no graba ni transcribe. No es una casilla que se tilda: es la llave.</p>
       </div>
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Confidencialidad</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>Nadie más lee las consultas</h3>
-          <p>Cada médico ve solo sus pacientes. Los datos no se venden, no se comparten y no se usan para publicidad.</p>
-        </div>
+      <div class="punto">
+        <h3>Nadie más lee las consultas</h3>
+        <p>Cada médico ve solo sus pacientes. Los datos no se venden, no se comparten y no se usan para publicidad.</p>
       </div>
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">Portabilidad</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>Te podés ir con todo</h3>
-          <p>Si un día decidís dejarlo, te llevás las historias completas. No hay forma de quedar atrapado adentro.</p>
-        </div>
+      <div class="punto">
+        <h3>Te podés ir con todo</h3>
+        <p>Si un día decidís dejarlo, te llevás las historias completas. No hay forma de quedar atrapado adentro.</p>
       </div>
-      <div class="bloque">
-        <div class="bloque-cab"><span class="etiqueta">En producción</span></div>
-        <div class="bloque-cuerpo item-cuerpo">
-          <h3>Está funcionando hoy</h3>
-          <p>No es una promesa ni una lista de espera. Hay médicos atendiendo con Symphomed en Bolivia y en Brasil.</p>
-        </div>
+      <div class="punto">
+        <h3>Está funcionando hoy</h3>
+        <p>No es una promesa ni una lista de espera. Hay médicos atendiendo con Symphomed en Bolivia y en Brasil.</p>
       </div>
     </div>
   </section>
@@ -549,29 +461,11 @@ section { padding-top: 34px; }
 
 <script nonce="__NONCE__">
 "use strict";
-
-// El trazo de electrocardiograma que separa las secciones. Se dibuja con
-// código y no a mano porque hay que repetir el ciclo hasta cubrir el ancho,
-// y un path escrito a mano quedaría fijo a una sola medida de pantalla.
-(function () {
-  var CICLO = 120, ALTO = 26, m = ALTO / 2;
-  // Un latido: línea de base, P, complejo QRS, T. Las proporciones son las
-  // de un trazo normal, no una zigzag decorativa.
-  var d = "M0 " + m + " h26 l5 -3 l5 3 h10 l4 8 l5 -20 l5 16 l4 -4 h12 q6 -7 12 0 h" + (CICLO - 88);
-  document.querySelectorAll(".ecg").forEach(function (caja) {
-    caja.innerHTML =
-      '<svg viewBox="0 0 ' + CICLO + " " + ALTO + '" preserveAspectRatio="none" fill="none">' +
-      '<path d="' + d + '" stroke="currentColor" stroke-width="1.4" ' +
-      'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';
-  });
-})();
-
-// La reproducción de la consulta.
 (function () {
   var ALTURAS = [
-    4, 7, 11, 16, 22, 18, 13, 9, 6, 4, 3, 5, 9, 15, 21, 24, 20, 14, 8, 5,
-    3, 4, 8, 13, 19, 23, 24, 21, 15, 10, 6, 4, 3, 6, 12, 18, 22, 17, 11, 7,
-    4, 3, 5, 10, 16, 21, 19, 12, 8, 5, 3, 4, 7, 12, 17, 14, 9, 6, 4, 3,
+    4, 7, 11, 15, 20, 17, 12, 8, 5, 4, 3, 5, 9, 14, 19, 22, 18, 13, 8, 5,
+    3, 4, 8, 12, 17, 21, 22, 19, 14, 9, 6, 4, 3, 6, 11, 16, 20, 16, 10, 7,
+    4, 3, 5, 9, 15, 20, 17, 11, 8, 5, 3, 4, 7, 11, 15, 13, 9, 6, 4, 3,
   ];
   var onda = document.getElementById("onda");
   var dialogo = document.getElementById("dialogo");
@@ -620,7 +514,7 @@ section { padding-top: 34px; }
     onda.classList.add("activa");
     lineas.concat(campos).forEach(function (e) { e.classList.remove("dicho"); });
     barras.forEach(function (b) { b.classList.remove("sonando"); });
-    if (estado) estado.textContent = "Escuchando…";
+    if (estado) estado.textContent = "escuchando";
 
     var porLinea = 1500;
     lineas.forEach(function (linea, i) {
@@ -635,14 +529,14 @@ section { padding-top: 34px; }
     var fin = 300 + lineas.length * porLinea;
     luego(fin, function () {
       boton.textContent = "Escribiendo…";
-      if (estado) estado.textContent = "Redactando…";
+      if (estado) estado.textContent = "redactando";
     });
     // La nota se arma más lento que el habla, a propósito: así se ve que
     // primero se escuchó todo y recién después se escribió.
     campos.forEach(function (campo, i) {
-      luego(fin + 700 + i * 460, function () { campo.classList.add("dicho"); });
+      luego(fin + 700 + i * 480, function () { campo.classList.add("dicho"); });
     });
-    luego(fin + 700 + campos.length * 460 + 400, function () {
+    luego(fin + 700 + campos.length * 480 + 400, function () {
       dialogo.classList.remove("reproduciendo");
       ficha.classList.remove("reproduciendo");
       if (estado) estado.textContent = estadoQuieto;
