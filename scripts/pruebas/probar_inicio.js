@@ -104,12 +104,24 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
   console.log("\n── 3b. La puerta del médico en el dominio nuevo ──");
   // En symphomed.com la raíz la ocupa la página de venta, así que sin /app un
   // médico NO tiene por dónde iniciar sesión: le sale marketing y nada más.
-  // El enlace "Ingresar" del pie apunta acá; mientras apuntó a "/" recargaba
-  // la misma página de venta, en un bucle que solo se ve en el dominio nuevo.
+  // Sin esto, un médico que entra a symphomed.com toca "Ingresar" y —cuando
+  // ese enlace apuntaba a "/"— recargaba la misma página de venta, en un
+  // bucle que solo se ve en el dominio nuevo.
   verificar("/app muestra la aplicación en symphomed.com", esApp(await pedir("/app", "symphomed.com")));
   verificar("  ...y también en el dominio viejo", esApp(await pedir("/app", "salud.chatgo.ia.bo")));
-  verificar("el enlace de Ingresar lleva ahí y no a la raíz",
-    /href="\/app"[^>]*>\s*Ingresar/.test(vista) && !/href="\/"[^>]*>\s*Ingresar/.test(vista));
+
+  // El destino de "Ingresar" NO está escrito en el HTML: symphomed.com es la
+  // cara pública y la plataforma va en su propio subdominio, así que el
+  // enlace tiene que poder salir del dominio sin editar la plantilla.
+  verificar("el destino de Ingresar es un marcador, no una ruta fija",
+    /href="__PLATAFORMA__"[^>]*>\s*Ingresar/.test(vista));
+  verificar("  ...y nunca la raíz, que en symphomed.com es esta misma página",
+    !/href="\/"[^>]*>\s*Ingresar/.test(vista));
+
+  const servida = await pedir("/inicio", "symphomed.com");
+  verificar("  ...sin el marcador sin reemplazar", !servida.texto.includes("__PLATAFORMA__"));
+  verificar("  ...y sin URL_PLATAFORMA cae en /app, que anda en cualquier dominio",
+    /href="\/app"[^>]*>\s*Ingresar/.test(servida.texto));
 
   console.log("\n── 4. /inicio anda en cualquier dominio ──");
   // Para poder verla antes de que el DNS apunte a este servidor.
@@ -130,6 +142,32 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
   verificar("y se deja cachear", /max-age/.test(r.cab["cache-control"] || ""));
 
   servidor.close();
+
+  console.log("\n── 5b. Con el subdominio ya configurado ──");
+  // La mudanza de verdad: symphomed.com queda como info y contacto, y la
+  // plataforma se va a su propio subdominio. Cuando eso pase, "Ingresar"
+  // tiene que SALIR del dominio — un enlace relativo dejaría al médico
+  // dando vueltas dentro de la página de venta.
+  //
+  // El módulo lee la variable una sola vez, al cargarse, así que hay que
+  // sacarlo del caché para que la relea. Es lo mismo que pasa en producción:
+  // cambiar URL_PLATAFORMA pide reiniciar, no alcanza con guardar el .env.
+  process.env.URL_PLATAFORMA = "https://app.symphomed.com";
+  delete require.cache[require.resolve(path.join(RAIZ, "routes", "inicio"))];
+  const app2 = express();
+  require(path.join(RAIZ, "routes", "inicio"))(app2);
+  const servidor2 = http.createServer(app2);
+  await new Promise(r => servidor2.listen(0, "127.0.0.1", r));
+  const conSubdominio = await new Promise(res => {
+    http.get({ host: "127.0.0.1", port: servidor2.address().port, path: "/inicio" },
+      r => { let t = ""; r.on("data", d => t += d); r.on("end", () => res(t)); });
+  });
+  servidor2.close();
+  verificar("Ingresar apunta al subdominio",
+    /href="https:\/\/app\.symphomed\.com"[^>]*>\s*Ingresar/.test(conSubdominio));
+  verificar("  ...y ya no a una ruta de este dominio",
+    !/href="\/app"[^>]*>\s*Ingresar/.test(conSubdominio));
+  delete process.env.URL_PLATAFORMA;
 
   console.log("\n── 6. Y que index.js sirva /app de verdad ──");
   // El servidor de arriba es un doble armado en esta prueba. Sin esta

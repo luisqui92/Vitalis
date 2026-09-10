@@ -3,38 +3,54 @@
 Procedimiento completo, en orden. Son unos 30 minutos, de los cuales 20 son
 esperar a que propague el DNS.
 
-Al final de esto:
+## Cómo queda repartido
+
+`symphomed.com` es **la cara pública**: info y contacto. La plataforma vive en
+su propio subdominio y no comparte la raíz con el marketing.
 
 | Dirección | Qué muestra |
 |---|---|
-| `symphomed.com` | La página de venta |
-| `symphomed.com/app` | La aplicación (login del médico) |
-| `salud.chatgo.ia.bo/…` | Redirige a `symphomed.com/…`, conservando el camino |
+| `symphomed.com` · `www.symphomed.com` | La página de venta |
+| `app.symphomed.com` | La plataforma (login del médico) |
+| `salud.chatgo.ia.bo/…` | Redirige a `app.symphomed.com/…` |
+
+El subdominio no necesita ni una línea de código: la aplicación sirve la
+página de venta **solo** en los dominios de `DOMINIOS_LANDING`, y en cualquier
+otro sirve la plataforma. `app.symphomed.com` no está en esa lista, así que su
+raíz muestra el login solo con apuntarle el DNS.
+
+> **El nombre del subdominio no está clavado en ningún lado.** Acá se usa
+> `app.` porque es corto y todo el mundo lo entiende, pero si preferís
+> `consultorio.` o `salud.`, se cambia en dos lugares: el registro DNS y la
+> variable `URL_PLATAFORMA`. No hay que tocar HTML ni volver a desplegar.
 
 ---
 
-## Por qué la mudanza se hace AHORA y no después
+## Por qué la mudanza del dominio viejo se hace AHORA
 
-Este procedimiento incluye apagar el dominio viejo. Eso solo es seguro
-mientras **no haya nadie usando la plataforma**, que es la situación hoy.
+Este procedimiento apaga `salud.chatgo.ia.bo` (lo deja redirigiendo). Eso solo
+es seguro mientras **no haya nadie usando la plataforma**, que es la situación
+hoy.
 
-Desde el primer médico deja de serlo, porque `salud.chatgo.ia.bo` empieza a
-quedar escrito adentro de links que viven en el WhatsApp de pacientes:
+Desde el primer médico deja de serlo, porque ese dominio empieza a quedar
+escrito adentro de links que viven en el WhatsApp de pacientes:
 
 - `/reservar.html?token=…` — cada link de reserva enviado
 - `/informe/<token>` — cada informe que un médico compartió
 - `/teleconsulta/<token>` — cada sala de teleconsulta
 
 Esos links no se pueden actualizar: ya están en el celular de otra persona.
-Por eso la redirección del paso 4 usa `$request_uri` — conserva el camino
-completo, así un link viejo sigue llegando a donde tiene que llegar en vez de
-caer en la portada. Con esa línea puesta, mudarse no rompe nada ni hoy ni
-dentro de un año.
+Por eso la redirección del paso 5 usa `$request_uri`, que conserva el camino
+completo. Con esa línea puesta, la mudanza no tiene fecha de vencimiento.
+
+**Y por eso la redirección apunta al SUBDOMINIO y no a `symphomed.com`.** Un
+`/informe/<token>` que aterrizara en la página de venta no le muestra el
+informe a nadie: esa página no sabe qué es un token. El dominio viejo era la
+plataforma, así que tiene que seguir llevando a la plataforma.
 
 **Lo que no sobrevive a la mudanza son las sesiones abiertas.** El token vive
-en el `localStorage`, y el navegador lo guarda por dominio: lo guardado bajo
-salud.chatgo.ia.bo no existe bajo symphomed.com. Hoy no afecta a nadie. El
-día que haya médicos trabajando, este paso se avisa antes.
+en el `localStorage` y el navegador lo guarda por dominio. Hoy no afecta a
+nadie; el día que haya médicos trabajando, este paso se avisa antes.
 
 ---
 
@@ -49,20 +65,27 @@ Anotala. Es la misma a la que ya apunta `salud.chatgo.ia.bo`.
 ## 2. El DNS, en el panel del registrador
 
 Donde compraste symphomed.com, buscá **DNS / Zona DNS / Administrar
-registros** y creá dos:
+registros** y creá **tres** registros, todos a la misma IP:
 
 | Tipo | Nombre | Valor | TTL |
 |---|---|---|---|
 | A | `@` | la IP del paso 1 | 3600 |
 | A | `www` | la misma IP | 3600 |
+| A | `app` | la misma IP | 3600 |
 
-Tarda entre 10 minutos y 2 horas. Para saber si ya llegó:
+El tercero es el que suele olvidarse, y sin él el paso 4 falla a mitad de
+camino: el certificado sale para dos dominios y no para el que usan los
+médicos.
+
+Tarda entre 10 minutos y 2 horas. Para saber si ya llegaron los tres:
 
 ```bash
-dig +short symphomed.com
+for d in symphomed.com www.symphomed.com app.symphomed.com; do
+  echo "$d → $(dig +short $d)"
+done
 ```
 
-Cuando devuelva tu IP, seguí. Antes de eso el paso 4 va a fallar.
+Cuando los tres devuelvan tu IP, seguí. Antes de eso el paso 4 va a fallar.
 
 ## 3. Desplegar el código
 
@@ -76,37 +99,45 @@ git pull origin clinica-multiconsultorio
 npm install --omit=dev
 ```
 
-### ⚠️ Antes de reiniciar: el App Secret de WhatsApp
-
-Esto **no es opcional**. Sin esta variable el webhook rechaza todos los
-mensajes entrantes y **ningún paciente puede reservar por WhatsApp**.
-
-En `developers.facebook.com` → tu app → **Configuración → Básica → App Secret
-→ Mostrar**. No es el token de acceso ni el verify token: es un tercer valor.
+### Las tres variables del `.env`
 
 ```bash
 nano ~/vitalis-app/.env
 ```
 
-Agregá estas dos líneas:
-
 ```
-WHATSAPP_APP_SECRET=el_valor_que_copiaste
-APP_URL=https://symphomed.com
+WHATSAPP_APP_SECRET=el_valor_de_meta
+APP_URL=https://app.symphomed.com
+URL_PLATAFORMA=https://app.symphomed.com
 ```
 
-`APP_URL` es lo que decide con qué dominio salen los links de reserva,
-informes y teleconsulta. De acá en adelante salen todos con symphomed.com.
+**`WHATSAPP_APP_SECRET`** — obligatoria. Sin ella el webhook rechaza todos los
+mensajes entrantes y **ningún paciente puede reservar por WhatsApp**. Está en
+`developers.facebook.com` → tu app → **Configuración → Básica → App Secret →
+Mostrar**. No es el token de acceso ni el verify token: es un tercer valor.
+
+**`APP_URL`** — con qué dominio salen los links de reserva, informes y
+teleconsulta. Va al **subdominio**, no a symphomed.com: esos links abren
+pantallas de la plataforma.
+
+**`URL_PLATAFORMA`** — a dónde manda el botón "Ingresar" de la página de
+venta. Si no está, el enlace cae en `/app` del mismo servidor, que funciona
+igual pero deja al médico dentro de symphomed.com.
 
 ```bash
 pm2 restart vitalis
 pm2 logs vitalis --lines 30
 ```
 
-En el log de arranque **no tiene que aparecer** ningún `❌`. Si aparece
-`WHATSAPP_APP_SECRET no está definido`, el `.env` no se guardó bien.
+En el log de arranque **no tiene que aparecer** ningún `❌`, y sí estas dos
+líneas:
 
-Comprobalo:
+```
+[INICIO] Página de venta en /inicio y en la raíz de: symphomed.com, www.symphomed.com
+[INICIO] El enlace "Ingresar" lleva a: https://app.symphomed.com
+```
+
+Y comprobá el WhatsApp:
 
 ```bash
 node scripts/revisar_whatsapp.js
@@ -114,41 +145,45 @@ node scripts/revisar_whatsapp.js
 
 La línea `App Secret` tiene que decir `configurado` en verde.
 
-## 4. nginx y el certificado
+## 4. nginx y los certificados
 
-Se hace en **dos tandas**, y el orden no es intercambiable: el certificado de
-symphomed.com hay que sacarlo mientras el dominio viejo todavía atiende
-normal. Si se pone la redirección primero, certbot pide la validación, nginx
-le contesta con un 301 y el certificado no sale.
-
-### 4a. Primero, que symphomed.com funcione
-
-Agregá los dos nombres al `server_name` que ya existe, **sin sacar el viejo**:
+Los tres nombres nuevos al `server_name` que ya existe, **sin sacar el
+viejo todavía**:
 
 ```nginx
-server_name salud.chatgo.ia.bo symphomed.com www.symphomed.com;
+server_name salud.chatgo.ia.bo symphomed.com www.symphomed.com app.symphomed.com;
 ```
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d symphomed.com -d www.symphomed.com
+sudo certbot --nginx -d symphomed.com -d www.symphomed.com -d app.symphomed.com
 ```
 
-certbot necesita que el DNS ya esté propagado (paso 2): valida pidiéndole al
-dominio que le conteste.
+certbot valida pidiéndole a cada dominio que le conteste, así que necesita los
+tres registros del paso 2 ya propagados.
 
-**Comprobá que anda antes de seguir:**
+### Comprobá antes de seguir
 
 ```bash
-curl -sI https://symphomed.com | head -1                        # 200
-curl -s  https://symphomed.com | grep -c "En qué atendés"        # 1 → la página de venta
-curl -s  https://symphomed.com/app | grep -c "<title>"           # 1 → la aplicación
+curl -sI https://symphomed.com | head -1                       # 200
+curl -s  https://symphomed.com | grep -c "En qué atendés"       # 1 → la página de venta
+curl -s  https://app.symphomed.com | grep -c "En qué atendés"   # 0 → la plataforma, NO la venta
+curl -s  https://app.symphomed.com | grep -c "<title>"          # 1 → el login
 ```
 
-Si alguna no da eso, **no sigas al 4b**: con la redirección puesta ya no vas
-a tener el dominio viejo para volver.
+**La tercera es la que importa.** Si devuelve 1, la página de venta se quedó
+con la raíz del subdominio de los médicos. Revisá `DOMINIOS_LANDING` en el
+`.env`: si no está definida el valor por defecto ya es el correcto, así que lo
+más probable es que esté definida y le hayan metido el subdominio.
 
-### 4b. Recién ahora, mudar el dominio viejo
+**Si algo de esto falla, no sigas al paso 5.** Con la redirección puesta ya no
+vas a tener el dominio viejo para volver.
+
+## 5. Recién ahora, mudar el dominio viejo
+
+El orden no es intercambiable: si ponés la redirección antes de sacar los
+certificados, certbot pide la validación, nginx le contesta con el 301 y el
+certificado no sale nunca.
 
 Sacá `salud.chatgo.ia.bo` del `server_name` de arriba y dale su propio bloque:
 
@@ -157,17 +192,19 @@ server {
     listen 443 ssl;
     server_name salud.chatgo.ia.bo;
 
-    # El certificado del dominio viejo sigue haciendo falta: sin él el
-    # navegador muestra la advertencia de seguridad ANTES de leer el 301,
-    # y el visitante nunca llega a la redirección.
+    # El certificado del dominio viejo sigue haciendo falta aunque solo
+    # redirija: sin él el navegador muestra la advertencia de seguridad ANTES
+    # de leer el 301, y el visitante nunca llega a la redirección.
     ssl_certificate     /etc/letsencrypt/live/salud.chatgo.ia.bo/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/salud.chatgo.ia.bo/privkey.pem;
 
-    # $request_uri conserva el camino Y los parámetros. Sin él, un link como
-    # /informe/abc123 caería en la portada de symphomed.com y el paciente no
-    # vería su informe. Hoy no hay links viejos dando vueltas; el día que los
-    # haya, esta línea es la diferencia entre que anden y que no.
-    return 301 https://symphomed.com$request_uri;
+    # Al SUBDOMINIO, no a symphomed.com: este dominio era la plataforma y
+    # tiene que seguir llevando a la plataforma. Un /informe/<token> que
+    # aterrizara en la página de venta no le muestra el informe a nadie.
+    #
+    # $request_uri conserva el camino Y los parámetros. Sin él, todos los
+    # links con token caen en la portada.
+    return 301 https://app.symphomed.com$request_uri;
 }
 ```
 
@@ -175,29 +212,20 @@ server {
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-## 5. Comprobar, en este orden
+## 6. La comprobación final
 
 ```bash
-curl -sI https://symphomed.com | head -1                         # 200
-curl -s  https://symphomed.com | grep -c "En qué atendés"         # 1 → la página de venta
-curl -s  https://symphomed.com/app | grep -c "<title>"            # 1 → la aplicación
-
-# La mudanza: el dominio viejo redirige y conserva el camino
-curl -sI https://salud.chatgo.ia.bo/app | grep -i "^location"
-# → location: https://symphomed.com/app     ← con el /app, no pelado
+curl -sI https://salud.chatgo.ia.bo/informe/abc123 | grep -i "^location"
+# → location: https://app.symphomed.com/informe/abc123
 ```
 
-**La última es la que importa.** Si dice `https://symphomed.com/` a secas, te
-falta `$request_uri` y todos los links con token van a caer en la portada.
+Tiene que salir **el camino completo**. Si dice `https://app.symphomed.com/` a
+secas, falta `$request_uri` y todos los links con token van a caer en la
+portada.
 
-Y si `symphomed.com` te muestra la aplicación en vez de la página de venta,
-revisá `DOMINIOS_LANDING` en el `.env`: si no está definida, el valor por
-defecto ya es el correcto (solo symphomed.com y www), así que lo más probable
-es que esté definida y le falte el dominio.
-
-Al final, desde el celular, la prueba que de verdad cuenta: abrir
-`symphomed.com`, contestar las tres preguntas y tocar el botón de WhatsApp.
-Tiene que abrir un chat con **+591 64637067** y el mensaje ya escrito.
+Y desde el celular, la prueba que de verdad cuenta: abrir `symphomed.com`,
+contestar las tres preguntas y tocar el botón de WhatsApp. Tiene que abrir un
+chat con **+591 64637067** y el mensaje ya escrito.
 
 ---
 

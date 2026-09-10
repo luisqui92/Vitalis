@@ -37,6 +37,17 @@ const DOMINIOS = new Set(
     .split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
 );
 
+// A dónde manda el enlace "Ingresar". symphomed.com es la cara pública —info
+// y contacto— y la plataforma vive en su propio subdominio, así que el enlace
+// tiene que SALIR de este dominio.
+//
+// Sin configurar cae en "/app", que es relativo y por lo tanto anda en
+// cualquier dominio. Eso es lo que hace que la página se pueda ver y probar
+// entera antes de que exista el subdominio: hoy el enlace lleva a la
+// aplicación del mismo servidor, y el día que se defina URL_PLATAFORMA
+// empieza a llevar afuera, sin tocar el HTML.
+const URL_PLATAFORMA = String(process.env.URL_PLATAFORMA || "/app").replace(/\/+$/, "") || "/app";
+
 let PLANTILLA = "";
 try {
   PLANTILLA = fs.readFileSync(path.join(VISTAS, "inicio.html"), "utf8");
@@ -60,7 +71,9 @@ function servir(_req, res) {
     "frame-ancestors 'none'",
   ].join("; "));
   res.setHeader("Cache-Control", "public, max-age=300");
-  res.type("html").send(PLANTILLA.replace(/__NONCE__/g, nonce));
+  res.type("html").send(
+    PLANTILLA.replace(/__NONCE__/g, nonce).replace(/__PLATAFORMA__/g, URL_PLATAFORMA)
+  );
 }
 
 module.exports = (app) => {
@@ -78,4 +91,5 @@ module.exports = (app) => {
   });
 
   log.info(`[INICIO] Página de venta en /inicio y en la raíz de: ${[...DOMINIOS].join(", ")}`);
+  log.info(`[INICIO] El enlace "Ingresar" lleva a: ${URL_PLATAFORMA}`);
 };
