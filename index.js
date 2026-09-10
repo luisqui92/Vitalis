@@ -197,6 +197,11 @@ app.use(express.static(PUBLICO, {
 // /informe/<token> es la página que abre el PACIENTE desde el enlace de
 // WhatsApp: mismo frontend, pero el JS detecta la ruta y muestra el informe
 // con membrete en vez de la pantalla de login (ver public/js/informePublico.js).
+// La página de venta. Va ANTES que la raíz de la aplicación a propósito: se
+// queda con "/" solo si el pedido llegó por symphomed.com, y en cualquier otro
+// dominio llama a next() y sigue de largo. Ver routes/inicio.js.
+require("./routes/inicio")(app);
+
 app.get(["/", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 // La sala del paciente: mismo frontend, el JS detecta la ruta (ver

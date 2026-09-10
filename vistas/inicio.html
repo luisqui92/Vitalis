@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Symphomed escucha la consulta y redacta la nota clínica, la receta y el control siguiente. El médico no escribe nada.">
+<meta property="og:title" content="Symphomed — terminá la consulta con la historia ya escrita">
+<meta property="og:description" content="La consulta se transcribe sola y queda la nota clínica, la receta y el kardex. Las primeras 4 consultas no se cobran.">
+<meta property="og:type" content="website">
+<style>
+@font-face {
+  font-family: "Fraunces"; src: url("/fonts/fraunces-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+@font-face {
+  font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+:root { color-scheme: light dark; }
+body { margin: 0; }
+img { max-width: 100%; }
+</style>
+<title>Symphomed</title>
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Symphomed — la voz se vuelve partitura.
+   Dos estados en toda la página: lo HABLADO va en ámbar, suelto,
+   con la tipografía de texto; lo ESCRITO va en tinta petróleo,
+   estructurado, con etiquetas de formulario clínico. El sello
+   granate aparece una vez por sección y nada más.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --papel:    #EEF1EF;
+  --carta:    #FAFBF9;
+  --tinta:    #10222A;
+  --tinta-2:  #4A6068;
+  --tinta-3:  #7E9199;
+  --linea:    #D6DCD9;
+  --linea-2:  #B5C0BC;
+  --sello:    #8C2F39;
+  --voz:      #8A5E18;
+  --voz-piso: #F3EADA;
+  --r: 4px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papel:#0B171C; --carta:#122630; --tinta:#E4EBE8; --tinta-2:#9DB0B6;
+    --tinta-3:#6E858D; --linea:#22343C; --linea-2:#3A4F58;
+    --sello:#D4737D; --voz:#D9A94E; --voz-piso:#231C10;
+  }
+}
+:root[data-theme="dark"] {
+  --papel:#0B171C; --carta:#122630; --tinta:#E4EBE8; --tinta-2:#9DB0B6;
+  --tinta-3:#6E858D; --linea:#22343C; --linea-2:#3A4F58;
+  --sello:#D4737D; --voz:#D9A94E; --voz-piso:#231C10;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: InterVar, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding-inline: 20px;
+}
+.env { max-width: 1080px; margin: 0 auto; }
+.prosa { max-width: 62ch; }
+
+h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.3rem, 6vw, 4rem); line-height: 1.02; letter-spacing: -.025em; }
+h2 { font-size: clamp(1.6rem, 3.4vw, 2.3rem); line-height: 1.12; letter-spacing: -.015em; }
+h3 { font-size: 1.08rem; line-height: 1.3; }
+p { margin: 0; }
+
+.mono, .campo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.rotulo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .69rem; letter-spacing: .15em; text-transform: uppercase; color: var(--tinta-3);
+}
+
+/* ── El pentagrama: divisor estructural, no adorno ─────────── */
+.pauta { display: flex; flex-direction: column; gap: 3px; padding-block: 4px; }
+.pauta i { display: block; height: 1px; background: var(--linea); }
+.pauta i:nth-child(2) { background: var(--linea-2); }
+
+/* ── Encabezado ────────────────────────────────────────────── */
+.barra {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 20px; padding-block: 26px 0; flex-wrap: wrap;
+}
+.marca { font-family: Fraunces, Georgia, serif; font-size: 1.32rem; font-weight: 600; letter-spacing: -.01em; }
+.marca span { color: var(--sello); }
+.barra .rotulo { color: var(--tinta-2); }
+
+/* ── Héroe ─────────────────────────────────────────────────── */
+.heroe { padding-block: 56px 12px; display: flex; flex-direction: column; gap: 22px; }
+.bajada { font-size: 1.18rem; line-height: 1.55; color: var(--tinta-2); max-width: 54ch; }
+.bajada b { color: var(--tinta); font-weight: 600; }
+
+.acciones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding-top: 6px; }
+.boton {
+  display: inline-block; background: var(--sello); color: #FBF7F7;
+  border: 0; border-radius: var(--r); padding: 14px 22px;
+  font-family: InterVar, sans-serif; font-size: .96rem; font-weight: 600;
+  text-decoration: none; transition: opacity .15s;
+}
+.boton:hover { opacity: .9; }
+.boton.calmo { background: transparent; color: var(--tinta); border: 1px solid var(--linea-2); }
+.boton:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
+.al-lado { font-size: .88rem; color: var(--tinta-3); }
+
+/* ── La transformación: el producto en una imagen ──────────── */
+.mesa {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 0;
+  border: 1px solid var(--linea-2); border-radius: var(--r);
+  background: var(--carta); overflow: hidden; margin-top: 12px;
+}
+.lado { padding: 24px 26px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.lado.hablado { background: var(--voz-piso); }
+.flecha {
+  display: flex; align-items: center; justify-content: center;
+  padding-inline: 6px; border-inline: 1px solid var(--linea);
+  color: var(--tinta-3);
+}
+.flecha svg { display: block; }
+
+/* Las ondas: lo que se dijo, antes de tener forma. */
+.onda { display: flex; align-items: center; gap: 2px; height: 26px; }
+.onda i { display: block; width: 3px; border-radius: 2px; background: var(--voz); opacity: .55; }
+
+.dialogo { display: flex; flex-direction: column; gap: 9px; font-size: .93rem; line-height: 1.5; }
+.dialogo p { color: var(--tinta-2); }
+.dialogo b { color: var(--voz); font-weight: 600; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; display: block; margin-bottom: 1px; }
+
+.ficha { display: flex; flex-direction: column; gap: 12px; }
+.campo-fila { display: flex; flex-direction: column; gap: 2px; }
+.campo-fila .rotulo { color: var(--tinta-3); }
+.campo-fila span:last-child { font-size: .93rem; line-height: 1.45; }
+.vital { color: var(--sello); font-weight: 600; }
+
+/* ── Secciones ─────────────────────────────────────────────── */
+section { padding-block: 60px 0; }
+.sec-cab { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+
+.pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 30px; }
+.paso { display: flex; flex-direction: column; gap: 9px; }
+.paso-n {
+  font-family: ui-monospace, monospace; font-size: .72rem; letter-spacing: .12em;
+  color: var(--sello); font-weight: 600;
+}
+.paso p { color: var(--tinta-2); font-size: .96rem; }
+
+/* Lista de capacidades: filas con regla, no tarjetas. */
+.capacidades { display: flex; flex-direction: column; }
+.cap {
+  display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 20px;
+  padding-block: 18px; border-top: 1px solid var(--linea); align-items: baseline;
+}
+.cap:last-child { border-bottom: 1px solid var(--linea); }
+.cap p { color: var(--tinta-2); font-size: .96rem; }
+
+/* ── Precios ───────────────────────────────────────────────── */
+.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; }
+.plan {
+  border: 1px solid var(--linea-2); border-radius: var(--r); background: var(--carta);
+  padding: 26px; display: flex; flex-direction: column; gap: 14px;
+}
+.plan.elegido { border-color: var(--sello); border-width: 1.5px; }
+.plan-precio { font-family: Fraunces, Georgia, serif; font-size: 2.2rem; line-height: 1; letter-spacing: -.02em; }
+.plan-precio small { font-family: InterVar, sans-serif; font-size: .88rem; color: var(--tinta-3); font-weight: 400; letter-spacing: 0; }
+.plan ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; color: var(--tinta-2); font-size: .93rem; }
+.plan-nota { font-size: .84rem; color: var(--tinta-3); }
+
+.regalo {
+  border-left: 2px solid var(--sello); padding: 4px 0 4px 18px;
+  color: var(--tinta-2); font-size: 1rem; max-width: 58ch;
+}
+.regalo b { color: var(--tinta); }
+
+/* ── Confianza ─────────────────────────────────────────────── */
+.garantias { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 26px; }
+.gar { display: flex; flex-direction: column; gap: 7px; }
+.gar p { color: var(--tinta-2); font-size: .94rem; }
+
+/* ── Cierre ────────────────────────────────────────────────── */
+.cierre {
+  background: var(--tinta); color: var(--papel);
+  border-radius: var(--r); padding: 46px 34px;
+  display: flex; flex-direction: column; gap: 18px; align-items: flex-start;
+  margin-top: 64px;
+}
+.cierre h2 { color: var(--papel); }
+.cierre p { color: var(--linea-2); max-width: 50ch; }
+.cierre .boton { background: var(--papel); color: var(--tinta); }
+
+.pie {
+  padding-block: 34px 48px; margin-top: 22px;
+  display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  font-size: .84rem; color: var(--tinta-3); border-top: 1px solid var(--linea);
+}
+.pie a { color: var(--tinta-2); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 720px) {
+  .mesa { grid-template-columns: 1fr; }
+  .flecha { border-inline: 0; border-block: 1px solid var(--linea); padding-block: 8px; transform: rotate(90deg); }
+  .cap { grid-template-columns: 1fr; gap: 6px; }
+  .cierre { padding: 34px 24px; }
+}
+</style>
+
+</head>
+<body>
+<div class="env">
+
+  <header class="barra">
+    <div class="marca">Sympho<span>med</span></div>
+    <div class="rotulo">Historia clínica · Bolivia y Brasil</div>
+  </header>
+
+  <div class="heroe">
+    <h1>Terminá la consulta con<br>la historia ya escrita.</h1>
+    <p class="bajada">
+      Symphomed escucha la consulta y redacta la nota clínica, la receta y el control siguiente.
+      <b>El médico no escribe nada</b> — y el paciente tiene toda su atención, no la nuca de
+      alguien tecleando.
+    </p>
+
+    <!-- Lo que hace el producto, mostrado en vez de descrito. -->
+    <div class="mesa">
+      <div class="lado hablado">
+        <span class="rotulo" style="color:var(--voz)">Lo que se habló · 4 min 12 s</span>
+        <div class="onda" id="onda" aria-hidden="true"></div>
+        <div class="dialogo">
+          <p><b>Médica</b>¿Está tomando el losartán y la hidroclorotiazida todos los días?</p>
+          <p><b>Paciente</b>El losartán sí, pero la otra la dejé hace tres semanas porque me hacía ir mucho al baño de noche.</p>
+          <p><b>Médica</b>Le tomo la presión… ciento cincuenta sobre noventa y cinco. Está alta otra vez.</p>
+        </div>
+      </div>
+
+      <div class="flecha" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M4 11h13m0 0-4.5-4.5M17 11l-4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="lado">
+        <span class="rotulo">Lo que quedó escrito · 40 s después</span>
+        <div class="ficha">
+          <div class="campo-fila">
+            <span class="rotulo">Motivo</span>
+            <span>Control de hipertensión arterial. Cefalea matinal de diez días.</span>
+          </div>
+          <div class="campo-fila">
+            <span class="rotulo">Adherencia</span>
+            <span>Suspendió hidroclorotiazida hace 3 semanas por nicturia. Losartán sin interrupciones.</span>
+          </div>
+          <div class="campo-fila">
+            <span class="rotulo">Examen</span>
+            <span class="campo vital">PA 150/95 mmHg · +2 kg desde el control previo</span>
+          </div>
+          <div class="campo-fila">
+            <span class="rotulo">Plan</span>
+            <span>Reiniciar hidroclorotiazida 12,5 mg en la mañana. Losartán 50 mg. Dieta hiposódica. Creatinina y electrolitos. Control en 3 semanas.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="acciones">
+      <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Pedir una demostración</a>
+      <a class="boton calmo" href="#precios">Ver precios</a>
+      <span class="al-lado">Las primeras 4 consultas no se cobran.</span>
+    </div>
+  </div>
+
+  <!-- ── Cómo funciona ─────────────────────────────────────── -->
+  <section>
+    <div class="pauta"><i></i><i></i><i></i><i></i></div>
+    <div class="sec-cab" style="padding-top:30px">
+      <h2>Tres pasos, y ninguno es escribir</h2>
+    </div>
+    <div class="pasos">
+      <div class="paso">
+        <span class="paso-n">PASO 1</span>
+        <h3>Apretás grabar y atendés</h3>
+        <p>Como siempre. El paciente autoriza la grabación una vez, en la primera consulta — sin ese permiso Symphomed no graba nada.</p>
+      </div>
+      <div class="paso">
+        <span class="paso-n">PASO 2</span>
+        <h3>Symphomed escucha y escribe</h3>
+        <p>Transcribe con vocabulario médico y arma la nota: motivo, antecedentes, examen, diagnóstico, plan y próximo control. Tarda menos de un minuto.</p>
+      </div>
+      <div class="paso">
+        <span class="paso-n">PASO 3</span>
+        <h3>Revisás y confirmás</h3>
+        <p>Corregís lo que quieras y queda guardado. Nada se archiva sin que el médico lo apruebe: la firma es suya y la responsabilidad también.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Qué más queda hecho ───────────────────────────────── -->
+  <section>
+    <div class="pauta"><i></i><i></i><i></i><i></i></div>
+    <div class="sec-cab" style="padding-top:30px">
+      <h2>Y todo lo demás también queda hecho</h2>
+      <p class="prosa" style="color:var(--tinta-2)">
+        La nota es lo que más se nota. Pero de la misma consulta salen la receta, el
+        recordatorio al paciente y el kardex actualizado.
+      </p>
+    </div>
+    <div class="capacidades">
+      <div class="cap">
+        <h3>Kardex del paciente</h3>
+        <p>Toda la historia en una pantalla: consultas anteriores, medicación activa, vacunas, y los signos vitales graficados en el tiempo. Antes de entrar ya sabés en qué quedó la última vez.</p>
+      </div>
+      <div class="cap">
+        <h3>Recetas</h3>
+        <p>Salen armadas de lo que se conversó, con la dosis y la frecuencia. Se imprimen o se mandan por WhatsApp. En Brasil, con receta digital válida.</p>
+      </div>
+      <div class="cap">
+        <h3>Agenda y recordatorios</h3>
+        <p>El paciente reserva desde un enlace y recibe el aviso por WhatsApp. Menos ausencias, y la secretaria deja de contar horarios por teléfono.</p>
+      </div>
+      <div class="cap">
+        <h3>Teleconsulta</h3>
+        <p>Video desde el navegador, sin instalar nada y sin que el paciente cree una cuenta. Se transcribe igual que una consulta presencial.</p>
+      </div>
+      <div class="cap">
+        <h3>Estudios e imágenes</h3>
+        <p>Laboratorios, ecografías y radiografías quedan en la ficha. Las imágenes se abren con un visor que permite medir sobre ellas.</p>
+      </div>
+      <div class="cap">
+        <h3>Varios consultorios</h3>
+        <p>Si trabajás con más médicos, cada uno ve lo suyo y el director ve el conjunto. Los permisos se reparten por persona, no por computadora.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Precios ───────────────────────────────────────────── -->
+  <section id="precios">
+    <div class="pauta"><i></i><i></i><i></i><i></i></div>
+    <div class="sec-cab" style="padding-top:30px">
+      <h2>Precios sin letra chica</h2>
+      <p class="prosa" style="color:var(--tinta-2)">
+        Dos formas de pagar. La que te conviene depende de cuántos pacientes atendés, y podés
+        cambiarte cuando quieras.
+      </p>
+    </div>
+
+    <div class="planes">
+      <div class="plan">
+        <span class="rotulo">Por consulta</span>
+        <div class="plan-precio">Bs 12 <small>cada consulta</small></div>
+        <ul>
+          <li>Pagás solo lo que usás</li>
+          <li>Sin cuota mensual ni permanencia</li>
+          <li>Todas las funciones incluidas</li>
+        </ul>
+        <span class="plan-nota">Para quien atiende pocos pacientes o está probando.</span>
+      </div>
+
+      <div class="plan elegido">
+        <span class="rotulo" style="color:var(--sello)">Plan mensual</span>
+        <div class="plan-precio">Bs 900 <small>por mes</small></div>
+        <ul>
+          <li>Consultas sin límite</li>
+          <li>Conviene desde 75 consultas al mes</li>
+          <li>Todas las funciones incluidas</li>
+          <li>El plan anual trae un mes de regalo</li>
+        </ul>
+        <span class="plan-nota">Para consultorios con agenda llena todos los días.</span>
+      </div>
+    </div>
+
+    <p class="regalo" style="margin-top:26px">
+      <b>Las primeras 4 consultas no se cobran</b>, en cualquiera de los dos planes. Para la
+      cuarta ya sabés si te ahorra tiempo — y recién ahí la decisión es honesta.
+    </p>
+    <p class="plan-nota" style="margin-top:14px">
+      En Brasil: R$ 10 por consulta o R$ 400 al mes. Los precios se muestran en la moneda de
+      cada país, no convertidos.
+    </p>
+  </section>
+
+  <!-- ── Confianza ─────────────────────────────────────────── -->
+  <section>
+    <div class="pauta"><i></i><i></i><i></i><i></i></div>
+    <div class="sec-cab" style="padding-top:30px">
+      <h2>La historia clínica es del médico y del paciente</h2>
+    </div>
+    <div class="garantias">
+      <div class="gar">
+        <h3>El paciente autoriza, o no se graba</h3>
+        <p>El consentimiento es la llave, no una casilla que se tilda. Sin autorización explícita del paciente, Symphomed no graba ni transcribe.</p>
+      </div>
+      <div class="gar">
+        <h3>Nadie más lee las consultas</h3>
+        <p>Cada médico ve solo sus pacientes. Los datos no se venden, no se comparten y no se usan para publicidad.</p>
+      </div>
+      <div class="gar">
+        <h3>Te podés ir con todo</h3>
+        <p>Si un día decidís dejarlo, te llevás las historias completas. No hay forma de quedar atrapado adentro.</p>
+      </div>
+      <div class="gar">
+        <h3>Está funcionando hoy</h3>
+        <p>No es una promesa ni una lista de espera. Hay médicos atendiendo con Symphomed en Bolivia y en Brasil.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Cierre ────────────────────────────────────────────── -->
+  <div class="cierre">
+    <h2>Empezá con una consulta</h2>
+    <p>
+      Escribinos por WhatsApp y te mostramos cómo funciona con un caso real, en quince minutos.
+      Si te sirve, seguís; si no, no perdiste nada.
+    </p>
+    <a class="boton" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escribir por WhatsApp</a>
+  </div>
+
+  <footer class="pie">
+    <span>Symphomed · Historia clínica asistida · Bolivia y Brasil</span>
+    <span><a href="https://wa.me/59164637067">WhatsApp</a></span>
+  </footer>
+</div>
+
+<script nonce="__NONCE__">
+"use strict";
+// Las barras del audio. Se generan acá y no como SVG a mano para que la
+// silueta sea la de una conversación —picos donde alguien habla, valles en
+// las pausas— y no una decoración uniforme.
+(function () {
+  var onda = document.getElementById("onda");
+  if (!onda) return;
+  var alturas = [
+    4, 7, 11, 16, 22, 18, 13, 9, 6, 4, 3, 5, 9, 15, 21, 25, 20, 14, 8, 5,
+    3, 4, 8, 13, 19, 24, 26, 21, 15, 10, 6, 4, 3, 6, 12, 18, 23, 17, 11, 7,
+    4, 3, 5, 10, 16, 22, 19, 12, 8, 5, 3, 4, 7, 12, 17, 14, 9, 6, 4, 3,
+  ];
+  onda.innerHTML = alturas.map(function (h) {
+    return '<i style="height:' + h + 'px"></i>';
+  }).join("");
+})();
+</script>
+
+</body>
+</html>
