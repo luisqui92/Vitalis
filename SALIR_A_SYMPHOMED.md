@@ -62,22 +62,54 @@ curl ifconfig.me
 
 Anotala. Es la misma a la que ya apunta `salud.chatgo.ia.bo`.
 
-## 2. El DNS, en el panel del registrador
+## 2. El DNS, en Hostinger
 
-Donde compraste symphomed.com, buscá **DNS / Zona DNS / Administrar
-registros** y creá **tres** registros, todos a la misma IP:
+symphomed.com está registrado en Hostinger, y su DNS viene incluido y gratis
+con el dominio. No hace falta contratar nada aparte ni mover los nameservers
+a otro proveedor.
 
-| Tipo | Nombre | Valor | TTL |
+**hPanel → Dominios → symphomed.com → DNS / Nameservers.**
+
+### Antes de agregar nada: mirá lo que ya está
+
+Hostinger deja puestos, de fábrica, registros `A` para `@` y `www` que apuntan
+a **su página de dominio estacionado**.
+
+**Esos hay que EDITARLOS, no agregar otros al lado.** Dos registros `A` con el
+mismo nombre y distinta IP no dan error: el DNS reparte las visitas entre los
+dos. Media hora después, la mitad de los médicos ve Symphomed y la otra mitad
+ve el cartel de Hostinger, cada uno convencido de que el otro se equivoca.
+
+Si además ves un registro `CNAME` en `www`, borralo: un nombre no puede tener
+`CNAME` y `A` a la vez.
+
+### Los tres registros
+
+Con **Add record**, tipo `A`, todos a la misma IP:
+
+| Tipo | Nombre (Host) | Contenido (Points to) | TTL |
 |---|---|---|---|
 | A | `@` | la IP del paso 1 | 3600 |
 | A | `www` | la misma IP | 3600 |
 | A | `app` | la misma IP | 3600 |
 
-El tercero es el que suele olvidarse, y sin él el paso 4 falla a mitad de
-camino: el certificado sale para dos dominios y no para el que usan los
-médicos.
+El de `app` es el que suele olvidarse, y sin él el paso 4 falla a mitad de
+camino: el certificado sale para los dos dominios de marketing y **no para el
+que usan los médicos**.
 
-Tarda entre 10 minutos y 2 horas. Para saber si ya llegaron los tres:
+### Que los nameservers sean los de Hostinger
+
+Si en algún momento se apuntaron a otro proveedor, el editor de zona de
+Hostinger deja guardar los registros y **no surten efecto** — se editan en un
+lado y el mundo pregunta en otro. En la misma pantalla tienen que decir algo
+como `ns1.dns-parking.com` / `ns2.dns-parking.com`. Desde afuera:
+
+```bash
+dig +short NS symphomed.com
+```
+
+Tarda entre 10 minutos y 2 horas (Hostinger avisa que puede llegar a 24).
+Para saber si ya llegaron los tres:
 
 ```bash
 for d in symphomed.com www.symphomed.com app.symphomed.com; do
