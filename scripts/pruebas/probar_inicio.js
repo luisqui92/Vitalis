@@ -25,7 +25,7 @@ const vista = fs.readFileSync(path.join(RAIZ, "vistas", "inicio.html"), "utf8");
 // La CSP de Symphomed solo admite 'self': una fuente de Google cae en silencio
 // y la página queda con la tipografía del sistema, sin que nadie se entere.
 verificar("no pide fuentes a Google", !/fonts\.googleapis|fonts\.gstatic/.test(vista));
-verificar("usa las que ya están alojadas", /\/fonts\/(fraunces|inter)-variable\.woff2/.test(vista));
+verificar("usa la que ya está alojada", /\/fonts\/inter-variable\.woff2/.test(vista));
 verificar("el script lleva el marcador del nonce", vista.includes('<script nonce="__NONCE__"'));
 verificar("vive en vistas/, no en public/",
   !fs.existsSync(path.join(RAIZ, "public", "inicio.html")));
@@ -63,7 +63,7 @@ verificar("el botón de repetir existe", /id="repetir"/.test(vista));
     req.end();
   });
 
-  const esLanding = (r) => /Terminá la consulta/.test(r.texto);
+  const esLanding = (r) => /Escribirla, diez/.test(r.texto);
   const esApp = (r) => /LA APLICACION/.test(r.texto);
 
   console.log("\n── 3. La raíz, según el dominio ──");
