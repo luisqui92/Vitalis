@@ -45,11 +45,22 @@ const PLANES = {
 // El precio de un mes, por moneda. Se lee del entorno para poder cambiarlo
 // sin desplegar: un precio metido en el código es un precio que hay que
 // programar para corregir.
+// Cada plan mensual tiene que valer lo mismo que un número redondo de
+// consultas sueltas, porque ese número ES el argumento de venta: a Bs 12 la
+// consulta, Bs 900 son 75 consultas — el punto exacto desde el que conviene
+// el plan, y el que dice la página de symphomed.com. Si se cambia uno de los
+// dos precios sin el otro, la web pasa a mentir.
+//
+//   BOB: 90000 ÷ 1200 = 75 consultas
+//   BRL: 40000 ÷ 1000 = 40 consultas
+const PLAN_MENSUAL_POR_DEFECTO = { BOB: 90000, BRL: 40000 };
+
 function precioMensual(moneda) {
   const m = monedas.normalizar(moneda);
-  const porDefecto = m === "BRL" ? 40000 : 40000;   // R$ 400,00 · Bs 400,00
   const env = Number(process.env[`PLAN_MENSUAL_CENTAVOS_${m}`]);
-  return Number.isFinite(env) && env > 0 ? env : porDefecto;
+  return Number.isFinite(env) && env > 0
+    ? env
+    : (PLAN_MENSUAL_POR_DEFECTO[m] || PLAN_MENSUAL_POR_DEFECTO.BOB);
 }
 
 // Lo que cuesta contratar cada plan, ya con el mes gratis aplicado.

@@ -35,6 +35,17 @@ console.log("\n── 2. Dice lo que hay que decir ──");
 // hace su trabajo, y las cuatro se borran fácil en una edición apurada.
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));
 verificar("dice los precios", /Bs\s*12/.test(vista) && /Bs\s*900/.test(vista));
+
+// Y que los precios que anuncia sean los que de verdad cobra. Esto ya se
+// desincronizó una vez: la página decía Bs 900 y el código cobraba Bs 400,
+// porque el precio boliviano heredaba del brasileño. Un médico leía un número
+// en la web y veía otro adentro — y eso, en la primera venta, no se recupera.
+const monedas = require(path.join(RAIZ, "services", "monedas"));
+const suscripciones = require(path.join(RAIZ, "services", "suscripciones"));
+const consultaBo = monedas.config("BOB").precioConsulta;
+const planBo = suscripciones.precioMensual("BOB");
+verificar(`  ...y el Bs ${consultaBo / 100} es el que cobra de verdad`, /Bs\s*12\b/.test(vista) === (consultaBo === 1200));
+verificar(`  ...y el Bs ${planBo / 100} del plan también`, /Bs\s*900\b/.test(vista) === (planBo === 90000));
 verificar("y las 4 consultas de cortesía", /4 consultas/.test(vista));
 verificar("tiene el apartado de prueba", /Empezar la prueba/.test(vista));
 

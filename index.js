@@ -94,7 +94,23 @@ app.use(helmet({
   },
 }));
 
-app.use(express.json({ limit: "10mb" }));
+// El cuerpo CRUDO hace falta para verificar la firma de Meta: el HMAC se
+// calcula sobre los bytes exactos que mandaron, y JSON.parse + JSON.stringify
+// no los devuelve iguales (cambia el orden de las claves, los espacios y el
+// escapado de los acentos). Una vez parseado, la firma ya no se puede
+// comprobar nunca más — por eso se captura acá y no en la ruta.
+//
+// Se guarda SOLO para el webhook: quedarse con una copia de cada cuerpo de
+// hasta 10 MB en todos los pedidos —las subidas de estudios entre ellos— es
+// duplicar la memoria por una ruta que recibe kilobytes.
+app.use(express.json({
+  limit: "10mb",
+  verify: (req, _res, buf) => {
+    if (String(req.originalUrl || "").startsWith("/webhook/meta-whatsapp")) {
+      req.cuerpoCrudo = buf;
+    }
+  },
+}));
 
 // ─── TIEMPO REAL ──────────────────────────────────────────────────────────
 // Avisa a las otras sesiones abiertas del mismo médico (celular + compu a

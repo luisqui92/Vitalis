@@ -45,6 +45,18 @@ console.log("\n── 2. El plan se paga solo a las 40 consultas ──");
 const equivale = precios.mensual / monedas.config("BRL").precioConsulta;
 verificar(`son ${equivale} consultas`, equivale === 40);
 
+console.log("\n── 2b. Y en Bolivia, a las 75 ──");
+// Esto no es una preferencia de números redondos: symphomed.com dice
+// "Bs 900 al mes" y "conviene desde 75 consultas al mes". Los dos salen de
+// acá. Durante un tiempo el precio boliviano fue Bs 400 —heredado del
+// brasileño por un ternario con las dos ramas iguales— mientras la página
+// anunciaba Bs 900, así que la web y el producto decían cosas distintas.
+const preciosBo = suscripciones.estado({ moneda: "BOB" }, HOY).precios;
+verificar("el plan mensual cuesta Bs 900,00", preciosBo.mensual === 90000);
+verificar("  ...y NO es el precio brasileño", preciosBo.mensual !== precios.mensual);
+const equivaleBo = preciosBo.mensual / monedas.config("BOB").precioConsulta;
+verificar(`son ${equivaleBo} consultas — lo que anuncia la página`, equivaleBo === 75);
+
 console.log("\n── 3. Vigente es una fecha, no un booleano guardado ──");
 verificar("un plan que vence mañana está vigente", suscripciones.vigente(conPlanHasta("2026-09-08T12:00:00Z"), HOY));
 verificar("uno que venció ayer NO", !suscripciones.vigente(conPlanHasta("2026-09-06T12:00:00Z"), HOY));

@@ -39,6 +39,16 @@ const CONFIG = {
   WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN || "",
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || "",
+  // WHATSAPP_APP_SECRET: el "App Secret" de la app de Meta (Configuración →
+  // Básica → Mostrar). NO es el token de acceso ni el verify token.
+  //
+  // Con esto se comprueba la firma X-Hub-Signature-256 que Meta pone en cada
+  // entrega. Sin comprobarla, /webhook/meta-whatsapp le cree a cualquiera:
+  // basta un POST con el número de un paciente adentro para cancelarle la
+  // cita, llenar la agenda de citas falsas o hacernos gastar en IA sin
+  // límite. El verify token NO sirve para esto — Meta solo lo usa una vez,
+  // al dar de alta la URL, y nunca más.
+  WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET || "",
 
   // "Súper número": un mismo WhatsApp que reparte entre varios consultorios
   // propios (uno por especialidad) — el paciente primero elige cuál busca,
@@ -94,6 +104,12 @@ if (!process.env.ASSEMBLYAI_API_KEY) {
 if (process.env.SALUD_WHATSAPP_MEDICO_PHONE && !process.env.APP_URL) {
   log.error("❌ APP_URL no está definido — el link de reserva que manda el WhatsApp va a salir roto (sin dominio). Definilo como, por ejemplo: APP_URL=https://salud.chatgo.ia.bo");
 }
+// Este tiene que gritar al arrancar y no al primer mensaje: sin el App Secret
+// el webhook rechaza TODO, así que las reservas por WhatsApp quedan mudas. El
+// síntoma —pacientes que escriben y nadie contesta— tarda días en llegar.
+if (process.env.WHATSAPP_TOKEN && !process.env.WHATSAPP_APP_SECRET) {
+  log.error("❌ WHATSAPP_APP_SECRET no está definido — el webhook va a RECHAZAR todos los mensajes y nadie va a poder reservar por WhatsApp. Está en Meta → tu app → Configuración → Básica → App Secret (Mostrar).");
+}
 
 // ─── VALIDACIÓN DE VARIABLES DE ENTORNO ─────────────────────────────────────
 function validateConfig() {
@@ -101,7 +117,7 @@ function validateConfig() {
   // revienta en el primer login/request autenticado con un error críptico en
   // vez de fallar limpio al arrancar.
   const required = ["MONGODB_URI", "OPENAI_KEY", "JWT_SECRET"];
-  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_ESPECIALIDADES_MEDICOS", "VAPI_PUBLIC_KEY", "VAPI_ASSISTANT_ID", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"];
+  const warned = ["ASSEMBLYAI_API_KEY", "SALUD_WHATSAPP_MEDICO_PHONE", "GOOGLE_SERVICE_ACCOUNT_JSON", "APP_URL", "VAPI_SERVER_SECRET", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_ESPECIALIDADES_MEDICOS", "VAPI_PUBLIC_KEY", "VAPI_ASSISTANT_ID", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"];
   const missing = required.filter(k => !process.env[k]);
   const warnings = warned.filter(k => !process.env[k]);
 

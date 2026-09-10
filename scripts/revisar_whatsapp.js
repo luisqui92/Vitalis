@@ -49,6 +49,22 @@ async function pedir(ruta, params = {}) {
   console.log(`  Phone Number ID : ${CONFIG.WHATSAPP_PHONE_NUMBER_ID}`);
   console.log(`  Token           : ${GRIS(CONFIG.WHATSAPP_TOKEN.slice(0, 12) + "…")}`);
 
+  // Este decide si los mensajes ENTRANTES se procesan, así que va antes de
+  // hablar con Meta. Sin él, mandar sigue funcionando y recibir no: el médico
+  // manda recordatorios sin problema y ningún paciente logra reservar. Los
+  // dos síntomas no parecen tener nada que ver entre sí.
+  console.log(`  App Secret      : ${CONFIG.WHATSAPP_APP_SECRET
+    ? VERDE("configurado") : ROJO("FALTA — nadie puede reservar por WhatsApp")}`);
+  if (!CONFIG.WHATSAPP_APP_SECRET) {
+    console.log("\n  " + ROJO("El webhook rechaza TODOS los mensajes entrantes con 503."));
+    console.log("  Con él se comprueba la firma que Meta pone en cada entrega. Sin");
+    console.log("  comprobarla, cualquiera que sepa la URL puede cancelarle la cita a");
+    console.log("  un paciente o llenarle la agenda al médico — por eso no se saltea.\n");
+    console.log("  Está en developers.facebook.com → tu app → Configuración → Básica");
+    console.log("  → App Secret → Mostrar. NO es el token de acceso ni el verify token.\n");
+    console.log("  " + GRIS("WHATSAPP_APP_SECRET=... en el .env, y después: pm2 restart vitalis\n"));
+  }
+
   // ─── El número ───────────────────────────────────────────────────────────
   let numero;
   try {
