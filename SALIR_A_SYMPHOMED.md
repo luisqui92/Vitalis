@@ -9,32 +9,32 @@ Al final de esto:
 |---|---|
 | `symphomed.com` | La página de venta |
 | `symphomed.com/app` | La aplicación (login del médico) |
-| `salud.chatgo.ia.bo` | La aplicación, **igual que siempre** |
-| `salud.chatgo.ia.bo/app` | También la aplicación |
+| `salud.chatgo.ia.bo/…` | Redirige a `symphomed.com/…`, conservando el camino |
 
 ---
 
-## Lo que NO se hace, y por qué
+## Por qué la mudanza se hace AHORA y no después
 
-**`salud.chatgo.ia.bo` no se apaga ni se redirige.** No es apego al dominio
-viejo: es que ese dominio ya está escrito adentro de links que viven en el
-WhatsApp de pacientes reales.
+Este procedimiento incluye apagar el dominio viejo. Eso solo es seguro
+mientras **no haya nadie usando la plataforma**, que es la situación hoy.
 
-- `salud.chatgo.ia.bo/reservar.html?token=…` — cada link de reserva enviado
-- `salud.chatgo.ia.bo/informe/<token>` — cada informe que un médico compartió
-- `salud.chatgo.ia.bo/teleconsulta/<token>` — cada sala de teleconsulta
+Desde el primer médico deja de serlo, porque `salud.chatgo.ia.bo` empieza a
+quedar escrito adentro de links que viven en el WhatsApp de pacientes:
 
-Si el dominio deja de resolver, todos esos links mueren a la vez y no hay
-forma de avisarle a nadie: el paciente toca y le sale un error del navegador.
+- `/reservar.html?token=…` — cada link de reserva enviado
+- `/informe/<token>` — cada informe que un médico compartió
+- `/teleconsulta/<token>` — cada sala de teleconsulta
 
-Los dos dominios apuntan al mismo servidor y sirven lo mismo. Lo único que
-cambia de dueño es **la raíz**, y solo en symphomed.com.
+Esos links no se pueden actualizar: ya están en el celular de otra persona.
+Por eso la redirección del paso 4 usa `$request_uri` — conserva el camino
+completo, así un link viejo sigue llegando a donde tiene que llegar en vez de
+caer en la portada. Con esa línea puesta, mudarse no rompe nada ni hoy ni
+dentro de un año.
 
-**Los médicos que ya estaban con sesión abierta van a tener que entrar de
-nuevo** si pasan a usar symphomed.com. El token vive en el `localStorage` del
-navegador, y el navegador lo guarda por dominio: lo que está guardado bajo
-salud.chatgo.ia.bo no existe bajo symphomed.com. No es un error y no se puede
-evitar — conviene avisarles antes.
+**Lo que no sobrevive a la mudanza son las sesiones abiertas.** El token vive
+en el `localStorage`, y el navegador lo guarda por dominio: lo guardado bajo
+salud.chatgo.ia.bo no existe bajo symphomed.com. Hoy no afecta a nadie. El
+día que haya médicos trabajando, este paso se avisa antes.
 
 ---
 
@@ -95,9 +95,8 @@ WHATSAPP_APP_SECRET=el_valor_que_copiaste
 APP_URL=https://symphomed.com
 ```
 
-`APP_URL` es lo que decide con qué dominio salen los links **nuevos** de
-reserva, informes y teleconsulta. Los ya enviados no cambian, y siguen
-funcionando porque el dominio viejo sigue vivo.
+`APP_URL` es lo que decide con qué dominio salen los links de reserva,
+informes y teleconsulta. De acá en adelante salen todos con symphomed.com.
 
 ```bash
 pm2 restart vitalis
@@ -117,7 +116,14 @@ La línea `App Secret` tiene que decir `configurado` en verde.
 
 ## 4. nginx y el certificado
 
-Agregá los dos nombres al `server_name` que ya existe, sin sacar el viejo:
+Se hace en **dos tandas**, y el orden no es intercambiable: el certificado de
+symphomed.com hay que sacarlo mientras el dominio viejo todavía atiende
+normal. Si se pone la redirección primero, certbot pide la validación, nginx
+le contesta con un 301 y el certificado no sale.
+
+### 4a. Primero, que symphomed.com funcione
+
+Agregá los dos nombres al `server_name` que ya existe, **sin sacar el viejo**:
 
 ```nginx
 server_name salud.chatgo.ia.bo symphomed.com www.symphomed.com;
@@ -129,31 +135,69 @@ sudo certbot --nginx -d symphomed.com -d www.symphomed.com
 ```
 
 certbot necesita que el DNS ya esté propagado (paso 2): valida pidiéndole al
-dominio que le conteste. Se renueva solo.
+dominio que le conteste.
+
+**Comprobá que anda antes de seguir:**
+
+```bash
+curl -sI https://symphomed.com | head -1                        # 200
+curl -s  https://symphomed.com | grep -c "En qué atendés"        # 1 → la página de venta
+curl -s  https://symphomed.com/app | grep -c "<title>"           # 1 → la aplicación
+```
+
+Si alguna no da eso, **no sigas al 4b**: con la redirección puesta ya no vas
+a tener el dominio viejo para volver.
+
+### 4b. Recién ahora, mudar el dominio viejo
+
+Sacá `salud.chatgo.ia.bo` del `server_name` de arriba y dale su propio bloque:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name salud.chatgo.ia.bo;
+
+    # El certificado del dominio viejo sigue haciendo falta: sin él el
+    # navegador muestra la advertencia de seguridad ANTES de leer el 301,
+    # y el visitante nunca llega a la redirección.
+    ssl_certificate     /etc/letsencrypt/live/salud.chatgo.ia.bo/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/salud.chatgo.ia.bo/privkey.pem;
+
+    # $request_uri conserva el camino Y los parámetros. Sin él, un link como
+    # /informe/abc123 caería en la portada de symphomed.com y el paciente no
+    # vería su informe. Hoy no hay links viejos dando vueltas; el día que los
+    # haya, esta línea es la diferencia entre que anden y que no.
+    return 301 https://symphomed.com$request_uri;
+}
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ## 5. Comprobar, en este orden
 
 ```bash
-curl -sI https://symphomed.com | head -1                    # 200
-curl -s  https://symphomed.com | grep -c "En qué atendés"    # 1 → la página de venta
-curl -s  https://symphomed.com/app | grep -c "<title>"       # 1 → la aplicación
-curl -s  https://salud.chatgo.ia.bo | grep -c "En qué atendés" # 0 → sigue la app, NO la venta
+curl -sI https://symphomed.com | head -1                         # 200
+curl -s  https://symphomed.com | grep -c "En qué atendés"         # 1 → la página de venta
+curl -s  https://symphomed.com/app | grep -c "<title>"            # 1 → la aplicación
+
+# La mudanza: el dominio viejo redirige y conserva el camino
+curl -sI https://salud.chatgo.ia.bo/app | grep -i "^location"
+# → location: https://symphomed.com/app     ← con el /app, no pelado
 ```
 
-**La cuarta es la que importa.** Si devuelve 1, la página de venta se quedó
-con la raíz del dominio de los médicos y todos perdieron el login. En ese
-caso, revertí:
+**La última es la que importa.** Si dice `https://symphomed.com/` a secas, te
+falta `$request_uri` y todos los links con token van a caer en la portada.
 
-```bash
-pm2 restart vitalis --update-env
-```
+Y si `symphomed.com` te muestra la aplicación en vez de la página de venta,
+revisá `DOMINIOS_LANDING` en el `.env`: si no está definida, el valor por
+defecto ya es el correcto (solo symphomed.com y www), así que lo más probable
+es que esté definida y le falte el dominio.
 
-y revisá `DOMINIOS_LANDING` en el `.env` (si no está, el valor por defecto ya
-es el correcto: solo symphomed.com y www).
-
-Y desde el celular, la prueba que de verdad cuenta: abrir `symphomed.com`,
-contestar las tres preguntas y tocar el botón de WhatsApp. Tiene que abrir un
-chat con **+591 64637067** y el mensaje ya escrito.
+Al final, desde el celular, la prueba que de verdad cuenta: abrir
+`symphomed.com`, contestar las tres preguntas y tocar el botón de WhatsApp.
+Tiene que abrir un chat con **+591 64637067** y el mensaje ya escrito.
 
 ---
 
@@ -161,9 +205,6 @@ chat con **+591 64637067** y el mensaje ya escrito.
 
 No hace falta el día del lanzamiento:
 
-- **Redirigir** `salud.chatgo.ia.bo` → `symphomed.com` conservando el camino
-  (`return 301 https://symphomed.com$request_uri;`). Recién cuando ya no
-  queden links viejos circulando, y nunca sin conservar `$request_uri`.
 - **Poner `NODE_ENV=production`** en el `.env`. Hoy Express corre en modo
   desarrollo y su manejador de errores por defecto devuelve el stack trace
   completo.
