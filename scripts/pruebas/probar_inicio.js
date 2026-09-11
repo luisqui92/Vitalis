@@ -55,6 +55,29 @@ verificar(`están los ${laminas} módulos`, laminas === 7);
  "OFTALMOLOGÍA", "IMÁGENES Y LABORATORIO", "SYMPHOMED PET"]
   .forEach(m => verificar(`  módulo «${m}»`, vista.includes(m)));
 
+console.log("\n── 1c. Las fichas de tecnología, sin regalar el cómo ──");
+// Cada ficha dice QUÉ LOGRA, nunca cómo está hecho. Nombrar un proveedor
+// —el de transcripción, el del modelo, el de la receta digital— le entrega a
+// un competidor el atajo entero y no le aporta nada al médico que está
+// decidiendo si probar. Por eso se comprueba, y no se deja a la memoria.
+["Inteligencia artificial", "Voz", "Lenguaje clínico", "Datos estructurados",
+ "Integraciones", "Seguridad"].forEach(f =>
+  verificar(`ficha «${f}»`, vista.includes(`<b>${f}</b>`)));
+
+const visible = vista.replace(/<style>[\s\S]*?<\/style>/g, "")
+  .replace(/<script[\s\S]*?<\/script>/g, "")
+  .replace(/<!--[\s\S]*?-->/g, "");
+const proveedores = ["assemblyai", "openai", "gpt-", "anthropic", "memed", "vapi", "daily.co", "twilio"];
+const filtrados = proveedores.filter(p => visible.toLowerCase().includes(p));
+verificar("no se nombra a ningún proveedor en el texto visible", filtrados.length === 0);
+if (filtrados.length) console.log("   aparecen:", filtrados.join(", "));
+
+// El resumen tiene que estar en el HTML, no inyectado por el script: así lo
+// lee Google y así se llega con el teclado aunque el script no corra.
+verificar("los resúmenes están en el HTML, no los pone el script",
+  /<b>Seguridad<\/b><span>Cada médico ve solo a sus pacientes/.test(vista));
+verificar("se abren también con el teclado", /\.tecno:focus-visible\b/.test(vista));
+
 console.log("\n── 2. Dice lo que hay que decir ──");
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));
 verificar("está en español", /lang="es"/.test(vista) && /Historia clínica|historia clínica/.test(vista));

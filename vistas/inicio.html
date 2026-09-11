@@ -83,6 +83,45 @@ footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;just
      Dos píxeles menos de cuerpo le devuelven el margen. */
   .hero h1{font-size:38px;letter-spacing:-2px}
 }
+/* ── Las fichas de tecnología ─────────────────────────────────────────────
+   Tres columnas y no seis: con seis, cada ficha medía 185px de ancho y el
+   texto no entraba sin quedar ilegible.
+
+   El resumen está SIEMPRE en el HTML, nunca escondido por JavaScript. Se
+   revela al pasar el cursor, al tabular y al tocar (por la clase que agrega
+   el script). Así lo lee Google, y si el script no corre se sigue pudiendo
+   llegar a todo con el teclado. */
+.tecnos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+/* La altura se COLAPSA de verdad con grid-template-rows 0fr → 1fr. Con
+   opacity:0 a secas el texto sigue ocupando su lugar, y las fichas cerradas
+   quedaban como cajas altas y vacías con una etiqueta arriba. */
+.tecno{
+  display:grid;grid-template-rows:auto 0fr;text-align:left;
+  background:#071a25;border:1px solid #214354;border-radius:12px;
+  padding:20px;color:#fff;font-family:inherit;cursor:pointer;
+  transition:grid-template-rows .25s,border-color .2s,background-color .2s;
+}
+.tecno:hover,.tecno[aria-expanded="true"]{border-color:#3f9dbe;background:#08202e}
+.tecno:focus-visible{outline:2px solid #49d8fb;outline-offset:2px}
+.tecno b{font-size:14px}
+.tecno span{
+  overflow:hidden;color:#a8bdc9;font-size:12px;line-height:1.65;
+  opacity:0;transition:opacity .2s;
+}
+.tecno:hover,.tecno:focus-visible,.tecno[aria-expanded="true"]{grid-template-rows:auto 1fr}
+.tecno:hover span,.tecno:focus-visible span,.tecno[aria-expanded="true"] span{opacity:1;padding-top:11px}
+/* Sin JavaScript no hay clase que alternar, así que el resumen se muestra al
+   pasar el cursor y al tabular — que es lo que ya hace el CSS de arriba. */
+@media(max-width:900px){.tecnos{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){
+  /* En el celular no hay cursor, y abrir de a una obliga a tocar seis veces
+     para leer seis párrafos cortos. Se muestran todos, siempre. */
+  .tecnos{grid-template-columns:1fr}
+  .tecno{grid-template-rows:auto 1fr;cursor:default}
+  .tecno span{opacity:1;padding-top:11px}
+}
+@media(prefers-reduced-motion:reduce){.tecno,.tecno b,.tecno span{transition:none}}
+
 /* ── El carrusel de módulos ───────────────────────────────────────────────
    Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
    sin JavaScript. Las flechas y los puntos son una mejora encima. */
@@ -287,8 +326,14 @@ html{overflow-x:hidden}
 </div></section>
 
 <section class="dark" id="tecnologia"><div class="container"><div class="section-head"><div class="eyebrow">TECNOLOGÍA</div><h2>Construido para la salud.</h2><p>Inteligencia artificial, voz, datos clínicos estructurados e integraciones, en una sola plataforma.</p></div>
-<div class="specialties"><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Inteligencia artificial</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Voz</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Lenguaje clínico</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Datos estructurados</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">API</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Seguridad</div></div>
-</div></section>
+<div class="tecnos" id="tecnos">
+<button class="tecno" type="button" aria-expanded="true"><b>Inteligencia artificial</b><span>Reconoce lo que importa de una conversación y lo ordena como nota clínica: motivo, antecedentes, examen y plan. Y aprende de las correcciones de cada médico, así que la nota se parece cada vez más a la suya y menos a una plantilla.</span></button>
+<button class="tecno" type="button" aria-expanded="false"><b>Voz</b><span>Transcribe la consulta mientras ocurre, con el vocabulario que una transcripción común no reconoce: nombres de fármacos, dosis, unidades y términos clínicos. Sin dictar y sin hablarle a la computadora: es la consulta normal.</span></button>
+<button class="tecno" type="button" aria-expanded="false"><b>Lenguaje clínico</b><span>Distingue lo que dijo el paciente de lo que observó el médico, separa los antecedentes de los hallazgos de hoy y entiende las negaciones —«sin fiebre» no es lo mismo que «fiebre»—. Ahí es donde una transcripción se vuelve una historia clínica.</span></button>
+<button class="tecno" type="button" aria-expanded="false"><b>Datos estructurados</b><span>Cada dato queda en su campo y no suelto en un párrafo. Por eso la presión de hoy se grafica junto a las de los controles anteriores, un estudio pedido puede figurar como pendiente, y una dosis se puede comparar con la anterior.</span></button>
+<button class="tecno" type="button" aria-expanded="false"><b>Integraciones</b><span>El consultorio no queda aislado: la agenda se sincroniza con el calendario, el equipo de rayos sube los estudios directo a la ficha del paciente, y en Brasil la receta sale por el sistema de firma digital que exige la norma.</span></button>
+<button class="tecno" type="button" aria-expanded="false"><b>Seguridad</b><span>Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed.</span></button>
+</div></div></section>
 
 <section class="final" id="demo"><div class="container"><div class="eyebrow">EMPEZAR</div><h2>En la salud se conversa todos los días.<br><span style="color:#28c9f4">Symphomed lo convierte en historia clínica.</span></h2><p>Escríbanos por WhatsApp y le mostramos cómo funciona con un caso real, en quince minutos. Las primeras 4 consultas no se cobran.</p><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos por WhatsApp →</a></div></section>
 
@@ -358,6 +403,24 @@ html{overflow-x:hidden}
   }, { passive: true });
   window.addEventListener("resize", pintar);
   pintar();
+})();
+
+// Las fichas de tecnología. En la compu se abren solas al pasar el cursor
+// (puro CSS); esto agrega el toque, que en una pantalla táctil es la única
+// forma de "pasar el cursor" — y no existe.
+(function () {
+  var caja = document.getElementById("tecnos");
+  if (!caja) return;
+  var fichas = [].slice.call(caja.children);
+  fichas.forEach(function (f) {
+    f.addEventListener("click", function () {
+      var abierta = f.getAttribute("aria-expanded") === "true";
+      // Se cierran las otras: dos resúmenes abiertos a la vez en una grilla
+      // de tres columnas descuadran las alturas de la fila.
+      fichas.forEach(function (o) { o.setAttribute("aria-expanded", "false"); });
+      f.setAttribute("aria-expanded", abierta ? "false" : "true");
+    });
+  });
 })();
 </script>
 </body>

@@ -78,6 +78,45 @@ css += `
      Dos píxeles menos de cuerpo le devuelven el margen. */
   .hero h1{font-size:38px;letter-spacing:-2px}
 }
+/* ── Las fichas de tecnología ─────────────────────────────────────────────
+   Tres columnas y no seis: con seis, cada ficha medía 185px de ancho y el
+   texto no entraba sin quedar ilegible.
+
+   El resumen está SIEMPRE en el HTML, nunca escondido por JavaScript. Se
+   revela al pasar el cursor, al tabular y al tocar (por la clase que agrega
+   el script). Así lo lee Google, y si el script no corre se sigue pudiendo
+   llegar a todo con el teclado. */
+.tecnos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+/* La altura se COLAPSA de verdad con grid-template-rows 0fr → 1fr. Con
+   opacity:0 a secas el texto sigue ocupando su lugar, y las fichas cerradas
+   quedaban como cajas altas y vacías con una etiqueta arriba. */
+.tecno{
+  display:grid;grid-template-rows:auto 0fr;text-align:left;
+  background:#071a25;border:1px solid #214354;border-radius:12px;
+  padding:20px;color:#fff;font-family:inherit;cursor:pointer;
+  transition:grid-template-rows .25s,border-color .2s,background-color .2s;
+}
+.tecno:hover,.tecno[aria-expanded="true"]{border-color:#3f9dbe;background:#08202e}
+.tecno:focus-visible{outline:2px solid #49d8fb;outline-offset:2px}
+.tecno b{font-size:14px}
+.tecno span{
+  overflow:hidden;color:#a8bdc9;font-size:12px;line-height:1.65;
+  opacity:0;transition:opacity .2s;
+}
+.tecno:hover,.tecno:focus-visible,.tecno[aria-expanded="true"]{grid-template-rows:auto 1fr}
+.tecno:hover span,.tecno:focus-visible span,.tecno[aria-expanded="true"] span{opacity:1;padding-top:11px}
+/* Sin JavaScript no hay clase que alternar, así que el resumen se muestra al
+   pasar el cursor y al tabular — que es lo que ya hace el CSS de arriba. */
+@media(max-width:900px){.tecnos{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){
+  /* En el celular no hay cursor, y abrir de a una obliga a tocar seis veces
+     para leer seis párrafos cortos. Se muestran todos, siempre. */
+  .tecnos{grid-template-columns:1fr}
+  .tecno{grid-template-rows:auto 1fr;cursor:default}
+  .tecno span{opacity:1;padding-top:11px}
+}
+@media(prefers-reduced-motion:reduce){.tecno,.tecno b,.tecno span{transition:none}}
+
 /* ── El carrusel de módulos ───────────────────────────────────────────────
    Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
    sin JavaScript. Las flechas y los puntos son una mejora encima. */
@@ -287,12 +326,8 @@ const T = [
   ["Built for intelligent healthcare.", "Construido para la salud."],
   ["AI, voice, structured clinical data and integrations brought together in one healthcare intelligence platform.",
    "Inteligencia artificial, voz, datos clínicos estructurados e integraciones, en una sola plataforma."],
-  [">AI Intelligence<", ">Inteligencia artificial<"],
-  [">Voice<", ">Voz<"],
-  [">Clinical NLP<", ">Lenguaje clínico<"],
-  [">Structured Data<", ">Datos estructurados<"],
-  [">API<", ">API<"],
-  [">Security<", ">Seguridad<"],
+  // Las seis fichas de tecnología se reemplazan enteras más abajo: ahora se
+  // abren y cuentan qué hace cada una.
 
   // — Cierre —
   ["GLOBAL HEALTHCARE INTELLIGENCE", "EMPEZAR"],
@@ -421,6 +456,45 @@ ${MODULOS.map((m, i) => `<article class="modulo" aria-label="${i + 1} de ${MODUL
 </div>
 </div>
 </section>`;
+
+// ─── Las fichas de tecnología, que se abren ────────────────────────────────
+//
+// ═══ QUÉ SE PUEDE CONTAR Y QUÉ NO ══════════════════════════════════════════
+//
+// Cada ficha dice QUÉ LOGRA y nunca CÓMO ESTÁ HECHO. No aparece el nombre de
+// ningún proveedor —ni el de transcripción, ni el del modelo, ni el de la
+// receta digital— ni una sola pista de arquitectura. Eso es exactamente lo
+// que un competidor necesitaría para copiar, y no aporta nada al médico que
+// está decidiendo si probar.
+//
+// Lo que sí se muestra son capacidades difíciles de fingir: reconocer
+// negaciones, distinguir lo que dijo el paciente de lo que observó el
+// médico, entender dosis y unidades. Un competidor que lea esto sabe que hay
+// trabajo hecho, pero no se lleva ni un atajo.
+const TECNO = [
+  ["Inteligencia artificial",
+   "Reconoce lo que importa de una conversación y lo ordena como nota clínica: motivo, antecedentes, examen y plan. Y aprende de las correcciones de cada médico, así que la nota se parece cada vez más a la suya y menos a una plantilla."],
+  ["Voz",
+   "Transcribe la consulta mientras ocurre, con el vocabulario que una transcripción común no reconoce: nombres de fármacos, dosis, unidades y términos clínicos. Sin dictar y sin hablarle a la computadora: es la consulta normal."],
+  ["Lenguaje clínico",
+   "Distingue lo que dijo el paciente de lo que observó el médico, separa los antecedentes de los hallazgos de hoy y entiende las negaciones —«sin fiebre» no es lo mismo que «fiebre»—. Ahí es donde una transcripción se vuelve una historia clínica."],
+  ["Datos estructurados",
+   "Cada dato queda en su campo y no suelto en un párrafo. Por eso la presión de hoy se grafica junto a las de los controles anteriores, un estudio pedido puede figurar como pendiente, y una dosis se puede comparar con la anterior."],
+  ["Integraciones",
+   "El consultorio no queda aislado: la agenda se sincroniza con el calendario, el equipo de rayos sube los estudios directo a la ficha del paciente, y en Brasil la receta sale por el sistema de firma digital que exige la norma."],
+  ["Seguridad",
+   "Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed."],
+];
+
+const FICHAS = `<div class="tecnos" id="tecnos">${TECNO.map(([t, d], i) => `
+<button class="tecno" type="button" aria-expanded="${i === 0 ? "true" : "false"}"><b>${t}</b><span>${d}</span></button>`).join("")}
+</div>`;
+
+// Se reemplaza la grilla de seis fichas planas del diseño.
+const iTec = cuerpo.indexOf('<div class="specialties"><div class="specialty" style="background:#071a25');
+const fTec = cuerpo.indexOf("</div>\n</div></section>", iTec);
+if (iTec < 0) throw new Error("no encontré las fichas de tecnología del diseño original");
+cuerpo = cuerpo.slice(0, iTec) + FICHAS + cuerpo.slice(cuerpo.indexOf("</div></section>", iTec));
 
 // Se reemplaza el bloque entero del diseño, con sus dos paneles fijos.
 const iSplit = cuerpo.indexOf('<section class="split" id="solutions">');
@@ -578,6 +652,24 @@ ${css}
   }, { passive: true });
   window.addEventListener("resize", pintar);
   pintar();
+})();
+
+// Las fichas de tecnología. En la compu se abren solas al pasar el cursor
+// (puro CSS); esto agrega el toque, que en una pantalla táctil es la única
+// forma de "pasar el cursor" — y no existe.
+(function () {
+  var caja = document.getElementById("tecnos");
+  if (!caja) return;
+  var fichas = [].slice.call(caja.children);
+  fichas.forEach(function (f) {
+    f.addEventListener("click", function () {
+      var abierta = f.getAttribute("aria-expanded") === "true";
+      // Se cierran las otras: dos resúmenes abiertos a la vez en una grilla
+      // de tres columnas descuadran las alturas de la fila.
+      fichas.forEach(function (o) { o.setAttribute("aria-expanded", "false"); });
+      f.setAttribute("aria-expanded", abierta ? "false" : "true");
+    });
+  });
 })();
 </script>
 </body>
