@@ -75,8 +75,14 @@ if (filtrados.length) console.log("   aparecen:", filtrados.join(", "));
 // El resumen tiene que estar en el HTML, no inyectado por el script: así lo
 // lee Google y así se llega con el teclado aunque el script no corra.
 verificar("los resúmenes están en el HTML, no los pone el script",
-  /<b>Seguridad<\/b><span>Cada médico ve solo a sus pacientes/.test(vista));
-verificar("se abren también con el teclado", /\.tecno:focus-visible\b/.test(vista));
+  /<b>Seguridad<\/b><p>Cada médico ve solo a sus pacientes/.test(vista));
+verificar("se llega con el teclado", /\.tecno:focus-visible\b/.test(vista));
+// Sin el script el visitante tiene que poder leer los SEIS. Por eso el HTML
+// llega con los seis visibles y es el script el que oculta cinco: al revés
+// —cinco ocultos en el marcado— quien no ejecute JavaScript vería un solo
+// resumen y cinco pestañas que no hacen nada.
+verificar("y sin JavaScript se leen los seis",
+  !/<div class="det" data-oculto/.test(vista) && /\[data-oculto\]\{display:none\}/.test(vista));
 
 console.log("\n── 2. Dice lo que hay que decir ──");
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));

@@ -86,36 +86,38 @@ css += `
    revela al pasar el cursor, al tabular y al tocar (por la clase que agrega
    el script). Así lo lee Google, y si el script no corre se sigue pudiendo
    llegar a todo con el teclado. */
-.tecnos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
-/* La altura se COLAPSA de verdad con grid-template-rows 0fr → 1fr. Con
-   opacity:0 a secas el texto sigue ocupando su lugar, y las fichas cerradas
-   quedaban como cajas altas y vacías con una etiqueta arriba. */
+.tecnos{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .tecno{
-  display:grid;grid-template-rows:auto 0fr;text-align:left;
-  background:#071a25;border:1px solid #214354;border-radius:12px;
-  padding:20px;color:#fff;font-family:inherit;cursor:pointer;
-  transition:grid-template-rows .25s,border-color .2s,background-color .2s;
+  background:#071a25;border:1px solid #214354;border-radius:10px;
+  padding:15px 12px;color:#8fb0c2;font-family:inherit;font-size:12px;
+  line-height:1.35;cursor:pointer;transition:.2s;
 }
-.tecno:hover,.tecno[aria-expanded="true"]{border-color:#3f9dbe;background:#08202e}
+.tecno:hover{border-color:#3f9dbe;color:#fff}
+.tecno[aria-selected="true"]{border-color:#5bddfa;background:#0c2a3a;color:#fff}
 .tecno:focus-visible{outline:2px solid #49d8fb;outline-offset:2px}
-.tecno b{font-size:14px}
-.tecno span{
-  overflow:hidden;color:#a8bdc9;font-size:12px;line-height:1.65;
-  opacity:0;transition:opacity .2s;
+/* El alto mínimo es lo que evita que cambiar de pestaña mueva la página: el
+   panel no se achica con el resumen más corto ni salta con el más largo. */
+.tecno-panel{
+  margin-top:14px;background:#071a25;border:1px solid #214354;border-radius:12px;
+  padding:26px 28px;min-height:200px;
 }
-.tecno:hover,.tecno:focus-visible,.tecno[aria-expanded="true"]{grid-template-rows:auto 1fr}
-.tecno:hover span,.tecno:focus-visible span,.tecno[aria-expanded="true"] span{opacity:1;padding-top:11px}
+.det b{display:block;font-size:15px;color:#fff;margin-bottom:10px}
+.det p{color:#a8bdc9;font-size:14px;line-height:1.75;max-width:74ch;margin:0}
+/* Sin JavaScript se muestran los seis, uno debajo del otro: una lista, que se
+   lee bien, y ahí el filete separa. Con el script solo hay uno visible.
+   El :not() es necesario: display:none saca al elemento del dibujo pero NO de
+   la cadena de hermanos, así que un ".det + .det" pelado le ponía el filete
+   al único visible por tener cinco ocultos delante — una línea suelta arriba
+   del título, sin nada que separar. */
+.det:not([data-oculto]) + .det:not([data-oculto]){
+  margin-top:20px;padding-top:20px;border-top:1px solid #16323f;
+}
 /* Sin JavaScript no hay clase que alternar, así que el resumen se muestra al
    pasar el cursor y al tabular — que es lo que ya hace el CSS de arriba. */
-@media(max-width:900px){.tecnos{grid-template-columns:1fr 1fr}}
-@media(max-width:620px){
-  /* En el celular no hay cursor, y abrir de a una obliga a tocar seis veces
-     para leer seis párrafos cortos. Se muestran todos, siempre. */
-  .tecnos{grid-template-columns:1fr}
-  .tecno{grid-template-rows:auto 1fr;cursor:default}
-  .tecno span{opacity:1;padding-top:11px}
-}
-@media(prefers-reduced-motion:reduce){.tecno,.tecno b,.tecno span{transition:none}}
+@media(max-width:900px){.tecnos{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.tecnos{grid-template-columns:1fr 1fr}.tecno-panel{padding:20px}}
+@media(prefers-reduced-motion:reduce){.tecno{transition:none}}
+[data-oculto]{display:none}
 
 /* ── El carrusel de módulos ───────────────────────────────────────────────
    Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
@@ -486,9 +488,41 @@ const TECNO = [
    "Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed."],
 ];
 
-const FICHAS = `<div class="tecnos" id="tecnos">${TECNO.map(([t, d], i) => `
-<button class="tecno" type="button" aria-expanded="${i === 0 ? "true" : "false"}"><b>${t}</b><span>${d}</span></button>`).join("")}
-</div>`;
+// Seis pestañas arriba y UN panel abajo, en vez de seis fichas que crecen.
+//
+// La primera versión expandía la ficha en su lugar dentro de una grilla de
+// tres columnas. Eso descuadra la fila por definición: la que se abre estira
+// la fila entera y las otras dos quedan chiquitas con un hueco debajo. No hay
+// forma de acomodarlo — o se estiran todas (seis cajas altas y vacías) o
+// queda el hueco. El patrón entero estaba mal elegido.
+//
+// Con un panel aparte, las pestañas no cambian nunca de tamaño y el panel
+// tiene un alto mínimo, así que cambiar de una a otra no mueve nada de la
+// página.
+const FICHAS = `<div class="tecnos" id="tecnos">${TECNO.map(([t], i) => `
+<button class="tecno" type="button" aria-selected="${i === 0 ? "true" : "false"}">${t}</button>`).join("")}
+</div>
+<div class="tecno-panel" id="tecnoPanel">${TECNO.map(([t, d]) => `
+<div class="det"><b>${t}</b><p>${d}</p></div>`).join("")}
+</div>
+<script nonce="__NONCE__">
+// Va acá, pegado al panel, y no al final del documento: así se ejecuta apenas
+// el navegador termina de leer estas seis fichas y ANTES de dibujarlas. Al
+// final de la página también funcionaría, pero se vería un parpadeo con los
+// seis resúmenes abiertos.
+//
+// Y por eso el HTML llega con los seis visibles en vez de con cinco ocultos:
+// si el script no corre —CSP, error de sintaxis—, el visitante ve los seis
+// uno debajo del otro, que es una lista perfectamente legible. Al revés
+// vería uno solo y cinco pestañas que no hacen nada.
+(function () {
+  var p = document.getElementById("tecnoPanel");
+  if (!p) return;
+  [].slice.call(p.children).forEach(function (d, i) {
+    if (i) d.setAttribute("data-oculto", "");
+  });
+})();
+</script>`;
 
 // Se reemplaza la grilla de seis fichas planas del diseño.
 const iTec = cuerpo.indexOf('<div class="specialties"><div class="specialty" style="background:#071a25');
@@ -654,22 +688,35 @@ ${css}
   pintar();
 })();
 
-// Las fichas de tecnología. En la compu se abren solas al pasar el cursor
-// (puro CSS); esto agrega el toque, que en una pantalla táctil es la única
-// forma de "pasar el cursor" — y no existe.
+// Las pestañas de tecnología. Sin este script se ven los seis resúmenes uno
+// debajo del otro —una lista, que se lee bien—; con él, el panel muestra el
+// de la pestaña activa.
 (function () {
   var caja = document.getElementById("tecnos");
-  if (!caja) return;
-  var fichas = [].slice.call(caja.children);
-  fichas.forEach(function (f) {
-    f.addEventListener("click", function () {
-      var abierta = f.getAttribute("aria-expanded") === "true";
-      // Se cierran las otras: dos resúmenes abiertos a la vez en una grilla
-      // de tres columnas descuadran las alturas de la fila.
-      fichas.forEach(function (o) { o.setAttribute("aria-expanded", "false"); });
-      f.setAttribute("aria-expanded", abierta ? "false" : "true");
+  var panel = document.getElementById("tecnoPanel");
+  if (!caja || !panel) return;
+  var pestanas = [].slice.call(caja.children);
+  var detalles = [].slice.call(panel.children);
+  if (pestanas.length !== detalles.length) return;
+
+  function activar(i) {
+    pestanas.forEach(function (p, j) { p.setAttribute("aria-selected", j === i ? "true" : "false"); });
+    detalles.forEach(function (d, j) {
+      if (j === i) d.removeAttribute("data-oculto");
+      else d.setAttribute("data-oculto", "");
     });
+  }
+
+  pestanas.forEach(function (p, i) {
+    // mouseenter y no hover de CSS: el panel es un hermano y el resumen que
+    // hay que mostrar depende de CUÁL pestaña se señaló, no de si alguna lo
+    // está. Eso no se puede expresar en CSS sin acoplar los seis selectores.
+    p.addEventListener("mouseenter", function () { activar(i); });
+    p.addEventListener("focus", function () { activar(i); });
+    p.addEventListener("click", function () { activar(i); });
   });
+
+  activar(0);
 })();
 </script>
 </body>

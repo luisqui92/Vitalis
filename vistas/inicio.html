@@ -91,36 +91,38 @@ footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;just
    revela al pasar el cursor, al tabular y al tocar (por la clase que agrega
    el script). Así lo lee Google, y si el script no corre se sigue pudiendo
    llegar a todo con el teclado. */
-.tecnos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
-/* La altura se COLAPSA de verdad con grid-template-rows 0fr → 1fr. Con
-   opacity:0 a secas el texto sigue ocupando su lugar, y las fichas cerradas
-   quedaban como cajas altas y vacías con una etiqueta arriba. */
+.tecnos{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .tecno{
-  display:grid;grid-template-rows:auto 0fr;text-align:left;
-  background:#071a25;border:1px solid #214354;border-radius:12px;
-  padding:20px;color:#fff;font-family:inherit;cursor:pointer;
-  transition:grid-template-rows .25s,border-color .2s,background-color .2s;
+  background:#071a25;border:1px solid #214354;border-radius:10px;
+  padding:15px 12px;color:#8fb0c2;font-family:inherit;font-size:12px;
+  line-height:1.35;cursor:pointer;transition:.2s;
 }
-.tecno:hover,.tecno[aria-expanded="true"]{border-color:#3f9dbe;background:#08202e}
+.tecno:hover{border-color:#3f9dbe;color:#fff}
+.tecno[aria-selected="true"]{border-color:#5bddfa;background:#0c2a3a;color:#fff}
 .tecno:focus-visible{outline:2px solid #49d8fb;outline-offset:2px}
-.tecno b{font-size:14px}
-.tecno span{
-  overflow:hidden;color:#a8bdc9;font-size:12px;line-height:1.65;
-  opacity:0;transition:opacity .2s;
+/* El alto mínimo es lo que evita que cambiar de pestaña mueva la página: el
+   panel no se achica con el resumen más corto ni salta con el más largo. */
+.tecno-panel{
+  margin-top:14px;background:#071a25;border:1px solid #214354;border-radius:12px;
+  padding:26px 28px;min-height:200px;
 }
-.tecno:hover,.tecno:focus-visible,.tecno[aria-expanded="true"]{grid-template-rows:auto 1fr}
-.tecno:hover span,.tecno:focus-visible span,.tecno[aria-expanded="true"] span{opacity:1;padding-top:11px}
+.det b{display:block;font-size:15px;color:#fff;margin-bottom:10px}
+.det p{color:#a8bdc9;font-size:14px;line-height:1.75;max-width:74ch;margin:0}
+/* Sin JavaScript se muestran los seis, uno debajo del otro: una lista, que se
+   lee bien, y ahí el filete separa. Con el script solo hay uno visible.
+   El :not() es necesario: display:none saca al elemento del dibujo pero NO de
+   la cadena de hermanos, así que un ".det + .det" pelado le ponía el filete
+   al único visible por tener cinco ocultos delante — una línea suelta arriba
+   del título, sin nada que separar. */
+.det:not([data-oculto]) + .det:not([data-oculto]){
+  margin-top:20px;padding-top:20px;border-top:1px solid #16323f;
+}
 /* Sin JavaScript no hay clase que alternar, así que el resumen se muestra al
    pasar el cursor y al tabular — que es lo que ya hace el CSS de arriba. */
-@media(max-width:900px){.tecnos{grid-template-columns:1fr 1fr}}
-@media(max-width:620px){
-  /* En el celular no hay cursor, y abrir de a una obliga a tocar seis veces
-     para leer seis párrafos cortos. Se muestran todos, siempre. */
-  .tecnos{grid-template-columns:1fr}
-  .tecno{grid-template-rows:auto 1fr;cursor:default}
-  .tecno span{opacity:1;padding-top:11px}
-}
-@media(prefers-reduced-motion:reduce){.tecno,.tecno b,.tecno span{transition:none}}
+@media(max-width:900px){.tecnos{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.tecnos{grid-template-columns:1fr 1fr}.tecno-panel{padding:20px}}
+@media(prefers-reduced-motion:reduce){.tecno{transition:none}}
+[data-oculto]{display:none}
 
 /* ── El carrusel de módulos ───────────────────────────────────────────────
    Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
@@ -327,13 +329,39 @@ html{overflow-x:hidden}
 
 <section class="dark" id="tecnologia"><div class="container"><div class="section-head"><div class="eyebrow">TECNOLOGÍA</div><h2>Construido para la salud.</h2><p>Inteligencia artificial, voz, datos clínicos estructurados e integraciones, en una sola plataforma.</p></div>
 <div class="tecnos" id="tecnos">
-<button class="tecno" type="button" aria-expanded="true"><b>Inteligencia artificial</b><span>Reconoce lo que importa de una conversación y lo ordena como nota clínica: motivo, antecedentes, examen y plan. Y aprende de las correcciones de cada médico, así que la nota se parece cada vez más a la suya y menos a una plantilla.</span></button>
-<button class="tecno" type="button" aria-expanded="false"><b>Voz</b><span>Transcribe la consulta mientras ocurre, con el vocabulario que una transcripción común no reconoce: nombres de fármacos, dosis, unidades y términos clínicos. Sin dictar y sin hablarle a la computadora: es la consulta normal.</span></button>
-<button class="tecno" type="button" aria-expanded="false"><b>Lenguaje clínico</b><span>Distingue lo que dijo el paciente de lo que observó el médico, separa los antecedentes de los hallazgos de hoy y entiende las negaciones —«sin fiebre» no es lo mismo que «fiebre»—. Ahí es donde una transcripción se vuelve una historia clínica.</span></button>
-<button class="tecno" type="button" aria-expanded="false"><b>Datos estructurados</b><span>Cada dato queda en su campo y no suelto en un párrafo. Por eso la presión de hoy se grafica junto a las de los controles anteriores, un estudio pedido puede figurar como pendiente, y una dosis se puede comparar con la anterior.</span></button>
-<button class="tecno" type="button" aria-expanded="false"><b>Integraciones</b><span>El consultorio no queda aislado: la agenda se sincroniza con el calendario, el equipo de rayos sube los estudios directo a la ficha del paciente, y en Brasil la receta sale por el sistema de firma digital que exige la norma.</span></button>
-<button class="tecno" type="button" aria-expanded="false"><b>Seguridad</b><span>Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed.</span></button>
-</div></div></section>
+<button class="tecno" type="button" aria-selected="true">Inteligencia artificial</button>
+<button class="tecno" type="button" aria-selected="false">Voz</button>
+<button class="tecno" type="button" aria-selected="false">Lenguaje clínico</button>
+<button class="tecno" type="button" aria-selected="false">Datos estructurados</button>
+<button class="tecno" type="button" aria-selected="false">Integraciones</button>
+<button class="tecno" type="button" aria-selected="false">Seguridad</button>
+</div>
+<div class="tecno-panel" id="tecnoPanel">
+<div class="det"><b>Inteligencia artificial</b><p>Reconoce lo que importa de una conversación y lo ordena como nota clínica: motivo, antecedentes, examen y plan. Y aprende de las correcciones de cada médico, así que la nota se parece cada vez más a la suya y menos a una plantilla.</p></div>
+<div class="det"><b>Voz</b><p>Transcribe la consulta mientras ocurre, con el vocabulario que una transcripción común no reconoce: nombres de fármacos, dosis, unidades y términos clínicos. Sin dictar y sin hablarle a la computadora: es la consulta normal.</p></div>
+<div class="det"><b>Lenguaje clínico</b><p>Distingue lo que dijo el paciente de lo que observó el médico, separa los antecedentes de los hallazgos de hoy y entiende las negaciones —«sin fiebre» no es lo mismo que «fiebre»—. Ahí es donde una transcripción se vuelve una historia clínica.</p></div>
+<div class="det"><b>Datos estructurados</b><p>Cada dato queda en su campo y no suelto en un párrafo. Por eso la presión de hoy se grafica junto a las de los controles anteriores, un estudio pedido puede figurar como pendiente, y una dosis se puede comparar con la anterior.</p></div>
+<div class="det"><b>Integraciones</b><p>El consultorio no queda aislado: la agenda se sincroniza con el calendario, el equipo de rayos sube los estudios directo a la ficha del paciente, y en Brasil la receta sale por el sistema de firma digital que exige la norma.</p></div>
+<div class="det"><b>Seguridad</b><p>Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed.</p></div>
+</div>
+<script nonce="__NONCE__">
+// Va acá, pegado al panel, y no al final del documento: así se ejecuta apenas
+// el navegador termina de leer estas seis fichas y ANTES de dibujarlas. Al
+// final de la página también funcionaría, pero se vería un parpadeo con los
+// seis resúmenes abiertos.
+//
+// Y por eso el HTML llega con los seis visibles en vez de con cinco ocultos:
+// si el script no corre —CSP, error de sintaxis—, el visitante ve los seis
+// uno debajo del otro, que es una lista perfectamente legible. Al revés
+// vería uno solo y cinco pestañas que no hacen nada.
+(function () {
+  var p = document.getElementById("tecnoPanel");
+  if (!p) return;
+  [].slice.call(p.children).forEach(function (d, i) {
+    if (i) d.setAttribute("data-oculto", "");
+  });
+})();
+</script></div></section>
 
 <section class="final" id="demo"><div class="container"><div class="eyebrow">EMPEZAR</div><h2>En la salud se conversa todos los días.<br><span style="color:#28c9f4">Symphomed lo convierte en historia clínica.</span></h2><p>Escríbanos por WhatsApp y le mostramos cómo funciona con un caso real, en quince minutos. Las primeras 4 consultas no se cobran.</p><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos por WhatsApp →</a></div></section>
 
@@ -405,22 +433,35 @@ html{overflow-x:hidden}
   pintar();
 })();
 
-// Las fichas de tecnología. En la compu se abren solas al pasar el cursor
-// (puro CSS); esto agrega el toque, que en una pantalla táctil es la única
-// forma de "pasar el cursor" — y no existe.
+// Las pestañas de tecnología. Sin este script se ven los seis resúmenes uno
+// debajo del otro —una lista, que se lee bien—; con él, el panel muestra el
+// de la pestaña activa.
 (function () {
   var caja = document.getElementById("tecnos");
-  if (!caja) return;
-  var fichas = [].slice.call(caja.children);
-  fichas.forEach(function (f) {
-    f.addEventListener("click", function () {
-      var abierta = f.getAttribute("aria-expanded") === "true";
-      // Se cierran las otras: dos resúmenes abiertos a la vez en una grilla
-      // de tres columnas descuadran las alturas de la fila.
-      fichas.forEach(function (o) { o.setAttribute("aria-expanded", "false"); });
-      f.setAttribute("aria-expanded", abierta ? "false" : "true");
+  var panel = document.getElementById("tecnoPanel");
+  if (!caja || !panel) return;
+  var pestanas = [].slice.call(caja.children);
+  var detalles = [].slice.call(panel.children);
+  if (pestanas.length !== detalles.length) return;
+
+  function activar(i) {
+    pestanas.forEach(function (p, j) { p.setAttribute("aria-selected", j === i ? "true" : "false"); });
+    detalles.forEach(function (d, j) {
+      if (j === i) d.removeAttribute("data-oculto");
+      else d.setAttribute("data-oculto", "");
     });
+  }
+
+  pestanas.forEach(function (p, i) {
+    // mouseenter y no hover de CSS: el panel es un hermano y el resumen que
+    // hay que mostrar depende de CUÁL pestaña se señaló, no de si alguna lo
+    // está. Eso no se puede expresar en CSS sin acoplar los seis selectores.
+    p.addEventListener("mouseenter", function () { activar(i); });
+    p.addEventListener("focus", function () { activar(i); });
+    p.addEventListener("click", function () { activar(i); });
   });
+
+  activar(0);
 })();
 </script>
 </body>
