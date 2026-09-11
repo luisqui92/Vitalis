@@ -18,10 +18,19 @@ const headerSub = document.getElementById("headerSub");
 const btnLogout = document.getElementById("btnLogout");
 const btnAsistente = document.getElementById("btnAsistente");
 
-// Odontología, estética, oftalmología y veterinaria tienen su propia
-// identidad visual (temas oscuros "Symphomed Dental" / "Symphomed Face" /
-// "Symphomed Visión" / "Symphomed Veterinaria") — medicina general sigue con
-// el look claro de siempre.
+// ⚠ HOY ESTAS CLASES NO PINTAN NADA, Y ES A PROPÓSITO.
+//
+// Symphomed tenía ocho paletas, una por especialidad. Se unificaron a una
+// sola: la plataforma se ve igual atienda quien atienda, con la misma piel
+// que symphomed.com. Los bloques body.tema-* se borraron de estilos.css.
+//
+// Los interruptores de acá se dejaron puestos aposta. Si algún día se quiere
+// volver a distinguir por especialidad, alcanza con agregar un bloque
+// body.tema-X en estilos.css que redefina SOLO las variables de :root —
+// nunca escribiendo colores sueltos en las reglas.
+//
+// La clase sigue sirviendo además para lo que viene abajo: el nombre de la
+// marca cambia según la especialidad, y eso no es color.
 function aplicarTemaSegunEspecialidad() {
   const esDental = MEDICO_TIPO_ESPECIALIDAD === "odontologia";
   const esEstetica = MEDICO_TIPO_ESPECIALIDAD === "estetica";
