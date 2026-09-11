@@ -66,7 +66,9 @@ if (rotas.length) console.log("   rotas:", rotas.join(", "));
 verificar("la reserva por WhatsApp está contada",
   /reserva solo/.test(vista) && /WhatsApp del consultorio/.test(vista));
 verificar("y el seguimiento después de la consulta también",
-  /El control siguiente no se pierde/.test(vista));
+  /El seguimiento sigue solo/.test(vista));
+["Reconsultas", "Laboratorios", "Medicación", "Vacunas", "Controles por edad"].forEach(r =>
+  verificar(`  recuerda «${r}»`, vista.includes(`<b>${r}</b>`)));
 
 // Estas dos se insertan buscando el bloque de Veterinary EN INGLÉS, porque la
 // regla corre antes de que se traduzca. Buscarlo en español no falla: no

@@ -44,10 +44,15 @@ css = css.replace(/\.panel-dark p\{color:#a8bdc9\}/, ".panel-dark p,.pet p{color
 // Esto no cambia el diseño: completa las reglas que ya venía aplicando a
 // todo lo demás en esos mismos puntos de quiebre.
 css += `
+/* El pie es una fila flex de tres bloques sin flex-wrap. Alargar el copyright
+   a "Bolivia y Brasil" bastó para que a 768px no entrara y desbordara la
+   página entera. Se deja envolviendo SIEMPRE: a ancho completo no cambia
+   nada, y deja de depender de que el texto no crezca. */
+.footer{flex-wrap:wrap;gap:14px 20px}
+.footerlinks{flex-wrap:wrap;gap:12px 18px}
 @media(max-width:620px){
   .scale{flex-wrap:wrap;justify-content:center;gap:12px}
   .scale-box{flex:1 1 38%}
-  .footerlinks{flex-wrap:wrap;gap:12px 18px}
 }
 @media(max-width:620px){
   /* .screen es una grilla dentro de otra grilla. Por defecto una celda no se
@@ -73,6 +78,14 @@ css += `
      Dos píxeles menos de cuerpo le devuelven el margen. */
   .hero h1{font-size:38px;letter-spacing:-2px}
 }
+/* Qué recuerda el seguimiento. Van como filete y no como tarjeta: son una
+   lista de cosas del mismo rango, y cinco tarjetas con sombra al lado de las
+   tres de arriba competirían con ellas por la atención. */
+.recuerdos{display:grid;grid-template-columns:repeat(5,1fr);gap:0 22px;margin-top:52px;border-top:1px solid var(--line);padding-top:26px}
+.recuerdo b{display:block;font-size:13px;margin-bottom:7px}
+.recuerdo span{color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:900px){.recuerdos{grid-template-columns:1fr 1fr;gap:22px}}
+@media(max-width:560px){.recuerdos{grid-template-columns:1fr;gap:18px}}
 /* La sección de la agenda tiene tres pasos y no cuatro. Sin esto quedaría una
    columna vacía a la derecha, que se lee como si faltara algo. */
 .steps-3{grid-template-columns:repeat(3,1fr)}
@@ -297,7 +310,14 @@ const AGENDA = `
 <div class="steps steps-3">
 <div class="step"><div class="icon">✆</div><h3>El paciente reserva solo</h3><p>Escribe al WhatsApp del consultorio, ve los horarios que están libres de verdad y elige. La cita aparece en la agenda sin que nadie atienda el teléfono.</p></div>
 <div class="step"><div class="icon">✓</div><h3>Queda confirmada al instante</h3><p>Recibe la confirmación en el momento. Si necesita cancelar, escribe «cancelar» ahí mismo y el horario se libera para otro paciente.</p></div>
-<div class="step"><div class="icon">↻</div><h3>El control siguiente no se pierde</h3><p>Al cerrar la consulta, Symphomed propone la fecha del próximo control y le manda al paciente un enlace para que elija su horario. El médico ve en su panel todo lo que se viene.</p></div>
+<div class="step"><div class="icon">↻</div><h3>El seguimiento sigue solo</h3><p>Al cerrar la consulta, Symphomed propone la fecha del próximo control y le manda al paciente un enlace para que elija su horario.</p></div>
+</div>
+<div class="recuerdos">
+<div class="recuerdo"><b>Reconsultas</b><span>El control que se acordó en la consulta, con la fecha que corresponde.</span></div>
+<div class="recuerdo"><b>Laboratorios</b><span>Los estudios que se pidieron y todavía no volvieron a la ficha.</span></div>
+<div class="recuerdo"><b>Medicación</b><span>Cuándo empieza y cuándo termina cada tratamiento, con su dosis y frecuencia.</span></div>
+<div class="recuerdo"><b>Vacunas</b><span>La dosis siguiente y las que quedaron pendientes del esquema.</span></div>
+<div class="recuerdo"><b>Controles por edad</b><span>Lo que toca revisar según la edad del paciente, sin depender de la memoria.</span></div>
 </div>
 </div></section>
 `;
