@@ -29,6 +29,57 @@ css = css.replace(
 );
 css = css.replace(/\.panel-dark p\{color:#a8bdc9\}/, ".panel-dark p,.pet p{color:#a8bdc9}");
 
+// ─── Lo que le faltaba al diseño para el celular ───────────────────────────
+//
+// El original trae reglas para 900px y 560px, pero ninguna toca .scale ni
+// .footerlinks: son filas flex sin flex-wrap, así que a 402px piden 511px y
+// 458px y no hay forma de que entren.
+//
+// El síntoma no es que se vean apretadas: el documento entero se hace más
+// ancho que la pantalla, y como los fondos de sección solo pintan hasta el
+// ancho de la VENTANA, queda una franja blanca a la derecha de toda la
+// página. Se ve como si el sitio estuviera roto, y la causa está a cinco
+// secciones de distancia de donde se nota.
+//
+// Esto no cambia el diseño: completa las reglas que ya venía aplicando a
+// todo lo demás en esos mismos puntos de quiebre.
+css += `
+@media(max-width:620px){
+  .scale{flex-wrap:wrap;justify-content:center;gap:12px}
+  .scale-box{flex:1 1 38%}
+  .footerlinks{flex-wrap:wrap;gap:12px 18px}
+}
+@media(max-width:620px){
+  /* .screen es una grilla dentro de otra grilla. Por defecto una celda no se
+     achica por debajo del ancho mínimo de su contenido, así que la maqueta
+     del consultorio empujaba 354px aunque su contenedor midiera 331. El
+     minmax(0,1fr) es lo que le da permiso para achicarse. */
+  .screen-body{grid-template-columns:84px minmax(0,1fr)}
+  .screen-main{min-width:0}
+  .metric{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  /* "SYMPHOMED" con letter-spacing:3px es ancho, y la barra reparte con
+     space-between: abajo de 480 el logo termina tocando el selector de idioma
+     y se lee "SYMPHOMEDES". Se achica el logo y se saca el selector, que hoy
+     no hace nada (hay un solo idioma). */
+  .logo{font-size:13px;letter-spacing:2px}
+  .nav .navright{gap:12px}
+  .nav .navright span{display:none}
+  .btn{padding:11px 16px}
+}
+@media(max-width:430px){
+  /* A 43px el titular llega justo al borde del contenedor y queda pegado.
+     Dos píxeles menos de cuerpo le devuelven el margen. */
+  .hero h1{font-size:38px;letter-spacing:-2px}
+}
+/* Cinturón de seguridad. Lo de arriba arregla las causas conocidas; esto
+   asegura que una futura —un texto más largo, una sección nueva— no vuelva a
+   producir la franja blanca al costado de TODA la página. El costo es que un
+   desborde nuevo se recorta en vez de avisar, y por eso no reemplaza a las
+   reglas de arriba: las respalda. */
+html{overflow-x:hidden}`;
+
 // La única regla que cambia: la foto deja de venir de afuera.
 css = css.replace(
   /url\("https:\/\/images\.unsplash\.com[^"]*"\)/,

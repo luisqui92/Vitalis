@@ -66,6 +66,26 @@ if (rotas.length) console.log("   rotas:", rotas.join(", "));
 verificar("el panel de Pet tiene color de texto propio",
   /\.pet\{[^}]*color:#fff/.test(vista));
 
+console.log("\n── 2c. Que no se desborde en el celular ──");
+// Esto se publicó roto una vez. El diseño traía dos filas flex sin
+// flex-wrap (.scale y .footerlinks) que a 402px pedían 511px y 458px.
+//
+// Lo grave no es que se vean apretadas: el documento entero se vuelve más
+// ancho que la pantalla, y como los fondos de sección solo pintan hasta el
+// ancho de la VENTANA, aparece una franja blanca al costado de TODA la
+// página. Parece que el sitio está roto, y la causa está a cinco secciones
+// de distancia de donde se nota.
+//
+// La comprobación de verdad es abrirla en un navegador angosto —esto solo
+// verifica que las reglas que lo arreglan sigan puestas, porque la página se
+// regenera desde scripts/diseno/ y es fácil perderlas en una reconstrucción.
+verificar("las filas que no entraban ahora envuelven",
+  /\.scale\{flex-wrap:wrap/.test(vista) && /\.footerlinks\{flex-wrap:wrap/.test(vista));
+verificar("la maqueta del consultorio puede achicarse",
+  /\.screen-body\{grid-template-columns:84px minmax\(0,1fr\)\}/.test(vista));
+verificar("y hay cinturón de seguridad contra un desborde nuevo",
+  /html\{overflow-x:hidden\}/.test(vista));
+
 (async () => {
   const express = require("express");
   const app = express();

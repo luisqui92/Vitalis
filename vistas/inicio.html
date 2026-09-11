@@ -49,6 +49,41 @@ footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;just
 @media(max-width:900px){.navlinks{display:none}.hero-grid,.product-show,.split{grid-template-columns:1fr}.hero-product{margin-top:30px;min-height:450px}.steps{grid-template-columns:1fr 1fr}.specialties{grid-template-columns:repeat(3,1fr)}.doctor-card{width:78%}.chat{left:0}.record{right:0}.ai-card{left:0}}
 @media(max-width:560px){.hero{padding-top:120px}.hero h1{font-size:43px}.actions,.trust-row{flex-direction:column;align-items:flex-start}.steps,.specialties{grid-template-columns:1fr 1fr}.hero-product{transform:scale(.88);transform-origin:left top;height:400px}.footer{flex-direction:column;gap:20px;align-items:flex-start}}
 
+@media(max-width:620px){
+  .scale{flex-wrap:wrap;justify-content:center;gap:12px}
+  .scale-box{flex:1 1 38%}
+  .footerlinks{flex-wrap:wrap;gap:12px 18px}
+}
+@media(max-width:620px){
+  /* .screen es una grilla dentro de otra grilla. Por defecto una celda no se
+     achica por debajo del ancho mínimo de su contenido, así que la maqueta
+     del consultorio empujaba 354px aunque su contenedor midiera 331. El
+     minmax(0,1fr) es lo que le da permiso para achicarse. */
+  .screen-body{grid-template-columns:84px minmax(0,1fr)}
+  .screen-main{min-width:0}
+  .metric{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  /* "SYMPHOMED" con letter-spacing:3px es ancho, y la barra reparte con
+     space-between: abajo de 480 el logo termina tocando el selector de idioma
+     y se lee "SYMPHOMEDES". Se achica el logo y se saca el selector, que hoy
+     no hace nada (hay un solo idioma). */
+  .logo{font-size:13px;letter-spacing:2px}
+  .nav .navright{gap:12px}
+  .nav .navright span{display:none}
+  .btn{padding:11px 16px}
+}
+@media(max-width:430px){
+  /* A 43px el titular llega justo al borde del contenedor y queda pegado.
+     Dos píxeles menos de cuerpo le devuelven el margen. */
+  .hero h1{font-size:38px;letter-spacing:-2px}
+}
+/* Cinturón de seguridad. Lo de arriba arregla las causas conocidas; esto
+   asegura que una futura —un texto más largo, una sección nueva— no vuelva a
+   producir la franja blanca al costado de TODA la página. El costo es que un
+   desborde nuevo se recorta en vez de avisar, y por eso no reemplaza a las
+   reglas de arriba: las respalda. */
+html{overflow-x:hidden}
 </style>
 </head>
 <body>
