@@ -22,52 +22,49 @@ function verificar(descripcion, condicion) {
 
 console.log("── 1. La página no depende de nada de afuera ──");
 const vista = fs.readFileSync(path.join(RAIZ, "vistas", "inicio.html"), "utf8");
-// La CSP de Symphomed solo admite 'self': una fuente de Google cae en silencio
-// y la página queda con la tipografía del sistema, sin que nadie se entere.
+// La CSP de esta página es default-src 'none' con img-src 'self' data:. Cualquier
+// cosa traída de afuera cae en SILENCIO: no hay error, no hay hueco visible,
+// simplemente no está. El diseño original traía la foto de Unsplash y habría
+// salido un recuadro vacío en producción sin que nadie se enterara.
+verificar("no pide imágenes de afuera", !/src="https?:|url\(["']?https?:/.test(vista));
 verificar("no pide fuentes a Google", !/fonts\.googleapis|fonts\.gstatic/.test(vista));
-verificar("usa la que ya está alojada", /\/fonts\/inter-variable\.woff2/.test(vista));
-verificar("el script lleva el marcador del nonce", vista.includes('<script nonce="__NONCE__"'));
+verificar("la foto está alojada acá", /\/img\/medica\.jpg/.test(vista));
+verificar("  ...y el archivo existe de verdad",
+  fs.existsSync(path.join(RAIZ, "public", "img", "medica.jpg")));
+verificar("la tipografía también", /\/fonts\/inter-variable\.woff2/.test(vista) && /InterVar/.test(vista));
 verificar("vive en vistas/, no en public/",
   !fs.existsSync(path.join(RAIZ, "public", "inicio.html")));
 
+// Sin scripts no hay forma de que un nonce mal puesto la deje inerte, que es
+// exactamente como se rompió el reporte financiero en su momento. Si algún
+// día se agrega uno, tiene que llevar el marcador o no va a correr.
+verificar("no necesita JavaScript",
+  !/<script/i.test(vista) || vista.includes('<script nonce="__NONCE__"'));
+
 console.log("\n── 2. Dice lo que hay que decir ──");
-// No es corrección de estilo: son las cuatro cosas sin las cuales la página no
-// hace su trabajo, y las cuatro se borran fácil en una edición apurada.
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));
-verificar("dice los precios", /Bs\s*12/.test(vista) && /Bs\s*900/.test(vista));
+verificar("está en español", /lang="es"/.test(vista) && /Historia clínica|historia clínica/.test(vista));
+verificar("dice para qué sirve", /convierte la conversación de la consulta/.test(vista));
 
-// Y que los precios que anuncia sean los que de verdad cobra. Esto ya se
-// desincronizó una vez: la página decía Bs 900 y el código cobraba Bs 400,
-// porque el precio boliviano heredaba del brasileño. Un médico leía un número
-// en la web y veía otro adentro — y eso, en la primera venta, no se recupera.
-const monedas = require(path.join(RAIZ, "services", "monedas"));
-const suscripciones = require(path.join(RAIZ, "services", "suscripciones"));
-const consultaBo = monedas.config("BOB").precioConsulta;
-const planBo = suscripciones.precioMensual("BOB");
-verificar(`  ...y el Bs ${consultaBo / 100} es el que cobra de verdad`, /Bs\s*12\b/.test(vista) === (consultaBo === 1200));
-verificar(`  ...y el Bs ${planBo / 100} del plan también`, /Bs\s*900\b/.test(vista) === (planBo === 90000));
-verificar("y las 4 consultas de cortesía", /4 consultas/.test(vista));
-verificar("tiene el apartado de prueba", /Empezar la prueba/.test(vista));
+console.log("\n── 2b. Las secciones y sus anclas ──");
+// El menú de arriba es la única navegación que tiene la página. Un enlace a
+// una sección renombrada no da error: no lleva a ningún lado, y eso solo se
+// descubre tocándolo. Ya pasó al traducir los identificadores del diseño.
+const anclas = [...vista.matchAll(/href="#([a-z0-9-]+)"/g)].map(m => m[1]);
+const ids = [...vista.matchAll(/id="([a-z0-9-]+)"/g)].map(m => m[1]);
+const rotas = [...new Set(anclas)].filter(a => !ids.includes(a));
+verificar("todas las anclas del menú llevan a una sección que existe",
+  rotas.length === 0);
+if (rotas.length) console.log("   rotas:", rotas.join(", "));
 
-console.log("\n── 2b. Las tres preguntas y el resultado ──");
-// La página ya no es un texto que se lee: es un cuestionario de tres pasos. Si
-// falta una pantalla, el script revienta al pedirla por id y no se ve NADA.
-[1, 2, 3, 4].forEach(p => verificar(`existe la pantalla ${p}`, vista.includes(`id="e${p}"`)));
-verificar("la primera NO nace oculta", /id="e1"(?![^>]*\bhidden\b)/.test(vista));
-verificar("las otras tres sí", ["e2", "e3", "e4"].every(
-  id => new RegExp(`id="${id}"[^>]*\\bhidden\\b`).test(vista)));
+["plataforma", "especialidades", "soluciones", "tecnologia", "confianza", "demo"]
+  .forEach(s => verificar(`sección «${s}»`, vista.includes(`id="${s}"`)));
 
-// Las opciones las escribe el script desde sus listas. Si se borran las listas
-// la página se ve entera pero sin nada que elegir, y el botón queda apagado
-// para siempre — un fallo que no rompe nada visible y no se nota hasta que
-// pasan las semanas y nadie escribió por WhatsApp.
-verificar("las especialidades salen de una lista", /ESPECIALIDADES\s*=\s*\[/.test(vista));
-verificar("los minutos también", /MINUTOS\s*=\s*\[/.test(vista));
-verificar("y hay dónde ponerlas", /id="ops-esp"/.test(vista) && /id="ops-min"/.test(vista));
-
-// Esta ya se rompió una vez: .progreso es flex, y sin esta regla el atributo
-// hidden no le hace nada. La barra de progreso se quedaba encima del resultado.
-verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*!important/.test(vista));
+// El panel de Symphomed Pet lleva .panel-light Y .pet: la segunda lo pinta
+// oscuro sin cambiar el color del texto, así que quedaba tinta casi negra
+// sobre fondo casi negro. Se ve perfecto en el inspector y no se lee nada.
+verificar("el panel de Pet tiene color de texto propio",
+  /\.pet\{[^}]*color:#fff/.test(vista));
 
 (async () => {
   const express = require("express");
@@ -90,7 +87,11 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
     req.end();
   });
 
-  const esLanding = (r) => /¿En qué atendés\?/.test(r.texto);
+  // Se reconoce por la estructura y no por una frase: el texto de la página se
+  // reescribe seguido, y una prueba atada a la copia se pone roja cada vez que
+  // se corrige una palabra. Lo que no cambia es que la página de venta tiene
+  // portada y la aplicación no.
+  const esLanding = (r) => /class="hero"/.test(r.texto);
   const esApp = (r) => /LA APLICACION/.test(r.texto);
 
   console.log("\n── 3. La raíz, según el dominio ──");
@@ -132,8 +133,15 @@ verificar("hidden le gana a display:flex", /\[hidden\]\s*\{\s*display:\s*none\s*
   const r = await pedir("/inicio", "symphomed.com");
   const csp = r.cab["content-security-policy"] || "";
   verificar("va con CSP propia y con nonce", /script-src 'nonce-/.test(csp));
-  verificar("  ...y el nonce del script es el de SU cabecera",
-    csp.includes("'nonce-" + (r.texto.match(/<script nonce="([^"]+)"/) || [])[1] + "'"));
+  // Hoy la página no trae scripts, así que esto no se está ejerciendo. Se
+  // comprueba igual porque el día que se agregue uno, el nonce del documento
+  // tiene que ser el de SU PROPIA cabecera — un script con el nonce de otra
+  // respuesta no da error: no corre, y la página queda inerte en silencio.
+  const scriptServido = r.texto.match(/<script nonce="([^"]+)"/);
+  verificar(scriptServido
+    ? "  ...y el nonce del script es el de SU cabecera"
+    : "  ...(sin scripts todavía: nada que quede inerte)",
+    !scriptServido || csp.includes("'nonce-" + scriptServido[1] + "'"));
   verificar("  ...sin el marcador sin reemplazar", !r.texto.includes("__NONCE__"));
   // Al revés que el reporte financiero: esta página existe para que la
   // encuentren. Un noindex acá la haría invisible en Google sin avisar.

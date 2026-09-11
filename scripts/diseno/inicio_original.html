@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Symphomed — The intelligence layer for healthcare</title>
+<meta name="description" content="Symphomed transforms clinical conversations into structured clinical intelligence.">
+<style>
+:root{
+  --ink:#07121b; --muted:#607080; --line:#dce7ef; --cyan:#19b9ef;
+  --cyan2:#65ddff; --white:#fff; --soft:#f5f9fc; --dark:#03101a;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}
+a{text-decoration:none;color:inherit}.container{width:min(1180px,92%);margin:auto}
+nav{position:fixed;top:0;left:0;right:0;z-index:20;height:72px;background:rgba(3,16,26,.82);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08)}
+.nav{height:100%;display:flex;align-items:center;justify-content:space-between}.logo{color:#fff;font-weight:800;letter-spacing:3px;font-size:15px;display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;position:relative}.logo-mark i{position:absolute;width:8px;height:8px;border-radius:50%;background:#20c7f3}.logo-mark i:nth-child(1){left:9px;top:0}.logo-mark i:nth-child(2){left:0;top:9px}.logo-mark i:nth-child(3){right:0;top:8px}.logo-mark i:nth-child(4){left:9px;bottom:0}.logo-mark i:nth-child(5){left:8px;top:8px;background:#8beaff}
+.navlinks{display:flex;gap:27px;color:#b9c9d5;font-size:12px}.navlinks a:hover{color:#fff}.navright{display:flex;align-items:center;gap:18px;color:#d8e5ed;font-size:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 21px;border-radius:30px;font-weight:700;font-size:12px;transition:.2s;border:1px solid transparent;cursor:pointer}.btn-primary{background:linear-gradient(100deg,#1fb9ee,#54d8ff);color:#03131d}.btn-outline{border-color:#78909f;color:#fff;background:transparent}.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.hero{min-height:720px;padding:145px 0 70px;background:radial-gradient(circle at 78% 28%,#12354a 0,#071a27 27%,#020b12 67%);color:#fff;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:43% 57%;align-items:center;gap:20px}.eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#45d5fa;margin-bottom:15px}.hero h1{font-size:clamp(45px,5vw,68px);line-height:1.01;letter-spacing:-3px;margin:0 0 20px}.hero h1 span{color:#25c7f5}.hero p{font-size:17px;line-height:1.65;color:#b9c9d5;max-width:520px}.actions{display:flex;gap:12px;margin:28px 0}.trust-row{display:flex;gap:30px;margin-top:38px;color:#c4d4de;font-size:11px}.trust-row span{display:flex;align-items:center;gap:8px}.dot{width:8px;height:8px;border-radius:50%;background:#26c8f2}
+.hero-product{position:relative;min-height:430px}.doctor-card{position:absolute;right:0;top:0;width:72%;height:285px;border:1px solid #3b6d83;border-radius:14px;background:linear-gradient(135deg,#193445,#081822);overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.5)}
+.doctor-photo{height:100%;background:linear-gradient(90deg,rgba(4,17,25,.15),rgba(4,17,25,.55)),url("https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1000&q=80") center/cover}
+.chat{position:absolute;left:-55px;top:55px;width:250px;padding:14px;border:1px solid #2c91b2;border-radius:12px;background:rgba(4,20,29,.92);font-size:12px;color:#d9e9f1}.chat b{color:#42d5fb;display:block;margin-bottom:8px}
+.ai-card{position:absolute;left:0;bottom:0;width:59%;padding:18px;border:1px solid #2c86a5;border-radius:13px;background:linear-gradient(145deg,#102c3d,#07151e);box-shadow:0 25px 60px rgba(0,0,0,.45)}
+.ai-head{display:flex;justify-content:space-between;color:#fff;font-weight:700;font-size:12px;margin-bottom:15px}.pill{font-size:9px;border:1px solid #28728d;color:#52dafa;border-radius:20px;padding:4px 8px}
+.row{display:grid;grid-template-columns:115px 1fr;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.08);font-size:10px}.row label{color:#8da7b5}.row div{color:#e4f0f5}
+.record{position:absolute;right:-15px;bottom:22px;width:43%;padding:18px;border:1px solid #316c84;border-radius:13px;background:#0a2230;color:#dcebf2;box-shadow:0 20px 60px #0008}.record h4{margin:0 0 13px;color:#5bddfa}.record p{font-size:10px;line-height:1.6;color:#afc3ce}.save{font-size:10px;color:#49d8fb;border:1px solid #287c98;border-radius:20px;padding:7px 10px;text-align:center}
+section{padding:95px 0}.light{background:#f6fafc}.dark{background:#03101a;color:#fff}.section-head{max-width:700px;margin-bottom:45px}.section-head h2{font-size:clamp(34px,4vw,52px);line-height:1.05;letter-spacing:-2px;margin:10px 0 18px}.section-head p{color:var(--muted);font-size:16px;line-height:1.7}.dark .section-head p{color:#a8bdc9}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:25px}.step{position:relative}.step:after{content:"→";position:absolute;right:-18px;top:28px;color:#9bb1bf;font-size:22px}.step:last-child:after{display:none}.icon{width:58px;height:58px;border-radius:50%;background:#e5f6fc;display:grid;place-items:center;color:#069fd3;font-size:23px;margin-bottom:20px}.step h3{margin:0 0 9px}.step p{color:var(--muted);font-size:13px;line-height:1.6}
+.product-show{display:grid;grid-template-columns:1.2fr .8fr;gap:60px;align-items:center}.screen{background:#071c29;border:1px solid #245267;border-radius:14px;padding:14px;box-shadow:0 30px 80px #001018aa}.screen-top{height:38px;border-bottom:1px solid #173847;color:#b9d1dc;font-size:11px;display:flex;align-items:center;justify-content:space-between}.screen-body{display:grid;grid-template-columns:110px 1fr;min-height:290px}.sidebar{padding:14px 8px;border-right:1px solid #173847;color:#8aa6b4;font-size:10px}.sidebar div{padding:9px}.sidebar div:first-child{color:#fff;background:#123b4e;border-radius:6px}.screen-main{padding:18px;color:#fff}.screen-main h4{margin:0 0 14px;color:#5bdcfa}.metric{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric div{background:#0d2939;border:1px solid #1d4a5d;padding:12px;border-radius:7px;font-size:10px}.metric b{display:block;color:#fff;margin-bottom:5px}.metric span{color:#8eabb8}
+.specialties{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.specialty{padding:24px 10px;border:1px solid var(--line);border-radius:12px;text-align:center;font-size:12px;background:#fff;transition:.2s}.specialty:hover{border-color:#4acaf0;transform:translateY(-3px);box-shadow:0 10px 30px #0a7fa51a}.specialty .sicon{font-size:25px;margin-bottom:12px}
+.split{display:grid;grid-template-columns:1fr 1fr}.split .panel{padding:80px max(6vw,40px)}.panel-dark{background:#061722;color:#fff}.panel-dark p{color:#a8bdc9}.panel-light{background:#f4f8fb}.odontogram{margin-top:28px;background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff}.teeth{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:18px}.tooth{height:30px;border:1px solid #5ecde9;border-radius:6px;display:grid;place-items:center;font-size:9px}.pet{background:linear-gradient(120deg,#06131c,#0d2836);position:relative;overflow:hidden}.pet:after{content:"🐕  🐈";position:absolute;font-size:110px;right:5%;bottom:-20px;opacity:.7}
+.scale{display:flex;align-items:center;justify-content:space-between;gap:10px}.scale-box{flex:1;border:1px solid var(--line);padding:22px 14px;border-radius:12px;text-align:center}.scale-box b{font-size:27px;display:block}.scale-box small{color:var(--muted)}
+.final{padding:110px 0;background:radial-gradient(circle at 50% 0,#10384e,#03101a 60%);text-align:center;color:#fff}.final h2{font-size:clamp(38px,5vw,62px);letter-spacing:-2px;max-width:850px;margin:0 auto 20px}.final p{color:#a9c0cb;max-width:620px;margin:0 auto 30px;line-height:1.7}
+footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;justify-content:space-between;align-items:center;font-size:11px}.footerlinks{display:flex;gap:22px}
+@media(max-width:900px){.navlinks{display:none}.hero-grid,.product-show,.split{grid-template-columns:1fr}.hero-product{margin-top:30px;min-height:450px}.steps{grid-template-columns:1fr 1fr}.specialties{grid-template-columns:repeat(3,1fr)}.doctor-card{width:78%}.chat{left:0}.record{right:0}.ai-card{left:0}}
+@media(max-width:560px){.hero{padding-top:120px}.hero h1{font-size:43px}.actions,.trust-row{flex-direction:column;align-items:flex-start}.steps,.specialties{grid-template-columns:1fr 1fr}.hero-product{transform:scale(.88);transform-origin:left top;height:400px}.footer{flex-direction:column;gap:20px;align-items:flex-start}}
+</style>
+</head>
+<body>
+<nav><div class="container nav">
+<a class="logo" href="#"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</a>
+<div class="navlinks"><a href="#platform">Platform</a><a href="#specialties">Specialties</a><a href="#solutions">Solutions</a><a href="#technology">Technology</a><a href="#security">Security</a></div>
+<div class="navright"><span>EN⌄</span><a href="#">Log in</a><a class="btn btn-primary" href="#demo">Book a demo</a></div>
+</div></nav>
+
+<header class="hero">
+<div class="container hero-grid">
+<div>
+<div class="eyebrow">THE INTELLIGENCE LAYER FOR HEALTHCARE</div>
+<h1>Clinical conversations.<br><span>Intelligent care.</span></h1>
+<p>Symphomed transforms healthcare conversations into structured clinical intelligence — helping professionals capture, understand and connect information throughout the patient journey.</p>
+<div class="actions"><a class="btn btn-primary" href="#demo">Book a demo →</a><a class="btn btn-outline" href="#platform">Explore the platform</a></div>
+<div class="trust-row"><span><i class="dot"></i> More time with patients</span><span><i class="dot"></i> Better clinical information</span><span><i class="dot"></i> Continuity of care</span></div>
+</div>
+<div class="hero-product">
+<div class="doctor-card"><div class="doctor-photo"></div></div>
+<div class="chat"><b>Patient</b>“I've had this pain for about three weeks, especially in the morning...”</div>
+<div class="ai-card"><div class="ai-head"><span>✦ SYMPHOMED <span class="pill">AI</span></span><span>•••</span></div>
+<div class="row"><label>Chief complaint</label><div>Back pain</div></div><div class="row"><label>Duration</label><div>3 weeks</div></div><div class="row"><label>Medication</label><div>Ibuprofen 400 mg</div></div><div class="row"><label>Relevant history</label><div>Previous episode</div></div></div>
+<div class="record"><h4>Clinical record</h4><p><b>Clinical note</b><br>Patient reports lumbar pain of 3 weeks duration, worse in the morning. No radiation. Prescribed follow-up and clinical review.</p><div class="save">✓ Save to patient record</div></div>
+</div>
+</div>
+</header>
+
+<section class="light">
+<div class="container">
+<div class="section-head"><div class="eyebrow">HOW IT WORKS</div><h2>From conversation<br>to clinical intelligence.</h2><p>Symphomed listens, understands and structures each consultation automatically, turning unstructured conversations into actionable clinical data.</p></div>
+<div class="steps">
+<div class="step"><div class="icon">♩</div><h3>1. Listen</h3><p>Captures the clinical conversation.</p></div>
+<div class="step"><div class="icon">✦</div><h3>2. Understand</h3><p>Identifies relevant clinical information.</p></div>
+<div class="step"><div class="icon">▤</div><h3>3. Structure</h3><p>Generates organized clinical data.</p></div>
+<div class="step"><div class="icon">↗</div><h3>4. Connect</h3><p>Updates the patient's history for continuity.</p></div>
+</div>
+</div>
+</section>
+
+<section class="dark" id="platform"><div class="container product-show">
+<div class="screen"><div class="screen-top"><span>✦ SYMPHOMED</span><span>Clinical workspace</span></div><div class="screen-body"><div class="sidebar"><div>Patient</div><div>Consultation</div><div>Clinical data</div><div>History</div><div>Kardex</div><div>Prescriptions</div></div><div class="screen-main"><h4>Clinical data</h4><div class="metric"><div><b>Chief complaint</b><span>Headache</span></div><div><b>Duration</b><span>3 weeks</span></div><div><b>Medication</b><span>Ibuprofen 400 mg</span></div><div><b>Assessment</b><span>Tension headache</span></div><div><b>History</b><span>No relevant history</span></div><div><b>Plan</b><span>Follow-up</span></div></div></div></div></div>
+<div><div class="eyebrow">A COMPLETE CLINICAL PICTURE</div><h2>One conversation.<br>A complete clinical picture.</h2><p>Symphomed captures the conversation, identifies key information and generates structured clinical data — ready for review and integration with the patient's record.</p><a class="btn btn-outline" href="#demo">▶ See it in action</a></div>
+</div></section>
+
+<section id="specialties"><div class="container"><div class="section-head"><div class="eyebrow">ONE PLATFORM. MULTIPLE HEALTHCARE EXPERIENCES.</div><h2>Built for the entire healthcare ecosystem.</h2><p>From general practice to specialized care, Symphomed adapts to every professional, every specialty and every setting.</p></div>
+<div class="specialties">
+<div class="specialty"><div class="sicon">⚕</div>Medicine</div><div class="specialty"><div class="sicon">♢</div>Dental</div><div class="specialty"><div class="sicon">◉</div>Dermatology</div><div class="specialty"><div class="sicon">◉</div>Ophthalmology</div><div class="specialty"><div class="sicon">✧</div>Aesthetics</div><div class="specialty"><div class="sicon">⌁</div>Surgery</div><div class="specialty"><div class="sicon">♧</div>Gynecology</div><div class="specialty"><div class="sicon">◌</div>Pediatrics</div><div class="specialty"><div class="sicon">♧</div>Physiotherapy</div><div class="specialty"><div class="sicon">🐾</div>Veterinary</div><div class="specialty"><div class="sicon">▣</div>Telehealth</div><div class="specialty"><div class="sicon">→</div>All specialties</div>
+</div></div></section>
+
+<section class="split" id="solutions">
+<div class="panel panel-dark"><div class="eyebrow">SPECIALIZED SOLUTIONS</div><h2>Dental, with its own language.</h2><p>The interactive odontogram and specialized modules make dental care more precise, complete and efficient.</p><div class="odontogram"><div class="teeth"><div class="tooth">11</div><div class="tooth">12</div><div class="tooth">13</div><div class="tooth">14</div><div class="tooth">15</div><div class="tooth">16</div><div class="tooth">17</div><div class="tooth">18</div><div class="tooth">21</div><div class="tooth">22</div><div class="tooth">23</div><div class="tooth">24</div><div class="tooth">25</div><div class="tooth">26</div><div class="tooth">27</div><div class="tooth">28</div><div class="tooth">31</div><div class="tooth">32</div><div class="tooth">33</div><div class="tooth">34</div><div class="tooth">35</div><div class="tooth">36</div><div class="tooth">37</div><div class="tooth">38</div><div class="tooth">41</div><div class="tooth">42</div><div class="tooth">43</div><div class="tooth">44</div><div class="tooth">45</div><div class="tooth">46</div><div class="tooth">47</div><div class="tooth">48</div></div><b>Tooth 36</b><p style="margin:8px 0;color:#9fb8c5;font-size:11px">Clinical history · Treatments · Evolution</p></div></div>
+<div class="panel panel-light pet"><div class="eyebrow">SYMPHOMED PET</div><h2>The same intelligence.<br>A different patient.</h2><p>Complete clinical records for dogs and cats, with specialized tools and visual anatomy.</p></div>
+</section>
+
+<section id="security" class="light"><div class="container"><div class="section-head"><div class="eyebrow">TRUST & SCALE</div><h2>Intelligence that scales with your organization.</h2><p>From a single professional to large healthcare networks, Symphomed is designed to grow with your operation.</p></div>
+<div class="scale"><div class="scale-box"><b>1</b><small>Professional</small></div><div>→</div><div class="scale-box"><b>10</b><small>Professionals</small></div><div>→</div><div class="scale-box"><b>100</b><small>Professionals</small></div><div>→</div><div class="scale-box"><b>∞</b><small>Healthcare network</small></div></div>
+</div></section>
+
+<section class="dark" id="technology"><div class="container"><div class="section-head"><div class="eyebrow">TECHNOLOGY</div><h2>Built for intelligent healthcare.</h2><p>AI, voice, structured clinical data and integrations brought together in one healthcare intelligence platform.</p></div>
+<div class="specialties"><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">AI Intelligence</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Voice</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Clinical NLP</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Structured Data</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">API</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Security</div></div>
+</div></section>
+
+<section class="final" id="demo"><div class="container"><div class="eyebrow">GLOBAL HEALTHCARE INTELLIGENCE</div><h2>Healthcare has conversations every day.<br><span style="color:#28c9f4">Symphomed turns them into intelligence.</span></h2><p>Discover how Symphomed can become the intelligence layer behind your healthcare organization.</p><a class="btn btn-primary" href="mailto:demo@symphomed.com">Book a demo →</a></div></section>
+
+<footer><div class="container footer"><div class="logo"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</div><div class="footerlinks"><a href="#platform">Platform</a><a href="#specialties">Specialties</a><a href="#solutions">Solutions</a><a href="#technology">Technology</a><a href="#security">Security</a><a href="#demo">Contact</a></div><div>© 2026 Symphomed</div></div></footer>
+</body></html>

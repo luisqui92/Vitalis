@@ -2,485 +2,118 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#F4F3EF">
-<meta name="description" content="Tres preguntas y Symphomed te dice cuántas horas por semana perdés escribiendo historias clínicas, y cuánto costaría dejar de hacerlo.">
-<meta property="og:title" content="Symphomed — ¿cuánto tiempo perdés escribiendo historias?">
-<meta property="og:description" content="Tres preguntas, treinta segundos, y ves tus propios números. Las primeras 4 consultas no se cobran.">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#03101a">
+<title>Symphomed — la capa de inteligencia para la salud</title>
+<meta name="description" content="Symphomed convierte la conversación de la consulta en información clínica estructurada: la nota, la receta y el control quedan listos sin que el médico escriba nada.">
+<meta property="og:title" content="Symphomed — la capa de inteligencia para la salud">
+<meta property="og:description" content="La nota clínica, la receta y el kardex salen de la consulta sin tipear. Las primeras 4 consultas no se cobran.">
 <meta property="og:type" content="website">
 <style>
 @font-face {
   font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
   font-weight: 100 900; font-display: swap;
 }
-/* Esta página SÍ acompaña el tema del sistema: se abre desde un WhatsApp, en
-   el celular de un médico, y no hay razón para imponerle un modo. */
-:root { color-scheme: light dark; }
-body { margin: 0; }
-img { max-width: 100%; }
+:root { color-scheme: dark; }
 </style>
-<title>Symphomed</title>
-
 <style>
-/* ─────────────────────────────────────────────────────────────
-   Symphomed — no es una página, es una herramienta.
-   Tres preguntas, una pantalla cada una, y al final los números
-   del médico que la está usando: sus horas, su plata, y una nota
-   clínica de SU especialidad.
-   Pensada para el pulgar: esto se abre desde un WhatsApp.
-   ───────────────────────────────────────────────────────────── */
-:root {
-  --lienzo:  #F4F3EF;
-  --carta:   #FFFFFF;
-  --tinta:   #15191B;
-  --tinta-2: #5A6468;
-  --tinta-3: #8E979B;
-  --linea:   #E2E0D9;
-  --pino:    #14614A;
-  --pino-2:  #0E4B39;
-  --pino-050:#E4EFEA;
-  --sol:     #E4A11B;
-  --alerta:  #B3402F;
-  --r: 14px;
-  --r-chico: 10px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --lienzo:#101413; --carta:#181D1C; --tinta:#EDF1EF; --tinta-2:#A3AFAC;
-    --tinta-3:#77837F; --linea:#262E2C; --pino:#5FBF9B; --pino-2:#7ED0AF;
-    --pino-050:#152A24; --sol:#E8B54A; --alerta:#E28471;
-  }
-}
-:root[data-theme="dark"] {
-  --lienzo:#101413; --carta:#181D1C; --tinta:#EDF1EF; --tinta-2:#A3AFAC;
-  --tinta-3:#77837F; --linea:#262E2C; --pino:#5FBF9B; --pino-2:#7ED0AF;
-  --pino-050:#152A24; --sol:#E8B54A; --alerta:#E28471;
-}
 
-* { box-sizing: border-box; }
-/* Sin esto, .progreso { display:flex } le gana al atributo hidden y la barra
-   se queda puesta en la pantalla del resultado. */
-[hidden] { display: none !important; }
-body {
-  margin: 0; background: var(--lienzo); color: var(--tinta);
-  font-family: InterVar, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+:root{
+  --ink:#07121b; --muted:#607080; --line:#dce7ef; --cyan:#19b9ef;
+  --cyan2:#65ddff; --white:#fff; --soft:#f5f9fc; --dark:#03101a;
 }
-.mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;font-family:InterVar,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}
+a{text-decoration:none;color:inherit}.container{width:min(1180px,92%);margin:auto}
+nav{position:fixed;top:0;left:0;right:0;z-index:20;height:72px;background:rgba(3,16,26,.82);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08)}
+.nav{height:100%;display:flex;align-items:center;justify-content:space-between}.logo{color:#fff;font-weight:800;letter-spacing:3px;font-size:15px;display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;position:relative}.logo-mark i{position:absolute;width:8px;height:8px;border-radius:50%;background:#20c7f3}.logo-mark i:nth-child(1){left:9px;top:0}.logo-mark i:nth-child(2){left:0;top:9px}.logo-mark i:nth-child(3){right:0;top:8px}.logo-mark i:nth-child(4){left:9px;bottom:0}.logo-mark i:nth-child(5){left:8px;top:8px;background:#8beaff}
+.navlinks{display:flex;gap:27px;color:#b9c9d5;font-size:12px}.navlinks a:hover{color:#fff}.navright{display:flex;align-items:center;gap:18px;color:#d8e5ed;font-size:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 21px;border-radius:30px;font-weight:700;font-size:12px;transition:.2s;border:1px solid transparent;cursor:pointer}.btn-primary{background:linear-gradient(100deg,#1fb9ee,#54d8ff);color:#03131d}.btn-outline{border-color:#78909f;color:#fff;background:transparent}.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.hero{min-height:720px;padding:145px 0 70px;background:radial-gradient(circle at 78% 28%,#12354a 0,#071a27 27%,#020b12 67%);color:#fff;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:43% 57%;align-items:center;gap:20px}.eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#45d5fa;margin-bottom:15px}.hero h1{font-size:clamp(45px,5vw,68px);line-height:1.01;letter-spacing:-3px;margin:0 0 20px}.hero h1 span{color:#25c7f5}.hero p{font-size:17px;line-height:1.65;color:#b9c9d5;max-width:520px}.actions{display:flex;gap:12px;margin:28px 0}.trust-row{display:flex;gap:30px;margin-top:38px;color:#c4d4de;font-size:11px}.trust-row span{display:flex;align-items:center;gap:8px}.dot{width:8px;height:8px;border-radius:50%;background:#26c8f2}
+.hero-product{position:relative;min-height:430px}.doctor-card{position:absolute;right:0;top:0;width:72%;height:285px;border:1px solid #3b6d83;border-radius:14px;background:linear-gradient(135deg,#193445,#081822);overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.5)}
+.doctor-photo{height:100%;background:linear-gradient(90deg,rgba(4,17,25,.15),rgba(4,17,25,.55)),url("/img/medica.jpg") center/cover}
+.chat{position:absolute;left:-55px;top:55px;width:250px;padding:14px;border:1px solid #2c91b2;border-radius:12px;background:rgba(4,20,29,.92);font-size:12px;color:#d9e9f1}.chat b{color:#42d5fb;display:block;margin-bottom:8px}
+.ai-card{position:absolute;left:0;bottom:0;width:59%;padding:18px;border:1px solid #2c86a5;border-radius:13px;background:linear-gradient(145deg,#102c3d,#07151e);box-shadow:0 25px 60px rgba(0,0,0,.45)}
+.ai-head{display:flex;justify-content:space-between;color:#fff;font-weight:700;font-size:12px;margin-bottom:15px}.pill{font-size:9px;border:1px solid #28728d;color:#52dafa;border-radius:20px;padding:4px 8px}
+.row{display:grid;grid-template-columns:115px 1fr;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.08);font-size:10px}.row label{color:#8da7b5}.row div{color:#e4f0f5}
+.record{position:absolute;right:-15px;bottom:22px;width:43%;padding:18px;border:1px solid #316c84;border-radius:13px;background:#0a2230;color:#dcebf2;box-shadow:0 20px 60px #0008}.record h4{margin:0 0 13px;color:#5bddfa}.record p{font-size:10px;line-height:1.6;color:#afc3ce}.save{font-size:10px;color:#49d8fb;border:1px solid #287c98;border-radius:20px;padding:7px 10px;text-align:center}
+section{padding:95px 0}.light{background:#f6fafc}.dark{background:#03101a;color:#fff}.section-head{max-width:700px;margin-bottom:45px}.section-head h2{font-size:clamp(34px,4vw,52px);line-height:1.05;letter-spacing:-2px;margin:10px 0 18px}.section-head p{color:var(--muted);font-size:16px;line-height:1.7}.dark .section-head p{color:#a8bdc9}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:25px}.step{position:relative}.step:after{content:"→";position:absolute;right:-18px;top:28px;color:#9bb1bf;font-size:22px}.step:last-child:after{display:none}.icon{width:58px;height:58px;border-radius:50%;background:#e5f6fc;display:grid;place-items:center;color:#069fd3;font-size:23px;margin-bottom:20px}.step h3{margin:0 0 9px}.step p{color:var(--muted);font-size:13px;line-height:1.6}
+.product-show{display:grid;grid-template-columns:1.2fr .8fr;gap:60px;align-items:center}.screen{background:#071c29;border:1px solid #245267;border-radius:14px;padding:14px;box-shadow:0 30px 80px #001018aa}.screen-top{height:38px;border-bottom:1px solid #173847;color:#b9d1dc;font-size:11px;display:flex;align-items:center;justify-content:space-between}.screen-body{display:grid;grid-template-columns:110px 1fr;min-height:290px}.sidebar{padding:14px 8px;border-right:1px solid #173847;color:#8aa6b4;font-size:10px}.sidebar div{padding:9px}.sidebar div:first-child{color:#fff;background:#123b4e;border-radius:6px}.screen-main{padding:18px;color:#fff}.screen-main h4{margin:0 0 14px;color:#5bdcfa}.metric{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric div{background:#0d2939;border:1px solid #1d4a5d;padding:12px;border-radius:7px;font-size:10px}.metric b{display:block;color:#fff;margin-bottom:5px}.metric span{color:#8eabb8}
+.specialties{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.specialty{padding:24px 10px;border:1px solid var(--line);border-radius:12px;text-align:center;font-size:12px;background:#fff;transition:.2s}.specialty:hover{border-color:#4acaf0;transform:translateY(-3px);box-shadow:0 10px 30px #0a7fa51a}.specialty .sicon{font-size:25px;margin-bottom:12px}
+.split{display:grid;grid-template-columns:1fr 1fr}.split .panel{padding:80px max(6vw,40px)}.panel-dark{background:#061722;color:#fff}.panel-dark p,.pet p{color:#a8bdc9}.panel-light{background:#f4f8fb}.odontogram{margin-top:28px;background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff}.teeth{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:18px}.tooth{height:30px;border:1px solid #5ecde9;border-radius:6px;display:grid;place-items:center;font-size:9px}.pet{background:linear-gradient(120deg,#06131c,#0d2836);color:#fff;position:relative;overflow:hidden}.pet:after{content:"🐕  🐈";position:absolute;font-size:110px;right:5%;bottom:-20px;opacity:.7}
+.scale{display:flex;align-items:center;justify-content:space-between;gap:10px}.scale-box{flex:1;border:1px solid var(--line);padding:22px 14px;border-radius:12px;text-align:center}.scale-box b{font-size:27px;display:block}.scale-box small{color:var(--muted)}
+.final{padding:110px 0;background:radial-gradient(circle at 50% 0,#10384e,#03101a 60%);text-align:center;color:#fff}.final h2{font-size:clamp(38px,5vw,62px);letter-spacing:-2px;max-width:850px;margin:0 auto 20px}.final p{color:#a9c0cb;max-width:620px;margin:0 auto 30px;line-height:1.7}
+footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;justify-content:space-between;align-items:center;font-size:11px}.footerlinks{display:flex;gap:22px}
+@media(max-width:900px){.navlinks{display:none}.hero-grid,.product-show,.split{grid-template-columns:1fr}.hero-product{margin-top:30px;min-height:450px}.steps{grid-template-columns:1fr 1fr}.specialties{grid-template-columns:repeat(3,1fr)}.doctor-card{width:78%}.chat{left:0}.record{right:0}.ai-card{left:0}}
+@media(max-width:560px){.hero{padding-top:120px}.hero h1{font-size:43px}.actions,.trust-row{flex-direction:column;align-items:flex-start}.steps,.specialties{grid-template-columns:1fr 1fr}.hero-product{transform:scale(.88);transform-origin:left top;height:400px}.footer{flex-direction:column;gap:20px;align-items:flex-start}}
 
-/* ── El marco: una sola columna, pensada para el pulgar ─────── */
-.app {
-  max-width: 560px; margin: 0 auto; min-height: 100svh;
-  display: flex; flex-direction: column; padding: 0 18px 26px;
-}
-
-.techo { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-block: 20px 6px; }
-.logo { display: flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: -.02em; font-size: 1.06rem; }
-.logo svg { display: block; color: var(--pino); }
-.saltar { background: none; border: 0; padding: 6px; color: var(--tinta-3); font: inherit; font-size: .86rem; cursor: pointer; }
-.saltar:hover { color: var(--tinta-2); }
-
-/* El progreso: tres tramos, no una barra genérica. */
-.progreso { display: flex; gap: 5px; padding-block: 10px 26px; }
-.progreso i { height: 3px; flex: 1; border-radius: 2px; background: var(--linea); transition: background-color .3s; }
-.progreso i.hecho { background: var(--pino); }
-
-.escena { flex: 1; display: flex; flex-direction: column; }
-.escena[hidden] { display: none; }
-
-h1 { margin: 0; font-size: clamp(1.75rem, 6vw, 2.3rem); line-height: 1.14; letter-spacing: -.028em; font-weight: 600; text-wrap: balance; }
-h2 { margin: 0; font-size: 1.28rem; line-height: 1.25; letter-spacing: -.02em; font-weight: 600; }
-h3 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
-p { margin: 0; }
-.sub { color: var(--tinta-2); font-size: 1.02rem; margin-top: 12px; }
-.pregunta { margin-top: 4px; }
-.pista { color: var(--tinta-3); font-size: .88rem; margin-top: 9px; }
-
-/* ── Opciones: botones grandes, uno debajo del otro ─────────── */
-.opciones { display: flex; flex-direction: column; gap: 9px; margin-top: 26px; }
-.opcion {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  width: 100%; text-align: left; background: var(--carta); color: var(--tinta);
-  border: 1.5px solid var(--linea); border-radius: var(--r-chico);
-  padding: 16px 18px; font: inherit; font-weight: 500; cursor: pointer;
-  transition: border-color .15s, background-color .15s;
-}
-.opcion:hover { border-color: var(--pino); }
-.opcion[aria-pressed="true"] { border-color: var(--pino); background: var(--pino-050); }
-.opcion:focus-visible { outline: 2px solid var(--pino); outline-offset: 2px; }
-.opcion small { color: var(--tinta-3); font-weight: 400; font-size: .86rem; }
-
-/* ── El contador de pacientes ──────────────────────────────── */
-.contador {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  background: var(--carta); border: 1.5px solid var(--linea); border-radius: var(--r);
-  padding: 20px; margin-top: 26px;
-}
-.paso-btn {
-  width: 52px; height: 52px; flex: none; border-radius: 50%;
-  border: 1.5px solid var(--linea); background: var(--lienzo); color: var(--tinta);
-  font-size: 1.5rem; line-height: 1; cursor: pointer; transition: border-color .15s;
-}
-.paso-btn:hover { border-color: var(--pino); }
-.paso-btn:focus-visible { outline: 2px solid var(--pino); outline-offset: 2px; }
-.contador-n { font-size: 3.2rem; font-weight: 600; letter-spacing: -.04em; line-height: 1; }
-.contador-d { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.contador-d small { color: var(--tinta-3); font-size: .84rem; }
-
-/* ── Botón principal, pegado abajo ─────────────────────────── */
-.abajo { margin-top: auto; padding-top: 30px; display: flex; flex-direction: column; gap: 10px; }
-.boton {
-  display: flex; align-items: center; justify-content: center; gap: 9px;
-  width: 100%; background: var(--pino); color: #F4FBF8;
-  border: 0; border-radius: var(--r-chico); padding: 17px 24px;
-  font: inherit; font-size: 1.02rem; font-weight: 600; text-decoration: none;
-  cursor: pointer; transition: background-color .15s;
-}
-.boton:hover { background: var(--pino-2); }
-.boton:disabled { opacity: .4; cursor: default; }
-.boton:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
-.boton.fino { background: transparent; color: var(--tinta-2); border: 1.5px solid var(--linea); }
-.boton.fino:hover { background: var(--carta); color: var(--tinta); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .boton { color: #0B1A15; }
-}
-:root[data-theme="dark"] .boton { color: #0B1A15; }
-
-/* ── El resultado ──────────────────────────────────────────── */
-.titular {
-  background: var(--pino); color: #F4FBF8; border-radius: var(--r);
-  padding: 26px 24px; display: flex; flex-direction: column; gap: 4px; margin-top: 22px;
-}
-.titular .n { font-size: 3.4rem; font-weight: 700; line-height: 1; letter-spacing: -.045em; }
-.titular .d { font-size: 1.02rem; opacity: .9; }
-.titular .p { font-size: .9rem; opacity: .75; margin-top: 8px; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .titular { color: #0B1A15; }
-}
-:root[data-theme="dark"] .titular { color: #0B1A15; }
-
-.cuentas { display: flex; flex-direction: column; margin-top: 4px; }
-.cuenta-fila {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
-  padding-block: 13px; border-bottom: 1px solid var(--linea); font-size: .96rem;
-}
-.cuenta-fila:last-child { border-bottom: 0; }
-.cuenta-fila span:first-child { color: var(--tinta-2); }
-.cuenta-fila b { font-weight: 600; }
-.cuenta-fila b.bien { color: var(--pino); }
-
-.muestra {
-  background: var(--carta); border: 1px solid var(--linea); border-radius: var(--r);
-  overflow: hidden; margin-top: 22px;
-}
-.muestra-cab {
-  padding: 13px 18px; border-bottom: 1px solid var(--linea);
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
-.muestra-cab .k { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); font-weight: 500; }
-.muestra-cuerpo { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-.campo { display: flex; flex-direction: column; gap: 3px; }
-.campo .k { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); font-weight: 500; }
-.campo .v { font-size: .93rem; line-height: 1.5; }
-.campo .v.dato { color: var(--alerta); font-weight: 500; }
-
-.oferta {
-  background: var(--carta); border: 1px solid var(--linea); border-radius: var(--r);
-  padding: 20px; margin-top: 22px; display: flex; flex-direction: column; gap: 12px;
-}
-.oferta-tope { display: flex; align-items: baseline; gap: 14px; }
-.oferta-n { font-size: 2.6rem; font-weight: 700; line-height: 1; color: var(--pino); letter-spacing: -.04em; }
-.oferta-tope p { color: var(--tinta-2); font-size: .93rem; margin-top: 3px; }
-.oferta ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--tinta-2); font-size: .92rem; }
-.precio-linea { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--linea); font-size: .92rem; color: var(--tinta-2); }
-.precio-linea b { color: var(--tinta); font-weight: 600; }
-
-.legal { color: var(--tinta-3); font-size: .82rem; text-align: center; margin-top: 4px; }
-
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
-
 </head>
 <body>
-<div class="app">
+<nav><div class="container nav">
+<a class="logo" href="/"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</a>
+<div class="navlinks"><a href="#plataforma">Plataforma</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a></div>
+<div class="navright"><span>ES</span><a href="__PLATAFORMA__">Ingresar</a><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos</a></div>
+</div></nav>
 
-  <header class="techo">
-    <span class="logo">
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-        <path d="M2 11h3l1.8-5.4L10.4 17l2.6-8 1.6 3.5H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      Symphomed
-    </span>
-    <button class="saltar" id="saltar" type="button">Saltar</button>
-  </header>
-
-  <div class="progreso" id="progreso" aria-hidden="true"><i></i><i></i><i></i></div>
-
-  <!-- ── 1. Especialidad ─────────────────────────────────── -->
-  <div class="escena" id="e1">
-    <h1>¿Cuánto tiempo perdés escribiendo historias?</h1>
-    <p class="sub">Tres preguntas y te doy tu número. Treinta segundos.</p>
-    <p class="pregunta sub" style="margin-top:28px"><b>¿En qué atendés?</b></p>
-    <div class="opciones" id="ops-esp"></div>
-    <div class="abajo">
-      <button class="boton" id="b1" type="button" disabled>Seguir</button>
-    </div>
-  </div>
-
-  <!-- ── 2. Pacientes por día ────────────────────────────── -->
-  <div class="escena" id="e2" hidden>
-    <h1>¿Cuántos pacientes ves en un día?</h1>
-    <p class="sub">Un día normal, no el peor ni el mejor.</p>
-    <div class="contador">
-      <button class="paso-btn" id="menos" type="button" aria-label="Menos pacientes">−</button>
-      <span class="contador-d">
-        <span class="contador-n mono" id="nPacientes">18</span>
-        <small>pacientes por día</small>
-      </span>
-      <button class="paso-btn" id="mas" type="button" aria-label="Más pacientes">+</button>
-    </div>
-    <div class="abajo">
-      <button class="boton" id="b2" type="button">Seguir</button>
-      <button class="boton fino" id="atras2" type="button">Volver</button>
-    </div>
-  </div>
-
-  <!-- ── 3. Minutos por historia ─────────────────────────── -->
-  <div class="escena" id="e3" hidden>
-    <h1>¿Cuánto tardás en dejar escrita cada historia?</h1>
-    <p class="sub">Contando lo que escribís después, no durante.</p>
-    <div class="opciones" id="ops-min"></div>
-    <div class="abajo">
-      <button class="boton" id="b3" type="button" disabled>Ver mi resultado</button>
-      <button class="boton fino" id="atras3" type="button">Volver</button>
-    </div>
-  </div>
-
-  <!-- ── 4. Resultado ────────────────────────────────────── -->
-  <div class="escena" id="e4" hidden>
-    <h1 id="tituloRes">Tu número</h1>
-    <div class="titular">
-      <span class="n mono" id="horas">—</span>
-      <span class="d" id="horasTexto">—</span>
-      <span class="p" id="horasPie">—</span>
-    </div>
-
-    <div class="cuentas">
-      <div class="cuenta-fila"><span id="dPacientes">—</span><b id="vPacientes">—</b></div>
-      <div class="cuenta-fila"><span>Escribiendo, cada día</span><b id="vDia">—</b></div>
-      <div class="cuenta-fila"><span>Al mes</span><b id="vMes">—</b></div>
-      <div class="cuenta-fila"><span>Lo que costaría Symphomed ese mes</span><b class="bien" id="vCosto">—</b></div>
-    </div>
-
-    <div class="muestra">
-      <div class="muestra-cab">
-        <span class="k">Ejemplo · <span id="espNombre">medicina general</span></span>
-        <span class="k mono">38 s</span>
-      </div>
-      <div class="muestra-cuerpo" id="muestraCuerpo"></div>
-    </div>
-
-    <div class="oferta">
-      <div class="oferta-tope">
-        <span class="oferta-n">4</span>
-        <div>
-          <h3>consultas sin cargo</h3>
-          <p>Completas, con tus pacientes de verdad. Sin tarjeta y sin instalar nada.</p>
-        </div>
-      </div>
-      <ul>
-        <li>Si no te sirve, no pasa nada y te llevás lo que cargaste</li>
-        <li>Te acompañamos en la primera consulta</li>
-      </ul>
-      <div class="precio-linea">
-        <span>Después: <b>Bs 12</b> por consulta</span>
-        <span>o <b>Bs 900</b> al mes sin límite</span>
-      </div>
-    </div>
-
-    <div class="abajo">
-      <a class="boton" id="waFinal" href="#">Empezar la prueba por WhatsApp</a>
-      <button class="boton fino" id="reiniciar" type="button">Volver a calcular</button>
-      <p class="legal">Symphomed · Bolivia y Brasil · <a href="__PLATAFORMA__" style="color:inherit">Ingresar</a></p>
-    </div>
-  </div>
-
+<header class="hero">
+<div class="container hero-grid">
+<div>
+<div class="eyebrow">LA CAPA DE INTELIGENCIA PARA LA SALUD</div>
+<h1>Conversación clínica.<br><span>Historia inteligente.</span></h1>
+<p>Symphomed convierte la conversación de la consulta en información clínica estructurada: la nota, la receta y el control siguiente quedan listos sin que el médico escriba nada.</p>
+<div class="actions"><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos por WhatsApp →</a><a class="btn btn-outline" href="#plataforma">Conocer la plataforma</a></div>
+<div class="trust-row"><span><i class="dot"></i> Más tiempo con el paciente</span><span><i class="dot"></i> Mejor información clínica</span><span><i class="dot"></i> Continuidad del cuidado</span></div>
 </div>
+<div class="hero-product">
+<div class="doctor-card"><div class="doctor-photo"></div></div>
+<div class="chat"><b>Paciente</b>“Me duele hace unas tres semanas, sobre todo en las mañanas…”</div>
+<div class="ai-card"><div class="ai-head"><span>✦ SYMPHOMED <span class="pill">AI</span></span><span>•••</span></div>
+<div class="row"><label>Motivo</label><div>Dolor lumbar</div></div><div class="row"><label>Tiempo</label><div>3 semanas</div></div><div class="row"><label>Medicación</label><div>Ibuprofeno 400 mg</div></div><div class="row"><label>Antecedentes</label><div>Episodio previo</div></div></div>
+<div class="record"><h4>Ficha del paciente</h4><p><b>Nota clínica</b><br>Refiere dolor lumbar de 3 semanas, de predominio matinal. Sin irradiación. Se indica control y revisión clínica.</p><div class="save">✓ Guardar en la ficha</div></div>
+</div>
+</div>
+</header>
 
-<script nonce="__NONCE__">
-"use strict";
+<section class="light">
+<div class="container">
+<div class="section-head"><div class="eyebrow">CÓMO FUNCIONA</div><h2>De la conversación<br>a la historia clínica.</h2><p>Symphomed escucha, entiende y ordena cada consulta de forma automática, y convierte lo que se habló en datos clínicos que sirven.</p></div>
+<div class="steps">
+<div class="step"><div class="icon">♩</div><h3>1. Escucha</h3><p>Capta la conversación de la consulta.</p></div>
+<div class="step"><div class="icon">✦</div><h3>2. Entiende</h3><p>Identifica la información clínica relevante.</p></div>
+<div class="step"><div class="icon">▤</div><h3>3. Ordena</h3><p>Genera la nota clínica estructurada.</p></div>
+<div class="step"><div class="icon">↗</div><h3>4. Conecta</h3><p>Actualiza la historia del paciente para el próximo control.</p></div>
+</div>
+</div>
+</section>
 
-// ── Las notas de ejemplo, una por especialidad ─────────────────
-// Que el médico vea SU tipo de consulta y no una genérica es lo que hace que
-// la muestra convenza: una nota de hipertensión no le dice nada a un
-// odontólogo.
-var ESPECIALIDADES = [
-  {
-    id: "general", nombre: "medicina general", etiqueta: "Medicina general",
-    nota: [
-      ["Motivo", "Control de hipertensión arterial. Cefalea matinal de diez días."],
-      ["Adherencia", "Suspendió hidroclorotiazida hace 3 semanas por nicturia."],
-      ["Examen", "PA 150/95 mmHg · +2 kg desde el control previo", true],
-      ["Plan", "Reiniciar hidroclorotiazida 12,5 mg. Losartán 50 mg. Control en 3 semanas."],
-    ],
-  },
-  {
-    id: "pediatria", nombre: "pediatría", etiqueta: "Pediatría",
-    nota: [
-      ["Motivo", "Tos de cinco días y fiebre de 38,4 °C desde anoche."],
-      ["Antecedentes", "Esquema de vacunación completo. Sin internaciones previas."],
-      ["Examen", "T 38,1 °C · SatO₂ 97 % · Peso 14,2 kg (p50)", true],
-      ["Plan", "Paracetamol 15 mg/kg cada 6 h. Control en 48 h o antes si empeora."],
-    ],
-  },
-  {
-    id: "gineco", nombre: "ginecología", etiqueta: "Ginecología",
-    nota: [
-      ["Motivo", "Control prenatal. Gesta 2, para 1. Semana 28."],
-      ["Antecedentes", "Cesárea previa. Sin diabetes gestacional en gesta anterior."],
-      ["Examen", "PA 118/74 mmHg · AU 27 cm · FCF 142 lpm", true],
-      ["Plan", "Curva de tolerancia a la glucosa. Hierro y ácido fólico. Control en 3 semanas."],
-    ],
-  },
-  {
-    id: "odonto", nombre: "odontología", etiqueta: "Odontología",
-    nota: [
-      ["Motivo", "Dolor en molar inferior derecho al masticar, hace una semana."],
-      ["Examen", "Pieza 46 con caries oclusal profunda. Percusión positiva.", true],
-      ["Diagnóstico", "Pulpitis irreversible sintomática en pieza 46."],
-      ["Plan", "Tratamiento de conducto en dos sesiones. Ibuprofeno 400 mg si duele."],
-    ],
-  },
-  {
-    id: "otra", nombre: "tu especialidad", etiqueta: "Otra especialidad",
-    nota: [
-      ["Motivo", "Lo que el paciente vino a consultar, en sus palabras."],
-      ["Antecedentes", "Lo relevante de la historia, sin repetir lo que ya estaba escrito."],
-      ["Examen", "Los signos y las medidas, con sus unidades", true],
-      ["Plan", "Indicaciones, estudios pedidos y cuándo volver."],
-    ],
-  },
-];
+<section class="dark" id="plataforma"><div class="container product-show">
+<div class="screen"><div class="screen-top"><span>✦ SYMPHOMED</span><span>Consultorio</span></div><div class="screen-body"><div class="sidebar"><div>Paciente</div><div>Consulta</div><div>Datos clínicos</div><div>Historia</div><div>Kardex</div><div>Recetas</div></div><div class="screen-main"><h4>Datos clínicos</h4><div class="metric"><div><b>Motivo</b><span>Cefalea</span></div><div><b>Tiempo</b><span>3 semanas</span></div><div><b>Medicación</b><span>Ibuprofeno 400 mg</span></div><div><b>Impresión</b><span>Cefalea tensional</span></div><div><b>Antecedentes</b><span>Sin antecedentes</span></div><div><b>Plan</b><span>Control</span></div></div></div></div></div>
+<div><div class="eyebrow">LA FICHA COMPLETA</div><h2>Una consulta.<br>La ficha completa.</h2><p>Symphomed capta la conversación, reconoce lo importante y arma la nota clínica estructurada, lista para que el médico la revise y la guarde en la ficha.</p><a class="btn btn-outline" href="#demo">▶ Ver una demostración</a></div>
+</div></section>
 
-var MINUTOS = [
-  { v: 5, etiqueta: "Menos de 5 minutos", nota: "Escribo lo justo" },
-  { v: 10, etiqueta: "Unos 10 minutos", nota: "Lo habitual" },
-  { v: 15, etiqueta: "Unos 15 minutos", nota: "Escribo completo" },
-  { v: 25, etiqueta: "Más de 20 minutos", nota: "O me las llevo a casa" },
-];
+<section id="especialidades"><div class="container"><div class="section-head"><div class="eyebrow">UNA PLATAFORMA. TODAS LAS ESPECIALIDADES.</div><h2>Pensado para todo el consultorio.</h2><p>De la medicina general a la especialidad, Symphomed se adapta a cada profesional, cada especialidad y cada consultorio.</p></div>
+<div class="specialties">
+<div class="specialty"><div class="sicon">⚕</div>Medicina general</div><div class="specialty"><div class="sicon">♢</div>Odontología</div><div class="specialty"><div class="sicon">◉</div>Dermatología</div><div class="specialty"><div class="sicon">◉</div>Oftalmología</div><div class="specialty"><div class="sicon">✧</div>Estética</div><div class="specialty"><div class="sicon">⌁</div>Cirugía</div><div class="specialty"><div class="sicon">♧</div>Ginecología</div><div class="specialty"><div class="sicon">◌</div>Pediatría</div><div class="specialty"><div class="sicon">♧</div>Fisioterapia</div><div class="specialty"><div class="sicon">🐾</div>Veterinaria</div><div class="specialty"><div class="sicon">▣</div>Teleconsulta</div><div class="specialty"><div class="sicon">→</div>Todas</div>
+</div></div></section>
 
-var estado = { esp: null, pacientes: 18, minutos: null, escena: 1 };
+<section class="split" id="soluciones">
+<div class="panel panel-dark"><div class="eyebrow">MÓDULOS POR ESPECIALIDAD</div><h2>Odontología, con su propio lenguaje.</h2><p>El odontograma interactivo y los módulos propios hacen que la ficha dental sea más precisa y más rápida de llenar.</p><div class="odontogram"><div class="teeth"><div class="tooth">11</div><div class="tooth">12</div><div class="tooth">13</div><div class="tooth">14</div><div class="tooth">15</div><div class="tooth">16</div><div class="tooth">17</div><div class="tooth">18</div><div class="tooth">21</div><div class="tooth">22</div><div class="tooth">23</div><div class="tooth">24</div><div class="tooth">25</div><div class="tooth">26</div><div class="tooth">27</div><div class="tooth">28</div><div class="tooth">31</div><div class="tooth">32</div><div class="tooth">33</div><div class="tooth">34</div><div class="tooth">35</div><div class="tooth">36</div><div class="tooth">37</div><div class="tooth">38</div><div class="tooth">41</div><div class="tooth">42</div><div class="tooth">43</div><div class="tooth">44</div><div class="tooth">45</div><div class="tooth">46</div><div class="tooth">47</div><div class="tooth">48</div></div><b>Pieza 36</b><p style="margin:8px 0;color:#9fb8c5;font-size:11px">Historia · Tratamientos · Evolución</p></div></div>
+<div class="panel panel-light pet"><div class="eyebrow">SYMPHOMED PET</div><h2>La misma inteligencia.<br>Otro paciente.</h2><p>Historia clínica completa para perros y gatos, con herramientas propias y anatomía visual.</p></div>
+</section>
 
-var $ = function (id) { return document.getElementById(id); };
-var fNum = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 0 });
+<section id="confianza" class="light"><div class="container"><div class="section-head"><div class="eyebrow">CONFIANZA Y ESCALA</div><h2>Crece con el consultorio.</h2><p>De un solo profesional a una red de centros de salud, Symphomed está pensado para acompañar el crecimiento.</p></div>
+<div class="scale"><div class="scale-box"><b>1</b><small>Profesional</small></div><div>→</div><div class="scale-box"><b>10</b><small>Profesionales</small></div><div>→</div><div class="scale-box"><b>100</b><small>Profesionales</small></div><div>→</div><div class="scale-box"><b>∞</b><small>Red de salud</small></div></div>
+</div></section>
 
-// ── Las pantallas ─────────────────────────────────────────────
-function mostrar(n) {
-  estado.escena = n;
-  [1, 2, 3, 4].forEach(function (i) { $("e" + i).hidden = i !== n; });
-  var barras = $("progreso").children;
-  for (var i = 0; i < barras.length; i++) barras[i].classList.toggle("hecho", i < Math.min(n, 3));
-  $("progreso").hidden = n === 4;
-  $("saltar").hidden = n === 4;
-  window.scrollTo(0, 0);
-}
+<section class="dark" id="tecnologia"><div class="container"><div class="section-head"><div class="eyebrow">TECNOLOGÍA</div><h2>Construido para la salud.</h2><p>Inteligencia artificial, voz, datos clínicos estructurados e integraciones, en una sola plataforma.</p></div>
+<div class="specialties"><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Inteligencia artificial</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Voz</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Lenguaje clínico</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Datos estructurados</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">API</div><div class="specialty" style="background:#071a25;border-color:#214354;color:#fff">Seguridad</div></div>
+</div></section>
 
-function opciones(caja, lista, elegida, alElegir) {
-  caja.innerHTML = lista.map(function (o) {
-    return '<button class="opcion" type="button" data-v="' + o.valor + '" aria-pressed="' +
-      (o.valor === elegida ? "true" : "false") + '"><span>' + o.titulo + "</span>" +
-      (o.nota ? "<small>" + o.nota + "</small>" : "") + "</button>";
-  }).join("");
-  caja.querySelectorAll(".opcion").forEach(function (b) {
-    b.addEventListener("click", function () {
-      caja.querySelectorAll(".opcion").forEach(function (o) { o.setAttribute("aria-pressed", "false"); });
-      b.setAttribute("aria-pressed", "true");
-      alElegir(b.getAttribute("data-v"));
-    });
-  });
-}
+<section class="final" id="demo"><div class="container"><div class="eyebrow">EMPEZAR</div><h2>En la salud se conversa todos los días.<br><span style="color:#28c9f4">Symphomed lo convierte en historia clínica.</span></h2><p>Escríbanos por WhatsApp y le mostramos cómo funciona con un caso real, en quince minutos. Las primeras 4 consultas no se cobran.</p><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos por WhatsApp →</a></div></section>
 
-opciones($("ops-esp"), ESPECIALIDADES.map(function (e) { return { valor: e.id, titulo: e.etiqueta }; }), null,
-  function (v) { estado.esp = v; $("b1").disabled = false; });
-
-opciones($("ops-min"), MINUTOS.map(function (m) { return { valor: String(m.v), titulo: m.etiqueta, nota: m.nota }; }), null,
-  function (v) { estado.minutos = Number(v); $("b3").disabled = false; });
-
-// ── El contador ───────────────────────────────────────────────
-function pintarContador() { $("nPacientes").textContent = estado.pacientes; }
-$("mas").addEventListener("click", function () {
-  estado.pacientes = Math.min(60, estado.pacientes + 1); pintarContador();
-});
-$("menos").addEventListener("click", function () {
-  estado.pacientes = Math.max(1, estado.pacientes - 1); pintarContador();
-});
-pintarContador();
-
-// "5 h 0 min" delata que el número lo escribió una fórmula. Y por debajo de
-// una hora, "0 h 45 min" es peor todavía.
-function duracion(min) {
-  var h = Math.floor(min / 60), m = min % 60;
-  if (!h) return m + " min";
-  return h + " h" + (m ? " " + m + " min" : "");
-}
-
-// ── El resultado ──────────────────────────────────────────────
-function calcular() {
-  var esp = ESPECIALIDADES.filter(function (e) { return e.id === estado.esp; })[0] || ESPECIALIDADES[0];
-  var minDia = estado.pacientes * estado.minutos;
-  var horasSemana = minDia * 5 / 60;
-  var horasMes = minDia * 22 / 60;
-  // El plan conviene desde 75 consultas al mes; abajo de eso, el prepago.
-  var consultasMes = estado.pacientes * 22;
-  var costo = consultasMes >= 75 ? 900 : consultasMes * 12;
-
-  $("horas").textContent = horasSemana >= 10 ? fNum.format(Math.round(horasSemana)) : horasSemana.toFixed(1);
-  $("horasTexto").textContent = "horas por semana escribiendo";
-  $("horasPie").textContent = horasSemana >= 8
-    ? "Es un día entero de trabajo, todas las semanas."
-    : "Son " + fNum.format(Math.round(horasMes)) + " horas al mes.";
-
-  $("dPacientes").textContent = "Pacientes por día";
-  $("vPacientes").textContent = estado.pacientes;
-  $("vDia").textContent = duracion(minDia);
-  $("vMes").textContent = fNum.format(Math.round(horasMes)) + " horas";
-  $("vCosto").textContent = consultasMes >= 75
-    ? "Bs 900 · plan sin límite"
-    : "Bs " + fNum.format(costo) + " · " + fNum.format(consultasMes) + " consultas";
-
-  $("tituloRes").textContent = horasSemana >= 8
-    ? "Perdés un día entero por semana"
-    : "Esto es lo que te cuesta escribir";
-  $("espNombre").textContent = esp.nombre;
-  $("muestraCuerpo").innerHTML = esp.nota.map(function (c) {
-    return '<div class="campo"><span class="k">' + c[0] + '</span>' +
-      '<span class="v' + (c[2] ? " dato mono" : "") + '">' + c[1] + "</span></div>";
-  }).join("");
-
-  var msg = "Hola, soy de " + esp.nombre + ", veo " + estado.pacientes +
-    " pacientes por día y pierdo unas " + Math.round(horasSemana) +
-    " horas por semana escribiendo historias. Quiero probar Symphomed.";
-  $("waFinal").href = "https://wa.me/59164637067?text=" + encodeURIComponent(msg);
-}
-
-// ── Navegación ────────────────────────────────────────────────
-$("b1").addEventListener("click", function () { mostrar(2); });
-$("b2").addEventListener("click", function () { mostrar(3); });
-$("b3").addEventListener("click", function () { calcular(); mostrar(4); });
-$("atras2").addEventListener("click", function () { mostrar(1); });
-$("atras3").addEventListener("click", function () { mostrar(2); });
-$("reiniciar").addEventListener("click", function () { mostrar(1); });
-
-// Saltar el cuestionario: quien ya sabe lo que busca no tiene por qué
-// contestar tres preguntas para llegar al precio y al WhatsApp.
-$("saltar").addEventListener("click", function () {
-  if (!estado.esp) estado.esp = "general";
-  if (!estado.minutos) estado.minutos = 10;
-  calcular();
-  mostrar(4);
-});
-
-mostrar(1);
-</script>
+<footer><div class="container footer"><div class="logo"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</div><div class="footerlinks"><a href="#plataforma">Plataforma</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a><a href="#demo">Contacto</a></div><div>© 2026 Symphomed · Bolivia y Brasil</div></div></footer>
 </body>
 </html>
