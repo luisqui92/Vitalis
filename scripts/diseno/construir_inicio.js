@@ -39,6 +39,28 @@ css = css.replace(
 );
 css = css.replace(/\.panel-dark p\{color:#a8bdc9\}/, ".panel-dark p,.pet p{color:#a8bdc9}");
 
+// ─── El símbolo de la marca, en lugar de los cinco puntos ──────────────────
+//
+// El diseño traía un símbolo inventado: cinco puntos cian dibujados con CSS.
+// Symphomed ya tiene el suyo —el círculo con la cruz, el cerebro y el
+// electro— y es el que reconoce un médico que ya usa la plataforma.
+//
+// La regla de los puntos se reemplaza en vez de agregarle otra encima: si se
+// dejara, los <i> seguirían dibujándose arriba de la imagen. Se deja sin
+// `position:relative` y sin los hijos, y el <i> se anula por si alguno
+// sobrevive a un cambio futuro del marcado.
+// 34px y no los 26 de los puntos: MEDIDO contra 26, 30, 34 y 38 en la barra
+// de verdad. El símbolo tiene cinco elementos —círculo, cruz, cerebro,
+// electro y la carpeta— y abajo de 34 el cerebro se convierte en una mancha:
+// se ve que hay "algo", no se ve QUÉ. Los puntos que traía el diseño se
+// bancaban 26 porque eran cinco círculos. De 38 para arriba el símbolo le
+// gana al texto y deja de ser un bloque.
+// Es el mismo tamaño que usa la cabecera de la plataforma, a propósito.
+css = css.replace(
+  /\.logo-mark\{width:26px;height:26px;position:relative\}/,
+  ".logo-mark{width:34px;height:34px;flex:none;object-fit:contain;display:block}.logo-mark i{display:none}"
+);
+
 // ─── Lo que le faltaba al diseño para el celular ───────────────────────────
 //
 // El original trae reglas para 900px y 560px, pero ninguna toca .scale ni
@@ -96,6 +118,9 @@ css += `
      cambiar de versión, y esconderlo justo en el celular lo dejaría atrapado
      en el idioma que le tocó. */
   .logo{font-size:13px;letter-spacing:2px}
+  /* El símbolo también se achica: a 34px con el texto ya chico quedaba
+     desbalanceado, y son 6px que en la barra de un celular se notan. */
+  .logo-mark{width:28px;height:28px}
   .nav .navright{gap:10px}
   .idiomas a{padding:4px;letter-spacing:0}
   .btn{padding:11px 16px}
@@ -476,6 +501,21 @@ function construir(idioma) {
   //    española: un médico brasileño que toque el logo no tiene por qué
   //    terminar en una página en español.
   cuerpo = cuerpo.split('<a class="logo" href="#">').join(`<a class="logo" href="${RUTAS[idioma]}">`);
+
+  // 8b. Y los cinco puntos del diseño, por el símbolo de verdad.
+  //
+  //     Va con width y height puestos aunque el CSS ya los defina: sin ellos
+  //     el navegador no sabe cuánto espacio reservar hasta que la imagen
+  //     llega, y la barra entera da un salto cuando aparece. Es lo primero
+  //     que se ve al abrir la página, así que el salto se nota siempre.
+  //
+  //     El alt va VACÍO a propósito: el enlace ya dice "SYMPHOMED" al lado,
+  //     y un alt="Symphomed" haría que un lector de pantalla leyera la marca
+  //     dos veces seguidas.
+  const puntos = '<span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>';
+  if (!cuerpo.includes(puntos)) throw new Error(`[${idioma}] no encontré los puntos del logo`);
+  cuerpo = cuerpo.split(puntos).join(
+    '<img class="logo-mark" src="/img/simbolo.webp" alt="" width="34" height="34">');
 
   // 9. Las anclas que quedaron con el nombre viejo de la sección. Un enlace a
   //    una sección que ya no se llama así no da error: simplemente no lleva a

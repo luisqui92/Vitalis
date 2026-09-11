@@ -154,9 +154,22 @@ const sinBloquePersona = (html) => html
   .replace(/\n {8}(?=\n {8}<div class="dato-row" style="border-bottom:none">)/g, "")
   .replace(/\n {4}(?=\n {4}<div class="tabs">)/g, "");
 
+// El archivo del símbolo cambió: /logo.png era un dibujo sobre fondo BLANCO
+// OPACO, y desde que la plataforma usa la paleta oscura se veía como un
+// cuadrado blanco en la cabecera de todas las pantallas. El reemplazo lo
+// genera scripts/diseno/construir_marca.js y lo comprueba probar_marca.js,
+// que le mira los píxeles.
+//
+// Acá se iguala en LOS DOS lados, no se descuenta de uno solo: esta prueba
+// existe para atajar que el trabajo de i18n mueva el dibujo sin querer, no
+// para congelar el nombre de un archivo. Tapando solo el lado nuevo, un
+// cambio de imagen futuro pasaría sin que nadie lo viera.
+const mismaMarca = (html) => html.replace(/\/logo\.png|\/img\/simbolo\.webp/g, "«símbolo»");
+
 let fallos = 0;
-function comparar(nombre, viejo, nuevoBruto) {
-  const nuevo = Object.fromEntries(Object.entries(nuevoBruto).map(([k, v]) => [k, sinBloquePersona(v)]));
+function comparar(nombre, viejoBruto, nuevoBruto) {
+  const viejo = Object.fromEntries(Object.entries(viejoBruto).map(([k, v]) => [k, mismaMarca(v)]));
+  const nuevo = Object.fromEntries(Object.entries(nuevoBruto).map(([k, v]) => [k, mismaMarca(sinBloquePersona(v))]));
   for (const k of Object.keys(viejo)) {
     if (viejo[k] === nuevo[k]) {
       console.log(`✅ ${nombre}/${k}: idéntico (${viejo[k].length} car.)`);

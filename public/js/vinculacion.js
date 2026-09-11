@@ -76,7 +76,7 @@ function pintarVincular(v) {
         <div class="listen-orb" id="audioOrbRemoto">
           <div class="listen-ring"></div>
           <div class="listen-ring listen-ring-2"></div>
-          <img src="/logo.png" alt="" class="listen-logo">
+          <img src="/img/simbolo.webp" alt="" class="listen-logo">
         </div>
         <div class="listen-time" id="recTimeRemoto">00:00</div>
         <div class="listen-label">${t("vincular.grabando", { paciente: esc(pacienteNombre) })}</div>

@@ -68,7 +68,20 @@ body{font-family:var(--font-texto);background:var(--bg);color:var(--text);min-he
 .header{background:var(--card);padding:16px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;}
 .header .brand{display:flex;align-items:center;gap:11px;}
 .header .logo{width:34px;height:34px;object-fit:contain;}
-.header h1{font-family:var(--font-marca);font-weight:600;font-size:19px;color:var(--text);letter-spacing:.01em;}
+/* ── La marca, el mismo bloque que en symphomed.com ───────────────────────
+   El símbolo y al lado SYMPHOMED en caja alta con las letras separadas. Es
+   exactamente el bloque que ve alguien que entra a la página pública, y
+   ahora también el que ve el médico adentro. Antes eran dos marcas
+   distintas —acá una serif en caja mixta, allá otra cosa— y quien venía de
+   la página tenía que reconocerla de nuevo.
+
+   OJO CON EL LARGO: acá no siempre dice "Symphomed". Según la especialidad
+   dice "Symphomed Neurodesarrollo" o "Symphomed Obstetricia", y en caja
+   alta con 2px de separación eso no entra a lo ancho de un celular. Por eso
+   NO lleva white-space:nowrap: cuando no entra, baja a dos renglones, que
+   se lee perfecto. Forzarlo a una línea lo empujaría fuera de la pantalla,
+   que es el desborde que se arrastra hasta pintar una franja al costado. */
+.header h1{font-family:var(--font-texto);font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:2px;color:var(--text);line-height:1.25;}
 .header p{font-size:11.5px;color:var(--text-muted);margin-top:1px;letter-spacing:.01em;}
 .header button{background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:var(--radius-sm);padding:6px 13px;font-size:12px;font-family:var(--font-texto);font-weight:500;transition:border-color .15s ease,color .15s ease;}
 .header button:hover{border-color:var(--primary);color:var(--primary);}
@@ -299,7 +312,9 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .escr-sidebar{width:230px;flex:0 0 auto;background:var(--card);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;}
 .escr-marca{display:flex;align-items:center;gap:10px;padding:0 8px 20px;}
 .escr-logo{width:30px;height:30px;object-fit:contain;}
-.escr-marca span{font-family:var(--font-marca);font-weight:600;font-size:16.5px;color:var(--text);letter-spacing:.01em;}
+/* El mismo bloque en la barra lateral de escritorio. Un poco más chico
+   porque la barra mide 230px y el nombre puede traer la especialidad. */
+.escr-marca span{font-family:var(--font-texto);font-weight:800;font-size:13.5px;text-transform:uppercase;letter-spacing:1.8px;color:var(--text);line-height:1.25;}
 .escr-nav{display:flex;flex-direction:column;gap:2px;flex:1;}
 .escr-nav-item{display:flex;align-items:center;gap:11px;background:none;border:none;color:var(--text-muted);font-family:var(--font-texto);font-size:13.5px;font-weight:600;padding:11px 12px;border-radius:var(--radius-sm);text-align:left;transition:background .15s ease,color .15s ease;}
 .escr-nav-item:hover{background:rgba(var(--primary-rgb),.07);color:var(--text);}

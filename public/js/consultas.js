@@ -56,7 +56,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         <div class="listen-orb" id="audioOrb">
           <div class="listen-ring"></div>
           <div class="listen-ring listen-ring-2"></div>
-          <img src="/logo.png" alt="" class="listen-logo">
+          <img src="/img/simbolo.webp" alt="" class="listen-logo">
         </div>
         <div class="listen-time" id="recTime">00:00</div>
         <div class="listen-label">${t("consulta.escuchando")}</div>

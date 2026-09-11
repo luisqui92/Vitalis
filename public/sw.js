@@ -17,8 +17,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(datos.titulo || "Symphomed", {
       body: datos.cuerpo || "",
-      icon: "/logo.png",
-      badge: "/logo.png",
+      icon: "/img/simbolo-192.png",
+      badge: "/img/simbolo-192.png",
       // Vibra al llegar: si el celular está en el bolsillo durante una
       // consulta, es lo único que se nota.
       vibrate: [180, 80, 180],
