@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#03101a">
+<title>Symphomed — the intelligence layer for healthcare</title>
+<meta name="description" content="Symphomed turns the consultation into structured clinical information: the note, the prescription and the follow-up are ready without the clinician typing a word.">
+<link rel="canonical" href="https://symphomed.com/en">
+<link rel="alternate" hreflang="es" href="https://symphomed.com/">
+<link rel="alternate" hreflang="pt" href="https://symphomed.com/pt">
+<link rel="alternate" hreflang="en" href="https://symphomed.com/en">
+<link rel="alternate" hreflang="x-default" href="https://symphomed.com/">
+<meta property="og:title" content="Symphomed — the intelligence layer for healthcare">
+<meta property="og:description" content="The clinical note, the prescription and the chart come out of the consultation without typing. The first 4 consultations are free.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://symphomed.com/en">
+<meta property="og:locale" content="en_US">
+<style>
+@font-face {
+  font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+:root { color-scheme: dark; }
+</style>
+<style>
+
+:root{
+  --ink:#07121b; --muted:#607080; --line:#dce7ef; --cyan:#19b9ef;
+  --cyan2:#65ddff; --white:#fff; --soft:#f5f9fc; --dark:#03101a;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;font-family:InterVar,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}
+a{text-decoration:none;color:inherit}.container{width:min(1180px,92%);margin:auto}
+nav{position:fixed;top:0;left:0;right:0;z-index:20;height:72px;background:rgba(3,16,26,.82);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08)}
+.nav{height:100%;display:flex;align-items:center;justify-content:space-between}.logo{color:#fff;font-weight:800;letter-spacing:3px;font-size:15px;display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;position:relative}.logo-mark i{position:absolute;width:8px;height:8px;border-radius:50%;background:#20c7f3}.logo-mark i:nth-child(1){left:9px;top:0}.logo-mark i:nth-child(2){left:0;top:9px}.logo-mark i:nth-child(3){right:0;top:8px}.logo-mark i:nth-child(4){left:9px;bottom:0}.logo-mark i:nth-child(5){left:8px;top:8px;background:#8beaff}
+.navlinks{display:flex;gap:27px;color:#b9c9d5;font-size:12px}.navlinks a:hover{color:#fff}.navright{display:flex;align-items:center;gap:18px;color:#d8e5ed;font-size:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 21px;border-radius:30px;font-weight:700;font-size:12px;transition:.2s;border:1px solid transparent;cursor:pointer}.btn-primary{background:linear-gradient(100deg,#1fb9ee,#54d8ff);color:#03131d}.btn-outline{border-color:#78909f;color:#fff;background:transparent}.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.hero{min-height:720px;padding:145px 0 70px;background:radial-gradient(circle at 78% 28%,#12354a 0,#071a27 27%,#020b12 67%);color:#fff;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:43% 57%;align-items:center;gap:20px}.eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#45d5fa;margin-bottom:15px}.hero h1{font-size:clamp(45px,5vw,68px);line-height:1.01;letter-spacing:-3px;margin:0 0 20px}.hero h1 span{color:#25c7f5}.hero p{font-size:17px;line-height:1.65;color:#b9c9d5;max-width:520px}.actions{display:flex;gap:12px;margin:28px 0}.trust-row{display:flex;gap:30px;margin-top:38px;color:#c4d4de;font-size:11px}.trust-row span{display:flex;align-items:center;gap:8px}.dot{width:8px;height:8px;border-radius:50%;background:#26c8f2}
+.hero-product{position:relative;min-height:430px}.doctor-card{position:absolute;right:0;top:0;width:72%;height:285px;border:1px solid #3b6d83;border-radius:14px;background:linear-gradient(135deg,#193445,#081822);overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.5)}
+.doctor-photo{height:100%;background:linear-gradient(90deg,rgba(4,17,25,.15),rgba(4,17,25,.55)),url("/img/medica.jpg") center/cover}
+.chat{position:absolute;left:-55px;top:55px;width:250px;padding:14px;border:1px solid #2c91b2;border-radius:12px;background:rgba(4,20,29,.92);font-size:12px;color:#d9e9f1}.chat b{color:#42d5fb;display:block;margin-bottom:8px}
+.ai-card{position:absolute;left:0;bottom:0;width:59%;padding:18px;border:1px solid #2c86a5;border-radius:13px;background:linear-gradient(145deg,#102c3d,#07151e);box-shadow:0 25px 60px rgba(0,0,0,.45)}
+.ai-head{display:flex;justify-content:space-between;color:#fff;font-weight:700;font-size:12px;margin-bottom:15px}.pill{font-size:9px;border:1px solid #28728d;color:#52dafa;border-radius:20px;padding:4px 8px}
+.row{display:grid;grid-template-columns:115px 1fr;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.08);font-size:10px}.row label{color:#8da7b5}.row div{color:#e4f0f5}
+.record{position:absolute;right:-15px;bottom:22px;width:43%;padding:18px;border:1px solid #316c84;border-radius:13px;background:#0a2230;color:#dcebf2;box-shadow:0 20px 60px #0008}.record h4{margin:0 0 13px;color:#5bddfa}.record p{font-size:10px;line-height:1.6;color:#afc3ce}.save{font-size:10px;color:#49d8fb;border:1px solid #287c98;border-radius:20px;padding:7px 10px;text-align:center}
+section{padding:95px 0}.light{background:#f6fafc}.dark{background:#03101a;color:#fff}.section-head{max-width:700px;margin-bottom:45px}.section-head h2{font-size:clamp(34px,4vw,52px);line-height:1.05;letter-spacing:-2px;margin:10px 0 18px}.section-head p{color:var(--muted);font-size:16px;line-height:1.7}.dark .section-head p{color:#a8bdc9}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:25px}.step{position:relative}.step:after{content:"→";position:absolute;right:-18px;top:28px;color:#9bb1bf;font-size:22px}.step:last-child:after{display:none}.icon{width:58px;height:58px;border-radius:50%;background:#e5f6fc;display:grid;place-items:center;color:#069fd3;font-size:23px;margin-bottom:20px}.step h3{margin:0 0 9px}.step p{color:var(--muted);font-size:13px;line-height:1.6}
+.product-show{display:grid;grid-template-columns:1.2fr .8fr;gap:60px;align-items:center}.screen{background:#071c29;border:1px solid #245267;border-radius:14px;padding:14px;box-shadow:0 30px 80px #001018aa}.screen-top{height:38px;border-bottom:1px solid #173847;color:#b9d1dc;font-size:11px;display:flex;align-items:center;justify-content:space-between}.screen-body{display:grid;grid-template-columns:110px 1fr;min-height:290px}.sidebar{padding:14px 8px;border-right:1px solid #173847;color:#8aa6b4;font-size:10px}.sidebar div{padding:9px}.sidebar div:first-child{color:#fff;background:#123b4e;border-radius:6px}.screen-main{padding:18px;color:#fff}.screen-main h4{margin:0 0 14px;color:#5bdcfa}.metric{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric div{background:#0d2939;border:1px solid #1d4a5d;padding:12px;border-radius:7px;font-size:10px}.metric b{display:block;color:#fff;margin-bottom:5px}.metric span{color:#8eabb8}
+.specialties{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.specialty{padding:24px 10px;border:1px solid var(--line);border-radius:12px;text-align:center;font-size:12px;background:#fff;transition:.2s}.specialty:hover{border-color:#4acaf0;transform:translateY(-3px);box-shadow:0 10px 30px #0a7fa51a}.specialty .sicon{font-size:25px;margin-bottom:12px}
+.split{display:grid;grid-template-columns:1fr 1fr}.split .panel{padding:80px max(6vw,40px)}.panel-dark{background:#061722;color:#fff}.panel-dark p,.pet p{color:#a8bdc9}.panel-light{background:#f4f8fb}.odontogram{margin-top:28px;background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff}.teeth{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:18px}.tooth{height:30px;border:1px solid #5ecde9;border-radius:6px;display:grid;place-items:center;font-size:9px}.pet{background:linear-gradient(120deg,#06131c,#0d2836);color:#fff;position:relative;overflow:hidden}.pet:after{content:"🐕  🐈";position:absolute;font-size:110px;right:5%;bottom:-20px;opacity:.7}
+.scale{display:flex;align-items:center;justify-content:space-between;gap:10px}.scale-box{flex:1;border:1px solid var(--line);padding:22px 14px;border-radius:12px;text-align:center}.scale-box b{font-size:27px;display:block}.scale-box small{color:var(--muted)}
+.final{padding:110px 0;background:radial-gradient(circle at 50% 0,#10384e,#03101a 60%);text-align:center;color:#fff}.final h2{font-size:clamp(38px,5vw,62px);letter-spacing:-2px;max-width:850px;margin:0 auto 20px}.final p{color:#a9c0cb;max-width:620px;margin:0 auto 30px;line-height:1.7}
+footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;justify-content:space-between;align-items:center;font-size:11px}.footerlinks{display:flex;gap:22px}
+@media(max-width:900px){.navlinks{display:none}.hero-grid,.product-show,.split{grid-template-columns:1fr}.hero-product{margin-top:30px;min-height:450px}.steps{grid-template-columns:1fr 1fr}.specialties{grid-template-columns:repeat(3,1fr)}.doctor-card{width:78%}.chat{left:0}.record{right:0}.ai-card{left:0}}
+@media(max-width:560px){.hero{padding-top:120px}.hero h1{font-size:43px}.actions,.trust-row{flex-direction:column;align-items:flex-start}.steps,.specialties{grid-template-columns:1fr 1fr}.hero-product{transform:scale(.88);transform-origin:left top;height:400px}.footer{flex-direction:column;gap:20px;align-items:flex-start}}
+
+/* El pie es una fila flex de tres bloques sin flex-wrap. Alargar el copyright
+   a "Bolivia y Brasil" bastó para que a 768px no entrara y desbordara la
+   página entera. Se deja envolviendo SIEMPRE: a ancho completo no cambia
+   nada, y deja de depender de que el texto no crezca. */
+.footer{flex-wrap:wrap;gap:14px 20px}
+.footerlinks{flex-wrap:wrap;gap:12px 18px}
+@media(max-width:620px){
+  .scale{flex-wrap:wrap;justify-content:center;gap:12px}
+  .scale-box{flex:1 1 38%}
+}
+@media(max-width:620px){
+  /* .screen es una grilla dentro de otra grilla. Por defecto una celda no se
+     achica por debajo del ancho mínimo de su contenido, así que la maqueta
+     del consultorio empujaba 354px aunque su contenedor midiera 331. El
+     minmax(0,1fr) es lo que le da permiso para achicarse. */
+  .screen-body{grid-template-columns:84px minmax(0,1fr)}
+  .screen-main{min-width:0}
+  .metric{grid-template-columns:1fr}
+}
+/* ── El selector de idioma ────────────────────────────────────────────────
+   Son tres enlaces de verdad, a tres URLs de verdad. Ni un menú desplegable
+   ni un botón con JavaScript: un médico brasileño que abra la página en
+   español tiene que poder cambiarla aunque el script no haya corrido, y un
+   buscador tiene que poder seguir el enlace para encontrar las otras dos
+   versiones. */
+.idiomas{display:inline-flex;gap:2px;align-items:center}
+.idiomas a{
+  color:#7f9fb0;text-decoration:none;font-size:11px;letter-spacing:1px;
+  padding:4px 6px;border-radius:5px;transition:.2s;
+}
+.idiomas a:hover{color:#fff;background:#0c2a3a}
+.idiomas a[aria-current="page"]{color:#fff;background:#12384a}
+.idiomas a:focus-visible{outline:2px solid #49d8fb;outline-offset:1px}
+@media(max-width:480px){
+  /* "SYMPHOMED" con letter-spacing:3px es ancho, y la barra reparte con
+     space-between: abajo de 480 el logo termina tocando el selector de idioma
+     y se lee "SYMPHOMEDES". Se achica el logo y se aprieta el selector.
+     Ojo: el selector NO se esconde. Antes sí —había un solo idioma y no
+     hacía nada—, pero ahora es la única forma que tiene un visitante de
+     cambiar de versión, y esconderlo justo en el celular lo dejaría atrapado
+     en el idioma que le tocó. */
+  .logo{font-size:13px;letter-spacing:2px}
+  .nav .navright{gap:10px}
+  .idiomas a{padding:4px;letter-spacing:0}
+  .btn{padding:11px 16px}
+  /* Y el botón de la barra se va. MEDIDO, no supuesto: con el selector
+     puesto, a 390px la .navright pedía 247px y terminaba 22px afuera de la
+     pantalla — el mismo desborde que produce la franja blanca al costado de
+     toda la página, otra vez.
+     Se saca este botón y no el selector porque este es el único de los tres
+     que se repite: la misma llamada está en la portada, justo abajo, y
+     de nuevo al cierre. El selector y "Ingresar" no están en ningún otro
+     lado. Y no se arregla apretando el botón unos píxeles: en portugués dice
+     "Fale conosco" y en inglés "Talk to us", así que el ancho cambia con el
+     idioma y el margen tiene que ser holgado, no justo. */
+  .nav .navright .btn{display:none}
+}
+@media(max-width:430px){
+  /* A 43px el titular llega justo al borde del contenedor y queda pegado.
+     Dos píxeles menos de cuerpo le devuelven el margen. */
+  .hero h1{font-size:38px;letter-spacing:-2px}
+}
+/* ── Las fichas de tecnología ─────────────────────────────────────────────
+   Tres columnas y no seis: con seis, cada ficha medía 185px de ancho y el
+   texto no entraba sin quedar ilegible.
+
+   El resumen está SIEMPRE en el HTML, nunca escondido por JavaScript. Se
+   revela al pasar el cursor, al tabular y al tocar (por la clase que agrega
+   el script). Así lo lee Google, y si el script no corre se sigue pudiendo
+   llegar a todo con el teclado. */
+.tecnos{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.tecno{
+  background:#071a25;border:1px solid #214354;border-radius:10px;
+  padding:15px 12px;color:#8fb0c2;font-family:inherit;font-size:12px;
+  line-height:1.35;cursor:pointer;transition:.2s;
+}
+.tecno:hover{border-color:#3f9dbe;color:#fff}
+.tecno[aria-selected="true"]{border-color:#5bddfa;background:#0c2a3a;color:#fff}
+.tecno:focus-visible{outline:2px solid #49d8fb;outline-offset:2px}
+/* El alto mínimo es lo que evita que cambiar de pestaña mueva la página: el
+   panel no se achica con el resumen más corto ni salta con el más largo. */
+.tecno-panel{
+  margin-top:14px;background:#071a25;border:1px solid #214354;border-radius:12px;
+  padding:26px 28px;min-height:200px;
+}
+.det b{display:block;font-size:15px;color:#fff;margin-bottom:10px}
+.det p{color:#a8bdc9;font-size:14px;line-height:1.75;max-width:74ch;margin:0}
+/* Sin JavaScript se muestran los seis, uno debajo del otro: una lista, que se
+   lee bien, y ahí el filete separa. Con el script solo hay uno visible.
+   El :not() es necesario: display:none saca al elemento del dibujo pero NO de
+   la cadena de hermanos, así que un ".det + .det" pelado le ponía el filete
+   al único visible por tener cinco ocultos delante — una línea suelta arriba
+   del título, sin nada que separar. */
+.det:not([data-oculto]) + .det:not([data-oculto]){
+  margin-top:20px;padding-top:20px;border-top:1px solid #16323f;
+}
+/* Sin JavaScript no hay clase que alternar, así que el resumen se muestra al
+   pasar el cursor y al tabular — que es lo que ya hace el CSS de arriba. */
+@media(max-width:900px){.tecnos{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.tecnos{grid-template-columns:1fr 1fr}.tecno-panel{padding:20px}}
+@media(prefers-reduced-motion:reduce){.tecno{transition:none}}
+[data-oculto]{display:none}
+
+/* ── El carrusel de módulos ───────────────────────────────────────────────
+   Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
+   sin JavaScript. Las flechas y los puntos son una mejora encima. */
+.carrusel{margin-top:45px}
+.pistas{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pistas::-webkit-scrollbar{display:none}
+.pistas:focus-visible{outline:2px solid #49d8fb;outline-offset:4px}
+.modulo{flex:0 0 100%;scroll-snap-align:start;min-width:0}
+.modulo-in{display:grid;grid-template-columns:1fr 1fr;gap:55px;align-items:center}
+.modulo-txt p{color:#a8bdc9;font-size:15px;line-height:1.7;margin:14px 0 0;max-width:46ch}
+.modulo-t{font-size:clamp(24px,2.6vw,34px);line-height:1.15;letter-spacing:-1px;margin:10px 0 0;font-weight:700}
+.demo{background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff;min-width:0}
+.demo b{display:block;margin-top:14px;font-size:13px}
+.demo .row:first-of-type{border-top:0}
+.demo-pie{margin:8px 0 0;color:#9fb8c5;font-size:11px;line-height:1.6}
+.tooth.marcada{border-color:#5bddfa;background:#123b4e;color:#8beaff}
+.visor{height:110px;border:1px solid #2c6b84;border-radius:8px;background:linear-gradient(140deg,#0d2b3b,#061620);position:relative;margin-bottom:14px}
+.visor-regla{position:absolute;left:18%;top:38%;width:46%;height:2px;background:#5bddfa}
+.visor-medida{position:absolute;left:18%;top:calc(38% + 10px);color:#5bddfa;font-size:10px}
+.pet-demo{position:relative;overflow:hidden}
+.pet-demo:after{content:"🐕";position:absolute;font-size:64px;right:10px;bottom:-12px;opacity:.55}
+.mandos{display:flex;align-items:center;gap:18px;margin-top:30px}
+.flecha{width:42px;height:42px;flex:none;border-radius:50%;border:1px solid #2c6b84;background:transparent;color:#8beaff;font-size:15px;cursor:pointer;transition:.2s}
+.flecha:hover:not(:disabled){background:#0d2b3b;border-color:#5bddfa}
+.flecha:disabled{opacity:.3;cursor:default}
+.flecha:focus-visible{outline:2px solid #49d8fb;outline-offset:3px}
+/* flex-wrap y no un ancho fijo: con siete puntos, dos flechas y los huecos,
+   los mandos pedían 350px dentro de un contenedor de 294 en una pantalla de
+   320. Envolviendo, deja de importar cuántos módulos haya. */
+.puntos{display:flex;gap:8px;flex:1;flex-wrap:wrap}
+.punto{width:26px;height:3px;border-radius:2px;border:0;padding:0;background:#23596d;cursor:pointer;transition:.2s}
+.punto[aria-current="true"]{background:#5bddfa}
+.punto:focus-visible{outline:2px solid #49d8fb;outline-offset:3px}
+@media(max-width:900px){
+  .modulo-in{grid-template-columns:1fr;gap:26px}
+  .carrusel{margin-top:32px}
+}
+@media(max-width:480px){
+  .mandos{gap:12px}
+  .flecha{width:38px;height:38px}
+  .punto{width:18px}
+}
+@media(prefers-reduced-motion:reduce){.pistas{scroll-behavior:auto}}
+
+/* Qué recuerda el seguimiento. Van como filete y no como tarjeta: son una
+   lista de cosas del mismo rango, y cinco tarjetas con sombra al lado de las
+   tres de arriba competirían con ellas por la atención. */
+.recuerdos{display:grid;grid-template-columns:repeat(5,1fr);gap:0 22px;margin-top:52px;border-top:1px solid var(--line);padding-top:26px}
+.recuerdo b{display:block;font-size:13px;margin-bottom:7px}
+.recuerdo span{color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:900px){.recuerdos{grid-template-columns:1fr 1fr;gap:22px}}
+@media(max-width:560px){.recuerdos{grid-template-columns:1fr;gap:18px}}
+/* La sección de la agenda tiene tres pasos y no cuatro. Sin esto quedaría una
+   columna vacía a la derecha, que se lee como si faltara algo. */
+.steps-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.steps-3{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.steps-3{grid-template-columns:1fr}.steps-3 .step:after{display:none}}
+/* Con psicología y psiquiatría son catorce especialidades. A seis columnas
+   quedaban doce arriba y dos solas abajo; a siete entran en dos filas justas.
+   Va acotado a esta sección: la de tecnología usa la misma clase con seis. */
+#especialidades .specialties{grid-template-columns:repeat(7,1fr)}
+@media(max-width:900px){#especialidades .specialties{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){#especialidades .specialties{grid-template-columns:repeat(2,1fr)}}
+/* Cinturón de seguridad. Lo de arriba arregla las causas conocidas; esto
+   asegura que una futura —un texto más largo, una sección nueva— no vuelva a
+   producir la franja blanca al costado de TODA la página. El costo es que un
+   desborde nuevo se recorta en vez de avisar, y por eso no reemplaza a las
+   reglas de arriba: las respalda. */
+html{overflow-x:hidden}
+</style>
+</head>
+<body>
+<nav><div class="container nav">
+<a class="logo" href="/en"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</a>
+<div class="navlinks"><a href="#plataforma">Platform</a><a href="#agenda">Scheduling</a><a href="/mapa">Map</a><a href="#especialidades">Specialties</a><a href="#soluciones">Modules</a><a href="#tecnologia">Technology</a><a href="#confianza">Trust</a></div>
+<div class="navright"><span class="idiomas" role="group" aria-label="Language"><a href="/" hreflang="es" lang="es">ES</a><a href="/pt" hreflang="pt" lang="pt">PT</a><a href="/en" hreflang="en" lang="en" aria-current="page">EN</a></span><a href="__PLATAFORMA__">Log in</a><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hi%2C%20I'd%20like%20to%20see%20a%20Symphomed%20demo">Talk to us</a></div>
+</div></nav>
+
+<header class="hero">
+<div class="container hero-grid">
+<div>
+<div class="eyebrow">THE INTELLIGENCE LAYER FOR HEALTHCARE</div>
+<h1>Clinical conversations.<br><span>Intelligent care.</span></h1>
+<p>Symphomed turns the consultation into structured clinical information: the note, the prescription and the next follow-up are ready without the clinician typing a word.</p>
+<div class="actions"><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hi%2C%20I'd%20like%20to%20see%20a%20Symphomed%20demo">Message us on WhatsApp →</a><a class="btn btn-outline" href="#plataforma">Explore the platform</a></div>
+<div class="trust-row"><span><i class="dot"></i> More time with patients</span><span><i class="dot"></i> Better clinical information</span><span><i class="dot"></i> Continuity of care</span></div>
+</div>
+<div class="hero-product">
+<div class="doctor-card"><div class="doctor-photo"></div></div>
+<div class="chat"><b>Patient</b>“I've had this pain for about three weeks, especially in the morning…”</div>
+<div class="ai-card"><div class="ai-head"><span>✦ SYMPHOMED <span class="pill">AI</span></span><span>•••</span></div>
+<div class="row"><label>Chief complaint</label><div>Low back pain</div></div><div class="row"><label>Duration</label><div>3 weeks</div></div><div class="row"><label>Medication</label><div>Ibuprofen 400 mg</div></div><div class="row"><label>Relevant history</label><div>Previous episode</div></div></div>
+<div class="record"><h4>Patient record</h4><p><b>Clinical note</b><br>Reports low back pain for 3 weeks, worse in the morning. No radiation. Follow-up and clinical review indicated.</p><div class="save">✓ Save to patient record</div></div>
+</div>
+</div>
+</header>
+
+<section class="light">
+<div class="container">
+<div class="section-head"><div class="eyebrow">HOW IT WORKS</div><h2>From conversation<br>to clinical record.</h2><p>Symphomed listens, understands and structures each consultation automatically, turning what was said into clinical data you can use.</p></div>
+<div class="steps">
+<div class="step"><div class="icon">♩</div><h3>1. Listen</h3><p>Captures the clinical conversation.</p></div>
+<div class="step"><div class="icon">✦</div><h3>2. Understand</h3><p>Identifies the relevant clinical information.</p></div>
+<div class="step"><div class="icon">▤</div><h3>3. Structure</h3><p>Generates the structured clinical note.</p></div>
+<div class="step"><div class="icon">↗</div><h3>4. Connect</h3><p>Updates the patient's history for the next visit.</p></div>
+</div>
+</div>
+</section>
+
+<section class="dark" id="plataforma"><div class="container product-show">
+<div class="screen"><div class="screen-top"><span>✦ SYMPHOMED</span><span>Clinical workspace</span></div><div class="screen-body"><div class="sidebar"><div>Patient</div><div>Consultation</div><div>Clinical data</div><div>History</div><div>Chart</div><div>Prescriptions</div></div><div class="screen-main"><h4>Clinical data</h4><div class="metric"><div><b>Chief complaint</b><span>Headache</span></div><div><b>Duration</b><span>3 weeks</span></div><div><b>Medication</b><span>Ibuprofen 400 mg</span></div><div><b>Assessment</b><span>Tension headache</span></div><div><b>History</b><span>No relevant history</span></div><div><b>Plan</b><span>Follow-up</span></div></div></div></div></div>
+<div><div class="eyebrow">A COMPLETE CLINICAL PICTURE</div><h2>One conversation.<br>A complete clinical picture.</h2><p>Symphomed captures the conversation, identifies what matters and builds the structured clinical note, ready for the clinician to review and save.</p><a class="btn btn-outline" href="#demo">▶ See it in action</a></div>
+</div></section>
+
+
+<section class="light" id="agenda"><div class="container">
+<div class="section-head"><div class="eyebrow">SCHEDULING</div><h2>Before and after<br>the consultation.</h2><p>Symphomed doesn't start when the patient walks in or end when they leave: booking and the next follow-up also take care of themselves, over WhatsApp.</p></div>
+<div class="steps steps-3">
+<div class="step"><div class="icon">✆</div><h3>Patients book themselves</h3><p>They message the practice on WhatsApp, see the slots that are actually free and pick one. The appointment lands in the calendar without anyone answering the phone.</p></div>
+<div class="step"><div class="icon">✓</div><h3>Confirmed instantly</h3><p>They get the confirmation right away. If they need to cancel, they write “cancel” in the same chat and the slot opens up again.</p></div>
+<div class="step"><div class="icon">↻</div><h3>Follow-up runs itself</h3><p>When the consultation closes, Symphomed proposes the next follow-up date and sends the patient a link to pick their time.</p></div>
+</div>
+<div class="recuerdos">
+<div class="recuerdo"><b>Follow-ups</b><span>The review agreed during the consultation, on the right date.</span></div>
+<div class="recuerdo"><b>Lab work</b><span>Tests that were ordered and haven't come back to the chart yet.</span></div>
+<div class="recuerdo"><b>Medication</b><span>When each treatment starts and ends, with its dose and frequency.</span></div>
+<div class="recuerdo"><b>Vaccines</b><span>The next dose and the ones still missing from the schedule.</span></div>
+<div class="recuerdo"><b>Age-based checks</b><span>What's due according to the patient's age, without relying on memory.</span></div>
+</div>
+</div></section>
+<section id="especialidades"><div class="container"><div class="section-head"><div class="eyebrow">ONE PLATFORM. EVERY SPECIALTY.</div><h2>Built for the whole practice.</h2><p>From general practice to specialty care, Symphomed adapts to every professional, every specialty and every setting.</p></div>
+<div class="specialties">
+<div class="specialty"><div class="sicon">⚕</div>General practice</div><div class="specialty"><div class="sicon">♢</div>Dental</div><div class="specialty"><div class="sicon">◉</div>Dermatology</div><div class="specialty"><div class="sicon">◉</div>Ophthalmology</div><div class="specialty"><div class="sicon">✧</div>Aesthetics</div><div class="specialty"><div class="sicon">⌁</div>Surgery</div><div class="specialty"><div class="sicon">♧</div>Gynecology</div><div class="specialty"><div class="sicon">◌</div>Pediatrics</div><div class="specialty"><div class="sicon">♧</div>Physiotherapy</div><div class="specialty"><div class="sicon">◈</div>Psychology</div><div class="specialty"><div class="sicon">❋</div>Psychiatry</div><div class="specialty"><div class="sicon">🐾</div>Veterinary</div><div class="specialty"><div class="sicon">▣</div>Telehealth</div><div class="specialty"><div class="sicon">→</div>All</div>
+</div></div></section>
+
+
+<section class="dark" id="soluciones">
+<div class="container"><div class="section-head"><div class="eyebrow">MODULES BY SPECIALTY</div><h2>Every specialty,<br>with its own chart.</h2><p>A pediatrics note looks nothing like a dental one, and neither do the charts. These are the modules already running.</p></div></div>
+<div class="carrusel">
+<div class="pistas" id="pistas" tabindex="0" role="region" aria-label="Modules by specialty">
+<article class="modulo" aria-label="1 of 7: DENTAL"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">DENTAL</div><h3 class="modulo-t">The odontogram, tooth by tooth.</h3><p>Every tooth with its history, its treatments and its progress. The dental chart stops being a drawing on a sheet of paper.</p></div>
+<div class="demo"><div class="teeth"><div class="tooth">11</div><div class="tooth">12</div><div class="tooth">13</div><div class="tooth">14</div><div class="tooth">15</div><div class="tooth">16</div><div class="tooth">17</div><div class="tooth">18</div><div class="tooth">21</div><div class="tooth">22</div><div class="tooth">23</div><div class="tooth">24</div><div class="tooth">25</div><div class="tooth">26</div><div class="tooth">27</div><div class="tooth">28</div><div class="tooth">31</div><div class="tooth">32</div><div class="tooth">33</div><div class="tooth">34</div><div class="tooth">35</div><div class="tooth marcada">36</div><div class="tooth">37</div><div class="tooth">38</div><div class="tooth">41</div><div class="tooth">42</div><div class="tooth">43</div><div class="tooth">44</div><div class="tooth">45</div><div class="tooth">46</div><div class="tooth">47</div><div class="tooth">48</div></div><b>Tooth 36</b><p class="demo-pie">Occlusal caries · Root canal · Under review</p></div>
+</div></article><article class="modulo" aria-label="2 of 7: PEDIATRICS"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">PEDIATRICS</div><h3 class="modulo-t">Growth curves, plotted for you.</h3><p>Weight, height and head circumference are plotted against WHO percentiles as they're entered. You don't look the percentile up in a table: it's already there.</p></div>
+<div class="demo"><svg viewBox="0 0 260 130" width="100%" height="130" role="img" aria-label="Weight curve against percentiles">
+<polyline points="10,108 60,88 110,74 160,63 210,54 250,48" fill="none" stroke="#2d6c85" stroke-width="1.5"/>
+<polyline points="10,116 60,99 110,87 160,78 210,71 250,66" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,99 60,76 110,60 160,47 210,37 250,30" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,110 60,90 110,73 160,60 210,52" fill="none" stroke="#5bddfa" stroke-width="2.5"/>
+<circle cx="210" cy="52" r="4" fill="#5bddfa"/>
+<text x="10" y="126" fill="#8da7b5" font-size="8">0 mo</text>
+<text x="196" y="126" fill="#8da7b5" font-size="8">24 mo</text>
+<text x="228" y="22" fill="#2d6c85" font-size="8">P97</text>
+<text x="228" y="62" fill="#2d6c85" font-size="8">P50</text>
+</svg><b>Weight · 62nd percentile</b><p class="demo-pie">12.4 kg at 24 months · within the expected range</p></div>
+</div></article><article class="modulo" aria-label="3 of 7: NEURODEVELOPMENT"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">NEURODEVELOPMENT</div><h3 class="modulo-t">Instruments, with their scores.</h3><p>ADOS-2, WISC-V, Vineland-3, Conners-4 and M-CHAT-R/F, each with its modules and scores. They stay in the chart and compare across administrations.</p></div>
+<div class="demo"><div class="row"><label>ADOS-2 · Module 2</label><div>Comparison 7/10</div></div>
+<div class="row"><label>WISC-V</label><div>Full-scale IQ 94</div></div>
+<div class="row"><label>Vineland-3</label><div>Composite 88</div></div>
+<div class="row"><label>Conners-4 · Parent</label><div>Inattention T 68</div></div><p class="demo-pie">Administered 14/03 · compared with the previous assessment</p></div>
+</div></article><article class="modulo" aria-label="4 of 7: OBSTETRICS & GYNECOLOGY"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">OBSTETRICS & GYNECOLOGY</div><h3 class="modulo-t">Prenatal care, week by week.</h3><p>Fundal height, fetal heart rate and blood pressure at every visit, on one timeline. Plus the gynecological exam with its own map.</p></div>
+<div class="demo"><div class="row"><label>Week</label><div>28 · G2 P1</div></div>
+<div class="row"><label>Fundal height</label><div>27 cm</div></div>
+<div class="row"><label>FHR</label><div>142 bpm</div></div>
+<div class="row"><label>Blood pressure</label><div>118/74 mmHg</div></div><p class="demo-pie">Next visit in 3 weeks · glucose tolerance test pending</p></div>
+</div></article><article class="modulo" aria-label="5 of 7: OPHTHALMOLOGY"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">OPHTHALMOLOGY</div><h3 class="modulo-t">Acuity and refraction, in the chart.</h3><p>Each eye with its acuity, refraction and intraocular pressure, comparable against the previous visit without rereading the whole history.</p></div>
+<div class="demo"><div class="row"><label>Acuity OD</label><div>20/25</div></div>
+<div class="row"><label>Acuity OS</label><div>20/40</div></div>
+<div class="row"><label>Refraction OS</label><div>−1.25 −0.50 × 180°</div></div>
+<div class="row"><label>IOP</label><div>14 / 15 mmHg</div></div><p class="demo-pie">Left eye dropped from 20/25 to 20/40 since the March visit</p></div>
+</div></article><article class="modulo" aria-label="6 of 7: IMAGING & LAB"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">IMAGING & LAB</div><h3 class="modulo-t">Studies, inside the chart.</h3><p>X-rays open in a viewer that lets you measure, and lab work stays flagged as pending until it comes back. The X-ray unit uploads directly.</p></div>
+<div class="demo"><div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div><div class="row"><label>Chest X-ray</label><div>Received · 14/03</div></div>
+<div class="row"><label>Creatinine</label><div>Pending</div></div><p class="demo-pie">What's pending shows on the dashboard until it arrives</p></div>
+</div></article><article class="modulo" aria-label="7 of 7: SYMPHOMED PET"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">SYMPHOMED PET</div><h3 class="modulo-t">Same intelligence. A different patient.</h3><p>Complete clinical records for dogs and cats, with visual anatomy, its own vaccine schedule and the particulars of each species.</p></div>
+<div class="demo pet-demo"><div class="row"><label>Patient</label><div>Mora · mixed breed, 6 years</div></div>
+<div class="row"><label>Weight</label><div>18.4 kg</div></div>
+<div class="row"><label>Vaccines</label><div>DHPP up to date · rabies in 2 months</div></div><p class="demo-pie">A chart per species, not a human chart adapted</p></div>
+</div></article>
+</div>
+<div class="container mandos">
+<button class="flecha" type="button" data-dir="-1" aria-label="Previous module">←</button>
+<div class="puntos" id="puntos" data-ir="Go to module"></div>
+<button class="flecha" type="button" data-dir="1" aria-label="Next module">→</button>
+</div>
+</div>
+</section>
+
+<section id="confianza" class="light"><div class="container"><div class="section-head"><div class="eyebrow">TRUST & SCALE</div><h2>It grows with your practice.</h2><p>From a single professional to a network of clinics, Symphomed is built to grow with you.</p></div>
+<div class="scale"><div class="scale-box"><b>1</b><small>Professional</small></div><div>→</div><div class="scale-box"><b>10</b><small>Professionals</small></div><div>→</div><div class="scale-box"><b>100</b><small>Professionals</small></div><div>→</div><div class="scale-box"><b>∞</b><small>Healthcare network</small></div></div>
+</div></section>
+
+<section class="dark" id="tecnologia"><div class="container"><div class="section-head"><div class="eyebrow">TECHNOLOGY</div><h2>Built for healthcare.</h2><p>AI, voice, structured clinical data and integrations, in a single platform.</p></div>
+<div class="tecnos" id="tecnos">
+<button class="tecno" type="button" aria-selected="true">Artificial intelligence</button>
+<button class="tecno" type="button" aria-selected="false">Voice</button>
+<button class="tecno" type="button" aria-selected="false">Clinical language</button>
+<button class="tecno" type="button" aria-selected="false">Structured data</button>
+<button class="tecno" type="button" aria-selected="false">Integrations</button>
+<button class="tecno" type="button" aria-selected="false">Security</button>
+</div>
+<div class="tecno-panel" id="tecnoPanel">
+<div class="det"><b>Artificial intelligence</b><p>It recognizes what matters in a conversation and lays it out as a clinical note: complaint, history, examination and plan. And it learns from each clinician's corrections, so the note reads more like theirs and less like a template.</p></div>
+<div class="det"><b>Voice</b><p>It transcribes the consultation as it happens, with the vocabulary ordinary transcription misses: drug names, doses, units and clinical terms. No dictating, no talking to the computer: it's the normal consultation.</p></div>
+<div class="det"><b>Clinical language</b><p>It tells what the patient said from what the clinician observed, separates history from today's findings, and understands negation — “no fever” is not “fever”. That's where a transcript becomes a clinical record.</p></div>
+<div class="det"><b>Structured data</b><p>Every value lands in its own field instead of loose in a paragraph. That's why today's blood pressure plots alongside previous visits, an ordered test can show as pending, and a dose can be compared with the last one.</p></div>
+<div class="det"><b>Integrations</b><p>The practice isn't an island: the calendar syncs, the X-ray unit uploads studies straight into the patient's chart, and in Brazil prescriptions go out through the digital signature system the law requires.</p></div>
+<div class="det"><b>Security</b><p>Each clinician sees only their own patients, and that doesn't depend on someone remembering to filter: it's enforced in the code, across every screen at once. And records export in full the day you decide to stop using Symphomed.</p></div>
+</div>
+<script nonce="__NONCE__">
+// Va acá, pegado al panel, y no al final del documento: así se ejecuta apenas
+// el navegador termina de leer estas seis fichas y ANTES de dibujarlas. Al
+// final de la página también funcionaría, pero se vería un parpadeo con los
+// seis resúmenes abiertos.
+//
+// Y por eso el HTML llega con los seis visibles en vez de con cinco ocultos:
+// si el script no corre —CSP, error de sintaxis—, el visitante ve los seis
+// uno debajo del otro, que es una lista perfectamente legible. Al revés
+// vería uno solo y cinco pestañas que no hacen nada.
+(function () {
+  var p = document.getElementById("tecnoPanel");
+  if (!p) return;
+  [].slice.call(p.children).forEach(function (d, i) {
+    if (i) d.setAttribute("data-oculto", "");
+  });
+})();
+</script></div></section>
+
+<section class="final" id="demo"><div class="container"><div class="eyebrow">GET STARTED</div><h2>Healthcare has conversations every day.<br><span style="color:#28c9f4">Symphomed turns them into clinical records.</span></h2><p>Message us on WhatsApp and we'll show you how it works with a real case, in fifteen minutes. The first 4 consultations are free.</p><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hi%2C%20I'd%20like%20to%20see%20a%20Symphomed%20demo">Message us on WhatsApp →</a></div></section>
+
+<footer><div class="container footer"><div class="logo"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</div><div class="footerlinks"><a href="#plataforma">Platform</a><a href="#agenda">Scheduling</a><a href="/mapa">Map</a><a href="#especialidades">Specialties</a><a href="#soluciones">Modules</a><a href="#tecnologia">Technology</a><a href="#confianza">Trust</a><a href="#demo">Contact</a></div><div>© 2026 Symphomed · Bolivia & Brazil</div></div></footer>
+
+<script nonce="__NONCE__">
+"use strict";
+// Las flechas y los puntos del carrusel. Todo lo que hay acá es OPCIONAL: las
+// diapositivas ya se desplazan solas con scroll-snap. Si este script no corre
+// —un nonce mal puesto, un error de sintaxis— se pierden los controles y no
+// se pierde ni un módulo.
+(function () {
+  var pistas = document.getElementById("pistas");
+  var puntos = document.getElementById("puntos");
+  if (!pistas || !puntos) return;
+  var laminas = [].slice.call(pistas.children);
+  if (laminas.length < 2) return;
+
+  var flechas = [].slice.call(document.querySelectorAll(".flecha"));
+  // La etiqueta viaja en el HTML y no acá adentro: este script es el mismo en
+  // los tres idiomas, y un "Ir al módulo 3" en español dentro de la versión
+  // inglesa es justo lo que escucha quien navega con lector de pantalla.
+  var irA = puntos.getAttribute("data-ir") || "";
+  var actual = 0;
+
+  laminas.forEach(function (_, i) {
+    var b = document.createElement("button");
+    b.className = "punto";
+    b.type = "button";
+    b.setAttribute("aria-label", irA + " " + (i + 1));
+    b.addEventListener("click", function () { ir(i); });
+    puntos.appendChild(b);
+  });
+  var bolitas = [].slice.call(puntos.children);
+
+  function ir(i) {
+    i = Math.max(0, Math.min(laminas.length - 1, i));
+    // scrollLeft y no scrollIntoView: este último arrastra TAMBIÉN la página
+    // vertical hasta la diapositiva, así que tocar una flecha daba un salto
+    // de scroll además del desplazamiento lateral.
+    pistas.scrollLeft = laminas[i].offsetLeft - laminas[0].offsetLeft;
+  }
+
+  function pintar() {
+    // Se deduce del scroll y no de una variable propia, para que quede bien
+    // también cuando el visitante arrastra con el dedo sin tocar los botones.
+    var ancho = pistas.clientWidth || 1;
+    actual = Math.round(pistas.scrollLeft / ancho);
+    actual = Math.max(0, Math.min(laminas.length - 1, actual));
+    bolitas.forEach(function (b, i) { b.setAttribute("aria-current", i === actual ? "true" : "false"); });
+    flechas.forEach(function (f) {
+      var d = Number(f.getAttribute("data-dir"));
+      f.disabled = (d < 0 && actual === 0) || (d > 0 && actual === laminas.length - 1);
+    });
+  }
+
+  flechas.forEach(function (f) {
+    f.addEventListener("click", function () { ir(actual + Number(f.getAttribute("data-dir"))); });
+  });
+
+  pistas.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { e.preventDefault(); ir(actual + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); ir(actual - 1); }
+  });
+
+  var esperando = false;
+  pistas.addEventListener("scroll", function () {
+    if (esperando) return;
+    esperando = true;
+    requestAnimationFrame(function () { esperando = false; pintar(); });
+  }, { passive: true });
+  window.addEventListener("resize", pintar);
+  pintar();
+})();
+
+// Las pestañas de tecnología. Sin este script se ven los seis resúmenes uno
+// debajo del otro —una lista, que se lee bien—; con él, el panel muestra el
+// de la pestaña activa.
+(function () {
+  var caja = document.getElementById("tecnos");
+  var panel = document.getElementById("tecnoPanel");
+  if (!caja || !panel) return;
+  var pestanas = [].slice.call(caja.children);
+  var detalles = [].slice.call(panel.children);
+  if (pestanas.length !== detalles.length) return;
+
+  function activar(i) {
+    pestanas.forEach(function (p, j) { p.setAttribute("aria-selected", j === i ? "true" : "false"); });
+    detalles.forEach(function (d, j) {
+      if (j === i) d.removeAttribute("data-oculto");
+      else d.setAttribute("data-oculto", "");
+    });
+  }
+
+  pestanas.forEach(function (p, i) {
+    // mouseenter y no hover de CSS: el panel es un hermano y el resumen que
+    // hay que mostrar depende de CUÁL pestaña se señaló, no de si alguna lo
+    // está. Eso no se puede expresar en CSS sin acoplar los seis selectores.
+    p.addEventListener("mouseenter", function () { activar(i); });
+    p.addEventListener("focus", function () { activar(i); });
+    p.addEventListener("click", function () { activar(i); });
+  });
+
+  activar(0);
+})();
+</script>
+</body>
+</html>

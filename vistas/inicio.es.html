@@ -6,9 +6,16 @@
 <meta name="theme-color" content="#03101a">
 <title>Symphomed — la capa de inteligencia para la salud</title>
 <meta name="description" content="Symphomed convierte la conversación de la consulta en información clínica estructurada: la nota, la receta y el control quedan listos sin que el médico escriba nada.">
+<link rel="canonical" href="https://symphomed.com/">
+<link rel="alternate" hreflang="es" href="https://symphomed.com/">
+<link rel="alternate" hreflang="pt" href="https://symphomed.com/pt">
+<link rel="alternate" hreflang="en" href="https://symphomed.com/en">
+<link rel="alternate" hreflang="x-default" href="https://symphomed.com/">
 <meta property="og:title" content="Symphomed — la capa de inteligencia para la salud">
 <meta property="og:description" content="La nota clínica, la receta y el kardex salen de la consulta sin tipear. Las primeras 4 consultas no se cobran.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://symphomed.com/">
+<meta property="og:locale" content="es_BO">
 <style>
 @font-face {
   font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
@@ -68,15 +75,43 @@ footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;just
   .screen-main{min-width:0}
   .metric{grid-template-columns:1fr}
 }
+/* ── El selector de idioma ────────────────────────────────────────────────
+   Son tres enlaces de verdad, a tres URLs de verdad. Ni un menú desplegable
+   ni un botón con JavaScript: un médico brasileño que abra la página en
+   español tiene que poder cambiarla aunque el script no haya corrido, y un
+   buscador tiene que poder seguir el enlace para encontrar las otras dos
+   versiones. */
+.idiomas{display:inline-flex;gap:2px;align-items:center}
+.idiomas a{
+  color:#7f9fb0;text-decoration:none;font-size:11px;letter-spacing:1px;
+  padding:4px 6px;border-radius:5px;transition:.2s;
+}
+.idiomas a:hover{color:#fff;background:#0c2a3a}
+.idiomas a[aria-current="page"]{color:#fff;background:#12384a}
+.idiomas a:focus-visible{outline:2px solid #49d8fb;outline-offset:1px}
 @media(max-width:480px){
   /* "SYMPHOMED" con letter-spacing:3px es ancho, y la barra reparte con
      space-between: abajo de 480 el logo termina tocando el selector de idioma
-     y se lee "SYMPHOMEDES". Se achica el logo y se saca el selector, que hoy
-     no hace nada (hay un solo idioma). */
+     y se lee "SYMPHOMEDES". Se achica el logo y se aprieta el selector.
+     Ojo: el selector NO se esconde. Antes sí —había un solo idioma y no
+     hacía nada—, pero ahora es la única forma que tiene un visitante de
+     cambiar de versión, y esconderlo justo en el celular lo dejaría atrapado
+     en el idioma que le tocó. */
   .logo{font-size:13px;letter-spacing:2px}
-  .nav .navright{gap:12px}
-  .nav .navright span{display:none}
+  .nav .navright{gap:10px}
+  .idiomas a{padding:4px;letter-spacing:0}
   .btn{padding:11px 16px}
+  /* Y el botón de la barra se va. MEDIDO, no supuesto: con el selector
+     puesto, a 390px la .navright pedía 247px y terminaba 22px afuera de la
+     pantalla — el mismo desborde que produce la franja blanca al costado de
+     toda la página, otra vez.
+     Se saca este botón y no el selector porque este es el único de los tres
+     que se repite: la misma llamada está en la portada, justo abajo, y
+     de nuevo al cierre. El selector y "Ingresar" no están en ningún otro
+     lado. Y no se arregla apretando el botón unos píxeles: en portugués dice
+     "Fale conosco" y en inglés "Talk to us", así que el ancho cambia con el
+     idioma y el margen tiene que ser holgado, no justo. */
+  .nav .navright .btn{display:none}
 }
 @media(max-width:430px){
   /* A 43px el titular llega justo al borde del contenedor y queda pegado.
@@ -199,7 +234,7 @@ html{overflow-x:hidden}
 <nav><div class="container nav">
 <a class="logo" href="/"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</a>
 <div class="navlinks"><a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="/mapa">Mapa</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a></div>
-<div class="navright"><span>ES</span><a href="__PLATAFORMA__">Ingresar</a><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos</a></div>
+<div class="navright"><span class="idiomas" role="group" aria-label="Idioma"><a href="/" hreflang="es" lang="es" aria-current="page">ES</a><a href="/pt" hreflang="pt" lang="pt">PT</a><a href="/en" hreflang="en" lang="en">EN</a></span><a href="__PLATAFORMA__">Ingresar</a><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos</a></div>
 </div></nav>
 
 <header class="hero">
@@ -285,39 +320,33 @@ html{overflow-x:hidden}
 <div class="demo"><div class="row"><label>ADOS-2 · Módulo 2</label><div>Comparación 7/10</div></div>
 <div class="row"><label>WISC-V</label><div>CI total 94</div></div>
 <div class="row"><label>Vineland-3</label><div>Compuesto 88</div></div>
-<div class="row"><label>Conners-4 · Padres</label><div>Inatención T 68</div></div>
-<p class="demo-pie">Aplicado el 14/03 · comparado con la evaluación anterior</p></div>
+<div class="row"><label>Conners-4 · Padres</label><div>Inatención T 68</div></div><p class="demo-pie">Aplicado el 14/03 · comparado con la evaluación anterior</p></div>
 </div></article><article class="modulo" aria-label="4 de 7: GINECOLOGÍA Y OBSTETRICIA"><div class="container modulo-in">
 <div class="modulo-txt"><div class="eyebrow">GINECOLOGÍA Y OBSTETRICIA</div><h3 class="modulo-t">El control prenatal, semana a semana.</h3><p>Altura uterina, frecuencia cardíaca fetal y presión en cada control, sobre la misma línea de tiempo. Y el examen ginecológico con su mapa propio.</p></div>
 <div class="demo"><div class="row"><label>Semana</label><div>28 · gesta 2, para 1</div></div>
 <div class="row"><label>Altura uterina</label><div>27 cm</div></div>
 <div class="row"><label>FCF</label><div>142 lpm</div></div>
-<div class="row"><label>Presión</label><div>118/74 mmHg</div></div>
-<p class="demo-pie">Próximo control en 3 semanas · curva de tolerancia pendiente</p></div>
+<div class="row"><label>Presión</label><div>118/74 mmHg</div></div><p class="demo-pie">Próximo control en 3 semanas · curva de tolerancia pendiente</p></div>
 </div></article><article class="modulo" aria-label="5 de 7: OFTALMOLOGÍA"><div class="container modulo-in">
 <div class="modulo-txt"><div class="eyebrow">OFTALMOLOGÍA</div><h3 class="modulo-t">La agudeza y la refracción, en su ficha.</h3><p>Cada ojo con su agudeza, su refracción y su presión intraocular, comparables contra el control anterior sin volver a leer la historia entera.</p></div>
 <div class="demo"><div class="row"><label>Agudeza OD</label><div>20/25</div></div>
 <div class="row"><label>Agudeza OI</label><div>20/40</div></div>
 <div class="row"><label>Refracción OI</label><div>−1,25 −0,50 × 180°</div></div>
-<div class="row"><label>PIO</label><div>14 / 15 mmHg</div></div>
-<p class="demo-pie">El OI bajó de 20/25 a 20/40 desde el control de marzo</p></div>
+<div class="row"><label>PIO</label><div>14 / 15 mmHg</div></div><p class="demo-pie">El OI bajó de 20/25 a 20/40 desde el control de marzo</p></div>
 </div></article><article class="modulo" aria-label="6 de 7: IMÁGENES Y LABORATORIO"><div class="container modulo-in">
 <div class="modulo-txt"><div class="eyebrow">IMÁGENES Y LABORATORIO</div><h3 class="modulo-t">Los estudios, dentro de la ficha.</h3><p>Las radiografías se abren en un visor que permite medir, y los laboratorios quedan marcados como pendientes hasta que vuelven. El equipo de rayos sube directo.</p></div>
-<div class="demo"><div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div>
-<div class="row"><label>Rx tórax</label><div>Recibida · 14/03</div></div>
-<div class="row"><label>Creatinina</label><div>Pendiente</div></div>
-<p class="demo-pie">Lo pendiente aparece en el panel hasta que llega</p></div>
+<div class="demo"><div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div><div class="row"><label>Rx tórax</label><div>Recibida · 14/03</div></div>
+<div class="row"><label>Creatinina</label><div>Pendiente</div></div><p class="demo-pie">Lo pendiente aparece en el panel hasta que llega</p></div>
 </div></article><article class="modulo" aria-label="7 de 7: SYMPHOMED PET"><div class="container modulo-in">
 <div class="modulo-txt"><div class="eyebrow">SYMPHOMED PET</div><h3 class="modulo-t">La misma inteligencia. Otro paciente.</h3><p>Historia clínica completa para perros y gatos, con anatomía visual, esquema de vacunas propio y las particularidades de cada especie.</p></div>
 <div class="demo pet-demo"><div class="row"><label>Paciente</label><div>Mora · mestiza, 6 años</div></div>
 <div class="row"><label>Peso</label><div>18,4 kg</div></div>
-<div class="row"><label>Vacunas</label><div>Quíntuple al día · antirrábica en 2 meses</div></div>
-<p class="demo-pie">Ficha por especie, no una ficha humana adaptada</p></div>
+<div class="row"><label>Vacunas</label><div>Quíntuple al día · antirrábica en 2 meses</div></div><p class="demo-pie">Ficha por especie, no una ficha humana adaptada</p></div>
 </div></article>
 </div>
 <div class="container mandos">
 <button class="flecha" type="button" data-dir="-1" aria-label="Módulo anterior">←</button>
-<div class="puntos" id="puntos"></div>
+<div class="puntos" id="puntos" data-ir="Ir al módulo"></div>
 <button class="flecha" type="button" data-dir="1" aria-label="Módulo siguiente">→</button>
 </div>
 </div>
@@ -381,13 +410,17 @@ html{overflow-x:hidden}
   if (laminas.length < 2) return;
 
   var flechas = [].slice.call(document.querySelectorAll(".flecha"));
+  // La etiqueta viaja en el HTML y no acá adentro: este script es el mismo en
+  // los tres idiomas, y un "Ir al módulo 3" en español dentro de la versión
+  // inglesa es justo lo que escucha quien navega con lector de pantalla.
+  var irA = puntos.getAttribute("data-ir") || "";
   var actual = 0;
 
   laminas.forEach(function (_, i) {
     var b = document.createElement("button");
     b.className = "punto";
     b.type = "button";
-    b.setAttribute("aria-label", "Ir al módulo " + (i + 1));
+    b.setAttribute("aria-label", irA + " " + (i + 1));
     b.addEventListener("click", function () { ir(i); });
     puntos.appendChild(b);
   });

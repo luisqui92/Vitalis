@@ -1,4 +1,5 @@
-// Construye vistas/inicio.html a partir del diseño que mandó el usuario.
+// Construye vistas/inicio.es.html, inicio.pt.html e inicio.en.html a partir
+// del diseño que mandó el usuario.
 //
 // El CSS se copia VERBATIM del archivo original: el pedido fue "tal cual", y
 // una transcripción a mano de 30 líneas de CSS minificado es la forma más
@@ -8,9 +9,18 @@
 //   1. la foto de Unsplash → alojada acá (la CSP solo admite img-src 'self')
 //   2. la tipografía Inter → la variable que ya está en /fonts
 //   3. los enlaces muertos (#, mailto) → plataforma y WhatsApp
-//   4. el idioma → español, que es quien lo va a leer
+//   4. el idioma → los tres, que es de lo que se trata este guion
+//
+// El CSS y los scripts son UNO SOLO para los tres idiomas. Solo cambia el
+// texto. Así una corrección de diseño no hay que hacerla tres veces —que es
+// como una versión se queda atrás sin que nadie lo note.
 const fs = require("fs");
 const path = require("path");
+
+const {
+  IDIOMAS, NOMBRES, RUTAS, WA_TEXTO, CABEZA, FRASES, AGENDA,
+  MODULOS_TXT, TECNO_TXT, FILAS, CARRUSEL_TXT, ESPECIALIDADES_EXTRA, SELECTOR,
+} = require("./textos");
 
 const ORIGEN = path.join(__dirname, "inicio_original.html");
 const RAIZ = path.join(__dirname, "..", "..");
@@ -63,15 +73,43 @@ css += `
   .screen-main{min-width:0}
   .metric{grid-template-columns:1fr}
 }
+/* ── El selector de idioma ────────────────────────────────────────────────
+   Son tres enlaces de verdad, a tres URLs de verdad. Ni un menú desplegable
+   ni un botón con JavaScript: un médico brasileño que abra la página en
+   español tiene que poder cambiarla aunque el script no haya corrido, y un
+   buscador tiene que poder seguir el enlace para encontrar las otras dos
+   versiones. */
+.idiomas{display:inline-flex;gap:2px;align-items:center}
+.idiomas a{
+  color:#7f9fb0;text-decoration:none;font-size:11px;letter-spacing:1px;
+  padding:4px 6px;border-radius:5px;transition:.2s;
+}
+.idiomas a:hover{color:#fff;background:#0c2a3a}
+.idiomas a[aria-current="page"]{color:#fff;background:#12384a}
+.idiomas a:focus-visible{outline:2px solid #49d8fb;outline-offset:1px}
 @media(max-width:480px){
   /* "SYMPHOMED" con letter-spacing:3px es ancho, y la barra reparte con
      space-between: abajo de 480 el logo termina tocando el selector de idioma
-     y se lee "SYMPHOMEDES". Se achica el logo y se saca el selector, que hoy
-     no hace nada (hay un solo idioma). */
+     y se lee "SYMPHOMEDES". Se achica el logo y se aprieta el selector.
+     Ojo: el selector NO se esconde. Antes sí —había un solo idioma y no
+     hacía nada—, pero ahora es la única forma que tiene un visitante de
+     cambiar de versión, y esconderlo justo en el celular lo dejaría atrapado
+     en el idioma que le tocó. */
   .logo{font-size:13px;letter-spacing:2px}
-  .nav .navright{gap:12px}
-  .nav .navright span{display:none}
+  .nav .navright{gap:10px}
+  .idiomas a{padding:4px;letter-spacing:0}
   .btn{padding:11px 16px}
+  /* Y el botón de la barra se va. MEDIDO, no supuesto: con el selector
+     puesto, a 390px la .navright pedía 247px y terminaba 22px afuera de la
+     pantalla — el mismo desborde que produce la franja blanca al costado de
+     toda la página, otra vez.
+     Se saca este botón y no el selector porque este es el único de los tres
+     que se repite: la misma llamada está en la portada, justo abajo, y
+     de nuevo al cierre. El selector y "Ingresar" no están en ningún otro
+     lado. Y no se arregla apretando el botón unos píxeles: en portugués dice
+     "Fale conosco" y en inglés "Talk to us", así que el ancho cambia con el
+     idioma y el margen tiene que ser holgado, no justo. */
+  .nav .navright .btn{display:none}
 }
 @media(max-width:430px){
   /* A 43px el titular llega justo al borde del contenedor y queda pegado.
@@ -199,165 +237,73 @@ css = css.replace(
 // caía en la fuente del sistema.
 css = css.replace(/font-family:Inter,/, "font-family:InterVar,Inter,");
 
-// ─── El cuerpo, traducido ──────────────────────────────────────────────────
-let cuerpo = original.slice(original.indexOf("<body>") + 6, original.indexOf("</body>"));
+
+// ─── El cuerpo, un idioma a la vez ─────────────────────────────────────────
+//
+// ═══ POR QUÉ TRES ARCHIVOS Y NO UNO CON PLANTILLAS ═════════════════════════
+//
+// La alternativa era servir una sola plantilla y sustituir los textos en cada
+// pedido. Sale más caro de lo que parece: hay que traducir en tiempo de
+// respuesta, cualquier frase que falte se descubre en producción, y la página
+// deja de poder cachearse igual para todos.
+//
+// Acá los tres HTML se arman una vez, al construir. Si a una versión le falta
+// una traducción, este guion lo dice ANTES de desplegar, y cada archivo se
+// sirve tal cual, sin trabajo por visita.
+const CUERPO = original.slice(original.indexOf("<body>") + 6, original.indexOf("</body>"));
 
 const WA = "https://wa.me/59164637067";
-const WA_DEMO = WA + "?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed";
+const SITIO = "https://symphomed.com";
 
-// Orden: de la cadena más larga a la más corta, para que una traducción no
-// se coma un pedazo de otra que todavía no se aplicó.
-const T = [
-  // — Navegación —
-  ['<a href="#platform">Platform</a>',
-   '<a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="/mapa">Mapa</a>'],
-  ['<a href="#specialties">Specialties</a>', '<a href="#especialidades">Especialidades</a>'],
-  ['<a href="#solutions">Solutions</a>', '<a href="#soluciones">Soluciones</a>'],
-  ['<a href="#technology">Technology</a>', '<a href="#tecnologia">Tecnología</a>'],
-  ['<a href="#security">Security</a>', '<a href="#confianza">Confianza</a>'],
-  ['<span>EN⌄</span>', '<span>ES</span>'],
-  ['<a href="#">Log in</a>', '<a href="__PLATAFORMA__">Ingresar</a>'],
-
-  // — Portada —
-  ["THE INTELLIGENCE LAYER FOR HEALTHCARE", "LA CAPA DE INTELIGENCIA PARA LA SALUD"],
-  // El largo importa tanto como el sentido: el titular vive en una columna del
-  // 43% a 68px con letter-spacing negativo. La primera traducción ("La consulta
-  // que habla / La historia que se escribe sola") se desbordaba y se montaba
-  // sobre la foto. Esta tiene casi los mismos caracteres que el inglés, así que
-  // cae en el lugar para el que se diseñó la retícula.
-  ["Clinical conversations.<br><span>Intelligent care.</span>",
-   "Conversación clínica.<br><span>Historia inteligente.</span>"],
-  ["Symphomed transforms healthcare conversations into structured clinical intelligence — helping professionals capture, understand and connect information throughout the patient journey.",
-   "Symphomed convierte la conversación de la consulta en información clínica estructurada: la nota, la receta y el control siguiente quedan listos sin que el médico escriba nada."],
-  ["Explore the platform", "Conocer la plataforma"],
-  ["More time with patients", "Más tiempo con el paciente"],
-  ["Better clinical information", "Mejor información clínica"],
-  ["Continuity of care", "Continuidad del cuidado"],
-
-  // — Tarjetas de la portada —
-  ["<b>Patient</b>“I've had this pain for about three weeks, especially in the morning...”",
-   "<b>Paciente</b>“Me duele hace unas tres semanas, sobre todo en las mañanas…”"],
-  ["<label>Chief complaint</label><div>Back pain</div>", "<label>Motivo</label><div>Dolor lumbar</div>"],
-  ["<label>Duration</label><div>3 weeks</div>", "<label>Tiempo</label><div>3 semanas</div>"],
-  ["<label>Medication</label><div>Ibuprofen 400 mg</div>", "<label>Medicación</label><div>Ibuprofeno 400 mg</div>"],
-  ["<label>Relevant history</label><div>Previous episode</div>", "<label>Antecedentes</label><div>Episodio previo</div>"],
-  ["<h4>Clinical record</h4>", "<h4>Ficha del paciente</h4>"],
-  ["<b>Clinical note</b><br>Patient reports lumbar pain of 3 weeks duration, worse in the morning. No radiation. Prescribed follow-up and clinical review.",
-   "<b>Nota clínica</b><br>Refiere dolor lumbar de 3 semanas, de predominio matinal. Sin irradiación. Se indica control y revisión clínica."],
-  ["✓ Save to patient record", "✓ Guardar en la ficha"],
-
-  // — Cómo funciona —
-  ["HOW IT WORKS", "CÓMO FUNCIONA"],
-  ["From conversation<br>to clinical intelligence.", "De la conversación<br>a la historia clínica."],
-  ["Symphomed listens, understands and structures each consultation automatically, turning unstructured conversations into actionable clinical data.",
-   "Symphomed escucha, entiende y ordena cada consulta de forma automática, y convierte lo que se habló en datos clínicos que sirven."],
-  ["<h3>1. Listen</h3><p>Captures the clinical conversation.</p>",
-   "<h3>1. Escucha</h3><p>Capta la conversación de la consulta.</p>"],
-  ["<h3>2. Understand</h3><p>Identifies relevant clinical information.</p>",
-   "<h3>2. Entiende</h3><p>Identifica la información clínica relevante.</p>"],
-  ["<h3>3. Structure</h3><p>Generates organized clinical data.</p>",
-   "<h3>3. Ordena</h3><p>Genera la nota clínica estructurada.</p>"],
-  ["<h3>4. Connect</h3><p>Updates the patient's history for continuity.</p>",
-   "<h3>4. Conecta</h3><p>Actualiza la historia del paciente para el próximo control.</p>"],
-
-  // — Plataforma —
+// Los identificadores de las secciones quedan en español en los TRES idiomas.
+// Son anclas, no texto que alguien lea: traducirlos daría tres juegos de
+// enlaces distintos para mantener y ningún visitante notaría la diferencia.
+const IDS = [
   ['id="platform"', 'id="plataforma"'],
-  ["<span>Clinical workspace</span>", "<span>Consultorio</span>"],
-  ["<div>Patient</div><div>Consultation</div><div>Clinical data</div><div>History</div><div>Kardex</div><div>Prescriptions</div>",
-   "<div>Paciente</div><div>Consulta</div><div>Datos clínicos</div><div>Historia</div><div>Kardex</div><div>Recetas</div>"],
-  ["<h4>Clinical data</h4>", "<h4>Datos clínicos</h4>"],
-  ["<b>Chief complaint</b><span>Headache</span>", "<b>Motivo</b><span>Cefalea</span>"],
-  ["<b>Duration</b><span>3 weeks</span>", "<b>Tiempo</b><span>3 semanas</span>"],
-  ["<b>Medication</b><span>Ibuprofen 400 mg</span>", "<b>Medicación</b><span>Ibuprofeno 400 mg</span>"],
-  ["<b>Assessment</b><span>Tension headache</span>", "<b>Impresión</b><span>Cefalea tensional</span>"],
-  ["<b>History</b><span>No relevant history</span>", "<b>Antecedentes</b><span>Sin antecedentes</span>"],
-  ["<b>Plan</b><span>Follow-up</span>", "<b>Plan</b><span>Control</span>"],
-  ["A COMPLETE CLINICAL PICTURE", "LA FICHA COMPLETA"],
-  ["One conversation.<br>A complete clinical picture.", "Una consulta.<br>La ficha completa."],
-  ["Symphomed captures the conversation, identifies key information and generates structured clinical data — ready for review and integration with the patient's record.",
-   "Symphomed capta la conversación, reconoce lo importante y arma la nota clínica estructurada, lista para que el médico la revise y la guarde en la ficha."],
-  ["▶ See it in action", "▶ Ver una demostración"],
-
-  // — Especialidades —
   ['id="specialties"', 'id="especialidades"'],
-  ["ONE PLATFORM. MULTIPLE HEALTHCARE EXPERIENCES.", "UNA PLATAFORMA. TODAS LAS ESPECIALIDADES."],
-  ["Built for the entire healthcare ecosystem.", "Pensado para todo el consultorio."],
-  ["From general practice to specialized care, Symphomed adapts to every professional, every specialty and every setting.",
-   "De la medicina general a la especialidad, Symphomed se adapta a cada profesional, cada especialidad y cada consultorio."],
-  [">Medicine<", ">Medicina general<"],
-  [">Dental<", ">Odontología<"],
-  [">Dermatology<", ">Dermatología<"],
-  [">Ophthalmology<", ">Oftalmología<"],
-  [">Aesthetics<", ">Estética<"],
-  [">Surgery<", ">Cirugía<"],
-  [">Gynecology<", ">Ginecología<"],
-  [">Pediatrics<", ">Pediatría<"],
-  [">Physiotherapy<", ">Fisioterapia<"],
-  // Psicología y psiquiatría no estaban en el diseño y sí en el producto: el
-  // catálogo de instrumentos ya trae WISC-V, WPPSI-IV, Vineland-3, Conners-4
-  // y ADOS-2, que son herramientas de psicología clínica.
-  // Ojo con el orden: esta regla corre ANTES de que ">Veterinary<" se
-  // traduzca, así que tiene que buscar el texto en inglés. Buscarlo en
-  // español no da error — simplemente no encuentra nada y las dos
-  // especialidades nuevas no aparecen, que fue lo que pasó la primera vez.
-  ['<div class="specialty"><div class="sicon">🐾</div>Veterinary</div>',
-   '<div class="specialty"><div class="sicon">◈</div>Psicología</div>' +
-   '<div class="specialty"><div class="sicon">❋</div>Psiquiatría</div>' +
-   '<div class="specialty"><div class="sicon">🐾</div>Veterinary</div>'],
-  [">Veterinary<", ">Veterinaria<"],
-  [">Telehealth<", ">Teleconsulta<"],
-  [">All specialties<", ">Todas<"],
-
-  // — Soluciones — el bloque entero se reemplaza por el carrusel más abajo,
-  //   así que acá no hay nada que traducir.
-
-  // — Confianza —
   ['id="security"', 'id="confianza"'],
-  ["TRUST &amp; SCALE", "CONFIANZA Y ESCALA"],
-  ["TRUST & SCALE", "CONFIANZA Y ESCALA"],
-  ["Intelligence that scales with your organization.", "Crece con el consultorio."],
-  ["From a single professional to large healthcare networks, Symphomed is designed to grow with your operation.",
-   "De un solo profesional a una red de centros de salud, Symphomed está pensado para acompañar el crecimiento."],
-  ["<small>Professional</small>", "<small>Profesional</small>"],
-  ["<small>Professionals</small>", "<small>Profesionales</small>"],
-  ["<small>Healthcare network</small>", "<small>Red de salud</small>"],
-
-  // — Tecnología —
   ['id="technology"', 'id="tecnologia"'],
-  [">TECHNOLOGY<", ">TECNOLOGÍA<"],
-  ["Built for intelligent healthcare.", "Construido para la salud."],
-  ["AI, voice, structured clinical data and integrations brought together in one healthcare intelligence platform.",
-   "Inteligencia artificial, voz, datos clínicos estructurados e integraciones, en una sola plataforma."],
-  // Las seis fichas de tecnología se reemplazan enteras más abajo: ahora se
-  // abren y cuentan qué hace cada una.
-
-  // — Cierre —
-  ["GLOBAL HEALTHCARE INTELLIGENCE", "EMPEZAR"],
-  ["Healthcare has conversations every day.<br>",
-   "En la salud se conversa todos los días.<br>"],
-  ["Symphomed turns them into intelligence.", "Symphomed lo convierte en historia clínica."],
-  ["Discover how Symphomed can become the intelligence layer behind your healthcare organization.",
-   "Escríbanos por WhatsApp y le mostramos cómo funciona con un caso real, en quince minutos. Las primeras 4 consultas no se cobran."],
-
-  // — Pie —
-  ['<a href="#demo">Contact</a>', '<a href="#demo">Contacto</a>'],
-  ["© 2026 Symphomed", "© 2026 Symphomed · Bolivia y Brasil"],
-
-  // — Llamadas a la acción: van a WhatsApp, que es donde contesta una persona —
-  ['<a class="btn btn-primary" href="#demo">Book a demo</a>',
-   `<a class="btn btn-primary" href="${WA_DEMO}">Escríbanos</a>`],
-  ['<a class="btn btn-primary" href="#demo">Book a demo →</a>',
-   `<a class="btn btn-primary" href="${WA_DEMO}">Escríbanos por WhatsApp →</a>`],
-  ['<a class="btn btn-primary" href="mailto:demo@symphomed.com">Book a demo →</a>',
-   `<a class="btn btn-primary" href="${WA_DEMO}">Escríbanos por WhatsApp →</a>`],
 ];
 
-// ─── El carrusel de módulos ────────────────────────────────────────────────
-//
-// El diseño mostraba dos módulos —odontología y veterinaria— en un split fijo.
-// Son siete los que existen, y los cinco que faltaban son justamente los que
-// hacen que un pediatra o una ginecóloga se reconozcan en la página.
-//
+function filas(lista) {
+  return lista.map(([r, v]) => `<div class="row"><label>${r}</label><div>${v}</div></div>`).join("\n");
+}
+
+// Las siete pantallas de ejemplo del carrusel. Los VALORES no se traducen
+// —27 cm, 142 lpm, 20/25 son mediciones— pero las etiquetas sí, y eso es
+// justo lo que se me había quedado en español adentro de cada maqueta.
+function pantalla(i, idioma, pie, rotulo) {
+  const c = CARRUSEL_TXT[idioma];
+  const cierre = (rotulo ? `<b>${rotulo}</b>` : "") + `<p class="demo-pie">${pie}</p>`;
+  if (i === 0) {
+    const dientes = ["11","12","13","14","15","16","17","18","21","22","23","24","25","26","27","28",
+                     "31","32","33","34","35","36","37","38","41","42","43","44","45","46","47","48"];
+    return `<div class="teeth">${dientes.map(n =>
+      `<div class="tooth${n === "36" ? " marcada" : ""}">${n}</div>`).join("")}</div>` + cierre;
+  }
+  if (i === 1) {
+    return `<svg viewBox="0 0 260 130" width="100%" height="130" role="img" aria-label="${c.curva}">
+<polyline points="10,108 60,88 110,74 160,63 210,54 250,48" fill="none" stroke="#2d6c85" stroke-width="1.5"/>
+<polyline points="10,116 60,99 110,87 160,78 210,71 250,66" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,99 60,76 110,60 160,47 210,37 250,30" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,110 60,90 110,73 160,60 210,52" fill="none" stroke="#5bddfa" stroke-width="2.5"/>
+<circle cx="210" cy="52" r="4" fill="#5bddfa"/>
+<text x="10" y="126" fill="#8da7b5" font-size="8">${c.eje[0]}</text>
+<text x="196" y="126" fill="#8da7b5" font-size="8">${c.eje[1]}</text>
+<text x="228" y="22" fill="#2d6c85" font-size="8">P97</text>
+<text x="228" y="62" fill="#2d6c85" font-size="8">P50</text>
+</svg>` + cierre;
+  }
+  if (i === 2) return filas(FILAS.neuro[idioma]) + cierre;
+  if (i === 3) return filas(FILAS.gineco[idioma]) + cierre;
+  if (i === 4) return filas(FILAS.oftalmo[idioma]) + cierre;
+  if (i === 5) {
+    return `<div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div>`
+      + filas(FILAS.imagenes[idioma]) + cierre;
+  }
+  return filas(FILAS.pet[idioma]) + cierre;
+}
+
 // ═══ POR QUÉ ES SCROLL NATIVO Y NO UN CARRUSEL DE JAVASCRIPT ═══════════════
 //
 // Las diapositivas viven en un contenedor con overflow-x y scroll-snap. Eso
@@ -370,94 +316,30 @@ const T = [
 // carrusel hecho con JavaScript dejaría siete módulos invisibles y la sección
 // se vería vacía, sin ningún error a la vista. Así, lo peor que pasa es que
 // se pierdan las flechas.
-const MODULOS = [
-  {
-    k: "ODONTOLOGÍA", t: "El odontograma, pieza por pieza.",
-    p: "Cada diente con su historia, sus tratamientos y su evolución. La ficha dental deja de ser un dibujo a mano en una hoja.",
-    v: `<div class="teeth">${
-      ["11","12","13","14","15","16","17","18","21","22","23","24","25","26","27","28",
-       "31","32","33","34","35","36","37","38","41","42","43","44","45","46","47","48"]
-        .map(n => `<div class="tooth${n === "36" ? " marcada" : ""}">${n}</div>`).join("")
-    }</div><b>Pieza 36</b><p class="demo-pie">Caries oclusal · Tratamiento de conducto · En control</p>`,
-  },
-  {
-    k: "PEDIATRÍA", t: "Las curvas, calculadas solas.",
-    p: "Peso, talla y perímetro cefálico se grafican sobre los percentiles de la OMS a medida que se cargan. El percentil no se busca en una tabla: ya está.",
-    v: `<svg viewBox="0 0 260 130" width="100%" height="130" role="img" aria-label="Curva de peso sobre percentiles">
-<polyline points="10,108 60,88 110,74 160,63 210,54 250,48" fill="none" stroke="#2d6c85" stroke-width="1.5"/>
-<polyline points="10,116 60,99 110,87 160,78 210,71 250,66" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
-<polyline points="10,99 60,76 110,60 160,47 210,37 250,30" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
-<polyline points="10,110 60,90 110,73 160,60 210,52" fill="none" stroke="#5bddfa" stroke-width="2.5"/>
-<circle cx="210" cy="52" r="4" fill="#5bddfa"/>
-<text x="10" y="126" fill="#8da7b5" font-size="8">0 m</text>
-<text x="196" y="126" fill="#8da7b5" font-size="8">24 m</text>
-<text x="228" y="22" fill="#2d6c85" font-size="8">P97</text>
-<text x="228" y="62" fill="#2d6c85" font-size="8">P50</text>
-</svg><b>Peso · percentil 62</b><p class="demo-pie">12,4 kg a los 24 meses · dentro de lo esperado</p>`,
-  },
-  {
-    k: "NEURODESARROLLO", t: "Los instrumentos, con su puntaje.",
-    p: "ADOS-2, WISC-V, Vineland-3, Conners-4 y M-CHAT-R/F, cada uno con sus módulos y sus puntajes. Quedan en la ficha y se comparan entre aplicaciones.",
-    v: `<div class="row"><label>ADOS-2 · Módulo 2</label><div>Comparación 7/10</div></div>
-<div class="row"><label>WISC-V</label><div>CI total 94</div></div>
-<div class="row"><label>Vineland-3</label><div>Compuesto 88</div></div>
-<div class="row"><label>Conners-4 · Padres</label><div>Inatención T 68</div></div>
-<p class="demo-pie">Aplicado el 14/03 · comparado con la evaluación anterior</p>`,
-  },
-  {
-    k: "GINECOLOGÍA Y OBSTETRICIA", t: "El control prenatal, semana a semana.",
-    p: "Altura uterina, frecuencia cardíaca fetal y presión en cada control, sobre la misma línea de tiempo. Y el examen ginecológico con su mapa propio.",
-    v: `<div class="row"><label>Semana</label><div>28 · gesta 2, para 1</div></div>
-<div class="row"><label>Altura uterina</label><div>27 cm</div></div>
-<div class="row"><label>FCF</label><div>142 lpm</div></div>
-<div class="row"><label>Presión</label><div>118/74 mmHg</div></div>
-<p class="demo-pie">Próximo control en 3 semanas · curva de tolerancia pendiente</p>`,
-  },
-  {
-    k: "OFTALMOLOGÍA", t: "La agudeza y la refracción, en su ficha.",
-    p: "Cada ojo con su agudeza, su refracción y su presión intraocular, comparables contra el control anterior sin volver a leer la historia entera.",
-    v: `<div class="row"><label>Agudeza OD</label><div>20/25</div></div>
-<div class="row"><label>Agudeza OI</label><div>20/40</div></div>
-<div class="row"><label>Refracción OI</label><div>−1,25 −0,50 × 180°</div></div>
-<div class="row"><label>PIO</label><div>14 / 15 mmHg</div></div>
-<p class="demo-pie">El OI bajó de 20/25 a 20/40 desde el control de marzo</p>`,
-  },
-  {
-    k: "IMÁGENES Y LABORATORIO", t: "Los estudios, dentro de la ficha.",
-    p: "Las radiografías se abren en un visor que permite medir, y los laboratorios quedan marcados como pendientes hasta que vuelven. El equipo de rayos sube directo.",
-    v: `<div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div>
-<div class="row"><label>Rx tórax</label><div>Recibida · 14/03</div></div>
-<div class="row"><label>Creatinina</label><div>Pendiente</div></div>
-<p class="demo-pie">Lo pendiente aparece en el panel hasta que llega</p>`,
-  },
-  {
-    k: "SYMPHOMED PET", t: "La misma inteligencia. Otro paciente.",
-    p: "Historia clínica completa para perros y gatos, con anatomía visual, esquema de vacunas propio y las particularidades de cada especie.",
-    v: `<div class="row"><label>Paciente</label><div>Mora · mestiza, 6 años</div></div>
-<div class="row"><label>Peso</label><div>18,4 kg</div></div>
-<div class="row"><label>Vacunas</label><div>Quíntuple al día · antirrábica en 2 meses</div></div>
-<p class="demo-pie">Ficha por especie, no una ficha humana adaptada</p>`,
-    pet: true,
-  },
-];
+function carrusel(idioma) {
+  const c = CARRUSEL_TXT[idioma];
+  const modulos = MODULOS_TXT[idioma];
+  const laminas = modulos.map(([k, t, p, rotulo, pie], i) =>
+    `<article class="modulo" aria-label="${i + 1} ${c.de} ${modulos.length}: ${k}"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">${k}</div><h3 class="modulo-t">${t}</h3><p>${p}</p></div>
+<div class="demo${i === 6 ? " pet-demo" : ""}">${pantalla(i, idioma, pie, rotulo)}</div>
+</div></article>`).join("");
 
-const CARRUSEL = `
+  return `
 <section class="dark" id="soluciones">
-<div class="container"><div class="section-head"><div class="eyebrow">MÓDULOS POR ESPECIALIDAD</div><h2>Cada especialidad,<br>con su propia ficha.</h2><p>Una nota de pediatría no se parece a una de odontología, y las fichas tampoco. Estos son los módulos que ya están funcionando.</p></div></div>
+<div class="container"><div class="section-head"><div class="eyebrow">${c.eyebrow}</div><h2>${c.h2}</h2><p>${c.p}</p></div></div>
 <div class="carrusel">
-<div class="pistas" id="pistas" tabindex="0" role="region" aria-label="Módulos por especialidad">
-${MODULOS.map((m, i) => `<article class="modulo" aria-label="${i + 1} de ${MODULOS.length}: ${m.k}"><div class="container modulo-in">
-<div class="modulo-txt"><div class="eyebrow">${m.k}</div><h3 class="modulo-t">${m.t}</h3><p>${m.p}</p></div>
-<div class="demo${m.pet ? " pet-demo" : ""}">${m.v}</div>
-</div></article>`).join("")}
+<div class="pistas" id="pistas" tabindex="0" role="region" aria-label="${c.region}">
+${laminas}
 </div>
 <div class="container mandos">
-<button class="flecha" type="button" data-dir="-1" aria-label="Módulo anterior">←</button>
-<div class="puntos" id="puntos"></div>
-<button class="flecha" type="button" data-dir="1" aria-label="Módulo siguiente">→</button>
+<button class="flecha" type="button" data-dir="-1" aria-label="${c.anterior}">←</button>
+<div class="puntos" id="puntos" data-ir="${c.irA}"></div>
+<button class="flecha" type="button" data-dir="1" aria-label="${c.siguiente}">→</button>
 </div>
 </div>
 </section>`;
+}
 
 // ─── Las fichas de tecnología, que se abren ────────────────────────────────
 //
@@ -469,41 +351,17 @@ ${MODULOS.map((m, i) => `<article class="modulo" aria-label="${i + 1} de ${MODUL
 // que un competidor necesitaría para copiar, y no aporta nada al médico que
 // está decidiendo si probar.
 //
-// Lo que sí se muestra son capacidades difíciles de fingir: reconocer
-// negaciones, distinguir lo que dijo el paciente de lo que observó el
-// médico, entender dosis y unidades. Un competidor que lea esto sabe que hay
-// trabajo hecho, pero no se lleva ni un atajo.
-const TECNO = [
-  ["Inteligencia artificial",
-   "Reconoce lo que importa de una conversación y lo ordena como nota clínica: motivo, antecedentes, examen y plan. Y aprende de las correcciones de cada médico, así que la nota se parece cada vez más a la suya y menos a una plantilla."],
-  ["Voz",
-   "Transcribe la consulta mientras ocurre, con el vocabulario que una transcripción común no reconoce: nombres de fármacos, dosis, unidades y términos clínicos. Sin dictar y sin hablarle a la computadora: es la consulta normal."],
-  ["Lenguaje clínico",
-   "Distingue lo que dijo el paciente de lo que observó el médico, separa los antecedentes de los hallazgos de hoy y entiende las negaciones —«sin fiebre» no es lo mismo que «fiebre»—. Ahí es donde una transcripción se vuelve una historia clínica."],
-  ["Datos estructurados",
-   "Cada dato queda en su campo y no suelto en un párrafo. Por eso la presión de hoy se grafica junto a las de los controles anteriores, un estudio pedido puede figurar como pendiente, y una dosis se puede comparar con la anterior."],
-  ["Integraciones",
-   "El consultorio no queda aislado: la agenda se sincroniza con el calendario, el equipo de rayos sube los estudios directo a la ficha del paciente, y en Brasil la receta sale por el sistema de firma digital que exige la norma."],
-  ["Seguridad",
-   "Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed."],
-];
-
-// Seis pestañas arriba y UN panel abajo, en vez de seis fichas que crecen.
-//
-// La primera versión expandía la ficha en su lugar dentro de una grilla de
-// tres columnas. Eso descuadra la fila por definición: la que se abre estira
-// la fila entera y las otras dos quedan chiquitas con un hueco debajo. No hay
-// forma de acomodarlo — o se estiran todas (seis cajas altas y vacías) o
-// queda el hueco. El patrón entero estaba mal elegido.
-//
-// Con un panel aparte, las pestañas no cambian nunca de tamaño y el panel
-// tiene un alto mínimo, así que cambiar de una a otra no mueve nada de la
-// página.
-const FICHAS = `<div class="tecnos" id="tecnos">${TECNO.map(([t], i) => `
-<button class="tecno" type="button" aria-selected="${i === 0 ? "true" : "false"}">${t}</button>`).join("")}
+// Seis pestañas arriba y UN panel abajo, en vez de seis fichas que crecen. La
+// primera versión expandía la ficha en su lugar dentro de una grilla de tres
+// columnas, y eso descuadra la fila por definición: la que se abre estira la
+// fila entera y las otras dos quedan chiquitas con un hueco debajo.
+function fichas(idioma) {
+  const t = TECNO_TXT[idioma];
+  return `<div class="tecnos" id="tecnos">${t.map(([nombre], i) => `
+<button class="tecno" type="button" aria-selected="${i === 0 ? "true" : "false"}">${nombre}</button>`).join("")}
 </div>
-<div class="tecno-panel" id="tecnoPanel">${TECNO.map(([t, d]) => `
-<div class="det"><b>${t}</b><p>${d}</p></div>`).join("")}
+<div class="tecno-panel" id="tecnoPanel">${t.map(([nombre, d]) => `
+<div class="det"><b>${nombre}</b><p>${d}</p></div>`).join("")}
 </div>
 <script nonce="__NONCE__">
 // Va acá, pegado al panel, y no al final del documento: así se ejecuta apenas
@@ -523,23 +381,6 @@ const FICHAS = `<div class="tecnos" id="tecnos">${TECNO.map(([t], i) => `
   });
 })();
 </script>`;
-
-// Se reemplaza la grilla de seis fichas planas del diseño.
-const iTec = cuerpo.indexOf('<div class="specialties"><div class="specialty" style="background:#071a25');
-const fTec = cuerpo.indexOf("</div>\n</div></section>", iTec);
-if (iTec < 0) throw new Error("no encontré las fichas de tecnología del diseño original");
-cuerpo = cuerpo.slice(0, iTec) + FICHAS + cuerpo.slice(cuerpo.indexOf("</div></section>", iTec));
-
-// Se reemplaza el bloque entero del diseño, con sus dos paneles fijos.
-const iSplit = cuerpo.indexOf('<section class="split" id="solutions">');
-const fSplit = cuerpo.indexOf("</section>", cuerpo.indexOf('<div class="panel panel-light pet">')) + 10;
-if (iSplit < 0 || fSplit < 10) throw new Error("no encontré la sección de soluciones del diseño original");
-cuerpo = cuerpo.slice(0, iSplit) + CARRUSEL + cuerpo.slice(fSplit);
-
-const sinAplicar = [];
-for (const [de, a] of T) {
-  if (!cuerpo.includes(de)) { sinAplicar.push(de.slice(0, 55)); continue; }
-  cuerpo = cuerpo.split(de).join(a);
 }
 
 // ─── La agenda: lo que pasa antes y después de la consulta ─────────────────
@@ -559,57 +400,144 @@ for (const [de, a] of T) {
 // unos días antes de la cita. Eso no existe todavía —los Recordatorio son la
 // lista que ve el médico en su panel, no un envío— y anunciarlo sería vender
 // algo que el primer médico descubre que falta en su primera semana.
-const AGENDA = `
+function agenda(idioma) {
+  const a = AGENDA[idioma];
+  return `
 <section class="light" id="agenda"><div class="container">
-<div class="section-head"><div class="eyebrow">LA AGENDA</div><h2>Antes y después<br>de la consulta.</h2><p>Symphomed no empieza cuando el paciente entra ni termina cuando se va: la reserva y el control siguiente también se resuelven solos, por WhatsApp.</p></div>
+<div class="section-head"><div class="eyebrow">${a.eyebrow}</div><h2>${a.h2}</h2><p>${a.p}</p></div>
 <div class="steps steps-3">
-<div class="step"><div class="icon">✆</div><h3>El paciente reserva solo</h3><p>Escribe al WhatsApp del consultorio, ve los horarios que están libres de verdad y elige. La cita aparece en la agenda sin que nadie atienda el teléfono.</p></div>
-<div class="step"><div class="icon">✓</div><h3>Queda confirmada al instante</h3><p>Recibe la confirmación en el momento. Si necesita cancelar, escribe «cancelar» ahí mismo y el horario se libera para otro paciente.</p></div>
-<div class="step"><div class="icon">↻</div><h3>El seguimiento sigue solo</h3><p>Al cerrar la consulta, Symphomed propone la fecha del próximo control y le manda al paciente un enlace para que elija su horario.</p></div>
+${a.pasos.map(([icono, titulo, texto]) =>
+  `<div class="step"><div class="icon">${icono}</div><h3>${titulo}</h3><p>${texto}</p></div>`).join("\n")}
 </div>
 <div class="recuerdos">
-<div class="recuerdo"><b>Reconsultas</b><span>El control que se acordó en la consulta, con la fecha que corresponde.</span></div>
-<div class="recuerdo"><b>Laboratorios</b><span>Los estudios que se pidieron y todavía no volvieron a la ficha.</span></div>
-<div class="recuerdo"><b>Medicación</b><span>Cuándo empieza y cuándo termina cada tratamiento, con su dosis y frecuencia.</span></div>
-<div class="recuerdo"><b>Vacunas</b><span>La dosis siguiente y las que quedaron pendientes del esquema.</span></div>
-<div class="recuerdo"><b>Controles por edad</b><span>Lo que toca revisar según la edad del paciente, sin depender de la memoria.</span></div>
+${a.recuerda.map(([que, cuando]) =>
+  `<div class="recuerdo"><b>${que}</b><span>${cuando}</span></div>`).join("\n")}
 </div>
 </div></section>
 `;
-cuerpo = cuerpo.replace('<section id="especialidades">', AGENDA + '<section id="especialidades">');
+}
 
-// El logo del pie y el de arriba llevan al inicio, no a "#".
-cuerpo = cuerpo.replace('<a class="logo" href="#">', '<a class="logo" href="/">');
+// ─── El selector de idioma ─────────────────────────────────────────────────
+// Tres enlaces, no un desplegable: se siguen sin JavaScript y un buscador los
+// usa para encontrar las otras dos versiones.
+function selector(idioma) {
+  const enlaces = IDIOMAS.map(i =>
+    `<a href="${RUTAS[i]}" hreflang="${i}" lang="${i}"${i === idioma ? ' aria-current="page"' : ""}>${NOMBRES[i]}</a>`
+  ).join("");
+  return `<span class="idiomas" role="group" aria-label="${SELECTOR[idioma]}">${enlaces}</span>`;
+}
 
-// Las anclas que quedaron con el nombre viejo de la sección. Un enlace a una
-// sección que ya no se llama así no da error: simplemente no lleva a ningún
-// lado, y eso solo se nota tocándolo.
-cuerpo = cuerpo
-  .replace(/href="#platform"/g, 'href="#plataforma"')
-  .replace(/href="#specialties"/g, 'href="#especialidades"')
-  .replace(/href="#solutions"/g, 'href="#soluciones"')
-  .replace(/href="#technology"/g, 'href="#tecnologia"')
-  .replace(/href="#security"/g, 'href="#confianza"');
+// ─── Armar una versión ─────────────────────────────────────────────────────
+function construir(idioma) {
+  let cuerpo = CUERPO;
+  const faltantes = [];
 
-// Y la comprobación que lo habría atajado antes: todo ancla interna tiene que
-// apuntar a un id que exista de verdad en la página.
-const anclas = [...cuerpo.matchAll(/href="#([a-z0-9-]+)"/g)].map(m => m[1]);
-const ids = [...cuerpo.matchAll(/id="([a-z0-9-]+)"/g)].map(m => m[1]);
-const rotas = [...new Set(anclas)].filter(a => !ids.includes(a));
-if (rotas.length) throw new Error("anclas que no llevan a ningún lado: " + rotas.join(", "));
+  // 1. Los identificadores de sección, que son los mismos en los tres idiomas.
+  for (const [de, a] of IDS) cuerpo = cuerpo.split(de).join(a);
 
-// ─── Salida ────────────────────────────────────────────────────────────────
-const cabeza = `<!doctype html>
-<html lang="es">
+  // 2. Psicología y psiquiatría, que el diseño no traía.
+  //    OJO CON EL ORDEN: esto corre ANTES de traducir ">Veterinary<", así que
+  //    tiene que buscar el texto EN INGLÉS. Buscarlo traducido no da error —
+  //    simplemente no encuentra nada y las dos especialidades no aparecen,
+  //    que fue exactamente lo que pasó la primera vez.
+  const ancla = '<div class="specialty"><div class="sicon">🐾</div>Veterinary</div>';
+  if (!cuerpo.includes(ancla)) throw new Error("no encontré dónde meter psicología y psiquiatría");
+  cuerpo = cuerpo.replace(ancla,
+    ESPECIALIDADES_EXTRA[idioma].map(([signo, nombre]) =>
+      `<div class="specialty"><div class="sicon">${signo}</div>${nombre}</div>`).join("") + ancla);
+
+  // 3. Las seis fichas planas del diseño, por las pestañas con resumen.
+  const iTec = cuerpo.indexOf('<div class="specialties"><div class="specialty" style="background:#071a25');
+  if (iTec < 0) throw new Error("no encontré las fichas de tecnología del diseño original");
+  cuerpo = cuerpo.slice(0, iTec) + fichas(idioma) + cuerpo.slice(cuerpo.indexOf("</div></section>", iTec));
+
+  // 4. Los dos paneles fijos de "Soluciones", por el carrusel de siete módulos.
+  const iSplit = cuerpo.indexOf('<section class="split" id="solutions">');
+  const fSplit = cuerpo.indexOf("</section>", cuerpo.indexOf('<div class="panel panel-light pet">')) + 10;
+  if (iSplit < 0 || fSplit < 10) throw new Error("no encontré la sección de soluciones del diseño original");
+  cuerpo = cuerpo.slice(0, iSplit) + carrusel(idioma) + cuerpo.slice(fSplit);
+
+  // 5. Las frases. De la más larga a la más corta ya viene ordenado en el
+  //    archivo de textos, para que una traducción no se coma un pedazo de
+  //    otra que todavía no se aplicó.
+  for (const [de, versiones] of FRASES) {
+    if (!cuerpo.includes(de)) { faltantes.push(de.slice(0, 55)); continue; }
+    cuerpo = cuerpo.split(de).join(versiones[idioma]);
+  }
+
+  // 6. El selector de idioma, donde el diseño tenía un "EN⌄" que no hacía nada.
+  if (!cuerpo.includes("<span>EN⌄</span>")) faltantes.push("<span>EN⌄</span>");
+  cuerpo = cuerpo.replace("<span>EN⌄</span>", selector(idioma));
+
+  // 7. La agenda, que el diseño no contemplaba.
+  cuerpo = cuerpo.replace('<section id="especialidades">', agenda(idioma) + '<section id="especialidades">');
+
+  // 8. El logo lleva al inicio DE ESTE IDIOMA, no a "#" ni a la versión
+  //    española: un médico brasileño que toque el logo no tiene por qué
+  //    terminar en una página en español.
+  cuerpo = cuerpo.split('<a class="logo" href="#">').join(`<a class="logo" href="${RUTAS[idioma]}">`);
+
+  // 9. Las anclas que quedaron con el nombre viejo de la sección. Un enlace a
+  //    una sección que ya no se llama así no da error: simplemente no lleva a
+  //    ningún lado, y eso solo se nota tocándolo.
+  cuerpo = cuerpo
+    .replace(/href="#platform"/g, 'href="#plataforma"')
+    .replace(/href="#specialties"/g, 'href="#especialidades"')
+    .replace(/href="#solutions"/g, 'href="#soluciones"')
+    .replace(/href="#technology"/g, 'href="#tecnologia"')
+    .replace(/href="#security"/g, 'href="#confianza"');
+
+  // 10. El WhatsApp, con el saludo en el idioma de quien lo va a escribir.
+  const wa = WA + "?text=" + encodeURIComponent(WA_TEXTO[idioma]);
+  cuerpo = cuerpo.split("__WA__").join(wa);
+
+  // Y la comprobación que lo habría atajado antes: toda ancla interna tiene
+  // que apuntar a un id que exista de verdad en la página.
+  const anclas = [...cuerpo.matchAll(/href="#([a-z0-9-]+)"/g)].map(m => m[1]);
+  const ids = [...cuerpo.matchAll(/id="([a-z0-9-]+)"/g)].map(m => m[1]);
+  const rotas = [...new Set(anclas)].filter(a => !ids.includes(a));
+  if (rotas.length) throw new Error(`[${idioma}] anclas que no llevan a ningún lado: ${rotas.join(", ")}`);
+
+  // Y que no haya quedado inglés del diseño colgando en la versión traducida.
+  if (/__[A-Z]+__/.test(cuerpo.replace(/__NONCE__|__PLATAFORMA__/g, ""))) {
+    throw new Error(`[${idioma}] quedó un marcador sin reemplazar`);
+  }
+
+  return { cuerpo, faltantes };
+}
+
+// ─── La cabecera ───────────────────────────────────────────────────────────
+//
+// ═══ QUÉ HACE hreflang Y POR QUÉ NO ALCANZA CON TRADUCIR ═══════════════════
+//
+// Sin estas tres líneas, Google ve tres páginas parecidas en tres idiomas y
+// tiene que adivinar cuál mostrarle a quién —o, peor, decidir que dos son la
+// misma y quedarse con una sola—. Con ellas sabe que son la MISMA página en
+// tres versiones y le muestra a cada quien la suya.
+//
+// Las tres se apuntan entre sí, incluida a sí misma: es lo que pide la
+// especificación y lo que más fácil se olvida. El x-default es a dónde mandar
+// a quien no hable ninguno de los tres.
+function cabecera(idioma) {
+  const c = CABEZA[idioma];
+  const alternativas = IDIOMAS.map(i =>
+    `<link rel="alternate" hreflang="${i}" href="${SITIO}${RUTAS[i]}">`).join("\n");
+  return `<!doctype html>
+<html lang="${idioma}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#03101a">
-<title>Symphomed — la capa de inteligencia para la salud</title>
-<meta name="description" content="Symphomed convierte la conversación de la consulta en información clínica estructurada: la nota, la receta y el control quedan listos sin que el médico escriba nada.">
-<meta property="og:title" content="Symphomed — la capa de inteligencia para la salud">
-<meta property="og:description" content="La nota clínica, la receta y el kardex salen de la consulta sin tipear. Las primeras 4 consultas no se cobran.">
+<title>${c.titulo}</title>
+<meta name="description" content="${c.descripcion}">
+<link rel="canonical" href="${SITIO}${RUTAS[idioma]}">
+${alternativas}
+<link rel="alternate" hreflang="x-default" href="${SITIO}${RUTAS.es}">
+<meta property="og:title" content="${c.ogTitulo}">
+<meta property="og:description" content="${c.ogDescripcion}">
 <meta property="og:type" content="website">
+<meta property="og:url" content="${SITIO}${RUTAS[idioma]}">
+<meta property="og:locale" content="${{ es: "es_BO", pt: "pt_BR", en: "en_US" }[idioma]}">
 <style>
 @font-face {
   font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
@@ -620,9 +548,11 @@ const cabeza = `<!doctype html>
 <style>
 ${css}
 </style>
-</head>
-<body>${cuerpo}
-<script nonce="__NONCE__">
+</head>`;
+}
+
+// ─── Los controles, que son una mejora y no el mecanismo ───────────────────
+const CONTROLES = `<script nonce="__NONCE__">
 "use strict";
 // Las flechas y los puntos del carrusel. Todo lo que hay acá es OPCIONAL: las
 // diapositivas ya se desplazan solas con scroll-snap. Si este script no corre
@@ -636,13 +566,17 @@ ${css}
   if (laminas.length < 2) return;
 
   var flechas = [].slice.call(document.querySelectorAll(".flecha"));
+  // La etiqueta viaja en el HTML y no acá adentro: este script es el mismo en
+  // los tres idiomas, y un "Ir al módulo 3" en español dentro de la versión
+  // inglesa es justo lo que escucha quien navega con lector de pantalla.
+  var irA = puntos.getAttribute("data-ir") || "";
   var actual = 0;
 
   laminas.forEach(function (_, i) {
     var b = document.createElement("button");
     b.className = "punto";
     b.type = "button";
-    b.setAttribute("aria-label", "Ir al módulo " + (i + 1));
+    b.setAttribute("aria-label", irA + " " + (i + 1));
     b.addEventListener("click", function () { ir(i); });
     puntos.appendChild(b);
   });
@@ -718,16 +652,40 @@ ${css}
 
   activar(0);
 })();
-</script>
+</script>`;
+
+// ─── Salida ────────────────────────────────────────────────────────────────
+let problemas = 0;
+for (const idioma of IDIOMAS) {
+  const { cuerpo, faltantes } = construir(idioma);
+  const html = `${cabecera(idioma)}
+<body>${cuerpo}
+${CONTROLES}
 </body>
 </html>
 `;
-
-fs.writeFileSync(path.join(RAIZ, "vistas", "inicio.html"), cabeza);
-console.log("escrito vistas/inicio.html —", cabeza.length, "bytes");
-if (sinAplicar.length) {
-  console.log("\n⚠️  NO se encontraron estas cadenas (quedaron en inglés):");
-  sinAplicar.forEach(s => console.log("   ·", s));
-} else {
-  console.log("todas las traducciones se aplicaron");
+  const archivo = path.join(RAIZ, "vistas", `inicio.${idioma}.html`);
+  fs.writeFileSync(archivo, html);
+  console.log(`✅ vistas/inicio.${idioma}.html — ${html.length} bytes`);
+  if (faltantes.length) {
+    problemas += faltantes.length;
+    console.log(`   ⚠️  ${faltantes.length} frase(s) que NO se encontraron en el diseño:`);
+    faltantes.forEach(s => console.log("      ·", s));
+  }
 }
+
+// El archivo viejo de un solo idioma. Se borra a propósito y no se deja
+// "por las dudas": si queda, routes/inicio.js podría seguir sirviéndolo sin
+// que nadie se entere, y la página en español se congelaría en la versión
+// anterior mientras las otras dos avanzan.
+const viejo = path.join(RAIZ, "vistas", "inicio.html");
+if (fs.existsSync(viejo)) {
+  fs.unlinkSync(viejo);
+  console.log("🗑  vistas/inicio.html (la versión de un solo idioma) — borrado");
+}
+
+if (problemas) {
+  console.log(`\n💥 ${problemas} frase(s) sin aplicar`);
+  process.exit(1);
+}
+console.log("\n🏁 los tres idiomas, completos");

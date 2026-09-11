@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#03101a">
+<title>Symphomed — a camada de inteligência para a saúde</title>
+<meta name="description" content="O Symphomed transforma a conversa da consulta em informação clínica estruturada: a evolução, a receita e o retorno ficam prontos sem que o médico digite nada.">
+<link rel="canonical" href="https://symphomed.com/pt">
+<link rel="alternate" hreflang="es" href="https://symphomed.com/">
+<link rel="alternate" hreflang="pt" href="https://symphomed.com/pt">
+<link rel="alternate" hreflang="en" href="https://symphomed.com/en">
+<link rel="alternate" hreflang="x-default" href="https://symphomed.com/">
+<meta property="og:title" content="Symphomed — a camada de inteligência para a saúde">
+<meta property="og:description" content="A evolução, a receita e o histórico saem da consulta sem digitar. As primeiras 4 consultas não são cobradas.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://symphomed.com/pt">
+<meta property="og:locale" content="pt_BR">
+<style>
+@font-face {
+  font-family: "InterVar"; src: url("/fonts/inter-variable.woff2") format("woff2");
+  font-weight: 100 900; font-display: swap;
+}
+:root { color-scheme: dark; }
+</style>
+<style>
+
+:root{
+  --ink:#07121b; --muted:#607080; --line:#dce7ef; --cyan:#19b9ef;
+  --cyan2:#65ddff; --white:#fff; --soft:#f5f9fc; --dark:#03101a;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;font-family:InterVar,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}
+a{text-decoration:none;color:inherit}.container{width:min(1180px,92%);margin:auto}
+nav{position:fixed;top:0;left:0;right:0;z-index:20;height:72px;background:rgba(3,16,26,.82);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08)}
+.nav{height:100%;display:flex;align-items:center;justify-content:space-between}.logo{color:#fff;font-weight:800;letter-spacing:3px;font-size:15px;display:flex;align-items:center;gap:10px}
+.logo-mark{width:26px;height:26px;position:relative}.logo-mark i{position:absolute;width:8px;height:8px;border-radius:50%;background:#20c7f3}.logo-mark i:nth-child(1){left:9px;top:0}.logo-mark i:nth-child(2){left:0;top:9px}.logo-mark i:nth-child(3){right:0;top:8px}.logo-mark i:nth-child(4){left:9px;bottom:0}.logo-mark i:nth-child(5){left:8px;top:8px;background:#8beaff}
+.navlinks{display:flex;gap:27px;color:#b9c9d5;font-size:12px}.navlinks a:hover{color:#fff}.navright{display:flex;align-items:center;gap:18px;color:#d8e5ed;font-size:12px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 21px;border-radius:30px;font-weight:700;font-size:12px;transition:.2s;border:1px solid transparent;cursor:pointer}.btn-primary{background:linear-gradient(100deg,#1fb9ee,#54d8ff);color:#03131d}.btn-outline{border-color:#78909f;color:#fff;background:transparent}.btn:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.hero{min-height:720px;padding:145px 0 70px;background:radial-gradient(circle at 78% 28%,#12354a 0,#071a27 27%,#020b12 67%);color:#fff;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:43% 57%;align-items:center;gap:20px}.eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#45d5fa;margin-bottom:15px}.hero h1{font-size:clamp(45px,5vw,68px);line-height:1.01;letter-spacing:-3px;margin:0 0 20px}.hero h1 span{color:#25c7f5}.hero p{font-size:17px;line-height:1.65;color:#b9c9d5;max-width:520px}.actions{display:flex;gap:12px;margin:28px 0}.trust-row{display:flex;gap:30px;margin-top:38px;color:#c4d4de;font-size:11px}.trust-row span{display:flex;align-items:center;gap:8px}.dot{width:8px;height:8px;border-radius:50%;background:#26c8f2}
+.hero-product{position:relative;min-height:430px}.doctor-card{position:absolute;right:0;top:0;width:72%;height:285px;border:1px solid #3b6d83;border-radius:14px;background:linear-gradient(135deg,#193445,#081822);overflow:hidden;box-shadow:0 25px 80px rgba(0,0,0,.5)}
+.doctor-photo{height:100%;background:linear-gradient(90deg,rgba(4,17,25,.15),rgba(4,17,25,.55)),url("/img/medica.jpg") center/cover}
+.chat{position:absolute;left:-55px;top:55px;width:250px;padding:14px;border:1px solid #2c91b2;border-radius:12px;background:rgba(4,20,29,.92);font-size:12px;color:#d9e9f1}.chat b{color:#42d5fb;display:block;margin-bottom:8px}
+.ai-card{position:absolute;left:0;bottom:0;width:59%;padding:18px;border:1px solid #2c86a5;border-radius:13px;background:linear-gradient(145deg,#102c3d,#07151e);box-shadow:0 25px 60px rgba(0,0,0,.45)}
+.ai-head{display:flex;justify-content:space-between;color:#fff;font-weight:700;font-size:12px;margin-bottom:15px}.pill{font-size:9px;border:1px solid #28728d;color:#52dafa;border-radius:20px;padding:4px 8px}
+.row{display:grid;grid-template-columns:115px 1fr;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.08);font-size:10px}.row label{color:#8da7b5}.row div{color:#e4f0f5}
+.record{position:absolute;right:-15px;bottom:22px;width:43%;padding:18px;border:1px solid #316c84;border-radius:13px;background:#0a2230;color:#dcebf2;box-shadow:0 20px 60px #0008}.record h4{margin:0 0 13px;color:#5bddfa}.record p{font-size:10px;line-height:1.6;color:#afc3ce}.save{font-size:10px;color:#49d8fb;border:1px solid #287c98;border-radius:20px;padding:7px 10px;text-align:center}
+section{padding:95px 0}.light{background:#f6fafc}.dark{background:#03101a;color:#fff}.section-head{max-width:700px;margin-bottom:45px}.section-head h2{font-size:clamp(34px,4vw,52px);line-height:1.05;letter-spacing:-2px;margin:10px 0 18px}.section-head p{color:var(--muted);font-size:16px;line-height:1.7}.dark .section-head p{color:#a8bdc9}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:25px}.step{position:relative}.step:after{content:"→";position:absolute;right:-18px;top:28px;color:#9bb1bf;font-size:22px}.step:last-child:after{display:none}.icon{width:58px;height:58px;border-radius:50%;background:#e5f6fc;display:grid;place-items:center;color:#069fd3;font-size:23px;margin-bottom:20px}.step h3{margin:0 0 9px}.step p{color:var(--muted);font-size:13px;line-height:1.6}
+.product-show{display:grid;grid-template-columns:1.2fr .8fr;gap:60px;align-items:center}.screen{background:#071c29;border:1px solid #245267;border-radius:14px;padding:14px;box-shadow:0 30px 80px #001018aa}.screen-top{height:38px;border-bottom:1px solid #173847;color:#b9d1dc;font-size:11px;display:flex;align-items:center;justify-content:space-between}.screen-body{display:grid;grid-template-columns:110px 1fr;min-height:290px}.sidebar{padding:14px 8px;border-right:1px solid #173847;color:#8aa6b4;font-size:10px}.sidebar div{padding:9px}.sidebar div:first-child{color:#fff;background:#123b4e;border-radius:6px}.screen-main{padding:18px;color:#fff}.screen-main h4{margin:0 0 14px;color:#5bdcfa}.metric{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric div{background:#0d2939;border:1px solid #1d4a5d;padding:12px;border-radius:7px;font-size:10px}.metric b{display:block;color:#fff;margin-bottom:5px}.metric span{color:#8eabb8}
+.specialties{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.specialty{padding:24px 10px;border:1px solid var(--line);border-radius:12px;text-align:center;font-size:12px;background:#fff;transition:.2s}.specialty:hover{border-color:#4acaf0;transform:translateY(-3px);box-shadow:0 10px 30px #0a7fa51a}.specialty .sicon{font-size:25px;margin-bottom:12px}
+.split{display:grid;grid-template-columns:1fr 1fr}.split .panel{padding:80px max(6vw,40px)}.panel-dark{background:#061722;color:#fff}.panel-dark p,.pet p{color:#a8bdc9}.panel-light{background:#f4f8fb}.odontogram{margin-top:28px;background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff}.teeth{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:18px}.tooth{height:30px;border:1px solid #5ecde9;border-radius:6px;display:grid;place-items:center;font-size:9px}.pet{background:linear-gradient(120deg,#06131c,#0d2836);color:#fff;position:relative;overflow:hidden}.pet:after{content:"🐕  🐈";position:absolute;font-size:110px;right:5%;bottom:-20px;opacity:.7}
+.scale{display:flex;align-items:center;justify-content:space-between;gap:10px}.scale-box{flex:1;border:1px solid var(--line);padding:22px 14px;border-radius:12px;text-align:center}.scale-box b{font-size:27px;display:block}.scale-box small{color:var(--muted)}
+.final{padding:110px 0;background:radial-gradient(circle at 50% 0,#10384e,#03101a 60%);text-align:center;color:#fff}.final h2{font-size:clamp(38px,5vw,62px);letter-spacing:-2px;max-width:850px;margin:0 auto 20px}.final p{color:#a9c0cb;max-width:620px;margin:0 auto 30px;line-height:1.7}
+footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;justify-content:space-between;align-items:center;font-size:11px}.footerlinks{display:flex;gap:22px}
+@media(max-width:900px){.navlinks{display:none}.hero-grid,.product-show,.split{grid-template-columns:1fr}.hero-product{margin-top:30px;min-height:450px}.steps{grid-template-columns:1fr 1fr}.specialties{grid-template-columns:repeat(3,1fr)}.doctor-card{width:78%}.chat{left:0}.record{right:0}.ai-card{left:0}}
+@media(max-width:560px){.hero{padding-top:120px}.hero h1{font-size:43px}.actions,.trust-row{flex-direction:column;align-items:flex-start}.steps,.specialties{grid-template-columns:1fr 1fr}.hero-product{transform:scale(.88);transform-origin:left top;height:400px}.footer{flex-direction:column;gap:20px;align-items:flex-start}}
+
+/* El pie es una fila flex de tres bloques sin flex-wrap. Alargar el copyright
+   a "Bolivia y Brasil" bastó para que a 768px no entrara y desbordara la
+   página entera. Se deja envolviendo SIEMPRE: a ancho completo no cambia
+   nada, y deja de depender de que el texto no crezca. */
+.footer{flex-wrap:wrap;gap:14px 20px}
+.footerlinks{flex-wrap:wrap;gap:12px 18px}
+@media(max-width:620px){
+  .scale{flex-wrap:wrap;justify-content:center;gap:12px}
+  .scale-box{flex:1 1 38%}
+}
+@media(max-width:620px){
+  /* .screen es una grilla dentro de otra grilla. Por defecto una celda no se
+     achica por debajo del ancho mínimo de su contenido, así que la maqueta
+     del consultorio empujaba 354px aunque su contenedor midiera 331. El
+     minmax(0,1fr) es lo que le da permiso para achicarse. */
+  .screen-body{grid-template-columns:84px minmax(0,1fr)}
+  .screen-main{min-width:0}
+  .metric{grid-template-columns:1fr}
+}
+/* ── El selector de idioma ────────────────────────────────────────────────
+   Son tres enlaces de verdad, a tres URLs de verdad. Ni un menú desplegable
+   ni un botón con JavaScript: un médico brasileño que abra la página en
+   español tiene que poder cambiarla aunque el script no haya corrido, y un
+   buscador tiene que poder seguir el enlace para encontrar las otras dos
+   versiones. */
+.idiomas{display:inline-flex;gap:2px;align-items:center}
+.idiomas a{
+  color:#7f9fb0;text-decoration:none;font-size:11px;letter-spacing:1px;
+  padding:4px 6px;border-radius:5px;transition:.2s;
+}
+.idiomas a:hover{color:#fff;background:#0c2a3a}
+.idiomas a[aria-current="page"]{color:#fff;background:#12384a}
+.idiomas a:focus-visible{outline:2px solid #49d8fb;outline-offset:1px}
+@media(max-width:480px){
+  /* "SYMPHOMED" con letter-spacing:3px es ancho, y la barra reparte con
+     space-between: abajo de 480 el logo termina tocando el selector de idioma
+     y se lee "SYMPHOMEDES". Se achica el logo y se aprieta el selector.
+     Ojo: el selector NO se esconde. Antes sí —había un solo idioma y no
+     hacía nada—, pero ahora es la única forma que tiene un visitante de
+     cambiar de versión, y esconderlo justo en el celular lo dejaría atrapado
+     en el idioma que le tocó. */
+  .logo{font-size:13px;letter-spacing:2px}
+  .nav .navright{gap:10px}
+  .idiomas a{padding:4px;letter-spacing:0}
+  .btn{padding:11px 16px}
+  /* Y el botón de la barra se va. MEDIDO, no supuesto: con el selector
+     puesto, a 390px la .navright pedía 247px y terminaba 22px afuera de la
+     pantalla — el mismo desborde que produce la franja blanca al costado de
+     toda la página, otra vez.
+     Se saca este botón y no el selector porque este es el único de los tres
+     que se repite: la misma llamada está en la portada, justo abajo, y
+     de nuevo al cierre. El selector y "Ingresar" no están en ningún otro
+     lado. Y no se arregla apretando el botón unos píxeles: en portugués dice
+     "Fale conosco" y en inglés "Talk to us", así que el ancho cambia con el
+     idioma y el margen tiene que ser holgado, no justo. */
+  .nav .navright .btn{display:none}
+}
+@media(max-width:430px){
+  /* A 43px el titular llega justo al borde del contenedor y queda pegado.
+     Dos píxeles menos de cuerpo le devuelven el margen. */
+  .hero h1{font-size:38px;letter-spacing:-2px}
+}
+/* ── Las fichas de tecnología ─────────────────────────────────────────────
+   Tres columnas y no seis: con seis, cada ficha medía 185px de ancho y el
+   texto no entraba sin quedar ilegible.
+
+   El resumen está SIEMPRE en el HTML, nunca escondido por JavaScript. Se
+   revela al pasar el cursor, al tabular y al tocar (por la clase que agrega
+   el script). Así lo lee Google, y si el script no corre se sigue pudiendo
+   llegar a todo con el teclado. */
+.tecnos{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.tecno{
+  background:#071a25;border:1px solid #214354;border-radius:10px;
+  padding:15px 12px;color:#8fb0c2;font-family:inherit;font-size:12px;
+  line-height:1.35;cursor:pointer;transition:.2s;
+}
+.tecno:hover{border-color:#3f9dbe;color:#fff}
+.tecno[aria-selected="true"]{border-color:#5bddfa;background:#0c2a3a;color:#fff}
+.tecno:focus-visible{outline:2px solid #49d8fb;outline-offset:2px}
+/* El alto mínimo es lo que evita que cambiar de pestaña mueva la página: el
+   panel no se achica con el resumen más corto ni salta con el más largo. */
+.tecno-panel{
+  margin-top:14px;background:#071a25;border:1px solid #214354;border-radius:12px;
+  padding:26px 28px;min-height:200px;
+}
+.det b{display:block;font-size:15px;color:#fff;margin-bottom:10px}
+.det p{color:#a8bdc9;font-size:14px;line-height:1.75;max-width:74ch;margin:0}
+/* Sin JavaScript se muestran los seis, uno debajo del otro: una lista, que se
+   lee bien, y ahí el filete separa. Con el script solo hay uno visible.
+   El :not() es necesario: display:none saca al elemento del dibujo pero NO de
+   la cadena de hermanos, así que un ".det + .det" pelado le ponía el filete
+   al único visible por tener cinco ocultos delante — una línea suelta arriba
+   del título, sin nada que separar. */
+.det:not([data-oculto]) + .det:not([data-oculto]){
+  margin-top:20px;padding-top:20px;border-top:1px solid #16323f;
+}
+/* Sin JavaScript no hay clase que alternar, así que el resumen se muestra al
+   pasar el cursor y al tabular — que es lo que ya hace el CSS de arriba. */
+@media(max-width:900px){.tecnos{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.tecnos{grid-template-columns:1fr 1fr}.tecno-panel{padding:20px}}
+@media(prefers-reduced-motion:reduce){.tecno{transition:none}}
+[data-oculto]{display:none}
+
+/* ── El carrusel de módulos ───────────────────────────────────────────────
+   Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
+   sin JavaScript. Las flechas y los puntos son una mejora encima. */
+.carrusel{margin-top:45px}
+.pistas{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pistas::-webkit-scrollbar{display:none}
+.pistas:focus-visible{outline:2px solid #49d8fb;outline-offset:4px}
+.modulo{flex:0 0 100%;scroll-snap-align:start;min-width:0}
+.modulo-in{display:grid;grid-template-columns:1fr 1fr;gap:55px;align-items:center}
+.modulo-txt p{color:#a8bdc9;font-size:15px;line-height:1.7;margin:14px 0 0;max-width:46ch}
+.modulo-t{font-size:clamp(24px,2.6vw,34px);line-height:1.15;letter-spacing:-1px;margin:10px 0 0;font-weight:700}
+.demo{background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff;min-width:0}
+.demo b{display:block;margin-top:14px;font-size:13px}
+.demo .row:first-of-type{border-top:0}
+.demo-pie{margin:8px 0 0;color:#9fb8c5;font-size:11px;line-height:1.6}
+.tooth.marcada{border-color:#5bddfa;background:#123b4e;color:#8beaff}
+.visor{height:110px;border:1px solid #2c6b84;border-radius:8px;background:linear-gradient(140deg,#0d2b3b,#061620);position:relative;margin-bottom:14px}
+.visor-regla{position:absolute;left:18%;top:38%;width:46%;height:2px;background:#5bddfa}
+.visor-medida{position:absolute;left:18%;top:calc(38% + 10px);color:#5bddfa;font-size:10px}
+.pet-demo{position:relative;overflow:hidden}
+.pet-demo:after{content:"🐕";position:absolute;font-size:64px;right:10px;bottom:-12px;opacity:.55}
+.mandos{display:flex;align-items:center;gap:18px;margin-top:30px}
+.flecha{width:42px;height:42px;flex:none;border-radius:50%;border:1px solid #2c6b84;background:transparent;color:#8beaff;font-size:15px;cursor:pointer;transition:.2s}
+.flecha:hover:not(:disabled){background:#0d2b3b;border-color:#5bddfa}
+.flecha:disabled{opacity:.3;cursor:default}
+.flecha:focus-visible{outline:2px solid #49d8fb;outline-offset:3px}
+/* flex-wrap y no un ancho fijo: con siete puntos, dos flechas y los huecos,
+   los mandos pedían 350px dentro de un contenedor de 294 en una pantalla de
+   320. Envolviendo, deja de importar cuántos módulos haya. */
+.puntos{display:flex;gap:8px;flex:1;flex-wrap:wrap}
+.punto{width:26px;height:3px;border-radius:2px;border:0;padding:0;background:#23596d;cursor:pointer;transition:.2s}
+.punto[aria-current="true"]{background:#5bddfa}
+.punto:focus-visible{outline:2px solid #49d8fb;outline-offset:3px}
+@media(max-width:900px){
+  .modulo-in{grid-template-columns:1fr;gap:26px}
+  .carrusel{margin-top:32px}
+}
+@media(max-width:480px){
+  .mandos{gap:12px}
+  .flecha{width:38px;height:38px}
+  .punto{width:18px}
+}
+@media(prefers-reduced-motion:reduce){.pistas{scroll-behavior:auto}}
+
+/* Qué recuerda el seguimiento. Van como filete y no como tarjeta: son una
+   lista de cosas del mismo rango, y cinco tarjetas con sombra al lado de las
+   tres de arriba competirían con ellas por la atención. */
+.recuerdos{display:grid;grid-template-columns:repeat(5,1fr);gap:0 22px;margin-top:52px;border-top:1px solid var(--line);padding-top:26px}
+.recuerdo b{display:block;font-size:13px;margin-bottom:7px}
+.recuerdo span{color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:900px){.recuerdos{grid-template-columns:1fr 1fr;gap:22px}}
+@media(max-width:560px){.recuerdos{grid-template-columns:1fr;gap:18px}}
+/* La sección de la agenda tiene tres pasos y no cuatro. Sin esto quedaría una
+   columna vacía a la derecha, que se lee como si faltara algo. */
+.steps-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.steps-3{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.steps-3{grid-template-columns:1fr}.steps-3 .step:after{display:none}}
+/* Con psicología y psiquiatría son catorce especialidades. A seis columnas
+   quedaban doce arriba y dos solas abajo; a siete entran en dos filas justas.
+   Va acotado a esta sección: la de tecnología usa la misma clase con seis. */
+#especialidades .specialties{grid-template-columns:repeat(7,1fr)}
+@media(max-width:900px){#especialidades .specialties{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){#especialidades .specialties{grid-template-columns:repeat(2,1fr)}}
+/* Cinturón de seguridad. Lo de arriba arregla las causas conocidas; esto
+   asegura que una futura —un texto más largo, una sección nueva— no vuelva a
+   producir la franja blanca al costado de TODA la página. El costo es que un
+   desborde nuevo se recorta en vez de avisar, y por eso no reemplaza a las
+   reglas de arriba: las respalda. */
+html{overflow-x:hidden}
+</style>
+</head>
+<body>
+<nav><div class="container nav">
+<a class="logo" href="/pt"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</a>
+<div class="navlinks"><a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="/mapa">Mapa</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluções</a><a href="#tecnologia">Tecnologia</a><a href="#confianza">Confiança</a></div>
+<div class="navright"><span class="idiomas" role="group" aria-label="Idioma"><a href="/" hreflang="es" lang="es">ES</a><a href="/pt" hreflang="pt" lang="pt" aria-current="page">PT</a><a href="/en" hreflang="en" lang="en">EN</a></span><a href="__PLATAFORMA__">Entrar</a><a class="btn btn-primary" href="https://wa.me/59164637067?text=Ol%C3%A1%2C%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o%20do%20Symphomed">Fale conosco</a></div>
+</div></nav>
+
+<header class="hero">
+<div class="container hero-grid">
+<div>
+<div class="eyebrow">A CAMADA DE INTELIGÊNCIA PARA A SAÚDE</div>
+<h1>Conversa clínica.<br><span>Prontuário inteligente.</span></h1>
+<p>O Symphomed transforma a conversa da consulta em informação clínica estruturada: a evolução, a receita e o retorno ficam prontos sem que o médico digite nada.</p>
+<div class="actions"><a class="btn btn-primary" href="https://wa.me/59164637067?text=Ol%C3%A1%2C%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o%20do%20Symphomed">Fale conosco pelo WhatsApp →</a><a class="btn btn-outline" href="#plataforma">Conhecer a plataforma</a></div>
+<div class="trust-row"><span><i class="dot"></i> Mais tempo com o paciente</span><span><i class="dot"></i> Melhor informação clínica</span><span><i class="dot"></i> Continuidade do cuidado</span></div>
+</div>
+<div class="hero-product">
+<div class="doctor-card"><div class="doctor-photo"></div></div>
+<div class="chat"><b>Paciente</b>“Dói há umas três semanas, principalmente de manhã…”</div>
+<div class="ai-card"><div class="ai-head"><span>✦ SYMPHOMED <span class="pill">AI</span></span><span>•••</span></div>
+<div class="row"><label>Queixa</label><div>Dor lombar</div></div><div class="row"><label>Tempo</label><div>3 semanas</div></div><div class="row"><label>Medicação</label><div>Ibuprofeno 400 mg</div></div><div class="row"><label>Antecedentes</label><div>Episódio prévio</div></div></div>
+<div class="record"><h4>Prontuário</h4><p><b>Evolução</b><br>Refere dor lombar há 3 semanas, de predomínio matinal. Sem irradiação. Indicado retorno e revisão clínica.</p><div class="save">✓ Salvar no prontuário</div></div>
+</div>
+</div>
+</header>
+
+<section class="light">
+<div class="container">
+<div class="section-head"><div class="eyebrow">COMO FUNCIONA</div><h2>Da conversa<br>ao prontuário.</h2><p>O Symphomed escuta, entende e organiza cada consulta automaticamente, e transforma o que foi falado em dados clínicos que servem.</p></div>
+<div class="steps">
+<div class="step"><div class="icon">♩</div><h3>1. Escuta</h3><p>Capta a conversa da consulta.</p></div>
+<div class="step"><div class="icon">✦</div><h3>2. Entende</h3><p>Identifica a informação clínica relevante.</p></div>
+<div class="step"><div class="icon">▤</div><h3>3. Organiza</h3><p>Gera a evolução estruturada.</p></div>
+<div class="step"><div class="icon">↗</div><h3>4. Conecta</h3><p>Atualiza o histórico do paciente para o próximo retorno.</p></div>
+</div>
+</div>
+</section>
+
+<section class="dark" id="plataforma"><div class="container product-show">
+<div class="screen"><div class="screen-top"><span>✦ SYMPHOMED</span><span>Consultório</span></div><div class="screen-body"><div class="sidebar"><div>Paciente</div><div>Consulta</div><div>Dados clínicos</div><div>Histórico</div><div>Kardex</div><div>Receitas</div></div><div class="screen-main"><h4>Dados clínicos</h4><div class="metric"><div><b>Queixa</b><span>Cefaleia</span></div><div><b>Tempo</b><span>3 semanas</span></div><div><b>Medicação</b><span>Ibuprofeno 400 mg</span></div><div><b>Impressão</b><span>Cefaleia tensional</span></div><div><b>Antecedentes</b><span>Sem antecedentes</span></div><div><b>Conduta</b><span>Retorno</span></div></div></div></div></div>
+<div><div class="eyebrow">O PRONTUÁRIO COMPLETO</div><h2>Uma consulta.<br>O prontuário completo.</h2><p>O Symphomed capta a conversa, reconhece o que importa e monta a evolução estruturada, pronta para o médico revisar e salvar no prontuário.</p><a class="btn btn-outline" href="#demo">▶ Ver uma demonstração</a></div>
+</div></section>
+
+
+<section class="light" id="agenda"><div class="container">
+<div class="section-head"><div class="eyebrow">A AGENDA</div><h2>Antes e depois<br>da consulta.</h2><p>O Symphomed não começa quando o paciente entra nem termina quando ele sai: o agendamento e o retorno também se resolvem sozinhos, pelo WhatsApp.</p></div>
+<div class="steps steps-3">
+<div class="step"><div class="icon">✆</div><h3>O paciente agenda sozinho</h3><p>Manda mensagem no WhatsApp do consultório, vê os horários realmente livres e escolhe. A consulta entra na agenda sem ninguém atender o telefone.</p></div>
+<div class="step"><div class="icon">✓</div><h3>Confirmado na hora</h3><p>Recebe a confirmação na mesma hora. Se precisar cancelar, escreve «cancelar» ali mesmo e o horário volta a ficar livre.</p></div>
+<div class="step"><div class="icon">↻</div><h3>O acompanhamento continua sozinho</h3><p>Ao encerrar a consulta, o Symphomed propõe a data do próximo retorno e manda ao paciente um link para escolher o horário.</p></div>
+</div>
+<div class="recuerdos">
+<div class="recuerdo"><b>Retornos</b><span>O retorno combinado na consulta, na data que corresponde.</span></div>
+<div class="recuerdo"><b>Exames</b><span>Os exames pedidos que ainda não voltaram ao prontuário.</span></div>
+<div class="recuerdo"><b>Medicação</b><span>Quando começa e quando termina cada tratamento, com dose e frequência.</span></div>
+<div class="recuerdo"><b>Vacinas</b><span>A próxima dose e as que ficaram pendentes no esquema.</span></div>
+<div class="recuerdo"><b>Controles por idade</b><span>O que precisa ser revisto conforme a idade do paciente, sem depender da memória.</span></div>
+</div>
+</div></section>
+<section id="especialidades"><div class="container"><div class="section-head"><div class="eyebrow">UMA PLATAFORMA. TODAS AS ESPECIALIDADES.</div><h2>Pensado para todo o consultório.</h2><p>Da clínica geral à especialidade, o Symphomed se adapta a cada profissional, cada especialidade e cada consultório.</p></div>
+<div class="specialties">
+<div class="specialty"><div class="sicon">⚕</div>Clínica geral</div><div class="specialty"><div class="sicon">♢</div>Odontologia</div><div class="specialty"><div class="sicon">◉</div>Dermatologia</div><div class="specialty"><div class="sicon">◉</div>Oftalmologia</div><div class="specialty"><div class="sicon">✧</div>Estética</div><div class="specialty"><div class="sicon">⌁</div>Cirurgia</div><div class="specialty"><div class="sicon">♧</div>Ginecologia</div><div class="specialty"><div class="sicon">◌</div>Pediatria</div><div class="specialty"><div class="sicon">♧</div>Fisioterapia</div><div class="specialty"><div class="sicon">◈</div>Psicologia</div><div class="specialty"><div class="sicon">❋</div>Psiquiatria</div><div class="specialty"><div class="sicon">🐾</div>Veterinária</div><div class="specialty"><div class="sicon">▣</div>Teleconsulta</div><div class="specialty"><div class="sicon">→</div>Todas</div>
+</div></div></section>
+
+
+<section class="dark" id="soluciones">
+<div class="container"><div class="section-head"><div class="eyebrow">MÓDULOS POR ESPECIALIDADE</div><h2>Cada especialidade,<br>com o seu próprio prontuário.</h2><p>Uma evolução de pediatria não se parece com uma de odontologia, e os prontuários também não. Estes são os módulos que já estão funcionando.</p></div></div>
+<div class="carrusel">
+<div class="pistas" id="pistas" tabindex="0" role="region" aria-label="Módulos por especialidade">
+<article class="modulo" aria-label="1 de 7: ODONTOLOGIA"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">ODONTOLOGIA</div><h3 class="modulo-t">O odontograma, dente por dente.</h3><p>Cada dente com seu histórico, seus tratamentos e sua evolução. A ficha odontológica deixa de ser um desenho à mão numa folha.</p></div>
+<div class="demo"><div class="teeth"><div class="tooth">11</div><div class="tooth">12</div><div class="tooth">13</div><div class="tooth">14</div><div class="tooth">15</div><div class="tooth">16</div><div class="tooth">17</div><div class="tooth">18</div><div class="tooth">21</div><div class="tooth">22</div><div class="tooth">23</div><div class="tooth">24</div><div class="tooth">25</div><div class="tooth">26</div><div class="tooth">27</div><div class="tooth">28</div><div class="tooth">31</div><div class="tooth">32</div><div class="tooth">33</div><div class="tooth">34</div><div class="tooth">35</div><div class="tooth marcada">36</div><div class="tooth">37</div><div class="tooth">38</div><div class="tooth">41</div><div class="tooth">42</div><div class="tooth">43</div><div class="tooth">44</div><div class="tooth">45</div><div class="tooth">46</div><div class="tooth">47</div><div class="tooth">48</div></div><b>Dente 36</b><p class="demo-pie">Cárie oclusal · Tratamento de canal · Em controle</p></div>
+</div></article><article class="modulo" aria-label="2 de 7: PEDIATRIA"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">PEDIATRIA</div><h3 class="modulo-t">As curvas, calculadas sozinhas.</h3><p>Peso, altura e perímetro cefálico são plotados sobre os percentis da OMS conforme são lançados. O percentil não se procura numa tabela: já está lá.</p></div>
+<div class="demo"><svg viewBox="0 0 260 130" width="100%" height="130" role="img" aria-label="Curva de peso sobre percentis">
+<polyline points="10,108 60,88 110,74 160,63 210,54 250,48" fill="none" stroke="#2d6c85" stroke-width="1.5"/>
+<polyline points="10,116 60,99 110,87 160,78 210,71 250,66" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,99 60,76 110,60 160,47 210,37 250,30" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,110 60,90 110,73 160,60 210,52" fill="none" stroke="#5bddfa" stroke-width="2.5"/>
+<circle cx="210" cy="52" r="4" fill="#5bddfa"/>
+<text x="10" y="126" fill="#8da7b5" font-size="8">0 m</text>
+<text x="196" y="126" fill="#8da7b5" font-size="8">24 m</text>
+<text x="228" y="22" fill="#2d6c85" font-size="8">P97</text>
+<text x="228" y="62" fill="#2d6c85" font-size="8">P50</text>
+</svg><b>Peso · percentil 62</b><p class="demo-pie">12,4 kg aos 24 meses · dentro do esperado</p></div>
+</div></article><article class="modulo" aria-label="3 de 7: NEURODESENVOLVIMENTO"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">NEURODESENVOLVIMENTO</div><h3 class="modulo-t">Os instrumentos, com sua pontuação.</h3><p>ADOS-2, WISC-V, Vineland-3, Conners-4 e M-CHAT-R/F, cada um com seus módulos e suas pontuações. Ficam no prontuário e se comparam entre aplicações.</p></div>
+<div class="demo"><div class="row"><label>ADOS-2 · Módulo 2</label><div>Comparação 7/10</div></div>
+<div class="row"><label>WISC-V</label><div>QI total 94</div></div>
+<div class="row"><label>Vineland-3</label><div>Composto 88</div></div>
+<div class="row"><label>Conners-4 · Pais</label><div>Desatenção T 68</div></div><p class="demo-pie">Aplicado em 14/03 · comparado com a avaliação anterior</p></div>
+</div></article><article class="modulo" aria-label="4 de 7: GINECOLOGIA E OBSTETRÍCIA"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">GINECOLOGIA E OBSTETRÍCIA</div><h3 class="modulo-t">O pré-natal, semana a semana.</h3><p>Altura uterina, frequência cardíaca fetal e pressão em cada consulta, na mesma linha do tempo. E o exame ginecológico com seu mapa próprio.</p></div>
+<div class="demo"><div class="row"><label>Semana</label><div>28 · gesta 2, para 1</div></div>
+<div class="row"><label>Altura uterina</label><div>27 cm</div></div>
+<div class="row"><label>BCF</label><div>142 bpm</div></div>
+<div class="row"><label>Pressão</label><div>118/74 mmHg</div></div><p class="demo-pie">Próximo retorno em 3 semanas · curva glicêmica pendente</p></div>
+</div></article><article class="modulo" aria-label="5 de 7: OFTALMOLOGIA"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">OFTALMOLOGIA</div><h3 class="modulo-t">A acuidade e a refração, no prontuário.</h3><p>Cada olho com sua acuidade, sua refração e sua pressão intraocular, comparáveis com a consulta anterior sem reler o histórico inteiro.</p></div>
+<div class="demo"><div class="row"><label>Acuidade OD</label><div>20/25</div></div>
+<div class="row"><label>Acuidade OE</label><div>20/40</div></div>
+<div class="row"><label>Refração OE</label><div>−1,25 −0,50 × 180°</div></div>
+<div class="row"><label>PIO</label><div>14 / 15 mmHg</div></div><p class="demo-pie">O OE caiu de 20/25 para 20/40 desde o retorno de março</p></div>
+</div></article><article class="modulo" aria-label="6 de 7: IMAGEM E LABORATÓRIO"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">IMAGEM E LABORATÓRIO</div><h3 class="modulo-t">Os exames, dentro do prontuário.</h3><p>As radiografias abrem num visualizador que permite medir, e os laboratoriais ficam marcados como pendentes até voltarem. O aparelho de raios-X envia direto.</p></div>
+<div class="demo"><div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div><div class="row"><label>Rx tórax</label><div>Recebida · 14/03</div></div>
+<div class="row"><label>Creatinina</label><div>Pendente</div></div><p class="demo-pie">O que está pendente aparece no painel até chegar</p></div>
+</div></article><article class="modulo" aria-label="7 de 7: SYMPHOMED PET"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">SYMPHOMED PET</div><h3 class="modulo-t">A mesma inteligência. Outro paciente.</h3><p>Prontuário completo para cães e gatos, com anatomia visual, esquema de vacinas próprio e as particularidades de cada espécie.</p></div>
+<div class="demo pet-demo"><div class="row"><label>Paciente</label><div>Mora · SRD, 6 anos</div></div>
+<div class="row"><label>Peso</label><div>18,4 kg</div></div>
+<div class="row"><label>Vacinas</label><div>Quíntupla em dia · antirrábica em 2 meses</div></div><p class="demo-pie">Ficha por espécie, não uma ficha humana adaptada</p></div>
+</div></article>
+</div>
+<div class="container mandos">
+<button class="flecha" type="button" data-dir="-1" aria-label="Módulo anterior">←</button>
+<div class="puntos" id="puntos" data-ir="Ir ao módulo"></div>
+<button class="flecha" type="button" data-dir="1" aria-label="Próximo módulo">→</button>
+</div>
+</div>
+</section>
+
+<section id="confianza" class="light"><div class="container"><div class="section-head"><div class="eyebrow">CONFIANÇA E ESCALA</div><h2>Cresce com o consultório.</h2><p>De um único profissional a uma rede de centros de saúde, o Symphomed acompanha o crescimento.</p></div>
+<div class="scale"><div class="scale-box"><b>1</b><small>Profissional</small></div><div>→</div><div class="scale-box"><b>10</b><small>Profissionais</small></div><div>→</div><div class="scale-box"><b>100</b><small>Profissionais</small></div><div>→</div><div class="scale-box"><b>∞</b><small>Rede de saúde</small></div></div>
+</div></section>
+
+<section class="dark" id="tecnologia"><div class="container"><div class="section-head"><div class="eyebrow">TECNOLOGIA</div><h2>Construído para a saúde.</h2><p>Inteligência artificial, voz, dados clínicos estruturados e integrações, em uma só plataforma.</p></div>
+<div class="tecnos" id="tecnos">
+<button class="tecno" type="button" aria-selected="true">Inteligência artificial</button>
+<button class="tecno" type="button" aria-selected="false">Voz</button>
+<button class="tecno" type="button" aria-selected="false">Linguagem clínica</button>
+<button class="tecno" type="button" aria-selected="false">Dados estruturados</button>
+<button class="tecno" type="button" aria-selected="false">Integrações</button>
+<button class="tecno" type="button" aria-selected="false">Segurança</button>
+</div>
+<div class="tecno-panel" id="tecnoPanel">
+<div class="det"><b>Inteligência artificial</b><p>Reconhece o que importa numa conversa e organiza como evolução: queixa, antecedentes, exame e conduta. E aprende com as correções de cada médico, então a evolução fica cada vez mais parecida com a dele e menos com um modelo pronto.</p></div>
+<div class="det"><b>Voz</b><p>Transcreve a consulta enquanto ela acontece, com o vocabulário que uma transcrição comum não reconhece: nomes de medicamentos, doses, unidades e termos clínicos. Sem ditar e sem falar com o computador: é a consulta normal.</p></div>
+<div class="det"><b>Linguagem clínica</b><p>Distingue o que o paciente disse do que o médico observou, separa os antecedentes dos achados de hoje e entende as negações — «sem febre» não é a mesma coisa que «febre». É aí que uma transcrição vira um prontuário.</p></div>
+<div class="det"><b>Dados estruturados</b><p>Cada dado fica no seu campo, não solto num parágrafo. Por isso a pressão de hoje é plotada junto com as das consultas anteriores, um exame pedido pode constar como pendente, e uma dose pode ser comparada com a anterior.</p></div>
+<div class="det"><b>Integrações</b><p>O consultório não fica isolado: a agenda sincroniza com o calendário, o aparelho de raios-X envia os exames direto ao prontuário, e no Brasil a receita sai pelo sistema de assinatura digital que a norma exige.</p></div>
+<div class="det"><b>Segurança</b><p>Cada médico vê apenas os seus pacientes, e isso não depende de alguém lembrar de filtrar: está garantido pelo código, em todas as telas ao mesmo tempo. E os prontuários se exportam completos no dia em que se quiser parar de usar o Symphomed.</p></div>
+</div>
+<script nonce="__NONCE__">
+// Va acá, pegado al panel, y no al final del documento: así se ejecuta apenas
+// el navegador termina de leer estas seis fichas y ANTES de dibujarlas. Al
+// final de la página también funcionaría, pero se vería un parpadeo con los
+// seis resúmenes abiertos.
+//
+// Y por eso el HTML llega con los seis visibles en vez de con cinco ocultos:
+// si el script no corre —CSP, error de sintaxis—, el visitante ve los seis
+// uno debajo del otro, que es una lista perfectamente legible. Al revés
+// vería uno solo y cinco pestañas que no hacen nada.
+(function () {
+  var p = document.getElementById("tecnoPanel");
+  if (!p) return;
+  [].slice.call(p.children).forEach(function (d, i) {
+    if (i) d.setAttribute("data-oculto", "");
+  });
+})();
+</script></div></section>
+
+<section class="final" id="demo"><div class="container"><div class="eyebrow">COMEÇAR</div><h2>Na saúde se conversa todos os dias.<br><span style="color:#28c9f4">O Symphomed transforma isso em prontuário.</span></h2><p>Fale com a gente pelo WhatsApp e mostramos como funciona com um caso real, em quinze minutos. As primeiras 4 consultas não são cobradas.</p><a class="btn btn-primary" href="https://wa.me/59164637067?text=Ol%C3%A1%2C%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o%20do%20Symphomed">Fale conosco pelo WhatsApp →</a></div></section>
+
+<footer><div class="container footer"><div class="logo"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</div><div class="footerlinks"><a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="/mapa">Mapa</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluções</a><a href="#tecnologia">Tecnologia</a><a href="#confianza">Confiança</a><a href="#demo">Contato</a></div><div>© 2026 Symphomed · Bolívia e Brasil</div></div></footer>
+
+<script nonce="__NONCE__">
+"use strict";
+// Las flechas y los puntos del carrusel. Todo lo que hay acá es OPCIONAL: las
+// diapositivas ya se desplazan solas con scroll-snap. Si este script no corre
+// —un nonce mal puesto, un error de sintaxis— se pierden los controles y no
+// se pierde ni un módulo.
+(function () {
+  var pistas = document.getElementById("pistas");
+  var puntos = document.getElementById("puntos");
+  if (!pistas || !puntos) return;
+  var laminas = [].slice.call(pistas.children);
+  if (laminas.length < 2) return;
+
+  var flechas = [].slice.call(document.querySelectorAll(".flecha"));
+  // La etiqueta viaja en el HTML y no acá adentro: este script es el mismo en
+  // los tres idiomas, y un "Ir al módulo 3" en español dentro de la versión
+  // inglesa es justo lo que escucha quien navega con lector de pantalla.
+  var irA = puntos.getAttribute("data-ir") || "";
+  var actual = 0;
+
+  laminas.forEach(function (_, i) {
+    var b = document.createElement("button");
+    b.className = "punto";
+    b.type = "button";
+    b.setAttribute("aria-label", irA + " " + (i + 1));
+    b.addEventListener("click", function () { ir(i); });
+    puntos.appendChild(b);
+  });
+  var bolitas = [].slice.call(puntos.children);
+
+  function ir(i) {
+    i = Math.max(0, Math.min(laminas.length - 1, i));
+    // scrollLeft y no scrollIntoView: este último arrastra TAMBIÉN la página
+    // vertical hasta la diapositiva, así que tocar una flecha daba un salto
+    // de scroll además del desplazamiento lateral.
+    pistas.scrollLeft = laminas[i].offsetLeft - laminas[0].offsetLeft;
+  }
+
+  function pintar() {
+    // Se deduce del scroll y no de una variable propia, para que quede bien
+    // también cuando el visitante arrastra con el dedo sin tocar los botones.
+    var ancho = pistas.clientWidth || 1;
+    actual = Math.round(pistas.scrollLeft / ancho);
+    actual = Math.max(0, Math.min(laminas.length - 1, actual));
+    bolitas.forEach(function (b, i) { b.setAttribute("aria-current", i === actual ? "true" : "false"); });
+    flechas.forEach(function (f) {
+      var d = Number(f.getAttribute("data-dir"));
+      f.disabled = (d < 0 && actual === 0) || (d > 0 && actual === laminas.length - 1);
+    });
+  }
+
+  flechas.forEach(function (f) {
+    f.addEventListener("click", function () { ir(actual + Number(f.getAttribute("data-dir"))); });
+  });
+
+  pistas.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { e.preventDefault(); ir(actual + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); ir(actual - 1); }
+  });
+
+  var esperando = false;
+  pistas.addEventListener("scroll", function () {
+    if (esperando) return;
+    esperando = true;
+    requestAnimationFrame(function () { esperando = false; pintar(); });
+  }, { passive: true });
+  window.addEventListener("resize", pintar);
+  pintar();
+})();
+
+// Las pestañas de tecnología. Sin este script se ven los seis resúmenes uno
+// debajo del otro —una lista, que se lee bien—; con él, el panel muestra el
+// de la pestaña activa.
+(function () {
+  var caja = document.getElementById("tecnos");
+  var panel = document.getElementById("tecnoPanel");
+  if (!caja || !panel) return;
+  var pestanas = [].slice.call(caja.children);
+  var detalles = [].slice.call(panel.children);
+  if (pestanas.length !== detalles.length) return;
+
+  function activar(i) {
+    pestanas.forEach(function (p, j) { p.setAttribute("aria-selected", j === i ? "true" : "false"); });
+    detalles.forEach(function (d, j) {
+      if (j === i) d.removeAttribute("data-oculto");
+      else d.setAttribute("data-oculto", "");
+    });
+  }
+
+  pestanas.forEach(function (p, i) {
+    // mouseenter y no hover de CSS: el panel es un hermano y el resumen que
+    // hay que mostrar depende de CUÁL pestaña se señaló, no de si alguna lo
+    // está. Eso no se puede expresar en CSS sin acoplar los seis selectores.
+    p.addEventListener("mouseenter", function () { activar(i); });
+    p.addEventListener("focus", function () { activar(i); });
+    p.addEventListener("click", function () { activar(i); });
+  });
+
+  activar(0);
+})();
+</script>
+</body>
+</html>
