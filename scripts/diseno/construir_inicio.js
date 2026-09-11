@@ -78,6 +78,50 @@ css += `
      Dos píxeles menos de cuerpo le devuelven el margen. */
   .hero h1{font-size:38px;letter-spacing:-2px}
 }
+/* ── El carrusel de módulos ───────────────────────────────────────────────
+   Las diapositivas se desplazan con overflow-x + scroll-snap, así que andan
+   sin JavaScript. Las flechas y los puntos son una mejora encima. */
+.carrusel{margin-top:45px}
+.pistas{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pistas::-webkit-scrollbar{display:none}
+.pistas:focus-visible{outline:2px solid #49d8fb;outline-offset:4px}
+.modulo{flex:0 0 100%;scroll-snap-align:start;min-width:0}
+.modulo-in{display:grid;grid-template-columns:1fr 1fr;gap:55px;align-items:center}
+.modulo-txt p{color:#a8bdc9;font-size:15px;line-height:1.7;margin:14px 0 0;max-width:46ch}
+.modulo-t{font-size:clamp(24px,2.6vw,34px);line-height:1.15;letter-spacing:-1px;margin:10px 0 0;font-weight:700}
+.demo{background:#092331;border:1px solid #23596d;border-radius:12px;padding:20px;color:#fff;min-width:0}
+.demo b{display:block;margin-top:14px;font-size:13px}
+.demo .row:first-of-type{border-top:0}
+.demo-pie{margin:8px 0 0;color:#9fb8c5;font-size:11px;line-height:1.6}
+.tooth.marcada{border-color:#5bddfa;background:#123b4e;color:#8beaff}
+.visor{height:110px;border:1px solid #2c6b84;border-radius:8px;background:linear-gradient(140deg,#0d2b3b,#061620);position:relative;margin-bottom:14px}
+.visor-regla{position:absolute;left:18%;top:38%;width:46%;height:2px;background:#5bddfa}
+.visor-medida{position:absolute;left:18%;top:calc(38% + 10px);color:#5bddfa;font-size:10px}
+.pet-demo{position:relative;overflow:hidden}
+.pet-demo:after{content:"🐕";position:absolute;font-size:64px;right:10px;bottom:-12px;opacity:.55}
+.mandos{display:flex;align-items:center;gap:18px;margin-top:30px}
+.flecha{width:42px;height:42px;flex:none;border-radius:50%;border:1px solid #2c6b84;background:transparent;color:#8beaff;font-size:15px;cursor:pointer;transition:.2s}
+.flecha:hover:not(:disabled){background:#0d2b3b;border-color:#5bddfa}
+.flecha:disabled{opacity:.3;cursor:default}
+.flecha:focus-visible{outline:2px solid #49d8fb;outline-offset:3px}
+/* flex-wrap y no un ancho fijo: con siete puntos, dos flechas y los huecos,
+   los mandos pedían 350px dentro de un contenedor de 294 en una pantalla de
+   320. Envolviendo, deja de importar cuántos módulos haya. */
+.puntos{display:flex;gap:8px;flex:1;flex-wrap:wrap}
+.punto{width:26px;height:3px;border-radius:2px;border:0;padding:0;background:#23596d;cursor:pointer;transition:.2s}
+.punto[aria-current="true"]{background:#5bddfa}
+.punto:focus-visible{outline:2px solid #49d8fb;outline-offset:3px}
+@media(max-width:900px){
+  .modulo-in{grid-template-columns:1fr;gap:26px}
+  .carrusel{margin-top:32px}
+}
+@media(max-width:480px){
+  .mandos{gap:12px}
+  .flecha{width:38px;height:38px}
+  .punto{width:18px}
+}
+@media(prefers-reduced-motion:reduce){.pistas{scroll-behavior:auto}}
+
 /* Qué recuerda el seguimiento. Van como filete y no como tarjeta: son una
    lista de cosas del mismo rango, y cinco tarjetas con sombra al lado de las
    tres de arriba competirían con ellas por la atención. */
@@ -223,18 +267,8 @@ const T = [
   [">Telehealth<", ">Teleconsulta<"],
   [">All specialties<", ">Todas<"],
 
-  // — Soluciones —
-  ['id="solutions"', 'id="soluciones"'],
-  ["SPECIALIZED SOLUTIONS", "MÓDULOS POR ESPECIALIDAD"],
-  ["Dental, with its own language.", "Odontología, con su propio lenguaje."],
-  ["The interactive odontogram and specialized modules make dental care more precise, complete and efficient.",
-   "El odontograma interactivo y los módulos propios hacen que la ficha dental sea más precisa y más rápida de llenar."],
-  ["<b>Tooth 36</b>", "<b>Pieza 36</b>"],
-  ["Clinical history · Treatments · Evolution", "Historia · Tratamientos · Evolución"],
-  ["SYMPHOMED PET", "SYMPHOMED PET"],
-  ["The same intelligence.<br>A different patient.", "La misma inteligencia.<br>Otro paciente."],
-  ["Complete clinical records for dogs and cats, with specialized tools and visual anatomy.",
-   "Historia clínica completa para perros y gatos, con herramientas propias y anatomía visual."],
+  // — Soluciones — el bloque entero se reemplaza por el carrusel más abajo,
+  //   así que acá no hay nada que traducir.
 
   // — Confianza —
   ['id="security"', 'id="confianza"'],
@@ -280,6 +314,119 @@ const T = [
   ['<a class="btn btn-primary" href="mailto:demo@symphomed.com">Book a demo →</a>',
    `<a class="btn btn-primary" href="${WA_DEMO}">Escríbanos por WhatsApp →</a>`],
 ];
+
+// ─── El carrusel de módulos ────────────────────────────────────────────────
+//
+// El diseño mostraba dos módulos —odontología y veterinaria— en un split fijo.
+// Son siete los que existen, y los cinco que faltaban son justamente los que
+// hacen que un pediatra o una ginecóloga se reconozcan en la página.
+//
+// ═══ POR QUÉ ES SCROLL NATIVO Y NO UN CARRUSEL DE JAVASCRIPT ═══════════════
+//
+// Las diapositivas viven en un contenedor con overflow-x y scroll-snap. Eso
+// significa que YA funciona sin una línea de script: se arrastra con el dedo
+// en el celular y con la rueda en la compu. Las flechas y los puntos son una
+// mejora encima, no el mecanismo.
+//
+// Importa porque esta página se sirve con una CSP de nonce por respuesta: si
+// el script no corriera —un nonce mal puesto, un error de sintaxis— un
+// carrusel hecho con JavaScript dejaría siete módulos invisibles y la sección
+// se vería vacía, sin ningún error a la vista. Así, lo peor que pasa es que
+// se pierdan las flechas.
+const MODULOS = [
+  {
+    k: "ODONTOLOGÍA", t: "El odontograma, pieza por pieza.",
+    p: "Cada diente con su historia, sus tratamientos y su evolución. La ficha dental deja de ser un dibujo a mano en una hoja.",
+    v: `<div class="teeth">${
+      ["11","12","13","14","15","16","17","18","21","22","23","24","25","26","27","28",
+       "31","32","33","34","35","36","37","38","41","42","43","44","45","46","47","48"]
+        .map(n => `<div class="tooth${n === "36" ? " marcada" : ""}">${n}</div>`).join("")
+    }</div><b>Pieza 36</b><p class="demo-pie">Caries oclusal · Tratamiento de conducto · En control</p>`,
+  },
+  {
+    k: "PEDIATRÍA", t: "Las curvas, calculadas solas.",
+    p: "Peso, talla y perímetro cefálico se grafican sobre los percentiles de la OMS a medida que se cargan. El percentil no se busca en una tabla: ya está.",
+    v: `<svg viewBox="0 0 260 130" width="100%" height="130" role="img" aria-label="Curva de peso sobre percentiles">
+<polyline points="10,108 60,88 110,74 160,63 210,54 250,48" fill="none" stroke="#2d6c85" stroke-width="1.5"/>
+<polyline points="10,116 60,99 110,87 160,78 210,71 250,66" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,99 60,76 110,60 160,47 210,37 250,30" fill="none" stroke="#2d6c85" stroke-width="1.5" stroke-dasharray="3 3"/>
+<polyline points="10,110 60,90 110,73 160,60 210,52" fill="none" stroke="#5bddfa" stroke-width="2.5"/>
+<circle cx="210" cy="52" r="4" fill="#5bddfa"/>
+<text x="10" y="126" fill="#8da7b5" font-size="8">0 m</text>
+<text x="196" y="126" fill="#8da7b5" font-size="8">24 m</text>
+<text x="228" y="22" fill="#2d6c85" font-size="8">P97</text>
+<text x="228" y="62" fill="#2d6c85" font-size="8">P50</text>
+</svg><b>Peso · percentil 62</b><p class="demo-pie">12,4 kg a los 24 meses · dentro de lo esperado</p>`,
+  },
+  {
+    k: "NEURODESARROLLO", t: "Los instrumentos, con su puntaje.",
+    p: "ADOS-2, WISC-V, Vineland-3, Conners-4 y M-CHAT-R/F, cada uno con sus módulos y sus puntajes. Quedan en la ficha y se comparan entre aplicaciones.",
+    v: `<div class="row"><label>ADOS-2 · Módulo 2</label><div>Comparación 7/10</div></div>
+<div class="row"><label>WISC-V</label><div>CI total 94</div></div>
+<div class="row"><label>Vineland-3</label><div>Compuesto 88</div></div>
+<div class="row"><label>Conners-4 · Padres</label><div>Inatención T 68</div></div>
+<p class="demo-pie">Aplicado el 14/03 · comparado con la evaluación anterior</p>`,
+  },
+  {
+    k: "GINECOLOGÍA Y OBSTETRICIA", t: "El control prenatal, semana a semana.",
+    p: "Altura uterina, frecuencia cardíaca fetal y presión en cada control, sobre la misma línea de tiempo. Y el examen ginecológico con su mapa propio.",
+    v: `<div class="row"><label>Semana</label><div>28 · gesta 2, para 1</div></div>
+<div class="row"><label>Altura uterina</label><div>27 cm</div></div>
+<div class="row"><label>FCF</label><div>142 lpm</div></div>
+<div class="row"><label>Presión</label><div>118/74 mmHg</div></div>
+<p class="demo-pie">Próximo control en 3 semanas · curva de tolerancia pendiente</p>`,
+  },
+  {
+    k: "OFTALMOLOGÍA", t: "La agudeza y la refracción, en su ficha.",
+    p: "Cada ojo con su agudeza, su refracción y su presión intraocular, comparables contra el control anterior sin volver a leer la historia entera.",
+    v: `<div class="row"><label>Agudeza OD</label><div>20/25</div></div>
+<div class="row"><label>Agudeza OI</label><div>20/40</div></div>
+<div class="row"><label>Refracción OI</label><div>−1,25 −0,50 × 180°</div></div>
+<div class="row"><label>PIO</label><div>14 / 15 mmHg</div></div>
+<p class="demo-pie">El OI bajó de 20/25 a 20/40 desde el control de marzo</p>`,
+  },
+  {
+    k: "IMÁGENES Y LABORATORIO", t: "Los estudios, dentro de la ficha.",
+    p: "Las radiografías se abren en un visor que permite medir, y los laboratorios quedan marcados como pendientes hasta que vuelven. El equipo de rayos sube directo.",
+    v: `<div class="visor"><span class="visor-regla"></span><span class="visor-medida">34,2 mm</span></div>
+<div class="row"><label>Rx tórax</label><div>Recibida · 14/03</div></div>
+<div class="row"><label>Creatinina</label><div>Pendiente</div></div>
+<p class="demo-pie">Lo pendiente aparece en el panel hasta que llega</p>`,
+  },
+  {
+    k: "SYMPHOMED PET", t: "La misma inteligencia. Otro paciente.",
+    p: "Historia clínica completa para perros y gatos, con anatomía visual, esquema de vacunas propio y las particularidades de cada especie.",
+    v: `<div class="row"><label>Paciente</label><div>Mora · mestiza, 6 años</div></div>
+<div class="row"><label>Peso</label><div>18,4 kg</div></div>
+<div class="row"><label>Vacunas</label><div>Quíntuple al día · antirrábica en 2 meses</div></div>
+<p class="demo-pie">Ficha por especie, no una ficha humana adaptada</p>`,
+    pet: true,
+  },
+];
+
+const CARRUSEL = `
+<section class="dark" id="soluciones">
+<div class="container"><div class="section-head"><div class="eyebrow">MÓDULOS POR ESPECIALIDAD</div><h2>Cada especialidad,<br>con su propia ficha.</h2><p>Una nota de pediatría no se parece a una de odontología, y las fichas tampoco. Estos son los módulos que ya están funcionando.</p></div></div>
+<div class="carrusel">
+<div class="pistas" id="pistas" tabindex="0" role="region" aria-label="Módulos por especialidad">
+${MODULOS.map((m, i) => `<article class="modulo" aria-label="${i + 1} de ${MODULOS.length}: ${m.k}"><div class="container modulo-in">
+<div class="modulo-txt"><div class="eyebrow">${m.k}</div><h3 class="modulo-t">${m.t}</h3><p>${m.p}</p></div>
+<div class="demo${m.pet ? " pet-demo" : ""}">${m.v}</div>
+</div></article>`).join("")}
+</div>
+<div class="container mandos">
+<button class="flecha" type="button" data-dir="-1" aria-label="Módulo anterior">←</button>
+<div class="puntos" id="puntos"></div>
+<button class="flecha" type="button" data-dir="1" aria-label="Módulo siguiente">→</button>
+</div>
+</div>
+</section>`;
+
+// Se reemplaza el bloque entero del diseño, con sus dos paneles fijos.
+const iSplit = cuerpo.indexOf('<section class="split" id="solutions">');
+const fSplit = cuerpo.indexOf("</section>", cuerpo.indexOf('<div class="panel panel-light pet">')) + 10;
+if (iSplit < 0 || fSplit < 10) throw new Error("no encontré la sección de soluciones del diseño original");
+cuerpo = cuerpo.slice(0, iSplit) + CARRUSEL + cuerpo.slice(fSplit);
 
 const sinAplicar = [];
 for (const [de, a] of T) {
@@ -366,7 +513,74 @@ const cabeza = `<!doctype html>
 ${css}
 </style>
 </head>
-<body>${cuerpo}</body>
+<body>${cuerpo}
+<script nonce="__NONCE__">
+"use strict";
+// Las flechas y los puntos del carrusel. Todo lo que hay acá es OPCIONAL: las
+// diapositivas ya se desplazan solas con scroll-snap. Si este script no corre
+// —un nonce mal puesto, un error de sintaxis— se pierden los controles y no
+// se pierde ni un módulo.
+(function () {
+  var pistas = document.getElementById("pistas");
+  var puntos = document.getElementById("puntos");
+  if (!pistas || !puntos) return;
+  var laminas = [].slice.call(pistas.children);
+  if (laminas.length < 2) return;
+
+  var flechas = [].slice.call(document.querySelectorAll(".flecha"));
+  var actual = 0;
+
+  laminas.forEach(function (_, i) {
+    var b = document.createElement("button");
+    b.className = "punto";
+    b.type = "button";
+    b.setAttribute("aria-label", "Ir al módulo " + (i + 1));
+    b.addEventListener("click", function () { ir(i); });
+    puntos.appendChild(b);
+  });
+  var bolitas = [].slice.call(puntos.children);
+
+  function ir(i) {
+    i = Math.max(0, Math.min(laminas.length - 1, i));
+    // scrollLeft y no scrollIntoView: este último arrastra TAMBIÉN la página
+    // vertical hasta la diapositiva, así que tocar una flecha daba un salto
+    // de scroll además del desplazamiento lateral.
+    pistas.scrollLeft = laminas[i].offsetLeft - laminas[0].offsetLeft;
+  }
+
+  function pintar() {
+    // Se deduce del scroll y no de una variable propia, para que quede bien
+    // también cuando el visitante arrastra con el dedo sin tocar los botones.
+    var ancho = pistas.clientWidth || 1;
+    actual = Math.round(pistas.scrollLeft / ancho);
+    actual = Math.max(0, Math.min(laminas.length - 1, actual));
+    bolitas.forEach(function (b, i) { b.setAttribute("aria-current", i === actual ? "true" : "false"); });
+    flechas.forEach(function (f) {
+      var d = Number(f.getAttribute("data-dir"));
+      f.disabled = (d < 0 && actual === 0) || (d > 0 && actual === laminas.length - 1);
+    });
+  }
+
+  flechas.forEach(function (f) {
+    f.addEventListener("click", function () { ir(actual + Number(f.getAttribute("data-dir"))); });
+  });
+
+  pistas.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { e.preventDefault(); ir(actual + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); ir(actual - 1); }
+  });
+
+  var esperando = false;
+  pistas.addEventListener("scroll", function () {
+    if (esperando) return;
+    esperando = true;
+    requestAnimationFrame(function () { esperando = false; pintar(); });
+  }, { passive: true });
+  window.addEventListener("resize", pintar);
+  pintar();
+})();
+</script>
+</body>
 </html>
 `;
 

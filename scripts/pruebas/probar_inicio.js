@@ -35,11 +35,25 @@ verificar("la tipografía también", /\/fonts\/inter-variable\.woff2/.test(vista
 verificar("vive en vistas/, no en public/",
   !fs.existsSync(path.join(RAIZ, "public", "inicio.html")));
 
-// Sin scripts no hay forma de que un nonce mal puesto la deje inerte, que es
-// exactamente como se rompió el reporte financiero en su momento. Si algún
-// día se agrega uno, tiene que llevar el marcador o no va a correr.
-verificar("no necesita JavaScript",
+// Si hay script, tiene que llevar el marcador del nonce. Sin él no da error:
+// el navegador lo bloquea en silencio por la CSP y la página queda inerte,
+// que es exactamente como se rompió el reporte financiero en su momento.
+verificar("el script lleva el marcador del nonce",
   !/<script/i.test(vista) || vista.includes('<script nonce="__NONCE__"'));
+
+console.log("\n── 1b. El carrusel anda sin JavaScript ──");
+// Las láminas se desplazan con overflow-x + scroll-snap, no con el script.
+// Eso es lo que hace que, si el script no corriera, se pierdan las flechas y
+// NO los siete módulos. Un carrusel hecho a fuerza de JavaScript dejaría la
+// sección vacía sin ningún error visible.
+verificar("las láminas se desplazan solas", /\.pistas\{[^}]*overflow-x:auto/.test(vista));
+verificar("  ...y encajan de a una", /scroll-snap-type:x mandatory/.test(vista) && /scroll-snap-align:start/.test(vista));
+verificar("ninguna lámina nace oculta", !/class="modulo"[^>]*\bhidden\b/.test(vista));
+const laminas = (vista.match(/class="modulo"/g) || []).length;
+verificar(`están los ${laminas} módulos`, laminas === 7);
+["ODONTOLOGÍA", "PEDIATRÍA", "NEURODESARROLLO", "GINECOLOGÍA Y OBSTETRICIA",
+ "OFTALMOLOGÍA", "IMÁGENES Y LABORATORIO", "SYMPHOMED PET"]
+  .forEach(m => verificar(`  módulo «${m}»`, vista.includes(m)));
 
 console.log("\n── 2. Dice lo que hay que decir ──");
 verificar("tiene a dónde escribir", /wa\.me\/\d{8,}/.test(vista));
