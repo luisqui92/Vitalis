@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#03101a">
+<title>Symphomed — Mapa de servicios médicos</title>
+<meta name="description" content="Consultorios, laboratorios y farmacias en el mapa. Buscá por especialidad y reservá tu ficha.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<style>
+@font-face{font-family:"InterVar";src:url("/fonts/inter-variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
+:root{
+  --fondo:#03101a; --panel:#071a25; --panel2:#0c2a3a;
+  --linea:#214354; --linea2:#2c6b84;
+  --tinta:#fff; --tinta2:#a8bdc9; --tinta3:#7f97a6;
+  --cian:#19b9ef; --cian2:#5bddfa;
+  --consultorio:#19b9ef; --laboratorio:#7BB98A; --farmacia:#D8A64B; --imagenes:#B98AD3;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--fondo);color:var(--tinta);
+  font-family:InterVar,Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+}
+a{color:inherit;text-decoration:none}
+
+/* ── Barra ────────────────────────────────────────────────────────── */
+.barra{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 20px;border-bottom:1px solid var(--linea);flex-wrap:wrap;
+  background:var(--fondo);
+}
+.marca{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:2.5px;font-size:13px}
+.marca i{width:7px;height:7px;border-radius:50%;background:var(--cian);display:block}
+.volver{color:var(--tinta2);font-size:13px}
+.volver:hover{color:var(--tinta)}
+
+/* ── Aviso de demostración ────────────────────────────────────────── */
+/* Va arriba de todo y no en letra chica: quien mire esta pantalla tiene que
+   saber en el primer segundo que los consultorios son de ejemplo. */
+.aviso{
+  background:#1d2a12;border-bottom:1px solid #3c5220;color:#d8e8bd;
+  padding:10px 20px;font-size:13px;display:flex;gap:10px;align-items:baseline;
+}
+.aviso b{color:#eaf6d8}
+
+/* ── Buscador ─────────────────────────────────────────────────────── */
+.buscador{padding:16px 20px;border-bottom:1px solid var(--linea);display:flex;flex-direction:column;gap:12px}
+.campo{position:relative;display:flex}
+.campo input{
+  width:100%;background:var(--panel);border:1px solid var(--linea2);border-radius:999px;
+  padding:13px 20px;color:var(--tinta);font:inherit;font-size:15px;
+}
+.campo input::placeholder{color:var(--tinta3)}
+.campo input:focus{outline:2px solid var(--cian);outline-offset:1px;border-color:var(--cian)}
+.filtros{display:flex;gap:8px;flex-wrap:wrap}
+.filtro{
+  background:transparent;border:1px solid var(--linea2);border-radius:999px;
+  padding:7px 15px;color:var(--tinta2);font:inherit;font-size:12.5px;cursor:pointer;transition:.18s;
+}
+.filtro:hover{color:var(--tinta);border-color:var(--cian)}
+.filtro[aria-pressed="true"]{background:var(--cian);border-color:var(--cian);color:#03131d;font-weight:600}
+.filtro:focus-visible{outline:2px solid var(--cian2);outline-offset:2px}
+
+/* ── El cuerpo: lista + mapa ──────────────────────────────────────── */
+.cuerpo{flex:1;display:grid;grid-template-columns:minmax(320px,400px) 1fr;min-height:0}
+.lista{overflow-y:auto;border-right:1px solid var(--linea);padding:8px 0}
+.cuenta{padding:8px 20px 12px;color:var(--tinta3);font-size:12.5px}
+.ficha{
+  display:grid;grid-template-columns:46px 1fr;gap:14px;align-items:start;
+  width:100%;text-align:left;background:transparent;border:0;border-top:1px solid var(--linea);
+  padding:16px 20px;color:var(--tinta);font:inherit;cursor:pointer;transition:background-color .16s;
+}
+.ficha:hover,.ficha[aria-current="true"]{background:var(--panel)}
+.ficha:focus-visible{outline:2px solid var(--cian);outline-offset:-2px}
+/* En vez de una foto de una persona que no existe, la inicial sobre el color
+   de su categoría. Cuando haya médicos de verdad, acá va su foto. */
+.avatar{
+  width:46px;height:46px;border-radius:12px;display:grid;place-items:center;
+  font-weight:700;font-size:17px;color:#03131d;
+}
+.ficha h3{margin:0;font-size:15px;font-weight:600;line-height:1.3}
+.esp{color:var(--cian2);font-size:12.5px;margin-top:3px}
+.resena{color:var(--tinta2);font-size:13px;margin:7px 0 0;line-height:1.55}
+.dir{color:var(--tinta3);font-size:12px;margin-top:7px}
+.subs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.sub{border:1px solid var(--linea2);border-radius:999px;padding:2px 9px;font-size:11px;color:var(--tinta2)}
+.reservar{
+  display:inline-block;margin-top:11px;background:var(--cian);color:#03131d;
+  border:0;border-radius:999px;padding:8px 16px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+}
+.reservar:hover{filter:brightness(1.08)}
+.ejemplo{
+  display:inline-block;margin-left:8px;border:1px solid #5c7a2e;color:#b9d68a;
+  border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:600;vertical-align:middle;
+}
+.vacio{padding:40px 20px;color:var(--tinta3);text-align:center;font-size:14px}
+
+#mapa{height:100%;width:100%;background:var(--panel)}
+.leaflet-container{background:#0a1a24}
+.leaflet-popup-content-wrapper{background:var(--panel);color:var(--tinta);border-radius:12px}
+.leaflet-popup-tip{background:var(--panel)}
+.leaflet-popup-content{margin:14px 16px;font-size:13px;line-height:1.55}
+.leaflet-popup-content b{display:block;font-size:14px;margin-bottom:4px}
+.leaflet-popup-content em{font-style:normal;color:var(--cian2);font-size:12px}
+.leaflet-control-attribution{background:rgba(3,16,26,.8)!important;color:#7f97a6!important}
+.leaflet-control-attribution a{color:#a8bdc9!important}
+.chincheta{
+  width:26px;height:26px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);
+  border:2px solid rgba(3,16,26,.55);box-shadow:0 3px 10px rgba(0,0,0,.5);
+}
+.chincheta.activa{outline:3px solid var(--cian2);outline-offset:2px}
+
+@media(max-width:860px){
+  .cuerpo{grid-template-columns:1fr;grid-template-rows:46vh 1fr}
+  .lista{border-right:0;border-top:1px solid var(--linea);order:2}
+  .mapa-caja{order:1;min-height:0}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <a class="marca" href="/"><i></i>SYMPHOMED</a>
+  <a class="volver" href="/">← Volver a Symphomed</a>
+</header>
+
+<div class="aviso">
+  <span>◆</span>
+  <span><b>Demostración.</b> Los consultorios, laboratorios y farmacias de este mapa son ejemplos para mostrar cómo se vería. Todavía no son establecimientos reales.</span>
+</div>
+
+<div class="buscador">
+  <label class="campo">
+    <span class="sr-only" hidden>Buscar</span>
+    <input id="q" type="search" autocomplete="off"
+      placeholder="Buscá una especialidad: pediatra, neonatólogo, laboratorio…">
+  </label>
+  <div class="filtros" id="filtros"></div>
+</div>
+
+<div class="cuerpo">
+  <div class="lista" id="lista">
+    <p class="cuenta" id="cuenta"></p>
+    <div id="fichas"></div>
+  </div>
+  <div class="mapa-caja"><div id="mapa"></div></div>
+</div>
+
+<script src="/vendor/leaflet/leaflet.js" nonce="__NONCE__"></script>
+<script nonce="__NONCE__">
+"use strict";
+
+// ═══ LOS DATOS ════════════════════════════════════════════════════════════
+//
+// Ejemplos, a propósito, y marcados como tales en pantalla. Cuando haya
+// médicos de verdad esta lista sale de Medico + Membrete y se borra de acá.
+// Por eso vive en un solo arreglo y no repartida por la pantalla.
+//
+// Los nombres son de CONSULTORIOS y no de personas: un nombre de médico
+// inventado, con dirección y reseña, es indistinguible de uno real para
+// quien lo lea, y eso no hace falta para mostrar cómo funciona el mapa.
+var LUGARES = [
+  { n:"Consultorio Pediátrico (ejemplo)", c:"consultorio", e:"Pediatría",
+    s:["Neonatología","Lactancia","Control del niño sano"],
+    r:"Control del niño sano, vacunas y seguimiento del recién nacido. Curvas de crecimiento en cada consulta.",
+    d:"Av. América, zona Norte", lat:-17.3799, lng:-66.1580, reserva:true },
+  { n:"Centro de Ginecología (ejemplo)", c:"consultorio", e:"Ginecología y obstetricia",
+    s:["Control prenatal","Colposcopía","Climaterio"],
+    r:"Control prenatal semana a semana, con altura uterina y frecuencia cardíaca fetal en la misma ficha.",
+    d:"Calle Antezana, centro", lat:-17.3912, lng:-66.1614, reserva:true },
+  { n:"Consultorio de Medicina General (ejemplo)", c:"consultorio", e:"Medicina general",
+    s:["Hipertensión","Diabetes","Chequeos"],
+    r:"Atención general y seguimiento de enfermedades crónicas, con la presión y el peso graficados en el tiempo.",
+    d:"Av. Heroínas, centro", lat:-17.3936, lng:-66.1570, reserva:true },
+  { n:"Clínica Odontológica (ejemplo)", c:"consultorio", e:"Odontología",
+    s:["Ortodoncia","Endodoncia","Odontopediatría"],
+    r:"Odontograma completo por pieza, con historia de tratamientos y evolución.",
+    d:"Av. Pando, Cala Cala", lat:-17.3745, lng:-66.1522, reserva:true },
+  { n:"Consultorio Oftalmológico (ejemplo)", c:"consultorio", e:"Oftalmología",
+    s:["Retina","Glaucoma","Oftalmología pediátrica"],
+    r:"Agudeza visual, refracción y presión intraocular comparadas contra el control anterior.",
+    d:"Calle España, centro", lat:-17.3888, lng:-66.1559, reserva:true },
+  { n:"Consultorio de Psicología (ejemplo)", c:"consultorio", e:"Psicología",
+    s:["Neurodesarrollo","Terapia infantil","Evaluación cognitiva"],
+    r:"Evaluación con instrumentos estandarizados (WISC-V, Vineland, Conners) y seguimiento entre aplicaciones.",
+    d:"Av. Salamanca, Recoleta", lat:-17.3854, lng:-66.1668, reserva:true },
+  { n:"Consultorio de Dermatología (ejemplo)", c:"consultorio", e:"Dermatología",
+    s:["Dermatoscopía","Dermatología pediátrica"],
+    r:"Seguimiento de lesiones con fotografía comparada en el tiempo.",
+    d:"Av. Ayacucho, centro", lat:-17.3960, lng:-66.1596, reserva:true },
+  { n:"Consultorio de Traumatología (ejemplo)", c:"consultorio", e:"Traumatología",
+    s:["Rodilla","Columna","Medicina deportiva"],
+    r:"Las radiografías se abren en un visor que permite medir, dentro de la misma ficha.",
+    d:"Av. Blanco Galindo km 2", lat:-17.3901, lng:-66.1795, reserva:true },
+  { n:"Laboratorio Clínico (ejemplo)", c:"laboratorio", e:"Laboratorio clínico",
+    s:["Hematología","Bioquímica","Microbiología"],
+    r:"Resultados que vuelven directo a la ficha del paciente, sin papeles de por medio.",
+    d:"Calle Lanza, centro", lat:-17.3925, lng:-66.1541, reserva:false },
+  { n:"Laboratorio de Análisis (ejemplo)", c:"laboratorio", e:"Laboratorio clínico",
+    s:["Perfil tiroideo","Hormonas","Alergias"],
+    r:"Toma de muestras a domicilio y entrega digital.",
+    d:"Av. América, Queru Queru", lat:-17.3762, lng:-66.1451, reserva:false },
+  { n:"Centro de Imágenes (ejemplo)", c:"imagenes", e:"Diagnóstico por imágenes",
+    s:["Radiografía","Ecografía","Tomografía"],
+    r:"Los estudios se suben directo a la ficha del médico que los pidió.",
+    d:"Av. Oquendo, centro", lat:-17.3873, lng:-66.1512, reserva:false },
+  { n:"Farmacia (ejemplo)", c:"farmacia", e:"Farmacia",
+    s:["Turno noche","Entrega a domicilio"],
+    r:"Recibe la receta digital y prepara el pedido antes de que el paciente llegue.",
+    d:"Plaza Colón", lat:-17.3846, lng:-66.1573, reserva:false },
+  { n:"Farmacia 24 horas (ejemplo)", c:"farmacia", e:"Farmacia",
+    s:["Abierto 24 h","Turno noche"],
+    r:"Atención las 24 horas, con la receta digital validada en el momento.",
+    d:"Av. Ballivián, El Prado", lat:-17.3818, lng:-66.1604, reserva:false },
+];
+
+// El signo va además del color: quien no distingue bien los colores —y es
+// mucha gente— se queda sin ninguna pista de qué es cada cosa si el color es
+// lo único que las separa.
+var CATEGORIAS = {
+  consultorio: { nombre: "Consultorios", color: "#19b9ef", signo: "\u2695" },
+  laboratorio: { nombre: "Laboratorios", color: "#7BB98A", signo: "\u2697" },
+  imagenes:    { nombre: "Imágenes",     color: "#B98AD3", signo: "\u25C9" },
+  farmacia:    { nombre: "Farmacias",    color: "#D8A64B", signo: "\u271A" },
+};
+
+// ═══ LA BÚSQUEDA ══════════════════════════════════════════════════════════
+//
+// Busca en el nombre, la especialidad, las SUBESPECIALIDADES y la reseña.
+//
+// Las subespecialidades son las que resuelven el caso que importa: un
+// pediatra que además es neonatólogo tiene que aparecer buscando "pediatra" y
+// buscando "neonatólogo". Con un solo campo de especialidad eso no se puede,
+// y es la razón por la que en la base hacen falta dos campos y no uno.
+function normalizar(t) {
+  return String(t || "").toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "");  // sin tildes
+}
+
+// "pediatra", "pediatría" y "pediátrico" son la misma búsqueda para quien la
+// escribe, así que se comparan por raíz y no letra por letra.
+//
+// La raíz se saca recortando SOLO la terminación de género y número. Un
+// recorte más ambicioso —quitar "atra", "ologo", "ico"— deja muñones tan
+// cortos que empiezan a coincidir con cualquier cosa: "pediatra" quedaba en
+// "pedi" y encontraba una farmacia, por la palabra "pedido" de su reseña.
+//
+// Recortando poco, "pediatra" y "pediatría" caen las dos en "pediatr", que
+// además está adentro de "odontopediatría" — o sea que un padre que busca
+// "pediatra" también ve al odontopediatra, que es lo que querría.
+function raiz(p) {
+  return p.replace(/(ias|ia|os|as|es|o|a|s)$/, "");
+}
+
+// Se indexa por raíces y no por el texto crudo, para que la comparación sea
+// entre cosas del mismo tipo a los dos lados.
+function indice(lugar) {
+  if (lugar._i) return lugar._i;
+  lugar._i = normalizar([lugar.n, lugar.e, lugar.s.join(" "), lugar.r, lugar.d].join(" "))
+    .split(/[^a-z0-9]+/).filter(Boolean).map(raiz).join(" ");
+  return lugar._i;
+}
+
+function coincide(lugar, consulta) {
+  if (!consulta) return true;
+  var heno = indice(lugar);
+  return normalizar(consulta).split(/\s+/).filter(Boolean).every(function (palabra) {
+    return heno.indexOf(raiz(palabra)) > -1;
+  });
+}
+
+// ═══ LA PANTALLA ══════════════════════════════════════════════════════════
+var $ = function (id) { return document.getElementById(id); };
+var estado = { q: "", cat: "todos", activo: null };
+var marcadores = [];
+
+var mapa = L.map("mapa", { scrollWheelZoom: true, zoomControl: true })
+  .setView(String("__CENTRO__").split(",").map(Number), Number("__ZOOM__"));
+L.tileLayer("__MOSAICOS__", {
+  maxZoom: 19,
+  attribution: '&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(mapa);
+
+function chincheta(color, activa) {
+  return L.divIcon({
+    className: "",
+    html: '<div class="chincheta' + (activa ? " activa" : "") + '" style="background:' + color + '"></div>',
+    iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24],
+  });
+}
+
+LUGARES.forEach(function (l, i) {
+  var m = L.marker([l.lat, l.lng], { icon: chincheta(CATEGORIAS[l.c].color, false), title: l.n })
+    .bindPopup("<b>" + l.n + "</b><em>" + l.e + "</em><br>" + l.d)
+    .addTo(mapa);
+  m.on("click", function () { seleccionar(i, false); });
+  marcadores.push(m);
+});
+
+function seleccionar(i, moverMapa) {
+  estado.activo = i;
+  marcadores.forEach(function (m, j) {
+    m.setIcon(chincheta(CATEGORIAS[LUGARES[j].c].color, j === i));
+  });
+  if (moverMapa !== false) mapa.panTo([LUGARES[i].lat, LUGARES[i].lng]);
+  marcadores[i].openPopup();
+  [].slice.call($("fichas").children).forEach(function (f) {
+    f.setAttribute("aria-current", Number(f.getAttribute("data-i")) === i ? "true" : "false");
+  });
+}
+
+function pintarFiltros() {
+  var cajas = [["todos", "Todos"]].concat(Object.keys(CATEGORIAS).map(function (k) {
+    return [k, CATEGORIAS[k].nombre];
+  }));
+  $("filtros").innerHTML = cajas.map(function (c) {
+    return '<button class="filtro" type="button" data-c="' + c[0] + '" aria-pressed="' +
+      (c[0] === estado.cat ? "true" : "false") + '">' + c[1] + "</button>";
+  }).join("");
+  [].slice.call($("filtros").children).forEach(function (b) {
+    b.addEventListener("click", function () {
+      estado.cat = b.getAttribute("data-c");
+      pintarFiltros(); pintar();
+    });
+  });
+}
+
+function pintar() {
+  var visibles = [];
+  LUGARES.forEach(function (l, i) {
+    var ok = (estado.cat === "todos" || l.c === estado.cat) && coincide(l, estado.q);
+    // El marcador se saca del mapa cuando no corresponde: dejarlo visible
+    // mientras la lista lo filtró haría que el mapa y la lista digan cosas
+    // distintas al mismo tiempo.
+    if (ok) { if (!mapa.hasLayer(marcadores[i])) marcadores[i].addTo(mapa); visibles.push(i); }
+    else if (mapa.hasLayer(marcadores[i])) mapa.removeLayer(marcadores[i]);
+  });
+
+  $("cuenta").textContent = visibles.length === 0 ? "" :
+    visibles.length + (visibles.length === 1 ? " lugar" : " lugares");
+
+  if (!visibles.length) {
+    $("fichas").innerHTML = '<p class="vacio">No encontramos nada con eso.<br>Probá con «pediatra», «laboratorio» o «farmacia».</p>';
+    return;
+  }
+
+  $("fichas").innerHTML = visibles.map(function (i) {
+    var l = LUGARES[i], cat = CATEGORIAS[l.c];
+    return '<button class="ficha" type="button" data-i="' + i + '" aria-current="false">' +
+      '<span class="avatar" style="background:' + cat.color + '" aria-hidden="true">' + cat.signo + "</span>" +
+      "<span>" +
+        "<h3>" + l.n.replace(" (ejemplo)", "") + '<span class="ejemplo">EJEMPLO</span></h3>' +
+        '<div class="esp">' + l.e + "</div>" +
+        '<p class="resena">' + l.r + "</p>" +
+        '<div class="subs">' + l.s.map(function (s) { return '<span class="sub">' + s + "</span>"; }).join("") + "</div>" +
+        '<div class="dir">' + l.d + "</div>" +
+        (l.reserva ? '<span class="reservar">Reservar ficha</span>' : "") +
+      "</span></button>";
+  }).join("");
+
+  [].slice.call($("fichas").children).forEach(function (f) {
+    f.addEventListener("click", function () { seleccionar(Number(f.getAttribute("data-i"))); });
+  });
+}
+
+var espera = null;
+$("q").addEventListener("input", function () {
+  clearTimeout(espera);
+  espera = setTimeout(function () { estado.q = $("q").value; pintar(); }, 120);
+});
+
+pintarFiltros();
+pintar();
+</script>
+</body>
+</html>

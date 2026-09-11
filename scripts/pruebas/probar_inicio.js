@@ -93,6 +93,9 @@ console.log("\n── 2b. Las secciones y sus anclas ──");
 // El menú de arriba es la única navegación que tiene la página. Un enlace a
 // una sección renombrada no da error: no lleva a ningún lado, y eso solo se
 // descubre tocándolo. Ya pasó al traducir los identificadores del diseño.
+// El enlace al mapa es a otra página, no un ancla — se excluye del control
+// de anclas de abajo, que solo mira las de esta misma pantalla.
+verificar("hay enlace al mapa de servicios", /href="\/mapa"/.test(vista));
 const anclas = [...vista.matchAll(/href="#([a-z0-9-]+)"/g)].map(m => m[1]);
 const ids = [...vista.matchAll(/id="([a-z0-9-]+)"/g)].map(m => m[1]);
 const rotas = [...new Set(anclas)].filter(a => !ids.includes(a));

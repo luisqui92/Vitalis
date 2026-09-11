@@ -210,7 +210,7 @@ const WA_DEMO = WA + "?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20d
 const T = [
   // — Navegación —
   ['<a href="#platform">Platform</a>',
-   '<a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a>'],
+   '<a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="/mapa">Mapa</a>'],
   ['<a href="#specialties">Specialties</a>', '<a href="#especialidades">Especialidades</a>'],
   ['<a href="#solutions">Solutions</a>', '<a href="#soluciones">Soluciones</a>'],
   ['<a href="#technology">Technology</a>', '<a href="#tecnologia">Tecnología</a>'],

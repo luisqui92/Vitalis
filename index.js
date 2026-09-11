@@ -218,6 +218,11 @@ app.use(express.static(PUBLICO, {
 // dominio llama a next() y sigue de largo. Ver routes/inicio.js.
 require("./routes/inicio")(app);
 
+// El mapa de servicios médicos. Va con su propia CSP —es la única pantalla
+// que trae algo de afuera, los mosaicos— y por eso no se cuelga de la de
+// inicio. Ver el encabezado de routes/mapa.js.
+require("./routes/mapa")(app);
+
 // "/app" es la puerta del médico en symphomed.com, donde la raíz la ocupa la
 // página de venta. Sin esto, un médico que entra a symphomed.com no tiene por
 // dónde iniciar sesión: la raíz le muestra marketing y no hay otra pantalla.
