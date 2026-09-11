@@ -73,6 +73,17 @@ css += `
      Dos píxeles menos de cuerpo le devuelven el margen. */
   .hero h1{font-size:38px;letter-spacing:-2px}
 }
+/* La sección de la agenda tiene tres pasos y no cuatro. Sin esto quedaría una
+   columna vacía a la derecha, que se lee como si faltara algo. */
+.steps-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.steps-3{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.steps-3{grid-template-columns:1fr}.steps-3 .step:after{display:none}}
+/* Con psicología y psiquiatría son catorce especialidades. A seis columnas
+   quedaban doce arriba y dos solas abajo; a siete entran en dos filas justas.
+   Va acotado a esta sección: la de tecnología usa la misma clase con seis. */
+#especialidades .specialties{grid-template-columns:repeat(7,1fr)}
+@media(max-width:900px){#especialidades .specialties{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){#especialidades .specialties{grid-template-columns:repeat(2,1fr)}}
 /* Cinturón de seguridad. Lo de arriba arregla las causas conocidas; esto
    asegura que una futura —un texto más largo, una sección nueva— no vuelva a
    producir la franja blanca al costado de TODA la página. El costo es que un
@@ -100,7 +111,8 @@ const WA_DEMO = WA + "?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20d
 // se coma un pedazo de otra que todavía no se aplicó.
 const T = [
   // — Navegación —
-  ['<a href="#platform">Platform</a>', '<a href="#plataforma">Plataforma</a>'],
+  ['<a href="#platform">Platform</a>',
+   '<a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a>'],
   ['<a href="#specialties">Specialties</a>', '<a href="#especialidades">Especialidades</a>'],
   ['<a href="#solutions">Solutions</a>', '<a href="#soluciones">Soluciones</a>'],
   ['<a href="#technology">Technology</a>', '<a href="#tecnologia">Tecnología</a>'],
@@ -183,6 +195,17 @@ const T = [
   [">Gynecology<", ">Ginecología<"],
   [">Pediatrics<", ">Pediatría<"],
   [">Physiotherapy<", ">Fisioterapia<"],
+  // Psicología y psiquiatría no estaban en el diseño y sí en el producto: el
+  // catálogo de instrumentos ya trae WISC-V, WPPSI-IV, Vineland-3, Conners-4
+  // y ADOS-2, que son herramientas de psicología clínica.
+  // Ojo con el orden: esta regla corre ANTES de que ">Veterinary<" se
+  // traduzca, así que tiene que buscar el texto en inglés. Buscarlo en
+  // español no da error — simplemente no encuentra nada y las dos
+  // especialidades nuevas no aparecen, que fue lo que pasó la primera vez.
+  ['<div class="specialty"><div class="sicon">🐾</div>Veterinary</div>',
+   '<div class="specialty"><div class="sicon">◈</div>Psicología</div>' +
+   '<div class="specialty"><div class="sicon">❋</div>Psiquiatría</div>' +
+   '<div class="specialty"><div class="sicon">🐾</div>Veterinary</div>'],
   [">Veterinary<", ">Veterinaria<"],
   [">Telehealth<", ">Teleconsulta<"],
   [">All specialties<", ">Todas<"],
@@ -250,6 +273,35 @@ for (const [de, a] of T) {
   if (!cuerpo.includes(de)) { sinAplicar.push(de.slice(0, 55)); continue; }
   cuerpo = cuerpo.split(de).join(a);
 }
+
+// ─── La agenda: lo que pasa antes y después de la consulta ─────────────────
+//
+// El diseño no la contemplaba y es de lo más vendible que tiene el producto,
+// porque le ahorra trabajo a la secretaria y no solo al médico.
+//
+// Lo que dice acá está limitado a propósito a lo que el código hace hoy:
+//
+//   · reservar por WhatsApp — services/reservaCitas.js, el bot con los pasos
+//     elegir_dia / elegir_hora
+//   · la confirmación al instante — routes/citas.js:102 y reservaPublica.js:86
+//   · la reconsulta — routes/consultaMedica.js:441, que arma un enlace de
+//     reserva y se lo manda al paciente al cerrar la consulta
+//
+// Lo que NO se promete: un recordatorio automático que le llegue al paciente
+// unos días antes de la cita. Eso no existe todavía —los Recordatorio son la
+// lista que ve el médico en su panel, no un envío— y anunciarlo sería vender
+// algo que el primer médico descubre que falta en su primera semana.
+const AGENDA = `
+<section class="light" id="agenda"><div class="container">
+<div class="section-head"><div class="eyebrow">LA AGENDA</div><h2>Antes y después<br>de la consulta.</h2><p>Symphomed no empieza cuando el paciente entra ni termina cuando se va: la reserva y el control siguiente también se resuelven solos, por WhatsApp.</p></div>
+<div class="steps steps-3">
+<div class="step"><div class="icon">✆</div><h3>El paciente reserva solo</h3><p>Escribe al WhatsApp del consultorio, ve los horarios que están libres de verdad y elige. La cita aparece en la agenda sin que nadie atienda el teléfono.</p></div>
+<div class="step"><div class="icon">✓</div><h3>Queda confirmada al instante</h3><p>Recibe la confirmación en el momento. Si necesita cancelar, escribe «cancelar» ahí mismo y el horario se libera para otro paciente.</p></div>
+<div class="step"><div class="icon">↻</div><h3>El control siguiente no se pierde</h3><p>Al cerrar la consulta, Symphomed propone la fecha del próximo control y le manda al paciente un enlace para que elija su horario. El médico ve en su panel todo lo que se viene.</p></div>
+</div>
+</div></section>
+`;
+cuerpo = cuerpo.replace('<section id="especialidades">', AGENDA + '<section id="especialidades">');
 
 // El logo del pie y el de arriba llevan al inicio, no a "#".
 cuerpo = cuerpo.replace('<a class="logo" href="#">', '<a class="logo" href="/">');

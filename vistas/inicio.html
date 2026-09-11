@@ -78,6 +78,17 @@ footer{background:#020a10;color:#8199a7;padding:40px 0}.footer{display:flex;just
      Dos píxeles menos de cuerpo le devuelven el margen. */
   .hero h1{font-size:38px;letter-spacing:-2px}
 }
+/* La sección de la agenda tiene tres pasos y no cuatro. Sin esto quedaría una
+   columna vacía a la derecha, que se lee como si faltara algo. */
+.steps-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.steps-3{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.steps-3{grid-template-columns:1fr}.steps-3 .step:after{display:none}}
+/* Con psicología y psiquiatría son catorce especialidades. A seis columnas
+   quedaban doce arriba y dos solas abajo; a siete entran en dos filas justas.
+   Va acotado a esta sección: la de tecnología usa la misma clase con seis. */
+#especialidades .specialties{grid-template-columns:repeat(7,1fr)}
+@media(max-width:900px){#especialidades .specialties{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){#especialidades .specialties{grid-template-columns:repeat(2,1fr)}}
 /* Cinturón de seguridad. Lo de arriba arregla las causas conocidas; esto
    asegura que una futura —un texto más largo, una sección nueva— no vuelva a
    producir la franja blanca al costado de TODA la página. El costo es que un
@@ -89,7 +100,7 @@ html{overflow-x:hidden}
 <body>
 <nav><div class="container nav">
 <a class="logo" href="/"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</a>
-<div class="navlinks"><a href="#plataforma">Plataforma</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a></div>
+<div class="navlinks"><a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a></div>
 <div class="navright"><span>ES</span><a href="__PLATAFORMA__">Ingresar</a><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos</a></div>
 </div></nav>
 
@@ -129,9 +140,18 @@ html{overflow-x:hidden}
 <div><div class="eyebrow">LA FICHA COMPLETA</div><h2>Una consulta.<br>La ficha completa.</h2><p>Symphomed capta la conversación, reconoce lo importante y arma la nota clínica estructurada, lista para que el médico la revise y la guarde en la ficha.</p><a class="btn btn-outline" href="#demo">▶ Ver una demostración</a></div>
 </div></section>
 
+
+<section class="light" id="agenda"><div class="container">
+<div class="section-head"><div class="eyebrow">LA AGENDA</div><h2>Antes y después<br>de la consulta.</h2><p>Symphomed no empieza cuando el paciente entra ni termina cuando se va: la reserva y el control siguiente también se resuelven solos, por WhatsApp.</p></div>
+<div class="steps steps-3">
+<div class="step"><div class="icon">✆</div><h3>El paciente reserva solo</h3><p>Escribe al WhatsApp del consultorio, ve los horarios que están libres de verdad y elige. La cita aparece en la agenda sin que nadie atienda el teléfono.</p></div>
+<div class="step"><div class="icon">✓</div><h3>Queda confirmada al instante</h3><p>Recibe la confirmación en el momento. Si necesita cancelar, escribe «cancelar» ahí mismo y el horario se libera para otro paciente.</p></div>
+<div class="step"><div class="icon">↻</div><h3>El control siguiente no se pierde</h3><p>Al cerrar la consulta, Symphomed propone la fecha del próximo control y le manda al paciente un enlace para que elija su horario. El médico ve en su panel todo lo que se viene.</p></div>
+</div>
+</div></section>
 <section id="especialidades"><div class="container"><div class="section-head"><div class="eyebrow">UNA PLATAFORMA. TODAS LAS ESPECIALIDADES.</div><h2>Pensado para todo el consultorio.</h2><p>De la medicina general a la especialidad, Symphomed se adapta a cada profesional, cada especialidad y cada consultorio.</p></div>
 <div class="specialties">
-<div class="specialty"><div class="sicon">⚕</div>Medicina general</div><div class="specialty"><div class="sicon">♢</div>Odontología</div><div class="specialty"><div class="sicon">◉</div>Dermatología</div><div class="specialty"><div class="sicon">◉</div>Oftalmología</div><div class="specialty"><div class="sicon">✧</div>Estética</div><div class="specialty"><div class="sicon">⌁</div>Cirugía</div><div class="specialty"><div class="sicon">♧</div>Ginecología</div><div class="specialty"><div class="sicon">◌</div>Pediatría</div><div class="specialty"><div class="sicon">♧</div>Fisioterapia</div><div class="specialty"><div class="sicon">🐾</div>Veterinaria</div><div class="specialty"><div class="sicon">▣</div>Teleconsulta</div><div class="specialty"><div class="sicon">→</div>Todas</div>
+<div class="specialty"><div class="sicon">⚕</div>Medicina general</div><div class="specialty"><div class="sicon">♢</div>Odontología</div><div class="specialty"><div class="sicon">◉</div>Dermatología</div><div class="specialty"><div class="sicon">◉</div>Oftalmología</div><div class="specialty"><div class="sicon">✧</div>Estética</div><div class="specialty"><div class="sicon">⌁</div>Cirugía</div><div class="specialty"><div class="sicon">♧</div>Ginecología</div><div class="specialty"><div class="sicon">◌</div>Pediatría</div><div class="specialty"><div class="sicon">♧</div>Fisioterapia</div><div class="specialty"><div class="sicon">◈</div>Psicología</div><div class="specialty"><div class="sicon">❋</div>Psiquiatría</div><div class="specialty"><div class="sicon">🐾</div>Veterinaria</div><div class="specialty"><div class="sicon">▣</div>Teleconsulta</div><div class="specialty"><div class="sicon">→</div>Todas</div>
 </div></div></section>
 
 <section class="split" id="soluciones">
@@ -149,6 +169,6 @@ html{overflow-x:hidden}
 
 <section class="final" id="demo"><div class="container"><div class="eyebrow">EMPEZAR</div><h2>En la salud se conversa todos los días.<br><span style="color:#28c9f4">Symphomed lo convierte en historia clínica.</span></h2><p>Escríbanos por WhatsApp y le mostramos cómo funciona con un caso real, en quince minutos. Las primeras 4 consultas no se cobran.</p><a class="btn btn-primary" href="https://wa.me/59164637067?text=Hola%2C%20quiero%20ver%20una%20demostraci%C3%B3n%20de%20Symphomed">Escríbanos por WhatsApp →</a></div></section>
 
-<footer><div class="container footer"><div class="logo"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</div><div class="footerlinks"><a href="#plataforma">Plataforma</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a><a href="#demo">Contacto</a></div><div>© 2026 Symphomed · Bolivia y Brasil</div></div></footer>
+<footer><div class="container footer"><div class="logo"><span class="logo-mark"><i></i><i></i><i></i><i></i><i></i></span>SYMPHOMED</div><div class="footerlinks"><a href="#plataforma">Plataforma</a><a href="#agenda">Agenda</a><a href="#especialidades">Especialidades</a><a href="#soluciones">Soluciones</a><a href="#tecnologia">Tecnología</a><a href="#confianza">Confianza</a><a href="#demo">Contacto</a></div><div>© 2026 Symphomed · Bolivia y Brasil</div></div></footer>
 </body>
 </html>

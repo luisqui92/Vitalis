@@ -57,8 +57,23 @@ verificar("todas las anclas del menú llevan a una sección que existe",
   rotas.length === 0);
 if (rotas.length) console.log("   rotas:", rotas.join(", "));
 
-["plataforma", "especialidades", "soluciones", "tecnologia", "confianza", "demo"]
+["plataforma", "agenda", "especialidades", "soluciones", "tecnologia", "confianza", "demo"]
   .forEach(s => verificar(`sección «${s}»`, vista.includes(`id="${s}"`)));
+
+// La agenda es de lo más vendible que tiene el producto y no venía en el
+// diseño: se agrega desde el guion de construcción, así que es justo lo que
+// se pierde sin ruido en una reconstrucción.
+verificar("la reserva por WhatsApp está contada",
+  /reserva solo/.test(vista) && /WhatsApp del consultorio/.test(vista));
+verificar("y el seguimiento después de la consulta también",
+  /El control siguiente no se pierde/.test(vista));
+
+// Estas dos se insertan buscando el bloque de Veterinary EN INGLÉS, porque la
+// regla corre antes de que se traduzca. Buscarlo en español no falla: no
+// encuentra nada y las especialidades desaparecen sin que nadie avise. Ya
+// pasó una vez.
+["Psicología", "Psiquiatría", "Veterinaria"].forEach(e =>
+  verificar(`especialidad «${e}»`, vista.includes(`</div>${e}</div>`)));
 
 // El panel de Symphomed Pet lleva .panel-light Y .pet: la segunda lo pinta
 // oscuro sin cambiar el color del texto, así que quedaba tinta casi negra
