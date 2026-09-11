@@ -42,7 +42,7 @@ console.log("\n── 2. Que se vea que es una demostración ──");
 // todo lo demás.
 verificar("el aviso está arriba de todo, no en letra chica",
   vista.indexOf("Demostración") < vista.indexOf('id="q"'));
-verificar("dice que todavía no son reales", /Todavía no son establecimientos reales/.test(vista));
+verificar("dice que los datos no son reales", /los datos no son reales/.test(vista));
 // Se cuenta DENTRO del arreglo de datos y no en toda la página: "(ejemplo)"
 // también aparece en el código que lo saca del título para mostrarlo aparte.
 const bloqueDatos = vista.slice(vista.indexOf("var LUGARES"), vista.indexOf("var CATEGORIAS"));
