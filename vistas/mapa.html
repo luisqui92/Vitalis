@@ -289,10 +289,20 @@ var mapa = L.map("mapa", { scrollWheelZoom: true, zoomControl: true })
 // La atribución NO es decorativa: es la condición de uso de los dos. Sacarla
 // es lo que convierte un mapa gratis en un mapa bloqueado — que es
 // exactamente lo que ya nos pasó con OpenStreetMap.
+// subdomains "abcd": los proveedores que reparten por subdominios usan
+// cuatro y Leaflet prueba con tres, así que el cuarto nunca se pediría. En
+// los que no usan {s} —MapTiler— esta opción no molesta.
+//
+// tileSize y zoomOffset van del servidor porque dependen del proveedor: 256
+// es lo clásico, 512 lo que sirven los modernos. Con 512 sin compensar el
+// zoom, el mapa sale corrido un nivel y borroso, sin ningún error a la vista.
+var tam = Number("__TAM_TEJA__") || 256;
 L.tileLayer("__MOSAICOS__", {
   maxZoom: 19,
   subdomains: "abcd",
-  attribution: '&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  tileSize: tam,
+  zoomOffset: tam === 512 ? -1 : 0,
+  attribution: "__CREDITO__",
 }).addTo(mapa);
 
 function chincheta(color, activa) {

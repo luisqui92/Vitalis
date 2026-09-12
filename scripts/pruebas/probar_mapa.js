@@ -148,8 +148,25 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   verificar("  ...y recuerda restringirla por dominio, que es lo que se olvida",
     /restringirla por dominio/.test(rutaMapa));
 
-  verificar("  ...y la atribución del proveedor está puesta",
-    /attribution:/.test(r.texto) && /openstreetmap\.org\/copyright/.test(r.texto));
+  // La atribución se DEDUCE del proveedor, no se escribe fija: si estuviera
+  // escrita, cambiar de proveedor por el .env dejaría el crédito del anterior
+  // puesto —el mapa diciendo "CARTO" mientras las tejas las sirve MapTiler—
+  // y eso incumple la licencia de los dos a la vez.
+  verificar("  ...y la atribución nombra al proveedor configurado",
+    /openstreetmap\.org\/copyright/.test(r.texto) &&
+    (/cartocdn/.test(MOSAICOS) ? /carto\.com\/attributions/.test(r.texto) : true) &&
+    (/maptiler/.test(MOSAICOS) ? /maptiler\.com\/copyright/.test(r.texto) : true));
+  verificar("  ...sin marcadores sin reemplazar",
+    !r.texto.includes("__CREDITO__") && !r.texto.includes("__TAM_TEJA__"));
+
+  // Leaflet asume tejas de 256px; los proveedores modernos sirven de 512. Sin
+  // decírselo, el mapa dibuja igual —sin error, sin hueco— pero con el zoom
+  // corrido un nivel y borroso. Y las dos opciones van JUNTAS: poner una sin
+  // la otra es peor que no poner ninguna.
+  const tam = (r.texto.match(/var tam = Number\("(\d+)"\)/) || [])[1];
+  verificar(`el tamaño de teja viaja del servidor (${tam}px)`, Boolean(tam));
+  verificar("  ...y el zoom se compensa solo cuando son de 512",
+    /zoomOffset: tam === 512 \? -1 : 0/.test(r.texto));
   verificar("y el centro del mapa", !r.texto.includes("__CENTRO__") && !r.texto.includes("__ZOOM__"));
   // Mientras sean ejemplos, que no lo levante un buscador: alguien podría
   // llegar buscando un laboratorio de verdad y encontrar uno inventado.

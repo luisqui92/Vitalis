@@ -73,6 +73,42 @@ const MOSAICOS = String(process.env.MAPA_MOSAICOS ||
 const MOSAICOS_ORIGEN = String(process.env.MAPA_MOSAICOS_ORIGEN ||
   "https://*.basemaps.cartocdn.com");
 
+// ═══ EL TAMAÑO DE LA TEJA, QUE NO SE VE PERO SE NOTA ══════════════════════
+//
+// Leaflet asume tejas de 256px. Los proveedores modernos —MapTiler entre
+// ellos— sirven de 512. Si no se le dice, el mapa dibuja igual: no hay error,
+// no falta nada, simplemente TODO sale con un nivel de zoom corrido y
+// borroso, y quien lo mire va a pensar que el mapa es feo y no que está mal
+// configurado.
+//
+// Con 512 hay que compensar el zoom en -1, y las dos cosas van JUNTAS: poner
+// una sin la otra es peor que no poner ninguna.
+const TAM_TEJA = String(Number(process.env.MAPA_MOSAICOS_TAM) || 256);
+
+// ═══ LA ATRIBUCIÓN SE DEDUCE DEL PROVEEDOR ════════════════════════════════
+//
+// Y no se escribe a mano a propósito. Es la CONDICIÓN DE USO de todos estos
+// mapas: sin ella, gratis se convierte en bloqueado — que es exactamente lo
+// que ya pasó con OpenStreetMap.
+//
+// Si estuviera escrita fija, cambiar de proveedor por el .env dejaría el
+// crédito del anterior puesto: el mapa diría "CARTO" mientras las tejas las
+// sirve MapTiler. Eso no es un detalle estético, es incumplir la licencia de
+// los dos a la vez.
+//
+// OpenStreetMap va SIEMPRE: los tres proveedores dibujan sobre sus datos.
+const CREDITOS = [
+  [/cartocdn\.com/, '&copy; <a href="https://carto.com/attributions">CARTO</a>'],
+  [/maptiler\.com/, '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a>'],
+  [/stadiamaps\.com/, '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'],
+];
+function creditoDe(url) {
+  const base = '&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  const prov = CREDITOS.find(([re]) => re.test(url));
+  return prov ? `${base} \u00b7 ${prov[1]}` : base;
+}
+const CREDITO = creditoDe(MOSAICOS);
+
 // Dónde se centra al abrir. Cochabamba por defecto.
 const CENTRO = String(process.env.MAPA_CENTRO || "-17.3935,-66.1570");
 const ZOOM = String(Number(process.env.MAPA_ZOOM) || 13);
@@ -108,6 +144,8 @@ module.exports = (app) => {
         .replace(/__MOSAICOS__/g, MOSAICOS)
         .replace(/__CENTRO__/g, CENTRO)
         .replace(/__ZOOM__/g, ZOOM)
+        .replace(/__TAM_TEJA__/g, TAM_TEJA)
+        .replace(/__CREDITO__/g, CREDITO)
     );
   });
 
