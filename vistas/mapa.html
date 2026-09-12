@@ -282,9 +282,17 @@ var marcadores = [];
 
 var mapa = L.map("mapa", { scrollWheelZoom: true, zoomControl: true })
   .setView(String("__CENTRO__").split(",").map(Number), Number("__ZOOM__"));
+// subdomains 'abcd': CARTO reparte por cuatro subdominios y Leaflet usa
+// 'abc' por defecto, así que sin esto el cuarto nunca se pide y los otros
+// tres cargan de más.
+//
+// La atribución NO es decorativa: es la condición de uso de los dos. Sacarla
+// es lo que convierte un mapa gratis en un mapa bloqueado — que es
+// exactamente lo que ya nos pasó con OpenStreetMap.
 L.tileLayer("__MOSAICOS__", {
   maxZoom: 19,
-  attribution: '&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  subdomains: "abcd",
+  attribution: '&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · &copy; <a href="https://carto.com/attributions">CARTO</a>',
 }).addTo(mapa);
 
 function chincheta(color, activa) {

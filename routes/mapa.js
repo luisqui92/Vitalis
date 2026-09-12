@@ -31,13 +31,33 @@ const { log } = require("../config");
 
 const VISTAS = path.join(__dirname, "..", "vistas");
 
-// De dónde salen los mosaicos. En una variable para poder cambiar de
-// proveedor sin desplegar: el día que haga falta un mapa con más detalle, o
-// uno pago, es una línea del .env.
+// ═══ DE DÓNDE SALEN LOS MOSAICOS, Y POR QUÉ NO DE OPENSTREETMAP ═══════════
+//
+// Arrancó apuntando a tile.openstreetmap.org y en producción devolvió 403:
+//
+//   "Access blocked — App is not following the tile usage policy of
+//    OpenStreetMap's volunteer-run servers"
+//
+// No fue un error de configuración: esos servidores los pagan voluntarios con
+// donaciones, y su política prohíbe que un producto los use de CDN. Que
+// funcionara en la prueba y en el navegador de uno no significaba permiso —
+// significaba que todavía no habíamos molestado lo suficiente como para que
+// nos vieran.
+//
+// Ahora salen de los mapas base de CARTO, que están hechos para esto y son
+// gratuitos con atribución. Y de paso el mapa deja de ser un rectángulo claro
+// en medio de una pantalla oscura: dark_all es la versión oscura, que es la
+// paleta de toda la plataforma.
+//
+// ⚠️ CARTO gratis alcanza para una demostración y para empezar. Cuando el
+// mapa tenga tráfico de verdad —que es el objetivo— hay que pasar a un
+// proveedor con clave (MapTiler, Stadia) o a mosaicos propios. Es una línea
+// del .env, pero hay que acordarse ANTES de que vuelva a aparecer un 403 en
+// la pantalla de un médico.
 const MOSAICOS = String(process.env.MAPA_MOSAICOS ||
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png");
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png");
 const MOSAICOS_ORIGEN = String(process.env.MAPA_MOSAICOS_ORIGEN ||
-  "https://*.tile.openstreetmap.org");
+  "https://*.basemaps.cartocdn.com");
 
 // Dónde se centra al abrir. Cochabamba por defecto.
 const CENTRO = String(process.env.MAPA_CENTRO || "-17.3935,-66.1570");

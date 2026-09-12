@@ -22,6 +22,10 @@ function verificar(descripcion, condicion) {
 }
 
 const vista = fs.readFileSync(path.join(RAIZ, "vistas", "mapa.html"), "utf8");
+// El proveedor sale de la ruta, no se escribe acá: así la prueba sigue al
+// código cuando se cambie de proveedor, en vez de quedar en rojo.
+const MOSAICOS = (fs.readFileSync(path.join(RAIZ, "routes", "mapa.js"), "utf8")
+  .match(/MAPA_MOSAICOS \|\|\s*\n?\s*"([^"]+)"/) || [])[1] || "";
 
 console.log("── 1. Lo que necesita para dibujarse ──");
 verificar("Leaflet está alojado acá, no en un CDN",
@@ -98,7 +102,28 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   console.log("\n── 4. La CSP, que es lo que puede dejarlo en negro ──");
   verificar("la página responde", r.estado === 200);
   const csp = r.cab["content-security-policy"] || "";
-  verificar("deja cargar los mosaicos", /img-src[^;]*tile\.openstreetmap\.org/.test(csp));
+  // No se comprueba que sea OpenStreetMap ni CARTO: se comprueba que la CSP
+  // permita EL PROVEEDOR QUE ESTÁ CONFIGURADO. Esa es la invariante que de
+  // verdad se rompe — alguien cambia MAPA_MOSAICOS por otro proveedor, se
+  // olvida de MAPA_MOSAICOS_ORIGEN, y el navegador bloquea los mosaicos EN
+  // SILENCIO: queda un rectángulo negro donde iba el mapa y ni un error.
+  //
+  // (Y el proveedor se cambió una vez de verdad: OpenStreetMap devolvió 403
+  // en producción porque sus servidores son de voluntarios y su política no
+  // admite que un producto los use de CDN.)
+  // El {s} se SUSTITUYE por un subdominio de ejemplo, no se borra: la URL que
+  // el navegador pide de verdad es "a.basemaps.cartocdn.com", y un comodín
+  // "*.basemaps.cartocdn.com" cubre eso pero NO cubre el dominio pelado.
+  // Borrándolo, la comprobación decía que faltaba permiso cuando estaba.
+  const hostMosaicos = MOSAICOS.replace("{s}", "a").replace(/^https?:\/\//, "").split("/")[0];
+  const permitido = (r.cab["content-security-policy"] || "")
+    .match(/img-src ([^;]*)/)?.[1] || "";
+  const cubierto = permitido.split(/\s+/).some(o => {
+    const limpio = o.replace(/^https?:\/\//, "");
+    return limpio === hostMosaicos ||
+      (limpio.startsWith("*.") && hostMosaicos.endsWith(limpio.slice(1)));
+  });
+  verificar(`la CSP deja cargar los mosaicos de ${hostMosaicos}`, cubierto);
   verificar("deja cargar Leaflet desde /vendor", /script-src[^;]*'self'/.test(csp));
   verificar("  ...y el script propio por nonce", /script-src[^;]*'nonce-/.test(csp));
   verificar("no abre nada más que eso", /default-src 'none'/.test(csp));
@@ -106,7 +131,15 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
 
   console.log("\n── 5. Los marcadores de la plantilla ──");
   verificar("el nonce quedó reemplazado", !r.texto.includes("__NONCE__"));
-  verificar("los mosaicos también", !r.texto.includes("__MOSAICOS__") && /tile\.openstreetmap/.test(r.texto));
+  // En el HTML la URL viaja con el {s} literal —lo sustituye Leaflet en el
+  // navegador— así que acá se busca el dominio sin el subdominio de ejemplo.
+  const dominioBase = hostMosaicos.replace(/^a\./, "");
+  verificar("los mosaicos también",
+    !r.texto.includes("__MOSAICOS__") && r.texto.includes(dominioBase));
+  // La atribución es la CONDICIÓN DE USO de los mapas gratuitos, no un
+  // adorno. Sacarla es lo que convierte un mapa gratis en un mapa bloqueado.
+  verificar("  ...y la atribución del proveedor está puesta",
+    /attribution:/.test(r.texto) && /openstreetmap\.org\/copyright/.test(r.texto));
   verificar("y el centro del mapa", !r.texto.includes("__CENTRO__") && !r.texto.includes("__ZOOM__"));
   // Mientras sean ejemplos, que no lo levante un buscador: alguien podría
   // llegar buscando un laboratorio de verdad y encontrar uno inventado.
