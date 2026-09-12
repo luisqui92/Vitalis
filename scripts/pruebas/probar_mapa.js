@@ -159,6 +159,30 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   verificar("  ...sin marcadores sin reemplazar",
     !r.texto.includes("__CREDITO__") && !r.texto.includes("__TAM_TEJA__"));
 
+  // ═══ QUE EL SCRIPT PARSEE, QUE ES LO QUE DE VERDAD SE ROMPE ═════════════
+  //
+  // Esta página se arma sustituyendo marcadores dentro de código JavaScript.
+  // Si lo que se mete trae una comilla, CIERRA la cadena y el script entero
+  // deja de parsear — y entonces no se cae "el mapa": se caen los filtros, la
+  // lista de lugares y el buscador, todo junto, y queda un rectángulo vacío.
+  //
+  // Pasó de verdad con la atribución, que trae href="..." con comillas
+  // dobles. En el servidor no hay ni un error: la página se sirve perfecta,
+  // 200, y es el NAVEGADOR el que no puede leerla.
+  //
+  // Por eso no alcanza con comprobar que el marcador se reemplazó. Hay que
+  // parsear lo que quedó, que es exactamente lo que hace el navegador.
+  const guiones = [...r.texto.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("\n");
+  let parsea = true, porQue = "";
+  try { new Function(guiones); } catch (e) { parsea = false; porQue = e.message; }
+  verificar("el JavaScript de la página servida parsea", parsea);
+  if (!parsea) console.log("   ", porQue);
+
+  // Y que ningún marcador pueda cerrar la etiqueta <script> desde adentro.
+  verificar("  ...y nada puede cerrar el <script> desde una sustitución",
+    !/<\/script>/i.test(r.texto.slice(r.texto.indexOf("attribution:"),
+                                      r.texto.indexOf("attribution:") + 400)));
+
   // Leaflet asume tejas de 256px; los proveedores modernos sirven de 512. Sin
   // decírselo, el mapa dibuja igual —sin error, sin hueco— pero con el zoom
   // corrido un nivel y borroso. Y las dos opciones van JUNTAS: poner una sin

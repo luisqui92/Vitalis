@@ -114,7 +114,21 @@ function creditoDe(url) {
   const prov = CREDITOS.find(([re]) => re.test(url));
   return prov ? `${base} \u00b7 ${prov[1]}` : base;
 }
-const CREDITO = creditoDe(MOSAICOS);
+// ═══ SE SERIALIZA, NO SE PEGA ═════════════════════════════════════════════
+//
+// El crédito trae href="..." con comillas DOBLES, y del otro lado va dentro
+// de una cadena de JavaScript. Pegado tal cual, la primera comilla de adentro
+// cierra la cadena y el script entero deja de parsear: se caen los filtros,
+// la lista y el mapa, y en la pantalla queda un rectángulo vacío. Ya pasó.
+//
+// JSON.stringify pone las comillas y escapa lo de adentro. El \u003c de
+// yapa es para que un "</script>" en el crédito no pueda cerrar la etiqueta
+// —hoy no lo tiene, pero el crédito sale de una tabla que alguien va a tocar
+// y este archivo no va a estar abierto ese día.
+function comoCadenaJS(s) {
+  return JSON.stringify(String(s)).replace(/</g, "\\u003c");
+}
+const CREDITO = comoCadenaJS(creditoDe(MOSAICOS));
 
 // Dónde se centra al abrir. Cochabamba por defecto.
 const CENTRO = String(process.env.MAPA_CENTRO || "-17.3935,-66.1570");
