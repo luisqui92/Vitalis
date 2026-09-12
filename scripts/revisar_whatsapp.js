@@ -87,7 +87,11 @@ async function pedir(ruta, params = {}) {
   console.log(`  Verificación    : ${numero.code_verification_status || "—"}`);
   console.log(`  Calidad         : ${numero.quality_rating || "—"}`);
 
-  if (numero.name_status && numero.name_status !== "APPROVED") {
+  // AVAILABLE_WITHOUT_REVIEW quiere decir que el nombre se puede usar SIN que
+  // Meta lo revise — o sea, está bien. Tratarlo como pendiente era una falsa
+  // alarma: mandaba a revisar algo que ya funciona.
+  const NOMBRE_OK = new Set(["APPROVED", "AVAILABLE_WITHOUT_REVIEW"]);
+  if (numero.name_status && !NOMBRE_OK.has(numero.name_status)) {
     console.log("\n  " + AMBAR(`El nombre visible está en estado ${numero.name_status}.`));
     console.log("  Mientras no esté aprobado, el paciente ve el número pelado en vez de la marca.");
   }
