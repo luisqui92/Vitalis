@@ -50,6 +50,16 @@ const CONFIG = {
   // al dar de alta la URL, y nunca más.
   WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET || "",
 
+  // WHATSAPP_WABA_ID: el "WhatsApp Business account ID". No es el del número
+  // ni el de la app — en el panel de Meta se ve arriba del número, en la
+  // tarjeta de la cuenta.
+  //
+  // No hace falta para mandar ni para recibir. Lo usa
+  // scripts/revisar_whatsapp.js para preguntarle a Meta dos cosas que desde
+  // el panel se leen mal: si el webhook quedó suscrito de verdad, y en qué
+  // estado está cada plantilla.
+  WHATSAPP_WABA_ID: process.env.WHATSAPP_WABA_ID || "",
+
   // "Súper número": un mismo WhatsApp que reparte entre varios consultorios
   // propios (uno por especialidad) — el paciente primero elige cuál busca,
   // y de ahí en más esa conversación queda atada a ESE médico. Lista de

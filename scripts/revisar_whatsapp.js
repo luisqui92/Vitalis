@@ -92,6 +92,90 @@ async function pedir(ruta, params = {}) {
     console.log("  Mientras no esté aprobado, el paciente ve el número pelado en vez de la marca.");
   }
 
+  // ─── El webhook, que es la mitad que nadie mira ──────────────────────────
+  //
+  // Guardar la URL y suscribir el campo "messages" son DOS pasos distintos en
+  // el panel, y el segundo no se ve: la pantalla dice que la URL quedó
+  // verificada igual. Si falta, el consultorio puede MANDAR mensajes y no
+  // recibe ninguno — los pacientes escriben y nadie contesta, sin un solo
+  // error en el log, porque el pedido nunca llega hasta acá.
+  if (CONFIG.WHATSAPP_WABA_ID) {
+    console.log("\n── El webhook ──\n");
+    try {
+      const susc = await pedir(`${CONFIG.WHATSAPP_WABA_ID}/subscribed_apps`);
+      const apps = susc.data || [];
+      if (!apps.length) {
+        console.log("  " + ROJO("Ninguna app suscrita a esta cuenta."));
+        console.log("  Meta no va a entregar NI UN mensaje entrante. En el panel:");
+        console.log("  WhatsApp → Configuración → Webhook, y suscribir el campo 'messages'.\n");
+      } else {
+        for (const a of apps) {
+          const d = a.whatsapp_business_api_data || {};
+          console.log(`  App suscrita    : ${d.name || d.id || "(sin nombre)"}`);
+          // Meta no siempre devuelve la lista de campos por este camino. Si no
+          // viene, se dice que no vino, en vez de inventar un veredicto: un
+          // diagnóstico que afirma de más es peor que uno que no sabe.
+          const campos = a.subscribed_fields || d.subscribed_fields;
+          if (Array.isArray(campos)) {
+            console.log(`  Campos          : ${campos.join(", ")}`);
+            console.log(`  ¿'messages'?    : ${campos.includes("messages")
+              ? VERDE("sí") : ROJO("NO — no va a llegar ningún mensaje")}`);
+          } else {
+            console.log("  " + AMBAR("Meta no devolvió la lista de campos en esta consulta."));
+            console.log("  " + GRIS("Miralo en el panel: WhatsApp → Configuración → Campos del"));
+            console.log("  " + GRIS("webhook → 'messages' tiene que figurar como suscrito."));
+          }
+        }
+        console.log("");
+      }
+    } catch (e) {
+      const err = e.response?.data?.error || {};
+      console.log("  " + ROJO(`No se pudo consultar (código ${err.code ?? "?"}): ${err.message || e.message}`));
+      if (err.code === 100) console.log("  Revisá WHATSAPP_WABA_ID — no es el ID del número ni el de la app.\n");
+    }
+
+    // ─── Las plantillas ────────────────────────────────────────────────────
+    //
+    // Sin plantilla aprobada, todo lo que INICIA la plataforma —confirmación
+    // de cita, reconsulta, informe— falla fuera de la ventana de 24 h. La
+    // aprobación tarda y puede volver rechazada, así que conviene poder
+    // preguntar cómo va sin entrar al panel.
+    console.log("── Las plantillas ──\n");
+    try {
+      const { PLANTILLAS } = require("../services/metaWhatsapp");
+      const esperadas = Object.values(PLANTILLAS);
+      const r = await pedir(`${CONFIG.WHATSAPP_WABA_ID}/message_templates`, { limit: 100 });
+      const porNombre = {};
+      for (const p of r.data || []) (porNombre[p.name] ||= []).push(p);
+
+      for (const nombre of esperadas) {
+        const versiones = porNombre[nombre];
+        if (!versiones) {
+          console.log(`  ${ROJO("✗")} ${nombre.padEnd(22)} no existe todavía`);
+          continue;
+        }
+        for (const v of versiones) {
+          const estado = v.status === "APPROVED" ? VERDE(v.status)
+            : v.status === "REJECTED" ? ROJO(v.status) : AMBAR(v.status);
+          console.log(`  ${v.status === "APPROVED" ? VERDE("✓") : AMBAR("•")} ${nombre.padEnd(22)} ${v.language || "?"}  ${estado}`);
+        }
+      }
+      const faltan = esperadas.filter(n => !porNombre[n]);
+      if (faltan.length) {
+        console.log("\n  " + AMBAR(`Faltan ${faltan.length}. Los mensajes que inicia la plataforma no salen`));
+        console.log("  " + GRIS("fuera de la ventana de 24 h. El cuerpo exacto está en WHATSAPP_PLANTILLAS.md\n"));
+      } else {
+        console.log("");
+      }
+    } catch (e) {
+      const err = e.response?.data?.error || {};
+      console.log("  " + ROJO(`No se pudieron listar (código ${err.code ?? "?"}): ${err.message || e.message}\n`));
+    }
+  } else {
+    console.log("\n  " + GRIS("Poniendo WHATSAPP_WABA_ID en el .env, este script también te dice si el"));
+    console.log("  " + GRIS("webhook quedó suscrito y cómo van las plantillas.\n"));
+  }
+
   // ─── La pregunta que importa ─────────────────────────────────────────────
   console.log("\n── ¿Puede escribirle a cualquiera? ──\n");
   const destino = String(process.argv[2] || "").replace(/\D/g, "");
