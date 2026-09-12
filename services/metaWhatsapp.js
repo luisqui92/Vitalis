@@ -24,6 +24,12 @@ const PISTAS = {
   131047: "Pasaron más de 24 h desde el último mensaje del paciente: ya no se puede mandar texto libre, " +
           "hay que usar una plantilla aprobada.",
   131026: "Ese número no tiene WhatsApp o no puede recibir mensajes.",
+  // Este aparece cuando la plantilla SÍ está aprobada y el envío igual se
+  // cae. Es fácil confundirlo con un problema de plantilla y perder una
+  // tarde: no falta nada del lado del código, falta la tarjeta.
+  131042: "La cuenta de WhatsApp Business no tiene método de pago. Los mensajes que INICIA la plataforma " +
+          "—confirmaciones de cita, reconsultas, informes— se cobran y no salen sin una tarjeta cargada. " +
+          "El bot de reservas sigue andando igual: esas conversaciones las inicia el paciente y son gratis.",
   132000: "La plantilla no existe o los parámetros no coinciden con los que se aprobaron.",
   132001: "La plantilla no existe con ese nombre y en ese idioma.",
   133010: "El número no está registrado en la API. Revisá WHATSAPP_PHONE_NUMBER_ID.",
