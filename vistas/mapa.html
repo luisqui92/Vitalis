@@ -109,9 +109,19 @@ a{color:inherit;text-decoration:none}
 .leaflet-popup-content em{font-style:normal;color:var(--cian2);font-size:12px}
 .leaflet-control-attribution{background:rgba(3,16,26,.8)!important;color:#7f97a6!important}
 .leaflet-control-attribution a{color:#a8bdc9!important}
+/* ═══ EL CONTORNO NO ES ADORNO ════════════════════════════════════════════
+   El borde era oscuro y semitransparente, que funcionaba sobre un mapa casi
+   negro. Sobre un mapa de calles azules la chincheta de Consultorios —que es
+   cian, y es la categoría que más importa— quedaba compitiendo con las
+   avenidas y se perdía justo la que hay que ver.
+
+   Un aro claro y opaco la despega de CUALQUIER fondo: azul, gris, agua o
+   parque. Y deja de depender del estilo de mapa que esté configurado, que
+   es una variable del .env y puede cambiar sin que nadie mire esto. */
 .chincheta{
   width:26px;height:26px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);
-  border:2px solid rgba(3,16,26,.55);box-shadow:0 3px 10px rgba(0,0,0,.5);
+  border:2px solid rgba(233,246,252,.92);
+  box-shadow:0 2px 4px rgba(3,16,26,.9), 0 4px 12px rgba(0,0,0,.55);
 }
 .chincheta.activa{outline:3px solid var(--cian2);outline-offset:2px}
 

@@ -57,8 +57,15 @@ const VISTAS = path.join(__dirname, "..", "vistas");
 //
 // Con MAPA_MOSAICOS puesto en el .env, esto se arregla sin desplegar:
 //
-//   MAPA_MOSAICOS=https://api.maptiler.com/maps/dark-matter/{z}/{x}/{y}.png?key=TU_CLAVE
+//   MAPA_MOSAICOS=https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}.png?key=TU_CLAVE
 //   MAPA_MOSAICOS_ORIGEN=https://api.maptiler.com
+//   MAPA_MOSAICOS_TAM=512
+//
+// streets-v2-dark y no darkmatter: se compararon los seis estilos oscuros
+// con la misma teja de Cochabamba. darkmatter y dataviz-dark son casi
+// negros y las calles no se leen; este tiene el fondo azul oscuro y las
+// calles en cian —la paleta de Symphomed— con los nombres legibles.
+// (Ojo: "dark-matter" con guion no existe, devuelve 404.)
 //
 // ⚠️ Esa clave viaja en el HTML, a la vista de cualquiera: es inevitable, el
 // navegador tiene que pedir las tejas. Por eso hay que restringirla POR
