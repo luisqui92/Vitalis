@@ -138,6 +138,16 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
     !r.texto.includes("__MOSAICOS__") && r.texto.includes(dominioBase));
   // La atribución es la CONDICIÓN DE USO de los mapas gratuitos, no un
   // adorno. Sacarla es lo que convierte un mapa gratis en un mapa bloqueado.
+  // Si los mosaicos van sin clave, el proveedor les estampa "API KEY REQUIRED"
+  // encima de las calles. El mapa funciona, pero se ve como algo pirateado —
+  // y es de las cosas que uno deja de ver a la semana, mientras cada médico
+  // que entra lo ve por primera vez. Por eso avisa al arrancar.
+  const rutaMapa = fs.readFileSync(path.join(RAIZ, "routes", "mapa.js"), "utf8");
+  verificar("avisa al arrancar si los mosaicos no llevan clave",
+    /\[MAPA\] ⚠️  Los mosaicos van SIN CLAVE/.test(rutaMapa));
+  verificar("  ...y recuerda restringirla por dominio, que es lo que se olvida",
+    /restringirla por dominio/.test(rutaMapa));
+
   verificar("  ...y la atribución del proveedor está puesta",
     /attribution:/.test(r.texto) && /openstreetmap\.org\/copyright/.test(r.texto));
   verificar("y el centro del mapa", !r.texto.includes("__CENTRO__") && !r.texto.includes("__ZOOM__"));

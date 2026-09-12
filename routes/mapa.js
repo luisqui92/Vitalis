@@ -44,16 +44,30 @@ const VISTAS = path.join(__dirname, "..", "vistas");
 // significaba que todavía no habíamos molestado lo suficiente como para que
 // nos vieran.
 //
-// Ahora salen de los mapas base de CARTO, que están hechos para esto y son
-// gratuitos con atribución. Y de paso el mapa deja de ser un rectángulo claro
-// en medio de una pantalla oscura: dark_all es la versión oscura, que es la
-// paleta de toda la plataforma.
+// Ahora salen de los mapas base de CARTO. Sirven las tejas sin registrarse,
+// pero LES ESTAMPAN "API KEY REQUIRED" encima hasta que se pone una clave —
+// no es un error, es cómo cobran. El mapa se ve y se usa; se ve mendigado.
 //
-// ⚠️ CARTO gratis alcanza para una demostración y para empezar. Cuando el
-// mapa tenga tráfico de verdad —que es el objetivo— hay que pasar a un
-// proveedor con clave (MapTiler, Stadia) o a mosaicos propios. Es una línea
-// del .env, pero hay que acordarse ANTES de que vuelva a aparecer un 403 en
-// la pantalla de un médico.
+// ═══ NO HAY MAPA GRATIS SIN CLAVE, Y CONVIENE SABERLO ══════════════════════
+//
+// Esto ya se probó dos veces por el camino equivocado. OpenStreetMap bloquea
+// el uso en producción porque sus servidores son de voluntarios. CARTO marca
+// las tejas. El resto —MapTiler, Stadia— pide clave de entrada y al menos
+// es honesto desde el principio.
+//
+// Con MAPA_MOSAICOS puesto en el .env, esto se arregla sin desplegar:
+//
+//   MAPA_MOSAICOS=https://api.maptiler.com/maps/dark-matter/{z}/{x}/{y}.png?key=TU_CLAVE
+//   MAPA_MOSAICOS_ORIGEN=https://api.maptiler.com
+//
+// ⚠️ Esa clave viaja en el HTML, a la vista de cualquiera: es inevitable, el
+// navegador tiene que pedir las tejas. Por eso hay que restringirla POR
+// DOMINIO en el panel del proveedor. Sin eso, cualquiera la copia y te gasta
+// la cuota — y el día que se agote, el mapa se apaga para tus médicos.
+//
+// Y el destino final, cuando el mapa sea parte del producto y no una
+// demostración: mosaicos propios. Bolivia entera entra en un archivo, no
+// depende de nadie, no tiene cuota y no se puede bloquear.
 const MOSAICOS = String(process.env.MAPA_MOSAICOS ||
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png");
 const MOSAICOS_ORIGEN = String(process.env.MAPA_MOSAICOS_ORIGEN ||
@@ -98,4 +112,13 @@ module.exports = (app) => {
   });
 
   log.info(`[MAPA] Mapa de servicios en /mapa — centro ${CENTRO}, zoom ${ZOOM}`);
+  // Que lo diga al arrancar y no cuando alguien mire la pantalla. Un mapa con
+  // "API KEY REQUIRED" estampado sobre las calles se ve como un producto
+  // pirateado, y es de las cosas que uno deja de ver a la semana de
+  // acostumbrarse — mientras cada médico que entra lo ve por primera vez.
+  if (!/[?&]key=|[?&]api_key=/.test(MOSAICOS)) {
+    log.warn("[MAPA] ⚠️  Los mosaicos van SIN CLAVE: se sirven con una marca de agua encima " +
+      "(«API KEY REQUIRED»). Poné MAPA_MOSAICOS con tu clave en el .env — ver el comentario " +
+      "de routes/mapa.js — y acordate de restringirla por dominio en el panel del proveedor.");
+  }
 };
