@@ -4,10 +4,11 @@
 // prolijo). Sigue siendo una máquina de estados (no IA libre): para algo
 // tan estructurado como elegir un turno, es más confiable que dejar que el
 // paciente escriba libre y una IA interprete la fecha/hora.
-const { Medico, Cita, SesionCitaWA, Paciente, ConsultaMedica, Vacuna, Medicamento } = require("../db/models");
+const { Medico, Cita, SesionCitaWA, Paciente, ConsultaMedica, Vacuna, Medicamento, Interesado } = require("../db/models");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
 const { eliminarEvento } = require("./googleCalendar");
 const { enrutarMensaje } = require("./asistenteWhatsapp");
+const { atenderMedico } = require("./asistenteVentas");
 const { crearCitaConfirmada } = require("./crearCita");
 const { CONFIG, log } = require("../config");
 
@@ -42,11 +43,24 @@ function comoLista(texto, textoBoton, filas) { return { tipo: "lista", texto, te
 // ya no tiene sentido — más simple para el paciente que quedar "trabado"
 // sin entender por qué el bot no le entiende.
 const SESION_MINUTOS_EXPIRA = 2;
+
+// ═══ LA CONVERSACIÓN CON UN MÉDICO DURA MÁS ═══════════════════════════════
+//
+// Dos minutos está bien para un paciente: el que dejó de elegir un horario
+// hace media hora quiere empezar de nuevo, no retomar un paso viejo.
+//
+// Un médico que está averiguando, no. Lee la respuesta, la piensa, la habla
+// con su socio y vuelve a los diez minutos. Con el tope de dos minutos caería
+// otra vez en el menú de especialidades como si fuera un paciente, y la
+// conversación de venta se cortaría justo cuando estaba andando.
+const MEDICO_MINUTOS_EXPIRA = 60;
+
 async function obtenerSesion(numero) {
   const doc = await SesionCitaWA.findOne({ numero }).lean();
   if (!doc) return { numero, paso: "inicio", datos: {} };
   const minutosInactiva = (Date.now() - new Date(doc.updatedAt).getTime()) / 60000;
-  if (minutosInactiva > SESION_MINUTOS_EXPIRA) return { numero, paso: "inicio", datos: {} };
+  const tope = doc.paso === "medico" ? MEDICO_MINUTOS_EXPIRA : SESION_MINUTOS_EXPIRA;
+  if (minutosInactiva > tope) return { numero, paso: "inicio", datos: {} };
   return doc;
 }
 async function guardarSesion(numero, paso, datos) {
@@ -108,18 +122,33 @@ async function mostrarEspecialidades(numero) {
   await guardarSesion(numero, "elegir_especialidad", {
     opciones: ordenados.map(m => ({ phone: m.phone, nombre: m.nombre, tipoEspecialidad: m.tipoEspecialidad })),
   });
-  return comoLista(
-    "¡Hola! 👋 ¿Cuál de nuestros consultorios buscás?",
-    "Ver opciones",
-    ordenados.map((m, i) => ({
-      id: `esp_${i}`,
-      title: ETIQUETA_ESPECIALIDAD[m.tipoEspecialidad] || m.tipoEspecialidad,
-      description: m.nombre,
-    })),
-  );
+  // La fila de los médicos va ÚLTIMA, y no primera: el que escribe a este
+  // número es un paciente en la enorme mayoría de los casos, y no tiene por
+  // qué leer una opción que no es para él antes de llegar a la suya.
+  //
+  // Las listas de WhatsApp admiten 10 filas como máximo, así que si algún día
+  // hay diez consultorios, esta se cae sola — y los médicos igual llegan por
+  // el texto de la página, que es por donde llegan casi todos.
+  const filas = ordenados.map((m, i) => ({
+    id: `esp_${i}`,
+    title: ETIQUETA_ESPECIALIDAD[m.tipoEspecialidad] || m.tipoEspecialidad,
+    description: m.nombre,
+  }));
+  if (filas.length < 10) {
+    filas.push({ id: "soy_medico", title: "🩺 Soy médico", description: "Quiero conocer Symphomed" });
+  }
+  return comoLista("¡Hola! 👋 ¿Qué estás buscando?", "Ver opciones", filas);
 }
 
 async function elegirEspecialidad(numero, t, datos) {
+  // El que se declara médico entra al flujo de ventas por la puerta de
+  // adelante, sin tener que escribir "Symphomed" para que la heurística lo
+  // reconozca.
+  if (t === "soy_medico") {
+    await guardarSesion(numero, "medico", { historial: [], actualizada: new Date() });
+    return comoTexto("¡Qué bueno! 👋 Cuénteme, ¿de qué especialidad es y en qué ciudad atiende? " +
+      "Así le cuento cómo le sirve Symphomed a un consultorio como el suyo.");
+  }
   const idx = t.startsWith("esp_") ? parseInt(t.slice(4), 10) : NaN;
   const opcion = Number.isInteger(idx) ? datos.opciones?.[idx] : null;
   if (!opcion) return comoTexto("Elegí una de las opciones de la lista de arriba para continuar.");
@@ -128,10 +157,109 @@ async function elegirEspecialidad(numero, t, datos) {
   return iniciarReserva(opcion.phone, numero);
 }
 
+// ─── El flujo de los médicos que preguntan por Symphomed ───────────────────
+
+// Sin tildes y en minúsculas: "demostración" y "demostracion" son la misma
+// palabra para quien la escribe apurado en un teclado de celular.
+function sinTildes(t) {
+  return String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+// Los botones de symphomed.com mandan estas frases, una por idioma (ver
+// scripts/diseno/textos.js → WA_TEXTO). No se comparan enteras: el visitante
+// puede borrar media frase antes de mandarla, o agregarle algo.
+function esConsultaDeMedico(texto) {
+  return sinTildes(texto).includes("symphomed");
+}
+
+// Cuánto se guarda de la conversación. Seis vueltas alcanzan para que la IA
+// no repregunte lo que ya le dijeron, y evitan que una charla larga se coma
+// el contexto —y el costo— de cada mensaje siguiente.
+const MAX_HISTORIAL = 12;
+
+async function atenderComoMedico(numero, texto, sesion, nombrePerfil) {
+  const interesado = await Interesado.findOne({ numero });
+  // obtenerSesion ya aplicó la ventana larga: si llegó con paso "medico", la
+  // charla sigue viva. Si no, arranca de cero — pero el Interesado se
+  // conserva, así que lo que se sabe de él no se pierde nunca.
+  const historial = sesion.paso === "medico" ? (sesion.datos?.historial || []) : [];
+  const idioma = interesado?.idioma || "es";
+
+  const r = await atenderMedico(texto, historial, idioma);
+
+  // La IA dice que en realidad es un paciente: se devuelve null y el mensaje
+  // sigue al flujo de reserva. Se limpia la sesión para que el próximo no
+  // vuelva a entrar acá.
+  if (r.intencion === "paciente") {
+    if (sesion.paso === "medico") await limpiarSesion(numero);
+    return null;
+  }
+
+  const nuevoHistorial = [...historial,
+    { de: "medico", texto },
+    { de: "bot", texto: r.respuesta },
+  ].slice(-MAX_HISTORIAL);
+
+  await guardarSesion(numero, "medico", { historial: nuevoHistorial, actualizada: new Date() });
+
+  // El contacto se guarda SIEMPRE, desde el primer mensaje. Un médico que
+  // pregunta el precio y no vuelve a escribir igual es alguien a quien
+  // llamar: si solo se guardaran los que piden la demostración, se perdería
+  // la mayoría.
+  const datos = {
+    ultimoMensaje: new Date(),
+    conversacion: nuevoHistorial.map(m => ({ de: m.de, texto: m.texto })),
+  };
+  if (r.datos.nombre) datos.nombre = r.datos.nombre;
+  if (r.datos.especialidad) datos.especialidad = r.datos.especialidad;
+  if (r.datos.ciudad) datos.ciudad = r.datos.ciudad;
+  if (!interesado && nombrePerfil && !datos.nombre) datos.nombre = nombrePerfil;
+  // Solo sube de "nuevo" a "interesado". Nunca pisa "contactado" ni
+  // "descartado": eso lo puso una persona y el bot no lo revisa.
+  if (r.intencion === "interesado" && (!interesado || interesado.estado === "nuevo")) {
+    datos.estado = "interesado";
+  }
+
+  await Interesado.findOneAndUpdate({ numero }, { $set: datos, $setOnInsert: { numero } }, { upsert: true });
+
+  if (r.intencion === "interesado") {
+    // Va como error y no como info a propósito: en el log de errores es donde
+    // se mira cuando algo importa, y un médico pidiendo una demostración es
+    // exactamente eso. Es la señal más barata que existe hasta que haya una
+    // pantalla en el panel.
+    log.error(`[VENTAS] 🔔 MÉDICO INTERESADO — ${numero} · ${datos.nombre || "sin nombre"} · ` +
+      `${datos.especialidad || "especialidad?"} · ${datos.ciudad || "ciudad?"}`);
+  }
+
+  return comoTexto(r.respuesta);
+}
+
 async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
   const superNumero = CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length > 0;
   const sesion = await obtenerSesion(numero);
   const t = texto.trim().toLowerCase();
+
+  // ═══ MÉDICO O PACIENTE ═══════════════════════════════════════════════════
+  //
+  // El mismo número atiende las dos cosas. La separación se hace acá, antes
+  // de cualquier lógica de reserva, y se apoya en algo que ya existía sin
+  // haber sido pensado para esto: los botones de symphomed.com mandan un
+  // texto predefinido —"Hola, quiero ver una demostración de Symphomed"— así
+  // que un médico que llega de la página se identifica solo, sin que haya que
+  // preguntarle nada y sin agregarle un paso al paciente.
+  //
+  // La heurística es "dice Symphomed": un paciente que quiere una cita
+  // escribe "hola" o "quiero un turno", no el nombre de la plataforma que le
+  // maneja la ficha a su médico.
+  //
+  // Y si igual se equivoca no se rompe nada: el asistente de ventas devuelve
+  // intención "paciente" y el mensaje sigue de largo al flujo de reserva. La
+  // heurística rutea, la IA corrige.
+  if (sesion.paso === "medico" || esConsultaDeMedico(t)) {
+    const r = await atenderComoMedico(numero, texto, sesion, nombrePerfil);
+    if (r) return r;
+    // Era un paciente que nombró Symphomed. Sigue por el camino normal.
+  }
 
   const medicoPhone = sesion.datos?.medicoPhone || (!superNumero ? CONFIG.SALUD_WHATSAPP_MEDICO_PHONE : null);
   if (!medicoPhone) {

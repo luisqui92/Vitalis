@@ -1704,7 +1704,46 @@ const invitacionReporteSchema = new mongoose.Schema({
 }, { timestamps: true });
 const InvitacionReporte = mongoose.model("InvitacionReporte", invitacionReporteSchema);
 
-module.exports = { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+// ─── Un médico que escribió preguntando por Symphomed ──────────────────────
+//
+// El mismo WhatsApp por el que los pacientes reservan atiende también a los
+// médicos que llegan desde symphomed.com. Lo que dicen ahí es la materia
+// prima de la venta, y si quedara solo en el log se pierde: nadie lee un log
+// buscando clientes.
+//
+// NO es una cuenta. Un médico que se registra queda como Medico con
+// estadoCuenta "pendiente"; esto es de ANTES — alguien que todavía está
+// averiguando. Los dos no se mezclan a propósito: meter interesados en la
+// cola de aprobaciones la llena de gente que nunca pidió entrar, y entonces
+// la cola deja de mirarse.
+const interesadoSchema = new mongoose.Schema({
+  // El WhatsApp desde el que escribió. Es la identidad acá: no hay login.
+  numero: { type: String, required: true, unique: true, index: true },
+  // Lo que la conversación dejó saber. Todo opcional: un interesado que solo
+  // preguntó el precio y se fue igual vale como contacto.
+  nombre: { type: String, default: "" },
+  especialidad: { type: String, default: "" },
+  ciudad: { type: String, default: "" },
+  idioma: { type: String, enum: ["es", "pt"], default: "es" },
+  // "nuevo"      — escribió y nadie lo llamó todavía
+  // "interesado" — pidió la demostración, que lo llamen, o cómo empezar
+  // "contactado" — ya se habló con él (lo marca una persona)
+  // "descartado" — no era médico, o no va
+  estado: { type: String, enum: ["nuevo", "interesado", "contactado", "descartado"], default: "nuevo", index: true },
+  // La conversación, para no llamar a ciegas. Va acotada a las últimas
+  // vueltas: el valor está ahí, no en la transcripción completa.
+  conversacion: [{
+    de: { type: String, enum: ["medico", "bot"] },
+    texto: { type: String, default: "" },
+    cuando: { type: Date, default: Date.now },
+  }],
+  // Qué pasó después. Lo llena una persona, no el bot.
+  notas: { type: String, default: "" },
+  ultimoMensaje: { type: Date, default: Date.now, index: true },
+}, { timestamps: true });
+const Interesado = mongoose.model("Interesado", interesadoSchema);
+
+module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
