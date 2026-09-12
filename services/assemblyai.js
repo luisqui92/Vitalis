@@ -340,6 +340,43 @@ async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, 
   };
 }
 
+// ─── La nota de voz de un paciente por WhatsApp ────────────────────────────
+//
+// ═══ POR QUÉ NO SE REUSA transcribirConsultaMedica ═════════════════════════
+//
+// Aquella pide diarización —separar quién habla— porque una consulta son dos
+// o tres voces sobre el mismo micrófono. Una nota de voz de WhatsApp es una
+// persona sola diciendo "hola doctora, quiero turno para el jueves".
+//
+// Pedir diarización ahí no es solo gastar de más: el motor puede partir a la
+// misma persona en dos hablantes inventados cuando hace una pausa, y la
+// transcripción vuelve descuartizada.
+//
+// El vocabulario clínico SÍ se mantiene: el paciente nombra su medicación
+// ("me quedé sin la losartana") y es justo donde una transcripción común se
+// equivoca.
+async function transcribirNotaDeVoz(audioBuffer, tipoEspecialidad, idioma) {
+  if (!CONFIG.ASSEMBLYAI_API_KEY) throw new Error("ASSEMBLYAI_API_KEY no configurado");
+
+  const lang = idiomaSoportado(idioma);
+  const audioUrl = await subirAudio(audioBuffer);
+  const res = await axios.post(
+    "https://api.assemblyai.com/v2/transcript",
+    {
+      audio_url: audioUrl,
+      language_code: lang,
+      keyterms_prompt: keytermsPara(tipoEspecialidad, lang),
+      // Sin speaker_labels, sin multichannel y sin domain: una voz, un texto.
+    },
+    {
+      headers: { Authorization: CONFIG.ASSEMBLYAI_API_KEY, "Content-Type": "application/json" },
+      timeout: CONFIG.TIMEOUT_ASSEMBLYAI,
+    }
+  );
+  const data = await esperarTranscripcion(res.data.id);
+  return { texto: data.text || "", duracionSegundos: data.audio_duration || null };
+}
+
 // Token de corta duración para que el navegador se conecte DIRECTO al
 // WebSocket de streaming de AssemblyAI (vista previa en vivo mientras se
 // graba). Nunca se manda la API key real al navegador.
@@ -355,4 +392,4 @@ async function crearTokenStreaming() {
   return res.data.token;
 }
 
-module.exports = { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE };
+module.exports = { transcribirConsultaMedica, transcribirNotaDeVoz, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE };

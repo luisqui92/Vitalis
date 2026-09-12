@@ -155,6 +155,49 @@ function firmar(cuerpo, secreto) {
 
   servidor.close();
 
+  console.log("\n── 5b. Las notas de voz, y que nunca se quede mudo ──");
+  // ═══ EL BUG QUE ESTO ATAJA ═══════════════════════════════════════════════
+  //
+  // Acá había un `return` pelado para todo lo que no fuera texto o botón. Un
+  // paciente mandaba un audio —que es como escribe muchísima gente, y sobre
+  // todo los pacientes mayores, que son los que más citas necesitan— y el bot
+  // no contestaba NADA. Doble palomita y silencio. Para esa persona el
+  // consultorio no atendía, y en el log no quedaba ni una línea.
+  const ruta = require("fs").readFileSync(path.join(RAIZ, "routes", "whatsappSalud.js"), "utf8");
+
+  verificar("los audios se transcriben en vez de descartarse",
+    /msg\.type === "audio"/.test(ruta) && /escucharNotaDeVoz/.test(ruta));
+  verificar("  ...con el motor que ya transcribe consultas", /transcribirNotaDeVoz/.test(ruta));
+  // Lo que no es texto, botón ni audio tiene que contestar algo igual: el
+  // silencio es la peor respuesta posible porque no se distingue de estar roto.
+  verificar("una foto o una ubicación reciben respuesta, no silencio",
+    !/return; \/\/ audio\/imagen/.test(ruta) &&
+    /todavía no puedo abrir ese tipo de archivo/.test(ruta));
+
+  // El orden importa: con el aviso DESPUÉS de transcribir, el paciente ve
+  // silencio varios segundos, manda el audio otra vez, y se transcriben dos —
+  // cobrando dos y contestando dos veces.
+  const iAviso = ruta.indexOf("Estoy escuchando tu audio");
+  const iBajar = ruta.indexOf("await bajarMedia(mediaId)");
+  verificar("  ...y el «estoy escuchando» sale ANTES de transcribir",
+    iAviso > 0 && iBajar > 0 && iAviso < iBajar);
+
+  // Las tres formas de fallar tienen que terminar en un mensaje al paciente.
+  verificar("un audio mudo se responde", /No llegué a escuchar nada/.test(ruta));
+  verificar("un audio demasiado largo se responde", /un poco largo para mí/.test(ruta));
+  verificar("y si la transcripción falla, también", /no pude escuchar tu audio/.test(ruta));
+  verificar("el tope de duración es configurable", /WA_AUDIO_SEGUNDOS_MAX/.test(ruta));
+
+  // Bajar el archivo de Meta son DOS pedidos, y el segundo también necesita el
+  // token aunque la URL parezca pública. Sin la cabecera devuelve 401 y el
+  // audio nunca llega.
+  const meta = require("fs").readFileSync(path.join(RAIZ, "services", "metaWhatsapp.js"), "utf8");
+  const bajada = meta.slice(meta.indexOf("async function bajarMedia"));
+  verificar("la descarga manda el token en los dos pedidos",
+    (bajada.match(/Bearer \$\{CONFIG\.WHATSAPP_TOKEN\}/g) || []).length >= 2);
+  verificar("  ...y corta por tamaño antes de bajar el archivo",
+    /if \(Number\(tam\) > TOPE_BYTES\)/.test(bajada));
+
   console.log("\n── 6. index.js sigue guardando el cuerpo crudo ──");
   // Sin el verify de express.json no hay bytes con los que comprobar el HMAC,
   // y TODO lo de arriba empezaría a dar 403 en producción aunque las pruebas

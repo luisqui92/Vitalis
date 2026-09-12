@@ -188,5 +188,38 @@ async function obtenerEstado() {
 
 module.exports = {
   enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado,
-  enviarPlantilla, enviarTextoOPlantilla, PLANTILLAS,
+  enviarPlantilla, enviarTextoOPlantilla, PLANTILLAS, bajarMedia,
 };
+
+// ─── Bajar un archivo que mandó el paciente ────────────────────────────────
+//
+// Meta no manda el audio en el webhook: manda un identificador. Bajarlo son
+// DOS pedidos —primero se pregunta la URL, después se baja— y el segundo
+// también necesita el token, aunque la URL parezca pública. Sin la cabecera
+// devuelve 401 y el archivo nunca llega.
+//
+// La URL vence a los cinco minutos, así que no sirve guardarla: se usa o se
+// pierde.
+const TOPE_BYTES = 16 * 1024 * 1024; // lo que deja subir WhatsApp
+
+async function bajarMedia(mediaId) {
+  if (!CONFIG.WHATSAPP_TOKEN) throw new Error("WHATSAPP_TOKEN no configurado");
+
+  const meta = await axios.get(`https://graph.facebook.com/v21.0/${mediaId}`, {
+    headers: { Authorization: `Bearer ${CONFIG.WHATSAPP_TOKEN}` },
+    timeout: 15000,
+  });
+  const { url, mime_type: tipo, file_size: tam } = meta.data || {};
+  if (!url) throw new Error("Meta no devolvió la URL del archivo");
+  // Se corta ANTES de bajarlo, no después: no tiene sentido traer diez megas
+  // para descartarlos. El límite real lo pone WhatsApp, esto es el cinturón.
+  if (Number(tam) > TOPE_BYTES) throw new Error(`El archivo pesa ${tam} bytes, más del tope`);
+
+  const archivo = await axios.get(url, {
+    headers: { Authorization: `Bearer ${CONFIG.WHATSAPP_TOKEN}` },
+    responseType: "arraybuffer",
+    timeout: 30000,
+    maxContentLength: TOPE_BYTES,
+  });
+  return { buffer: Buffer.from(archivo.data), tipo };
+}

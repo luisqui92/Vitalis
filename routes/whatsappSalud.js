@@ -6,7 +6,9 @@
 const crypto = require("crypto");
 const { CONFIG, log } = require("../config");
 const { requireAuth } = require("../services/auth");
-const { enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado } = require("../services/metaWhatsapp");
+const { enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado, bajarMedia } = require("../services/metaWhatsapp");
+const { transcribirNotaDeVoz } = require("../services/assemblyai");
+const { Medico } = require("../db/models");
 const { procesarMensajeEntrante } = require("../services/reservaCitas");
 const { asyncRoute } = require("../services/httpHelpers");
 const { rateLimit } = require("../services/ratelimit");
@@ -101,8 +103,24 @@ async function procesarWebhook(body) {
     texto = msg.text?.body || "";
   } else if (msg.type === "interactive") {
     texto = msg.interactive?.list_reply?.id || msg.interactive?.button_reply?.id || "";
+  } else if (msg.type === "audio") {
+    texto = await escucharNotaDeVoz(numero, msg);
+    if (!texto) return;  // ya se le contestó adentro
   } else {
-    return; // audio/imagen/ubicación/etc. — no soportado por ahora
+    // ═══ NUNCA MUDO ══════════════════════════════════════════════════════
+    //
+    // Acá antes había un return pelado. Una foto, una ubicación o un
+    // contacto entraban y el bot no contestaba NADA: el paciente veía su
+    // doble palomita y ningún mensaje, y lo que concluye no es "no soporta
+    // ese formato", es "este consultorio no atiende".
+    //
+    // Un "no puedo con eso, mandámelo así" es infinitamente mejor que el
+    // silencio, y cuesta un mensaje adentro de la ventana de 24 h, que es
+    // gratis porque lo abrió el paciente.
+    await enviarTexto(numero,
+      "Perdón, todavía no puedo abrir ese tipo de archivo 🙏 Si querés reservar una cita, " +
+      "escribime o mandame un audio y te ayudo.").catch(() => {});
+    return;
   }
   if (!numero || !texto.trim()) return;
 
@@ -115,4 +133,74 @@ async function procesarWebhook(body) {
   if (respuesta.tipo === "botones") await enviarBotones(numero, respuesta.texto, respuesta.botones);
   else if (respuesta.tipo === "lista") await enviarLista(numero, respuesta.texto, respuesta.textoBoton, respuesta.filas);
   else await enviarTexto(numero, respuesta.texto);
+}
+
+// ─── Las notas de voz ──────────────────────────────────────────────────────
+//
+// ═══ POR QUÉ ESTO NO ES UN EXTRA ═══════════════════════════════════════════
+//
+// En Bolivia y en Brasil, muchísima gente no escribe por WhatsApp: manda
+// audios. Y los que más audios mandan son justo los pacientes mayores, que
+// son los que más citas necesitan y los que menos van a pelear con un teclado.
+//
+// Hasta ahora un audio caía en un `return` y el bot no contestaba nada. Para
+// esa persona, el consultorio simplemente no atendía.
+//
+// La capacidad ya estaba en casa: el mismo motor que transcribe consultas.
+// Lo único que faltaba era bajarle el archivo a Meta y conectarlo.
+
+// Tope de duración. Un audio de reserva dura diez o quince segundos; uno de
+// tres minutos es alguien contando su vida, y transcribirlo cuesta plata sin
+// darle nada mejor al paciente. Se corta con cariño y se le pide el resumen.
+const AUDIO_SEGUNDOS_MAX = Number(process.env.WA_AUDIO_SEGUNDOS_MAX || 90);
+
+async function escucharNotaDeVoz(numero, msg) {
+  const mediaId = msg.audio?.id;
+  if (!mediaId) return "";
+
+  // El aviso va ANTES de transcribir, no después: transcribir tarda unos
+  // segundos y sin esto el paciente ve silencio y manda el audio de nuevo —
+  // y entonces se transcriben dos y contesta dos veces.
+  await enviarTexto(numero, "🎧 Estoy escuchando tu audio, dame un segundito…").catch(() => {});
+
+  try {
+    const { buffer } = await bajarMedia(mediaId);
+
+    // El idioma y la especialidad salen del consultorio, no de una constante:
+    // el vocabulario clínico que se le pasa al motor es distinto para un
+    // odontólogo que para una ginecóloga, y en Brasil se dice losartana y no
+    // losartán. Con súper número todavía no se sabe qué consultorio busca —
+    // recién lo elige— así que ahí va el primero como aproximación.
+    const phone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE || CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS[0];
+    const medico = phone ? await Medico.findOne({ phone }).select("idioma tipoEspecialidad").lean() : null;
+
+    const { texto, duracionSegundos } = await transcribirNotaDeVoz(
+      buffer, medico?.tipoEspecialidad || "medicina_general", medico?.idioma || "es");
+
+    if (duracionSegundos && duracionSegundos > AUDIO_SEGUNDOS_MAX) {
+      log.warn(`[WHATSAPP audio] ${numero}: ${Math.round(duracionSegundos)}s, más del tope`);
+      await enviarTexto(numero, "Uy, ese audio es un poco largo para mí 🙈 " +
+        "¿Me lo contás en uno más cortito, o me escribís qué necesitás?").catch(() => {});
+      return "";
+    }
+
+    if (!texto.trim()) {
+      // Pasa de verdad: se aprieta el micrófono sin querer y sale un audio de
+      // un segundo de ruido. Decirlo es mejor que quedarse callado.
+      await enviarTexto(numero, "No llegué a escuchar nada en ese audio 🙏 " +
+        "¿Me lo mandás de nuevo, o me escribís qué necesitás?").catch(() => {});
+      return "";
+    }
+
+    log.info(`[WHATSAPP audio] ${numero}: ${Math.round(duracionSegundos || 0)}s → "${texto.slice(0, 60)}…"`);
+    return texto;
+  } catch (e) {
+    // Que falle la transcripción no puede dejar al paciente hablando solo. Se
+    // le pide por escrito y sigue por el camino de siempre — la reserva no
+    // depende de que el audio ande.
+    log.error(`[WHATSAPP audio] ${numero}: ${e.message}`);
+    await enviarTexto(numero, "Perdón, no pude escuchar tu audio 🙏 " +
+      "¿Me escribís qué necesitás? Así te ayudo igual.").catch(() => {});
+    return "";
+  }
 }
