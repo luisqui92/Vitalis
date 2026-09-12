@@ -10,7 +10,7 @@ const { generarToken, verificarToken } = require("../services/auth");
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("../services/agenda");
 const { crearCitaConfirmada } = require("../services/crearCita");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
-const { enviarTexto } = require("../services/metaWhatsapp");
+const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { limitReservaPublica } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { CONFIG, log } = require("../config");
@@ -83,7 +83,13 @@ module.exports = function (app) {
     }
 
     const primerNombre = pacienteNombre.split(" ")[0];
-    enviarTexto(numero, `✅ ${primerNombre}, tu cita con ${medico.nombre} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)
+    // Reservó desde la PÁGINA, no por WhatsApp: es muy probable que nunca le
+    // haya escrito al consultorio, así que casi siempre cae fuera de la
+    // ventana de 24 h y va por la plantilla.
+    const cuando = formatearFechaCompleta(cita.fecha);
+    enviarTextoOPlantilla(numero,
+      `✅ ${primerNombre}, su cita con ${medico.nombre} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,
+      { plantilla: PLANTILLAS.citaConfirmada, parametros: [primerNombre, medico.nombre, cuando], idioma: medico.idioma })
       .catch(e => log.error(`[RESERVA_PUBLICA] no se pudo mandar la confirmación por WhatsApp a ${numero}:`, e.message));
 
     res.json({ ok: true, fecha: cita.fecha });

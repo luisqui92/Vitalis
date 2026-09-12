@@ -27,7 +27,7 @@ const { limitMedico, rateLimit } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { DIR_ESTUDIOS } = require("../services/archivosEstudio");
-const { enviarTexto } = require("../services/metaWhatsapp");
+const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { siguienteCodigo } = require("../services/codigos");
 const { CONFIG, log } = require("../config");
 
@@ -224,22 +224,35 @@ module.exports = function (app) {
     // Cero contenido clínico en el mensaje: la vista previa de WhatsApp
     // aparece en la pantalla bloqueada de un teléfono que a veces es
     // compartido. El detalle vive detrás del enlace.
-    const texto = `Hola ${paciente?.nombre || ""}. Tu informe ya está disponible.\n\n` +
-      `${informe.titulo || informe.tipoEstudio || "Estudio"} — ${new Date(informe.fechaEstudio).toLocaleDateString("es-BO")}\n\n` +
-      `Podés verlo acá:\n${enlaceDe(informe, req)}\n\n` +
+    const primerNombre = String(paciente?.nombre || "").split(" ")[0];
+    const queEstudio = `${informe.titulo || informe.tipoEstudio || "Estudio"} — ${new Date(informe.fechaEstudio).toLocaleDateString("es-BO")}`;
+    const enlace = enlaceDe(informe, req);
+    const texto = `Hola ${primerNombre}. Su informe ya está disponible.\n\n` +
+      `${queEstudio}\n\n` +
+      `Puede verlo acá:\n${enlace}\n\n` +
       `El enlace vence en ${DIAS_VALIDEZ_ENLACE} días.\n${membrete.nombreCentro || ""}`;
 
     try {
-      await enviarTexto(destino, texto);
+      // Ni el título del estudio ni nada clínico viajan en la plantilla más
+      // allá de lo que ya va en el texto libre: la vista previa de WhatsApp
+      // aparece en la pantalla bloqueada de un teléfono que a veces es
+      // compartido. El detalle sigue viviendo detrás del enlace.
+      await enviarTextoOPlantilla(destino, texto,
+        { plantilla: PLANTILLAS.informeListo, parametros: [primerNombre, queEstudio, enlace] });
     } catch (e) {
-      // El error más común, y hay que decirlo con todas las letras porque
-      // si no parece que Symphomed está roto: fuera de la ventana de 24 h
-      // Meta solo deja mandar plantillas aprobadas.
+      // Hasta ahora acá caía todo lo que pasara de las 24 h, que era el caso
+      // normal. Eso ahora lo resuelve la plantilla de respaldo: si el envío
+      // llega igual hasta acá, es que la plantilla no está aprobada todavía o
+      // que el número no recibe. Hay que decir CUÁL de las dos, porque las
+      // dos se ven igual desde la pantalla del médico.
+      const codigo = e.response?.data?.error?.code;
       log.error("[INFORME] falló el envío por WhatsApp:", e.response?.data?.error?.message || e.message);
       throw new ErrorHttp(502,
-        "WhatsApp rechazó el envío. Suele ser porque el paciente no te escribió en las últimas 24 horas: " +
-        "fuera de esa ventana Meta solo permite mensajes con una plantilla aprobada. " +
-        "Mientras tanto podés copiar el enlace y mandárselo vos.");
+        (codigo === 132000 || codigo === 132001)
+          ? "La plantilla «informe_listo» todavía no está aprobada en Meta, así que no se le puede escribir " +
+            "a un paciente que no haya escrito en las últimas 24 horas. Mientras tanto, copiá el enlace y mandáselo vos."
+          : "WhatsApp rechazó el envío. Revisá que ese número tenga WhatsApp. " +
+            "Mientras tanto podés copiar el enlace y mandárselo vos.");
     }
 
     informe.compartidoEn = new Date();

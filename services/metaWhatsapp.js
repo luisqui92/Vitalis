@@ -59,6 +59,79 @@ async function enviarTexto(destino, texto) {
   return mandar({ to: destino, type: "text", text: { body: texto } });
 }
 
+// ─── PLANTILLAS ────────────────────────────────────────────────────────────
+//
+// ═══ LA VENTANA DE 24 HORAS ════════════════════════════════════════════════
+//
+// Meta deja mandar texto libre SOLO dentro de las 24 h desde el último
+// mensaje del paciente. Fuera de esa ventana, únicamente plantillas
+// aprobadas de antemano.
+//
+// No es un detalle: de los cinco lugares donde Symphomed manda algo, el único
+// que siempre cae adentro es la respuesta del bot de reservas. Los otros
+// cuatro los inicia la plataforma —la confirmación de una cita que cargó el
+// médico, el aviso de reconsulta, el informe— y un paciente que reservó desde
+// la página web puede no haberle escrito nunca al WhatsApp. Sin plantilla,
+// esos mensajes fallan con 131047 y el paciente no recibe nada.
+//
+// ═══ POR QUÉ SE INTENTA PRIMERO EL TEXTO LIBRE ═════════════════════════════
+//
+// Se podría mandar siempre la plantilla y listo. No conviene: la plantilla
+// está congelada en lo que Meta aprobó —cambiarle una coma es volver a pedir
+// aprobación, que tarda— y una conversación abierta por plantilla se cobra
+// como tal aunque el paciente estuviera escribiendo hace dos minutos.
+//
+// Así el paciente que está conversando recibe el mensaje natural y completo,
+// y la plantilla queda de red para cuando no hay otra forma.
+const PLANTILLAS = {
+  citaConfirmada: "cita_confirmada",
+  reconsulta: "reconsulta_sugerida",
+  informeListo: "informe_listo",
+};
+
+// Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es
+// el nombre viejo del mismo rechazo y todavía aparece en cuentas antiguas.
+const FUERA_DE_VENTANA = new Set([131047, 470]);
+
+function codigoDe(e) {
+  const err = e?.response?.data?.error || {};
+  return Number(err.code ?? err.error_subcode ?? 0);
+}
+
+// idioma: "es" o "pt". Una plantilla se aprueba POR IDIOMA, así que pedir
+// "pt" cuando solo se aprobó "es" no falla en silencio: Meta devuelve 132001
+// y el log ya lo traduce a algo que se entiende.
+async function enviarPlantilla(destino, nombre, parametros = [], idioma = "es") {
+  return mandar({
+    to: destino,
+    type: "template",
+    template: {
+      name: nombre,
+      language: { code: idioma },
+      components: parametros.length
+        ? [{ type: "body", parameters: parametros.map(p => ({ type: "text", text: String(p ?? "") })) }]
+        : [],
+    },
+  });
+}
+
+// Texto libre, y si Meta lo rechaza por la ventana, la plantilla.
+//
+// OJO CON EL ORDEN: `parametros` tiene que coincidir EXACTO con los {{1}},
+// {{2}}… del cuerpo que se aprobó en Meta. Es el acoplamiento más frágil de
+// todo esto —vive mitad acá y mitad en un panel web al que este código no
+// puede preguntarle nada— y por eso está escrito en WHATSAPP_PLANTILLAS.md y
+// comprobado en scripts/pruebas/probar_plantillas.js.
+async function enviarTextoOPlantilla(destino, texto, respaldo) {
+  try {
+    return await enviarTexto(destino, texto);
+  } catch (e) {
+    if (!FUERA_DE_VENTANA.has(codigoDe(e))) throw e;
+    log.info(`[WHATSAPP] Fuera de la ventana de 24 h con ${destino} — se manda la plantilla «${respaldo.plantilla}»`);
+    return enviarPlantilla(destino, respaldo.plantilla, respaldo.parametros, respaldo.idioma || "es");
+  }
+}
+
 // botones: hasta 3, [{id, title}] — límite de Meta: título de hasta 20
 // caracteres, se recorta acá para no depender de que cada caller lo respete.
 async function enviarBotones(destino, textoBody, botones) {
@@ -107,4 +180,7 @@ async function obtenerEstado() {
   return { configurado, conectado: configurado };
 }
 
-module.exports = { enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado };
+module.exports = {
+  enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado,
+  enviarPlantilla, enviarTextoOPlantilla, PLANTILLAS,
+};

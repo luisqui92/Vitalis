@@ -11,7 +11,7 @@ const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSopo
 const { generarNotaClinica } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
-const { enviarTexto } = require("../services/metaWhatsapp");
+const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { registrar } = require("../services/auditoria");
 const { registrarCorreccion } = require("../services/correccionesIA");
@@ -441,8 +441,13 @@ module.exports = function (app) {
           const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
           const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
           const primerNombre = String(paciente.nombre || "").split(" ")[0];
-          const texto = `Hola ${primerNombre} 👋 ${medico?.nombre || "Tu médico"} te sugiere tu próxima consulta para el ${formatearFechaCompleta(sugerida.fechaHora)}.\n\nElegí el horario que te quede mejor acá (vas a ver la disponibilidad real):\n${link}\n\n(el link es válido por 45 minutos)`;
-          await enviarTexto(paciente.telefono, texto);
+          // Pasan días entre que se cierra la consulta y el paciente escribió
+          // por última vez, así que esto cae fuera de la ventana casi siempre.
+          const cuando = formatearFechaCompleta(sugerida.fechaHora);
+          const quien = medico?.nombre || "Su médico";
+          const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
+          await enviarTextoOPlantilla(paciente.telefono, texto,
+            { plantilla: PLANTILLAS.reconsulta, parametros: [primerNombre, quien, cuando, link], idioma: medico?.idioma });
 
           sugerida.estado = "confirmada";
           aplicado.push("Reconsulta avisada por WhatsApp");
@@ -592,8 +597,11 @@ module.exports = function (app) {
     const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
     const primerNombre = String(paciente.nombre || "").split(" ")[0];
 
-    const texto = `Hola ${primerNombre} 👋 ${medico?.nombre || "Tu médico"} te sugiere tu próxima consulta para el ${formatearFechaCompleta(sugerida.fechaHora)}.\n\nElegí el horario que te quede mejor acá (vas a ver la disponibilidad real):\n${link}\n\n(el link es válido por 45 minutos)`;
-    await enviarTexto(paciente.telefono, texto).catch(e => {
+    const cuando = formatearFechaCompleta(sugerida.fechaHora);
+    const quien = medico?.nombre || "Su médico";
+    const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
+    await enviarTextoOPlantilla(paciente.telefono, texto,
+      { plantilla: PLANTILLAS.reconsulta, parametros: [primerNombre, quien, cuando, link], idioma: medico?.idioma }).catch(e => {
       log.error(`[RECONSULTA] no se pudo mandar el WhatsApp a ${paciente.telefono}:`, e.message);
       throw new ErrorHttp(502, "No se pudo mandar el WhatsApp — revisá que esté conectado en Agenda.");
     });

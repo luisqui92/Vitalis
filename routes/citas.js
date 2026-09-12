@@ -7,7 +7,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { obtenerHorariosDisponibles } = require("../services/agenda");
 const { fechaLocalBoliviaAInstante } = require("../services/utils");
 const { crearEvento, actualizarEvento, eliminarEvento } = require("../services/googleCalendar");
-const { enviarTexto } = require("../services/metaWhatsapp");
+const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
@@ -99,7 +99,15 @@ module.exports = function (app) {
     // cita la reserva el propio paciente — no depende de por dónde se creó.
     if (cita.pacienteTelefono) {
       const primerNombre = cita.pacienteNombre.split(" ")[0];
-      enviarTexto(cita.pacienteTelefono, `✅ ${primerNombre}, tu cita con ${medico?.nombre || "el consultorio"} quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" acá mismo, o avisanos directo en el consultorio.`)
+      // Este es EL caso que más se cae fuera de la ventana de 24 h: la cita la
+      // cargó el médico en su panel, así que el paciente puede no haberle
+      // escrito nunca al WhatsApp del consultorio. Sin la plantilla de
+      // respaldo, no recibía nada y el médico veía "cita creada ✓".
+      const cuando = formatearFechaCompleta(cita.fecha);
+      const quien = medico?.nombre || "el consultorio";
+      enviarTextoOPlantilla(cita.pacienteTelefono,
+        `✅ ${primerNombre}, su cita con ${quien} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,
+        { plantilla: PLANTILLAS.citaConfirmada, parametros: [primerNombre, quien, cuando], idioma: medico?.idioma })
         .catch(e => log.error(`[CITAS] no se pudo mandar la confirmación por WhatsApp a ${cita.pacienteTelefono}:`, e.message));
     }
 

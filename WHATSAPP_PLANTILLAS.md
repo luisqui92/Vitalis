@@ -1,0 +1,146 @@
+# Las plantillas de WhatsApp
+
+## Por qué hacen falta
+
+Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
+mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
+de antemano.
+
+De los cinco lugares donde Symphomed manda algo por WhatsApp, el único que
+siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
+acaba de escribir. Los otros cuatro los inicia la plataforma, y el paciente
+puede no haber escrito nunca:
+
+| Qué manda | Dónde | Cae fuera de la ventana |
+|---|---|---|
+| Respuestas del bot de reservas | `routes/whatsappSalud.js` | nunca |
+| Confirmación de cita (la carga el médico) | `routes/citas.js` | casi siempre |
+| Confirmación de cita (reserva desde la web) | `routes/reservaPublica.js` | casi siempre |
+| Aviso de reconsulta | `routes/consultaMedica.js` | casi siempre |
+| Informe al paciente | `routes/informes.js` | a menudo |
+
+El código intenta **primero el texto libre** y solo cae a la plantilla cuando
+Meta lo rechaza con el código `131047`. Así el paciente que está conversando
+recibe el mensaje natural y completo, y la plantilla queda de red.
+
+## Cómo cargarlas
+
+`business.facebook.com` → WhatsApp Manager → **Message templates** → Create.
+
+Para las tres: categoría **Utility** (no Marketing — Marketing se cobra más
+caro y se aprueba peor), idioma **Spanish** (`es`).
+
+> **El acoplamiento frágil de todo esto:** el orden de los `{{1}}, {{2}}…`
+> tiene que coincidir exacto con el orden de `parametros` en el código.
+> Vive mitad acá y mitad en un panel web al que el código no le puede
+> preguntar nada. `scripts/pruebas/probar_plantillas.js` compara este
+> archivo contra el código y se pone rojo si se desincronizan.
+
+---
+
+### 1. `cita_confirmada`
+
+Cuerpo:
+
+```
+Hola {{1}}, su cita con {{2}} quedó confirmada para el {{3}}.
+
+Si necesita cancelarla, responda "cancelar" a este mensaje.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del paciente | `María` |
+| `{{2}}` | nombre del médico o del consultorio | `Dra. Camacho` |
+| `{{3}}` | fecha y hora de la cita | `lunes 15 de septiembre a las 10:30` |
+
+---
+
+### 2. `reconsulta_sugerida`
+
+Cuerpo:
+
+```
+Hola {{1}}, {{2}} le sugiere su próxima consulta para el {{3}}.
+
+Elija el horario que le quede mejor acá: {{4}}
+
+El enlace vence en 45 minutos.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del paciente | `María` |
+| `{{2}}` | nombre del médico | `Dra. Camacho` |
+| `{{3}}` | fecha sugerida | `lunes 15 de septiembre` |
+| `{{4}}` | enlace de reserva | `https://app.symphomed.com/reservar.html?token=abc123` |
+
+Los 45 minutos van **escritos en la plantilla**, no como variable: es el
+vencimiento del token que arma `routes/consultaMedica.js` y no cambia.
+
+---
+
+### 3. `informe_listo`
+
+Cuerpo:
+
+```
+Hola {{1}}, su informe ya está disponible.
+
+{{2}}
+
+Puede verlo acá: {{3}}
+
+El enlace vence en 90 días.
+```
+
+Los 90 días van escritos y no como variable: es `DIAS_VALIDEZ_ENLACE` en
+`routes/informes.js` y no cambia por paciente. Si algún día cambia, hay que
+pedir aprobación de la plantilla de nuevo — por eso está el número acá, para
+que se encuentre.
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del paciente | `María` |
+| `{{2}}` | estudio y fecha | `Radiografía de tórax — 14/03/2026` |
+| `{{3}}` | enlace al informe | `https://app.symphomed.com/informe/abc123` |
+
+Nada clínico más allá del nombre del estudio: la vista previa de WhatsApp
+aparece en la pantalla bloqueada de un teléfono que a veces es compartido.
+El detalle vive detrás del enlace.
+
+---
+
+## Reglas de Meta que hacen que te la rechacen
+
+- El cuerpo **no puede empezar ni terminar con una variable**. Por eso las
+  tres arrancan con "Hola" y ninguna termina en `{{n}}`.
+- **No puede haber dos variables pegadas** (`{{1}} {{2}}` sin texto en medio).
+- Las variables van **numeradas desde `{{1}}`, sin saltos**.
+- Al crearla, Meta pide un **ejemplo para cada variable**. Poné los de las
+  tablas de arriba: si no son verosímiles, la rechaza.
+- Aprobación: de minutos a un día. Si la rechaza, en WhatsApp Manager dice
+  por qué.
+
+## Portugués
+
+El código ya manda el idioma del médico (`Medico.idioma`, `es` o `pt`). Las
+plantillas se aprueban **por idioma**: el día que entre el primer consultorio
+brasileño hay que cargar las mismas tres en `pt`, con el mismo nombre. Hasta
+entonces, un médico en `pt` recibe `132001` y el log lo dice con esas
+palabras — no falla en silencio.
+
+## Cómo saber si están andando
+
+```bash
+node scripts/revisar_whatsapp.js
+```
+
+Y en el log, cuando una salga por plantilla:
+
+```
+[WHATSAPP] Fuera de la ventana de 24 h con 5917xxxxxxx — se manda la plantilla «cita_confirmada»
+```
+
+Si en cambio aparece `132000` o `132001`, la plantilla no existe con ese
+nombre o los parámetros no coinciden con los aprobados.
