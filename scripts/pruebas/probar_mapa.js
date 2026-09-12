@@ -58,6 +58,82 @@ verificar(`los ${lugares} lugares están marcados como ejemplo`, lugares > 0 && 
 verificar("ninguno lleva nombre de persona",
   !/n:"(Dr|Dra|Doctor|Doctora)\.?\s/.test(vista));
 
+console.log("\n── 2b. Lo que decide si la tarjeta sirve ──");
+// Un domingo a la noche el 90% de la lista está cerrada, y sin decirlo el
+// visitante toca tarjetas al azar. Y sin orden por distancia, el primero de
+// la lista es el que se cargó primero — con 13 ejemplos no se nota, con 200
+// médicos de verdad la lista deja de servir.
+const datos = new Function(
+  vista.slice(vista.indexOf("var LUGARES"), vista.indexOf("var CATEGORIAS")) +
+  "\nreturn { LUGARES };")().LUGARES;
+verificar(`los ${datos.length} lugares tienen horario`, datos.every(l => Array.isArray(l.h) && l.h.length));
+verificar("  ...y teléfono al que llamar", datos.every(l => /^\d{8,}$/.test(l.tel || "")));
+
+// Se ejecutan las funciones DE LA PÁGINA, no una copia: una copia se
+// desincroniza a la primera corrección y entonces la prueba miente.
+const utiles = new Function(
+  vista.slice(vista.indexOf("var DIAS ="), vista.indexOf("function chincheta")) +
+  "\nreturn { estadoHorario, distanciaKm, formatearDistancia, ahoraEnBolivia, comoLlegar };")();
+
+const consultorio = [[1, "08:00", "12:00"], [1, "14:30", "19:00"], [6, "09:00", "13:00"]];
+verificar("lunes 10:00 → abierto",
+  utiles.estadoHorario(consultorio, { dia: 1, minutos: 600 }).abierto === true);
+// El corte del mediodía es lo que más se escapa: a las 13:00 está cerrado
+// pero vuelve a abrir el mismo día, y decir "abre mañana" sería falso.
+verificar("lunes 13:00 → cerrado, y abre HOY a las 14:30",
+  /abre hoy 14:30/.test(utiles.estadoHorario(consultorio, { dia: 1, minutos: 780 }).texto));
+verificar("domingo 20:00 → dice qué día abre, no solo «cerrado»",
+  /abre mañana 08:00/.test(utiles.estadoHorario(consultorio, { dia: 0, minutos: 1200 }).texto));
+verificar("una farmacia 24 h está abierta a las 3 de la mañana",
+  utiles.estadoHorario([[0, "00:00", "23:59"]], { dia: 0, minutos: 180 }).abierto === true);
+verificar("sin horario cargado no inventa nada", utiles.estadoHorario([], { dia: 1, minutos: 600 }) === null);
+
+// ═══ LA HORA ES LA DE BOLIVIA, NO LA DEL DISPOSITIVO ══════════════════════
+// new Date().getHours() anda perfecto mientras quien mira está en Bolivia, y
+// miente para todos los demás: el médico que abre el mapa desde São Paulo
+// vería "cerrado" a las 9 de la mañana porque allá son las 10.
+// Se miran las líneas de CÓDIGO, sin los comentarios: el comentario que
+// explica por qué NO usar getHours() lo nombra, y la prueba lo encontraba ahí
+// y se ponía roja por el motivo exactamente opuesto al que la motivó.
+const codigo = vista.split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+verificar("la hora sale de America/La_Paz y no del reloj de quien mira",
+  /timeZone: "America\/La_Paz"/.test(codigo) && !/new Date\(\)\.getHours\(\)/.test(codigo));
+
+verificar("abajo del kilómetro se dice en metros",
+  utiles.formatearDistancia(0.42) === "a 420 m" && utiles.formatearDistancia(1.5) === "a 1,5 km");
+verificar("la lista se ordena por distancia cuando se sabe dónde está",
+  /if \(estado\.aqui\) \{[\s\S]{0,200}visibles\.sort/.test(vista));
+verificar("«cómo llegar» abre la aplicación de mapas con la ruta",
+  /maps\/dir\/\?api=1&destination=/.test(vista));
+
+console.log("\n── 2c. La tarjeta, que dejó de ser un botón ──");
+// Un <a> o un <button> dentro de otro <button> es HTML inválido, y cada
+// navegador lo resuelve a su manera: el enlace de llamar puede no funcionar,
+// o funcionar Y ADEMÁS seleccionar la tarjeta y mover el mapa debajo del dedo.
+const tarjeta = vista.slice(vista.indexOf('<article class="ficha"'), vista.indexOf("</article>"));
+verificar("la tarjeta es un <article>, no un <button>", tarjeta.startsWith('<article class="ficha"'));
+verificar("  ...y los enlaces de acción quedan FUERA del botón",
+  tarjeta.indexOf('class="acciones"') > tarjeta.indexOf("</button>"));
+verificar("el click va al cuerpo y no a la tarjeta entera",
+  /querySelectorAll\("\.ficha-cuerpo"\)/.test(vista));
+// .cuerpo ya era el contenedor del layout (grid de panel + mapa). Reusar ese
+// nombre para la tarjeta le pisaba la grilla y el panel se achicaba a 46px,
+// con el texto cortado letra por letra. No da ningún error: gana la última
+// regla y la pantalla queda irreconocible.
+verificar("y la tarjeta no le pisa el nombre al contenedor del layout",
+  /\.cuerpo\{flex:1/.test(vista) && !/\n\.cuerpo\{\n\s*display:grid;grid-template-columns:46px/.test(vista));
+
+console.log("\n── 2d. Cuando no se puede saber dónde está ──");
+// Va a pasar seguido: mucha gente dice que no. Si el botón se queda en
+// "Buscando…" para siempre, el visitante no sabe si anda o si se colgó.
+verificar("se distingue «lo bloqueaste» de «no se pudo»",
+  /err\.code === 1 \? "Permiso denegado" : "No se pudo ubicarte"/.test(vista));
+verificar("  ...y el botón se vuelve a habilitar si fue un fallo pasajero",
+  /b\.disabled = err\.code === 1;/.test(vista));
+verificar("hay tiempo máximo de espera, no se cuelga", /timeout: 10000/.test(vista));
+verificar("un navegador sin geolocalización lo dice en vez de no hacer nada",
+  /!navigator\.geolocation/.test(vista));
+
 console.log("\n── 3. La búsqueda por subespecialidad ──");
 // El caso que motivó todo: un pediatra que además es neonatólogo tiene que
 // aparecer buscando las dos cosas. Con un solo campo de especialidad no se
