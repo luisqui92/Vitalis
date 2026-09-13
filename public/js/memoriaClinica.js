@@ -20,9 +20,45 @@ function tabMemoriaHtml(pacienteId) {
 
 function pintarMemoriaChat(historial) {
   return historial.map(h => `
-    <div class="memoria-pregunta">🧑‍⚕️ ${esc(h.pregunta)}</div>
-    <div class="memoria-respuesta">🤖 ${esc(h.respuesta)}</div>
+    <div class="memoria-par" data-id="${h.id == null ? "" : h.id}">
+      <div class="memoria-pregunta">🧑‍⚕️ ${esc(h.pregunta)}</div>
+      <div class="memoria-respuesta">🤖 ${esc(h.respuesta)}</div>
+    </div>
   `).join("");
+}
+
+// ═══ POR QUÉ NO SE REPINTA TODO EL CHAT ═══════════════════════════════════
+//
+// Antes cada mensaje rehacía el innerHTML entero. Con dos preguntas no se
+// nota; con una conversación de diez, cada respuesta desarma y rehace toda la
+// charla: parpadea, se pierde cualquier texto que estuviera seleccionado, y
+// si el médico estaba leyendo una respuesta de arriba, se le mueve.
+//
+// Acá se toca SOLO lo que cambió: se agrega el par que falta, y cuando llega
+// la respuesta se reemplaza el "…" de ESE par. Lo demás queda quieto, que es
+// lo que uno espera de una conversación.
+function sincronizarMemoriaChat(caja, historial) {
+  const existentes = {};
+  [].slice.call(caja.children).forEach(function (nodo) {
+    existentes[nodo.getAttribute("data-id")] = nodo;
+  });
+
+  historial.forEach(function (h) {
+    const nodo = existentes[String(h.id)];
+    if (!nodo) {
+      caja.insertAdjacentHTML("beforeend", pintarMemoriaChat([h]));
+      return;
+    }
+    delete existentes[String(h.id)];
+    const resp = nodo.querySelector(".memoria-respuesta");
+    const nuevo = "🤖 " + esc(h.respuesta);
+    // Solo si cambió: escribir el mismo HTML igual rehace los nodos.
+    if (resp && resp.innerHTML !== nuevo) resp.innerHTML = nuevo;
+  });
+
+  // Lo que quedó sin par en el historial se fue (una pregunta que falló y se
+  // sacó del arreglo).
+  Object.keys(existentes).forEach(function (k) { existentes[k].remove(); });
 }
 
 // Preguntar por voz con el reconocimiento de voz del navegador (Web Speech
@@ -51,8 +87,13 @@ function wireTabMemoria(p) {
   const btnMic = document.getElementById("btnMicMemoria");
 
   const repintar = () => {
-    chatBox.innerHTML = pintarMemoriaChat(memoriaHistorialPorPaciente[p._id] || []);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    sincronizarMemoriaChat(chatBox, memoriaHistorialPorPaciente[p._id] || []);
+    // Suave: el salto seco hace que no se entienda que apareció algo abajo.
+    // Y solo si hay a dónde scrollear, para no pelear con el navegador
+    // cuando la conversación todavía entra entera.
+    if (chatBox.scrollHeight > chatBox.clientHeight) {
+      chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: "smooth" });
+    }
   };
 
   const preguntar = async () => {

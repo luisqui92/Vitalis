@@ -7,12 +7,18 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { responderPregunta } = require("../services/memoriaClinica");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { sinCambios } = require("../services/realtime");
 const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
 module.exports = function (app) {
   app.post("/medico/pacientes/:id/preguntar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    // Es un POST porque la pregunta va en el cuerpo, pero no escribe
+    // nada. Sin esto, el aviso de cambio vuelve al navegador del propio
+    // médico y le repinta la pantalla entera abajo de los ojos: su propia
+    // pregunta lo manda arriba de todo, a buscar la respuesta que pidió.
+    sinCambios(res);
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.id, medicoPhone }, "Paciente no encontrado");
 

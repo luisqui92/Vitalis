@@ -55,10 +55,49 @@ function desconectarTiempoReal() {
 // otro lado.
 const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele"]);
 
+// ═══ UN REPINTADO QUE NO PIDIÓ EL MÉDICO NO PUEDE MOVERLE LA PÁGINA ═══════
+//
+// Estos repintados los dispara un aviso del servidor: una cita que entró por
+// WhatsApp, un estudio que subió el equipo de rayos. El médico no tocó nada —
+// puede estar leyendo la mitad de una historia clínica.
+//
+// Repintar arma el HTML de cero, así que el navegador manda el scroll arriba
+// de todo. El médico pierde el renglón que estaba leyendo y tiene que volver
+// a bajar a buscarlo, sin entender por qué se movió.
+//
+// En el escritorio el que scrollea es #escritorioContent; en el celular, la
+// ventana. Se guardan los dos y se restauran los dos: cuál está activo
+// depende de la pantalla, y preguntarlo acá sería otra cosa que se
+// desincroniza.
+function guardarScroll() {
+  const caja = document.getElementById("escritorioContent");
+  return { caja: caja ? caja.scrollTop : 0, ventana: window.scrollY || 0 };
+}
+
+function restaurarScroll(pos) {
+  // En el mismo cuadro no alcanza: el contenido recién se mide después de
+  // que el navegador lo acomoda, y hasta entonces la página no tiene alto
+  // suficiente para scrollear hasta donde estaba.
+  requestAnimationFrame(function () {
+    const caja = document.getElementById("escritorioContent");
+    if (caja && pos.caja) caja.scrollTop = pos.caja;
+    if (pos.ventana) window.scrollTo(0, pos.ventana);
+  });
+}
+
 function refrescarPantallaActual() {
   if (!PANTALLA_ACTUAL) return;
   const { tipo, params } = PANTALLA_ACTUAL;
   if (PANTALLAS_SIN_REFRESCO.has(tipo)) return;
+
+  // Y si el médico está escribiendo, no se le toca la pantalla. Repintar le
+  // arranca el campo del DOM con lo que llevaba escrito adentro — y lo peor
+  // es que no se pierde "un texto": se pierde a mitad de una frase, que es
+  // cuando más molesta.
+  const foco = document.activeElement;
+  if (foco && (foco.tagName === "INPUT" || foco.tagName === "TEXTAREA" || foco.isContentEditable)) return;
+
+  const pos = guardarScroll();
   if (tipo === "dashboard") renderDashboard();
   else if (tipo === "agenda") renderAgenda();
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
@@ -70,6 +109,8 @@ function refrescarPantallaActual() {
   // preservarToken: este repintado no lo pidió el médico, así que no puede
   // hacerle desaparecer el token que está copiando en ese momento.
   else if (tipo === "equiposRayos" && typeof renderEquiposRayos === "function") renderEquiposRayos(params.pacienteVuelta, { preservarToken: true });
+
+  restaurarScroll(pos);
 }
 
 function envolverParaTiempoReal(nombreFn, calcularPantalla) {

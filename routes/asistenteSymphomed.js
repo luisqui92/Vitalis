@@ -7,6 +7,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { preguntarASymphomed } = require("../services/asistenteSymphomed");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
+const { sinCambios } = require("../services/realtime");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -21,6 +22,11 @@ const ETIQUETA_ESPECIALIDAD = {
 
 module.exports = function (app) {
   app.post("/medico/asistente", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    // Es un POST porque la pregunta va en el cuerpo, pero no escribe
+    // nada. Sin esto, el aviso de cambio vuelve al navegador del propio
+    // médico y le repinta la pantalla entera abajo de los ojos: su propia
+    // pregunta lo manda arriba de todo, a buscar la respuesta que pidió.
+    sinCambios(res);
     const medicoPhone = req.adminUser.usuario;
     const pregunta = String(req.body?.pregunta || "").trim();
     if (!pregunta) throw new ErrorHttp(400, "Escribí una pregunta");

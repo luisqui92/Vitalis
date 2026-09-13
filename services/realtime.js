@@ -59,6 +59,26 @@ function avisarCambio(medicoPhone) {
   }
 }
 
+// ═══ HAY POST QUE NO CAMBIAN NADA ═════════════════════════════════════════
+//
+// El método no alcanza para saber si algo cambió. Preguntarle al Kardex por
+// un paciente es un POST —la pregunta va en el cuerpo, no en la URL— y no
+// escribe una sola letra en la base.
+//
+// Tratarlo como escritura tenía una consecuencia que no se ve leyendo este
+// archivo: el aviso vuelve al NAVEGADOR DEL PROPIO MÉDICO, que repinta la
+// pantalla del paciente entera. O sea que su propia pregunta le rearmaba la
+// página abajo de los ojos y lo mandaba de vuelta arriba de todo, teniendo
+// que bajar a buscar la respuesta que acababa de pedir.
+//
+// Una ruta que sabe que no cambió nada lo dice con sinCambios(res). No se
+// hace por lista de rutas a propósito: una lista se desactualiza en silencio
+// —alguien agrega un POST de consulta y nadie se acuerda de anotarlo— y el
+// síntoma vuelve sin que nadie relacione una cosa con la otra.
+function sinCambios(res) {
+  res.locals.sinCambios = true;
+}
+
 // Middleware: se engancha una sola vez en index.js, antes de las rutas.
 // Lee req.adminUser recién en el callback de "finish" (se completa async,
 // para entonces las rutas ya corrieron y ya lo dejaron seteado si el
@@ -66,11 +86,11 @@ function avisarCambio(medicoPhone) {
 function middlewareAvisarCambios(req, res, next) {
   res.on("finish", () => {
     const esEscritura = ["POST", "PATCH", "PUT", "DELETE"].includes(req.method);
-    if (esEscritura && res.statusCode < 400 && req.adminUser?.usuario) {
+    if (esEscritura && !res.locals.sinCambios && res.statusCode < 400 && req.adminUser?.usuario) {
       avisarCambio(req.adminUser.usuario);
     }
   });
   next();
 }
 
-module.exports = { iniciarServidorTiempoReal, middlewareAvisarCambios, avisarCambio };
+module.exports = { iniciarServidorTiempoReal, middlewareAvisarCambios, avisarCambio, sinCambios };
