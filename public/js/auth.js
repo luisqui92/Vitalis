@@ -119,6 +119,26 @@ function irAPantallaInicial() {
 
   if (typeof esSoloPagos === "function" && esSoloPagos()) return renderPagos();
   if (typeof esSoloAdministrador === "function" && esSoloAdministrador()) return renderClinica();
+
+  // ═══ /?consulta=<id> — a dónde lleva tocar la notificación ═══════════════
+  //
+  // Cuando la nota clínica queda lista, el servidor le manda al médico una
+  // notificación con esta dirección. Sin esto, tocarla lo dejaba en el panel
+  // buscando cuál de las consultas era la que se avisó — y avisar algo que
+  // después hay que ir a buscar no le ahorra nada a nadie.
+  //
+  // Se limpia la barra de direcciones apenas se usa. Si quedara puesta, un
+  // F5 o un "volver" lo devolverían a esa consulta en vez de a donde estaba,
+  // horas después, sin entender por qué.
+  const pedida = new URLSearchParams(location.search).get("consulta");
+  if (pedida && /^[a-f0-9]{24}$/i.test(pedida) && typeof renderDetalle === "function") {
+    history.replaceState(null, "", location.pathname);
+    // El escritorio se arma igual: el detalle se pinta adentro de su
+    // contenedor, no en lugar de él.
+    if (typeof activarEscritorioSiCorresponde === "function") activarEscritorioSiCorresponde();
+    return renderDetalle(pedida);
+  }
+
   if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) return renderInicioEscritorio();
   renderDashboard();
 }

@@ -248,5 +248,53 @@ for (const ruta of ["memoriaClinica", "asistenteSymphomed"]) {
   verificar(`routes/${ruta}.js declara que no cambia nada`, /sinCambios\(res\);/.test(codigo));
 }
 
+console.log("\n── 9. Que el médico se entere de que la nota está lista ──");
+// ═══ LO QUE REPORTÓ ═══════════════════════════════════════════════════════
+//
+// "Cuando la transcripción ya está lista no aparece ninguna notificación."
+//
+// Transcribir una consulta de veinte minutos y escribir la nota tarda. El
+// único que se enteraba era el que dejaba la pantalla abierta —consulta cada
+// ocho segundos— y el médico normal no la deja abierta: cierra y atiende al
+// siguiente. Volvía cuando se acordaba.
+{
+  const consultas = fs.readFileSync(path.join(RAIZ, "routes", "consultaMedica.js"), "utf8");
+  verificar("cuando la nota queda lista, se notifica",
+    /titulo: listo \? "Nota clínica lista"/.test(consultas));
+  // El error importa MÁS que el éxito: ahí el médico está esperando algo que
+  // no va a llegar nunca, y cuanto antes lo sepa más fresco tiene lo que se
+  // habló para escribirlo a mano.
+  verificar("  ...y cuando falla, también", /"La nota clínica falló"/.test(consultas));
+  verificar("  ...incluso si falla la transcripción entera",
+    /"No se pudo transcribir la consulta"/.test(consultas));
+
+  // Dos avisos distintos: uno para el que dejó la pantalla abierta (se
+  // actualiza al toque, sin esperar los ocho segundos) y otro para el que se
+  // fue.
+  const trozo = consultas.slice(consultas.indexOf("AVISARLE AL MÉDICO"));
+  verificar("las pantallas abiertas se enteran al toque", /avisarCambio\(medicoPhone\);/.test(trozo));
+  verificar("  ...y el que se fue, por notificación", /notificarMedico\(medicoPhone/.test(trozo));
+  // Si notificar fallara y tumbara el flujo, se perdería el brief clínico y
+  // el hilo, que corren después. La nota ya está guardada: avisar es un
+  // extra y no puede costar nada.
+  verificar("y notificar no puede tumbar lo que viene después",
+    /notificarMedico\(medicoPhone[\s\S]{0,400}?\}\)\.catch\(/.test(trozo));
+
+  // Sin esto la notificación deja al médico en el panel, buscando cuál de las
+  // consultas era la que se avisó.
+  verificar("la notificación abre DERECHO en esa consulta",
+    /url: `\/\?consulta=\$\{consulta\._id\}`/.test(consultas));
+
+  const auth = fs.readFileSync(path.join(RAIZ, "public", "js", "auth.js"), "utf8");
+  verificar("  ...y la app sabe abrirse ahí", /get\("consulta"\)/.test(auth) && /renderDetalle\(pedida\)/.test(auth));
+  // Viene de una URL: podría traer cualquier cosa, y va derecho a una consulta
+  // a la base.
+  verificar("  ...validando el id antes de usarlo", /\^\[a-f0-9\]\{24\}\$/i.test(auth));
+  // Si quedara en la barra, un F5 o un "volver" devolverían al médico a esa
+  // consulta horas después, sin que entienda por qué.
+  verificar("  ...y limpiando la barra de direcciones al usarlo",
+    /history\.replaceState\(null, "", location\.pathname\)/.test(auth));
+}
+
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

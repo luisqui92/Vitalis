@@ -14,6 +14,8 @@ const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { registrar } = require("../services/auditoria");
+const { notificarMedico } = require("../services/push");
+const { avisarCambio } = require("../services/realtime");
 const { registrarCorreccion } = require("../services/correccionesIA");
 const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
@@ -295,6 +297,34 @@ module.exports = function (app) {
           consulta.notaClinicaEstado = "error"; // para que el chequeo de brief clínico de abajo no dispare con datos corruptos
         }
 
+        // ═══ AVISARLE AL MÉDICO, QUE ES EL QUE ESTÁ ESPERANDO ═══════════════
+        //
+        // Esto tarda: transcribir una consulta de veinte minutos y escribir la
+        // nota no es instantáneo. Hasta ahora el único que se enteraba era el
+        // que dejaba la pantalla abierta —consulta cada ocho segundos— y el
+        // médico normal NO la deja abierta: cierra y atiende al siguiente.
+        //
+        // Volvía cuando se acordaba. Si la nota había fallado, se enteraba
+        // más tarde todavía, cuando ya no tenía fresco lo que se habló.
+        //
+        // Van los dos avisos y hacen cosas distintas:
+        //   · avisarCambio  → las pantallas ABIERTAS se actualizan al toque,
+        //                     sin esperar los ocho segundos del sondeo.
+        //   · notificarMedico → el que se fue de la pantalla se entera igual.
+        //
+        // Ninguno de los dos puede tumbar la nota si falla: ya está guardada.
+        avisarCambio(medicoPhone);
+        const listo = consulta.notaClinicaEstado === "completado";
+        notificarMedico(medicoPhone, {
+          titulo: listo ? "Nota clínica lista" : "La nota clínica falló",
+          cuerpo: listo
+            ? `${paciente.nombre} — ya la podés revisar y firmar.`
+            : `${paciente.nombre} — no se pudo generar. Entrá para ver qué pasó.`,
+          // Abre DERECHO en esa consulta. Una notificación que deja al médico
+          // en el panel buscando cuál era no le ahorra nada.
+          url: `/?consulta=${consulta._id}`,
+        }).catch(e => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e.message));
+
         if (consulta.notaClinicaEstado === "completado") {
           regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
           // El hilo con las consultas anteriores. Va acá y no antes porque
@@ -312,6 +342,15 @@ module.exports = function (app) {
         consulta.estado = "error";
         consulta.error = e.response?.data?.error || e.message;
         await consulta.save().catch(e2 => log.error("[CONSULTA_MEDICA] No se pudo guardar el estado de error:", e2.message));
+        // El caso donde el silencio cuesta más caro: el médico está esperando
+        // algo que no va a llegar nunca. Cuanto antes lo sepa, más fresco
+        // tiene lo que se habló para escribirlo a mano.
+        avisarCambio(medicoPhone);
+        notificarMedico(medicoPhone, {
+          titulo: "No se pudo transcribir la consulta",
+          cuerpo: "Entrá a verla: el audio quedó guardado.",
+          url: `/?consulta=${consulta._id}`,
+        }).catch(e2 => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e2.message));
       });
   }));
 
