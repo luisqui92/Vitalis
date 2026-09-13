@@ -33,7 +33,7 @@
 //
 // Medico.saldoCentavos es una copia rápida. Si alguna vez no coincide con la
 // suma de los movimientos, gana la suma — ver reconciliar().
-const { Medico, MovimientoSaldo } = require("../db/models");
+const { Clinica, Medico, MovimientoSaldo } = require("../db/models");
 const monedas = require("./monedas");
 const suscripciones = require("./suscripciones");
 const { log } = require("../config");
@@ -77,7 +77,13 @@ async function monedaDe(medicoPhone) {
 }
 
 async function estadoDe(medicoPhone) {
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion consultasGratisUsadas").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion consultasGratisUsadas clinicaId").lean();
+  // El plan puede venir del centro donde trabaja. Se busca SOLO si pertenece
+  // a uno: la enorme mayoría de los médicos no, y una consulta de más por
+  // cada pintado de pantalla se paga en todas.
+  const clinica = medico?.clinicaId
+    ? await Clinica.findById(medico.clinicaId).select("suscripcion").lean()
+    : null;
   const saldoCentavos = medico?.saldoCentavos || 0;
   const moneda = monedas.normalizar(medico?.moneda);
   const cfg = monedas.config(moneda);
@@ -85,7 +91,7 @@ async function estadoDe(medicoPhone) {
   // queda UNA, no una y media. Decirle 1.5 sería mentirle.
   const consultasRestantes = Math.max(0, Math.floor(saldoCentavos / cfg.precioConsulta));
   const limiteNegativo = -5 * cfg.precioConsulta;
-  const plan = suscripciones.estado(medico);
+  const plan = suscripciones.estado(medico, clinica);
   const gratisUsadas = Math.min(medico?.consultasGratisUsadas || 0, CONSULTAS_GRATIS);
   const gratisRestantes = CONSULTAS_GRATIS - gratisUsadas;
   return {
@@ -274,7 +280,10 @@ async function cobrarConsulta({ medicoPhone, consultaId }) {
   // El precio es el de SU moneda. Cobrarle 1200 centavos a un médico
   // brasileño porque ese es el precio boliviano sería cobrarle un número, no
   // un precio.
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("moneda suscripcion").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("moneda suscripcion clinicaId").lean();
+  const clinica = medico?.clinicaId
+    ? await Clinica.findById(medico.clinicaId).select("suscripcion").lean()
+    : null;
   const monedaCuenta = monedas.normalizar(medico?.moneda);
   const cfg = monedas.config(monedaCuenta);
 
@@ -288,7 +297,7 @@ async function cobrarConsulta({ medicoPhone, consultaId }) {
   //
   // Además el índice único por consultaId sigue valiendo, así que un
   // suscriptor tampoco puede duplicar el registro de una misma consulta.
-  const conPlan = suscripciones.vigente(medico);
+  const conPlan = suscripciones.vigente(medico, clinica);
 
   // ═══ LAS DE CORTESÍA, ANTES DE COBRAR ═══════════════════════════════════
   //

@@ -28,7 +28,7 @@
 //
 // Lo que este archivo NO hace: crear cuentas, cambiar contraseñas, ver
 // historias clínicas. Un operador de recargas administra plata y nada más.
-const { Medico, SolicitudRecarga, MovimientoSaldo } = require("../db/models");
+const { Clinica, Medico, SolicitudRecarga, MovimientoSaldo } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { rateLimitPorClave, claveDeMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
@@ -409,6 +409,86 @@ module.exports = function (app) {
   // Mismo candado que acreditar plata —lista de operadores, 2FA, auditoría—
   // porque es exactamente lo mismo: dar servicio a cambio de un pago que
   // alguien dice haber recibido.
+  // ─── PLAN DE UN CENTRO ───────────────────────────────────────────────────
+  //
+  // ═══ POR QUÉ EL PRECIO LO PONE EL OPERADOR ════════════════════════════════
+  //
+  // El plan individual tiene precio de lista: sale de suscripciones.js y el
+  // operador no lo elige. Este NO.
+  //
+  // Un centro se negocia. Uno de cuatro profesionales no paga lo mismo que
+  // uno de doce, y ninguno paga cuatro ni doce veces el plan individual —a
+  // precio de lista, seis profesionales serían Bs 5.400 al mes, y ningún
+  // centro de terapia paga eso—. Inventar acá una fórmula por profesional
+  // daría un número que la realidad contradice en la primera reunión, y peor:
+  // lo daría con aspecto de precio oficial.
+  //
+  // Se guarda LO QUE SE ACORDÓ. Y con el mismo candado que acreditar plata
+  // —operadores, 2FA, auditoría, referencia obligatoria— porque es lo mismo:
+  // dar servicio a cambio de un pago que alguien dice haber recibido.
+  app.post("/medico/operador/plan-centro", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const quien = req.adminUser.usuario;
+    const clinicaId = String(req.body?.clinicaId || "").trim();
+    const plan = String(req.body?.plan || "").trim();
+    const referencia = String(req.body?.referencia || "").trim().slice(0, 120);
+    const precioCentavos = Math.round(Number(req.body?.precioCentavos));
+    const profesionales = Math.max(0, Math.round(Number(req.body?.profesionales) || 0));
+    const moneda = monedas.normalizar(req.body?.moneda);
+
+    if (!/^[a-f0-9]{24}$/i.test(clinicaId)) throw new ErrorHttp(400, "Falta el centro");
+    if (!suscripciones.PLANES[plan]) throw new ErrorHttp(400, "Plan desconocido: tiene que ser mensual o anual");
+    if (!referencia) throw new ErrorHttp(400, "Poné la referencia del pago");
+    if (!Number.isFinite(precioCentavos) || precioCentavos <= 0) {
+      throw new ErrorHttp(400, "Poné el precio acordado con el centro");
+    }
+    // El mismo techo que una carga de saldo, y por el mismo motivo: no
+    // protege de un operador deshonesto —puede hacer varias— pero sí de un
+    // dedo que resbala y convierte 2.700 en 270.000.
+    const techo = monedas.config(moneda).techoPorCarga;
+    if (precioCentavos > techo) {
+      throw new ErrorHttp(400, `Ese precio supera el techo por operación (${monedas.conSimbolo(techo, moneda)}). Si es correcto, cargalo en dos veces o avisá antes.`);
+    }
+
+    const clinica = await Clinica.findById(clinicaId);
+    if (!clinica) throw new ErrorHttp(404, "No encontramos ese centro");
+
+    const hasta = suscripciones.nuevoVencimiento(clinica, plan);
+    const renovacion = suscripciones.vigenteEn(clinica, new Date());
+
+    clinica.suscripcion = {
+      plan,
+      // En una renovación se conserva desde cuándo es cliente, igual que en
+      // el plan individual: pisarlo borraría que este centro paga hace un año.
+      desde: clinica.suscripcion?.desde || new Date(),
+      hasta,
+      precioCentavos,
+      moneda,
+      activadaPor: quien,
+      profesionalesAcordados: profesionales || clinica.suscripcion?.profesionalesAcordados || 0,
+    };
+    await clinica.save();
+
+    // Cuántos profesionales tiene HOY, que puede no ser lo acordado. No se
+    // bloquea a nadie por eso —pelearse con un cliente que está pagando por
+    // un dato administrativo es la peor forma de perderlo— pero el operador
+    // tiene que verlo al renovar.
+    const cuantos = await Medico.countDocuments({ clinicaId: clinica._id });
+
+    registrar({
+      req, medicoPhone: quien, accion: renovacion ? "plan_centro_renovado" : "plan_centro_activado",
+      recurso: `Clinica:${clinica._id}`,
+      detalle: `${plan} · ${monedas.conSimbolo(precioCentavos, moneda)} · ${cuantos} profesional(es) · hasta ${hasta.toISOString().slice(0, 10)} · ref ${referencia}`,
+    });
+    log.info(`[PLAN_CENTRO] ${quien} ${renovacion ? "renovó" : "activó"} ${plan} a ${clinica.nombre} (${cuantos} profesionales) hasta ${hasta.toISOString().slice(0, 10)}`);
+
+    res.json({
+      ok: true, plan, renovacion, hasta, precioCentavos,
+      clinica: clinica.nombre,
+      profesionales: cuantos,
+      acordados: clinica.suscripcion.profesionalesAcordados,
+    });
+  }));
+
   app.post("/medico/operador/plan", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const quien = req.adminUser.usuario;
     const destino = String(req.body?.phone || "").trim();

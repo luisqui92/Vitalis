@@ -75,28 +75,73 @@ function precioDelPlan(plan, moneda) {
 // Se compara contra la fecha y punto. No hay un campo "activo" que mantener
 // en sincronía: un booleano guardado se queda en true después de vencido y
 // nadie se entera hasta que alguien no paga durante meses.
-function vigente(medico, ahora = new Date()) {
-  const hasta = medico?.suscripcion?.hasta;
+//
+// ═══ DOS LUGARES DE DONDE PUEDE VENIR EL PLAN ═════════════════════════════
+//
+// El propio del médico, o el del CENTRO donde trabaja. Un centro de terapia
+// de neurodesarrollo —fonoaudióloga, terapista ocupacional, psicopedagoga,
+// psicóloga— es un cliente que comparte fichas, no cuatro clientes sueltos.
+//
+// Se mira primero el propio: si un profesional pagó su plan y además el
+// centro paga el suyo, el que vale es el que él pagó —es el que le da
+// cobertura si mañana se va del centro— y el del centro queda de red.
+//
+// `clinica` es opcional. Quien no la pase obtiene el comportamiento de
+// siempre, que es lo que hace que este cambio no pueda romper nada de lo que
+// ya funcionaba.
+function vigenteEn(titular, ahora) {
+  const hasta = titular?.suscripcion?.hasta;
   return Boolean(hasta && new Date(hasta) > ahora);
 }
 
-function diasRestantes(medico, ahora = new Date()) {
-  if (!vigente(medico, ahora)) return 0;
-  return Math.ceil((new Date(medico.suscripcion.hasta) - ahora) / 86400000);
+function vigente(medico, clinica = null, ahora = new Date()) {
+  // Compatibilidad: alguien puede seguir llamando vigente(medico, fecha).
+  // Sin esto, pasarle una fecha como segundo argumento la tomaría por una
+  // clínica sin suscripción y devolvería siempre lo del médico — que es el
+  // caso correcto por casualidad, hasta que deje de serlo.
+  if (clinica instanceof Date) { ahora = clinica; clinica = null; }
+  return vigenteEn(medico, ahora) || vigenteEn(clinica, ahora);
+}
+
+// De dónde sale el plan que está cubriendo a este médico ahora mismo.
+// Devuelve null si no hay ninguno.
+function titularDelPlan(medico, clinica = null, ahora = new Date()) {
+  if (vigenteEn(medico, ahora)) return { origen: "propio", titular: medico };
+  if (vigenteEn(clinica, ahora)) return { origen: "clinica", titular: clinica };
+  return null;
+}
+
+function diasRestantes(medico, clinica = null, ahora = new Date()) {
+  if (clinica instanceof Date) { ahora = clinica; clinica = null; }
+  const quien = titularDelPlan(medico, clinica, ahora);
+  if (!quien) return 0;
+  return Math.ceil((new Date(quien.titular.suscripcion.hasta) - ahora) / 86400000);
 }
 
 // Estado para mostrar. Devuelve siempre algo: "sin plan" es una respuesta.
-function estado(medico, ahora = new Date()) {
-  const s = medico?.suscripcion || {};
-  const activa = vigente(medico, ahora);
+function estado(medico, clinica = null, ahora = new Date()) {
+  if (clinica instanceof Date) { ahora = clinica; clinica = null; }
+  const quien = titularDelPlan(medico, clinica, ahora);
+  const s = quien ? quien.titular.suscripcion : {};
+  const activa = Boolean(quien);
+  // La moneda es SIEMPRE la del médico, aunque el plan lo pague el centro:
+  // los precios que se le muestran son los que él pagaría si contratara, y
+  // un profesional boliviano en un centro que factura en reales tiene que
+  // seguir viendo bolivianos.
   const moneda = monedas.normalizar(medico?.moneda);
+  const dias = diasRestantes(medico, clinica, ahora);
   return {
     activa,
+    // De dónde viene la cobertura. La pantalla lo necesita: a un profesional
+    // cubierto por su centro no se le puede ofrecer renovar un plan que no
+    // es suyo ni avisarle que "su" plan vence — no es suyo, y el que tiene
+    // que renovar es el director.
+    origen: quien ? quien.origen : "",
     plan: activa ? s.plan : "",
     hasta: activa ? s.hasta : null,
-    diasRestantes: diasRestantes(medico, ahora),
+    diasRestantes: dias,
     // Con menos de una semana ya conviene avisarle, no el último día.
-    porVencer: activa && diasRestantes(medico, ahora) <= 7,
+    porVencer: activa && dias <= 7,
     // Lo que costaría contratar, para que la pantalla no tenga que saber
     // ningún precio: si un día cambian, cambian en un solo lugar.
     precios: {
@@ -127,5 +172,6 @@ function nuevoVencimiento(medico, plan, ahora = new Date()) {
 }
 
 module.exports = {
-  PLANES, precioMensual, precioDelPlan, vigente, diasRestantes, estado, nuevoVencimiento,
+  PLANES, precioMensual, precioDelPlan, vigente, vigenteEn, titularDelPlan,
+  diasRestantes, estado, nuevoVencimiento,
 };

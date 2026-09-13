@@ -32,6 +32,40 @@ const clinicaSchema = new mongoose.Schema({
   ciudad: { type: String, default: "" },
   telefono: { type: String, default: "" },
   activa: { type: Boolean, default: true },
+
+  // ═══ EL PLAN DEL CENTRO ═════════════════════════════════════════════════
+  //
+  // Hasta ahora la suscripción vivía SOLO en Medico, o sea que un centro con
+  // seis profesionales pagaba seis suscripciones. A precio de lista eso son
+  // Bs 5.400 al mes, y ningún centro de terapia de Cochabamba paga eso.
+  //
+  // El problema no era el precio: era dónde colgaba. Un centro de
+  // neurodesarrollo —fonoaudióloga, terapista ocupacional, psicopedagoga,
+  // psicóloga— es UN cliente que comparte fichas, no cuatro clientes
+  // sueltos. Cobrarle como cuatro cerraba el canal que más factura en esa
+  // vertical.
+  //
+  // Misma forma que la de Medico a propósito: así suscripciones.js trabaja
+  // con las dos sin saber cuál está mirando, y no hay dos lógicas de
+  // vencimiento que mantener en sincronía.
+  //
+  // El precio NO se calcula con una fórmula. Se guarda el que se acordó, que
+  // es como se vende un centro: se negocia. Inventar acá un precio por
+  // profesional daría un número que la realidad contradice en la primera
+  // reunión.
+  suscripcion: {
+    plan: { type: String, enum: ["mensual", "anual", ""], default: "" },
+    desde: { type: Date, default: null },
+    hasta: { type: Date, default: null, index: true },
+    precioCentavos: { type: Number, default: 0 },
+    moneda: { type: String, default: "" },
+    activadaPor: { type: String, default: "" },
+    // Cuántos profesionales cubre lo acordado. No se hace cumplir por código
+    // —bloquear al séptimo profesional de un centro que está pagando es
+    // pelearse con un cliente por un dato administrativo— pero queda
+    // escrito, y el operador lo ve al renovar.
+    profesionalesAcordados: { type: Number, default: 0 },
+  },
 }, { timestamps: true });
 const Clinica = mongoose.model("Clinica", clinicaSchema);
 

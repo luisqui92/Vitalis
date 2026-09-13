@@ -204,6 +204,103 @@ console.log("\n── 9. La ruta que activa el plan ──");
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();
-  console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
+  console.log("\n── El plan del CENTRO ──");
+// ═══ POR QUÉ EXISTE ═══════════════════════════════════════════════════════
+//
+// La suscripción vivía solo en Medico, así que un centro de terapia con seis
+// profesionales pagaba seis planes: a precio de lista, Bs 5.400 al mes.
+// Ninguno paga eso, y ese es justo el cliente que necesita la vertical de
+// neurodesarrollo — cuatro profesionales que comparten la ficha del mismo
+// chico NO son cuatro clientes sueltos.
+//
+// Lo que se prueba es la frontera: quién queda cubierto, quién no, y que
+// nadie quede cubierto de gratis por un plan vencido.
+const centroHasta = (fecha, plan = "anual") => ({
+  suscripcion: { plan, hasta: new Date(fecha), desde: new Date("2026-01-01") },
+});
+const sinPlan = { moneda: "BOB" };
+const VIGENTE = "2026-12-01", VENCIDO = "2026-08-01";
+
+verificar("un profesional sin plan y sin centro NO está cubierto",
+  suscripciones.vigente(sinPlan, null, HOY) === false);
+verificar("con el centro pagando, SÍ",
+  suscripciones.vigente(sinPlan, centroHasta(VIGENTE), HOY) === true);
+verificar("  ...y el estado dice que viene del centro",
+  suscripciones.estado(sinPlan, centroHasta(VIGENTE), HOY).origen === "clinica");
+
+// Lo que más plata cuesta si sale mal: un plan vencido que sigue dando
+// servicio. Se compara contra la fecha y punto, igual que el individual.
+verificar("un centro VENCIDO no cubre a nadie",
+  suscripciones.vigente(sinPlan, centroHasta(VENCIDO), HOY) === false);
+verificar("  ...ni aunque el profesional pertenezca al centro hace años",
+  suscripciones.estado(sinPlan, centroHasta(VENCIDO), HOY).activa === false);
+
+// El plan propio manda sobre el del centro: es el que le queda si mañana se
+// va, y el que él pagó.
+const propio = conPlanHasta("2026-10-15");
+verificar("el plan propio gana sobre el del centro",
+  suscripciones.estado(propio, centroHasta(VIGENTE), HOY).origen === "propio");
+verificar("  ...y los días restantes son los del suyo, no los del centro",
+  suscripciones.estado(propio, centroHasta(VIGENTE), HOY).diasRestantes ===
+  suscripciones.diasRestantes(propio, null, HOY));
+// Si el suyo venció pero el centro paga, el centro lo sostiene.
+verificar("si el propio vence y el centro paga, sigue cubierto",
+  suscripciones.estado(conPlanHasta(VENCIDO), centroHasta(VIGENTE), HOY).origen === "clinica");
+
+// La moneda es SIEMPRE la del profesional, aunque pague el centro: los
+// precios que ve son los que él pagaría si contratara por su cuenta.
+verificar("la moneda que ve es la suya, no la del centro",
+  suscripciones.estado({ moneda: "BRL" }, centroHasta(VIGENTE), HOY).precios.mensual ===
+  suscripciones.precioDelPlan("mensual", "BRL"));
+
+// ═══ COMPATIBILIDAD, QUE ACÁ NO ES UN DETALLE ════════════════════════════
+//
+// vigente() y estado() ya se llamaban en varios lados con (medico, fecha).
+// Si la fecha se tomara por una clínica, devolverían el resultado correcto
+// POR CASUALIDAD —una fecha no tiene suscripción— hasta el día que alguien
+// mire el origen y vea cualquier cosa. Se detecta el Date y se corre.
+verificar("vigente(medico, fecha) sigue funcionando como antes",
+  suscripciones.vigente(conPlanHasta(VIGENTE), HOY) === true &&
+  suscripciones.vigente(conPlanHasta(VENCIDO), HOY) === false);
+verificar("estado(medico, fecha) también",
+  suscripciones.estado(conPlanHasta(VIGENTE), HOY).activa === true &&
+  suscripciones.estado(conPlanHasta(VIGENTE), HOY).origen === "propio");
+verificar("y diasRestantes(medico, fecha) no se corrió",
+  suscripciones.diasRestantes(conPlanHasta("2026-09-17"), HOY) === 10);
+
+// El cobro tiene que mirar lo mismo. Si estadoDe dice "cubierto" y
+// cobrarConsulta descuenta igual, el centro paga dos veces.
+const fsS = require("fs");
+const saldoTxt = fsS.readFileSync(path.join(RAIZ, "services", "saldo.js"), "utf8");
+verificar("el cobro también mira el plan del centro",
+  /suscripciones\.vigente\(medico, clinica\)/.test(saldoTxt));
+verificar("  ...y el estado que ve el profesional, igual",
+  /suscripciones\.estado\(medico, clinica\)/.test(saldoTxt));
+// Solo se busca la clínica si pertenece a una: una consulta de más por cada
+// pintado de pantalla se paga en todas.
+verificar("  ...y no se consulta la clínica si el médico no tiene",
+  /medico\?\.clinicaId\s*\n?\s*\? await Clinica\.findById/.test(saldoTxt));
+
+console.log("\n── El precio de un centro lo pone quien lo negoció ──");
+const ruta = fsS.readFileSync(path.join(RAIZ, "routes", "operadorSaldo.js"), "utf8");
+// El individual tiene precio de lista. Este no: un centro de cuatro no paga
+// lo mismo que uno de doce, y ninguno paga N veces el individual.
+verificar("el precio del centro viene en el pedido, no de una fórmula",
+  /precioCentavos = Math\.round\(Number\(req\.body\?\.precioCentavos\)\)/.test(ruta));
+verificar("  ...y se rechaza si falta o es cero",
+  /Poné el precio acordado con el centro/.test(ruta));
+// Mismo techo que una carga de saldo: no protege de un operador deshonesto,
+// sí de un dedo que resbala y convierte 2.700 en 270.000.
+verificar("  ...y tiene techo por operación", /techoPorCarga/.test(ruta));
+verificar("la referencia del pago es obligatoria, como en las recargas",
+  /Poné la referencia del pago[\s\S]{0,3000}plan-centro|plan-centro[\s\S]{0,3000}Poné la referencia del pago/.test(ruta));
+verificar("queda auditado con el centro, el precio y cuántos profesionales",
+  /plan_centro_activado/.test(ruta) && /profesional\(es\)/.test(ruta));
+// Bloquear al séptimo profesional de un centro que está pagando es pelearse
+// con un cliente por un dato administrativo.
+verificar("y tener más profesionales que lo acordado NO bloquea a nadie",
+  !/throw new ErrorHttp\([^)]*profesionalesAcordados/.test(ruta));
+
+console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
   process.exit(fallos === 0 ? 0 : 1);
 })();
