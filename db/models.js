@@ -1525,6 +1525,24 @@ const solicitudRecargaSchema = new mongoose.Schema({
   // Lo que el médico declara. Sin valor probatorio: es su palabra.
   montoCentavos: { type: Number, required: true },
   referencia: { type: String, default: "" },
+  // ═══ EL IDENTIFICADOR QUE VIAJA DENTRO DEL PAGO ═════════════════════════
+  //
+  // El código Pix lleva un txid adentro. Cuando el médico paga, ese mismo
+  // txid aparece en el extracto del banco, al lado del monto.
+  //
+  // Se generaba, se metía en el código, se le mandaba al navegador y se
+  // TIRABA. Así, el operador tenía que casar el pago por monto y nombre — que
+  // funciona hasta el día que dos médicos pagan R$ 400 el mismo martes, y
+  // entonces hay que adivinar cuál es cuál o acreditar mal.
+  //
+  // Guardarlo sirve dos veces: hoy le pone al operador el número exacto que
+  // va a buscar en el extracto, y el día que haya aviso automático del banco
+  // es lo que permite acreditar sin que nadie mire nada.
+  //
+  // Vacío cuando el médico pagó por transferencia o efectivo, que no llevan
+  // txid. No se inventa uno: un identificador que no está en ningún extracto
+  // es peor que ninguno, porque parece que se puede buscar.
+  txid: { type: String, default: "", index: true },
   metodo: { type: String, enum: ["qr", "transferencia", "efectivo", "otro"], default: "qr" },
   nota: { type: String, default: "" },
 

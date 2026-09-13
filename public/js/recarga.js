@@ -14,6 +14,8 @@
 // veces, y dos avisos del mismo pago es exactamente cómo se acredita dos
 // veces la misma transferencia.
 
+let ultimoTxid = "";
+
 let RECARGA_DATOS = null;
 
 async function pintarRecarga() {
@@ -156,7 +158,7 @@ function engancharFormularioRecarga() {
     try {
       await api("/medico/recargas", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bolivianos, referencia }),
+        body: JSON.stringify({ bolivianos, referencia, txid: ultimoTxid }),
       });
       pintarRecarga();
     } catch (e) {
@@ -212,6 +214,10 @@ function engancharPix() {
     caja.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
     try {
       const r = await api(`/medico/recargas/pix?centavos=${Math.round(monto * 100)}`);
+      // Se guarda para mandarlo al avisar el pago. Es el identificador que va
+      // DENTRO del código Pix y que después aparece en el extracto del banco:
+      // sin él, el operador tiene que casar el pago por monto y nombre.
+      ultimoTxid = r.txid || "";
       caja.innerHTML = `
         <div class="hint" style="margin:0 0 8px">${t("recarga.pixListo", { monto: esc(r.monto) })}</div>
         <img src="${esc(r.qr)}" alt="Pix" class="recarga-qr">

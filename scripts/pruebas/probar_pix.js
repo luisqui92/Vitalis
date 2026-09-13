@@ -101,5 +101,46 @@ console.log("\n── 8. El CRC es el que manda el estándar ──");
 // Valor de control conocido de CRC16/CCITT-FALSE.
 verificar('crc16("123456789") = 29B1', crc16("123456789") === "29B1");
 
+console.log("\n── El txid, de punta a punta ──");
+// ═══ POR QUÉ ESTO IMPORTA ═════════════════════════════════════════════════
+//
+// El txid viaja DENTRO del código Pix, y cuando el médico paga aparece en el
+// extracto del banco al lado del monto. Es lo único que dice qué pago
+// corresponde a qué médico.
+//
+// Se generaba, se metía en el código, se le mandaba al navegador y se TIRABA:
+// no se guardaba en ningún lado. El operador tenía que casar por monto y
+// nombre, que funciona hasta el martes en que dos médicos pagan R$ 400.
+//
+// Y es la misma pieza que hace falta el día que el banco avise solo: sin
+// txid guardado, un webhook con un pago no tiene a quién acreditárselo.
+const fs2 = require("fs");
+const path2 = require("path");
+const RAIZ2 = path2.join(__dirname, "..", "..");
+const modelos = fs2.readFileSync(path2.join(RAIZ2, "db", "models.js"), "utf8");
+const rutaRec = fs2.readFileSync(path2.join(RAIZ2, "routes", "recargas.js"), "utf8");
+const jsRec = fs2.readFileSync(path2.join(RAIZ2, "public", "js", "recarga.js"), "utf8");
+const jsOp = fs2.readFileSync(path2.join(RAIZ2, "public", "js", "operador.js"), "utf8");
+
+verificar("la solicitud de recarga guarda el txid",
+  /txid: \{ type: String, default: "", index: true \}/.test(modelos));
+verificar("  ...y está indexado, que es como lo va a buscar un webhook",
+  /txid:[\s\S]{0,60}index: true/.test(modelos));
+verificar("el navegador se queda con el txid del código que generó",
+  /ultimoTxid = r\.txid/.test(jsRec));
+verificar("  ...y lo manda al avisar el pago", /txid: ultimoTxid/.test(jsRec));
+verificar("la ruta lo recibe y lo guarda", /referencia, metodo, nota, txid,/.test(rutaRec));
+// Viene del cliente y termina en la pantalla del operador, que lo va a
+// copiar a su banco: se acota al formato que genera esta misma ruta.
+verificar("  ...validando el formato, porque viene del cliente",
+  /\^\[A-Z0-9\]\{1,25\}\$/.test(rutaRec));
+verificar("el operador lo ve en la cola", /s\.txid/.test(jsOp));
+
+// Lo que NO se debe hacer: inventar uno cuando no hay. Una transferencia o un
+// pago en efectivo no llevan txid, y un identificador que no está en ningún
+// extracto es peor que ninguno — parece que se puede buscar y no se puede.
+verificar("y no se inventa un txid cuando el pago no lo lleva",
+  /const txid = \/\^\[A-Z0-9\]\{1,25\}\$\/\.test\(String\(req\.body\?\.txid \|\| ""\)\) \? req\.body\.txid : "";/.test(rutaRec));
+
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

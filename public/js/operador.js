@@ -421,6 +421,13 @@ async function pintarColaSolicitudes() {
         </div>
         <div class="saldo-monto" style="font-size:22px">${esc(s.simbolo || "Bs")} ${esc(s.montoBs)}</div>
         <div class="hint" style="margin:0">${t("recarga.referencia")}: <b>${esc(s.referencia)}</b></div>
+        ${s.txid ? `
+        <!-- El identificador que viaja DENTRO del código Pix y que aparece
+             en el extracto del banco, al lado del monto. Va en monoespaciada
+             y seleccionable porque el operador lo va a copiar y pegar en el
+             buscador de su banco: es la diferencia entre encontrar el pago y
+             adivinar cuál de los dos de R$ 400 es el de este médico. -->
+        <div class="hint" style="margin:4px 0 0">Pix: <b style="font-family:monospace;user-select:all">${esc(s.txid)}</b></div>` : ""}
         <div class="hint" style="margin:4px 0 0;${s.saldo.enNegativo ? "color:var(--danger);font-weight:600" : ""}">
           ${t("op.saldoActual", { monto: `${esc(s.saldo.simbolo || "Bs")} ${esc(s.saldo.saldoBs)}` })}${s.saldo.enNegativo ? ` — ${t("op.enNegativo")}` : ""}
         </div>

@@ -131,6 +131,11 @@ module.exports = function (app) {
     const referencia = String(req.body?.referencia || "").trim().slice(0, 120);
     const metodo = ["qr", "transferencia", "efectivo", "otro"].includes(req.body?.metodo) ? req.body.metodo : "qr";
     const nota = String(req.body?.nota || "").trim().slice(0, 300);
+    // El identificador que el navegador recibió al pedir el código Pix. Se
+    // acota al formato que genera esta misma ruta: viene del cliente, así que
+    // podría venir cualquier cosa, y termina en la pantalla del operador —
+    // que lo va a copiar y pegar en el buscador de su banco.
+    const txid = /^[A-Z0-9]{1,25}$/.test(String(req.body?.txid || "")) ? req.body.txid : "";
 
     if (!Number.isFinite(bolivianos) || bolivianos <= 0) throw new ErrorHttp(400, "Poné cuánto pagaste");
     if (bolivianos > 5000) throw new ErrorHttp(400, "Para montos mayores a Bs 5.000, escribinos antes de avisar por acá.");
@@ -148,7 +153,7 @@ module.exports = function (app) {
     const solicitud = await SolicitudRecarga.create({
       medicoPhone, medicoNombre: medico?.nombre || "",
       montoCentavos: Math.round(bolivianos * 100),
-      referencia, metodo, nota,
+      referencia, metodo, nota, txid,
     });
     registrar({ req, medicoPhone, accion: "aviso_pago", recurso: `Bs${bolivianos} ref:${referencia}` });
     res.status(201).json({ ok: true, solicitud: paraElMedico(solicitud) });
