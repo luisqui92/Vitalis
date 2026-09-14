@@ -1315,6 +1315,104 @@ const INSTRUMENTOS_NEURO = [
   { nombre: "Otro", editor: "", quienPuede: "profesional", modulos: [], puntajes: [], nota: "" },
 ];
 
+// ─── EL EQUIPO TRATANTE DE UN CHICO ───────────────────────────────────────
+//
+// ═══ POR QUÉ ESTO EXISTE Y POR QUÉ NO EXISTÍA ══════════════════════════════
+//
+// En todo el resto de Symphomed la ficha es del profesional: `medicoPhone` y
+// se acabó. Ser director de la clínica no da acceso a las fichas de los
+// colegas —para eso está la interconsulta, y queda auditada— y esa regla
+// está bien: un cardiólogo no tiene por qué leer las notas de un psiquiatra.
+//
+// Un centro de neurodesarrollo NO es eso. La fonoaudióloga, la terapista
+// ocupacional, la psicopedagoga y la psicóloga no son cuatro profesionales
+// que casualmente atienden a la misma persona: son UN equipo trabajando
+// sobre UN plan. La fonoaudióloga trabaja el objetivo "pedir agua señalando"
+// y la TO trabaja EL MISMO objetivo. Partirlo en cuatro fichas no es
+// privacidad, es pérdida de datos: cuatro copias del mismo chico que no se
+// ven entre sí, y ninguna con la historia completa.
+//
+// ═══ LA REGLA, QUE NO ES "EL DIRECTOR VE TODO" ═════════════════════════════
+//
+// Es más angosta, a propósito: EL EQUIPO TRATANTE DE ESTE CHICO COMPARTE SU
+// FICHA. Cuatro consecuencias que conviene no aflojar:
+//
+//   1. LA FAMILIA AUTORIZA. Sin autorización registrada no hay equipo. No es
+//      una casilla: queda quién autorizó, qué vínculo tiene con el chico,
+//      cuándo, y qué profesional lo registró.
+//   2. SER DIRECTOR NO ALCANZA. Estás en el equipo de ese chico o no estás.
+//      Un director que no lo atiende no ve su ficha, igual que antes.
+//   3. ES POR CHICO, NO POR CENTRO. Estar en el equipo de Leo no da acceso a
+//      la ficha de ningún otro paciente.
+//   4. SOLO EN NEURODESARROLLO. En el resto de las ramas manda la regla
+//      vieja, sin excepciones.
+//
+// ═══ UNA FICHA CON VARIAS MANOS, NO N FICHAS QUE SE SINCRONIZAN ════════════
+//
+// El equipo trabaja sobre UNA ficha: la del profesional que lo armó. No se
+// copia nada ni se "sincroniza" — copiar sería inventar el problema de
+// decidir qué versión gana cuando dos personas editan el perfil sensorial la
+// misma tarde.
+//
+// ═══ LO QUE SE COMPARTE, Y LO QUE NO ═══════════════════════════════════════
+//
+// SÍ: el mapa de la persona y el plan — perfil, perfil sensorial, objetivos
+//     con su progreso, calendario de vigilancia, instrumentos aplicados y
+//     los informes para la familia. Todo eso ES el trabajo del equipo.
+//
+// NO: las notas de sesión. La evolución que dicta cada profesional sigue
+//     siendo suya. Es la misma línea de siempre, corrida al lugar correcto:
+//     se comparte el plan, no el relato clínico de cada uno.
+const equipoNeuroSchema = new mongoose.Schema({
+  clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", required: true, index: true },
+  // La identidad compartida del chico. Es la única ancla posible: cada
+  // profesional tiene su propio Paciente para la misma persona, y lo que los
+  // une ya es PersonaClinica (ver routes/personas.js).
+  personaId: { type: mongoose.Schema.Types.ObjectId, ref: "PersonaClinica", required: true, unique: true, index: true },
+
+  // La ficha sobre la que trabaja el equipo, y de quién es. Todo el equipo
+  // lee y escribe ESTA, no la suya.
+  pacienteIdTitular: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true },
+  medicoPhoneTitular: { type: String, required: true, index: true },
+
+  miembros: {
+    type: [{
+      medicoPhone: { type: String, required: true },
+      // El nombre y la disciplina del día que se lo agregó, para que la lista
+      // se lea sin ir a buscar cuatro cuentas. Si después cambia el nombre en
+      // su cuenta esto queda viejo y no importa: para los permisos manda el
+      // teléfono.
+      nombre: { type: String, default: "" },
+      rol: { type: String, default: "" },   // "Fonoaudiología", "Terapia ocupacional"...
+      agregadoPor: { type: String, default: "" },
+      agregadoEn: { type: Date, default: Date.now },
+      _id: false,
+    }],
+    default: [],
+  },
+
+  // ═══ SIN ESTO NO HAY EQUIPO ═════════════════════════════════════════════
+  //
+  // Compartir la ficha de un chico entre cuatro profesionales es una decisión
+  // de su familia, no del centro. Symphomed no puede verificar que la
+  // conversación ocurrió —igual que no puede verificar una certificación de
+  // ADOS-2— pero sí puede negarse a armar el equipo sin que alguien ponga por
+  // escrito quién autorizó y cuándo. Eso convierte "el centro comparte
+  // fichas" en "la mamá de Leo autorizó el 14 de marzo, lo registró la Lic.
+  // Arce", que es lo que hay que poder contestar si algún día preguntan.
+  autorizacion: {
+    porQuien: { type: String, required: true },      // "Marcela Aguilar"
+    vinculo: { type: String, default: "" },          // "madre", "tutora legal"
+    fecha: { type: Date, required: true },
+    registradaPor: { type: String, required: true }, // el teléfono del profesional
+    nota: { type: String, default: "" },
+  },
+
+  activo: { type: Boolean, default: true },
+}, { timestamps: true });
+equipoNeuroSchema.index({ "miembros.medicoPhone": 1 });
+const EquipoNeuro = mongoose.model("EquipoNeuro", equipoNeuroSchema);
+
 // ─── EL INFORME DE AVANCE PARA LA FAMILIA ─────────────────────────────────
 // Nace de una frase de una madre de un chico con autismo leve: le serviría
 // un informe de avance como el que le dan en la clase de programación de su
@@ -1943,6 +2041,6 @@ module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, Consul
   EquipoRayos, CapturaPendiente, EstudioEntrante,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, Informe,
   CALIFICACIONES_INSTRUMENTO,
-  InformeFamilia,
+  InformeFamilia, EquipoNeuro,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,
   InvitacionReporte };

@@ -144,6 +144,7 @@ require("./routes/estudios")(app);
 require("./routes/rayos")(app);
 require("./routes/cajaDicom")(app);
 require("./routes/neurodesarrollo")(app);
+require("./routes/equipoNeuro")(app);
 require("./routes/informeFamilia")(app);
 require("./routes/vacunasPet")(app);
 require("./routes/instrumentos")(app);

@@ -12,6 +12,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { fichaNeuroOFallar, objetoNeuroOFallar } = require("../services/equipoNeuro");
 const { PLANTILLAS_VIGILANCIA, estadoVigilancia } = require("../services/vigilancia");
 
 const requireMedico = requireAuth(["medico"]);
@@ -47,15 +48,21 @@ function limpiarLista(v, max = 20) {
 module.exports = function (app) {
   // ═══ PERFIL ══════════════════════════════════════════════════════════════
   app.get("/medico/pacientes/:pacienteId/neuro", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const perfil = await perfilDe(paciente._id, medicoPhone);
     res.json({ perfil, opciones: { CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO } });
   }));
 
   app.patch("/medico/pacientes/:pacienteId/neuro", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const perfil = await perfilDe(paciente._id, medicoPhone);
 
     if (Array.isArray(req.body?.condiciones)) {
@@ -90,8 +97,11 @@ module.exports = function (app) {
   // Mismo patrón que el odontograma y el mapa ocular: se toca una zona, se
   // carga el hallazgo, y queda el historial con quién/cómo lo cargó.
   app.post("/medico/pacientes/:pacienteId/neuro/sensorial", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
 
     const modalidad = String(req.body?.modalidad || "").trim();
     const respuesta = String(req.body?.respuesta || "").trim();
@@ -123,15 +133,21 @@ module.exports = function (app) {
 
   // ═══ OBJETIVOS ═══════════════════════════════════════════════════════════
   app.get("/medico/pacientes/:pacienteId/neuro/objetivos", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const objetivos = await ObjetivoNeuro.find({ pacienteId: paciente._id, medicoPhone }).sort({ estado: 1, createdAt: -1 }).lean();
     res.json({ objetivos });
   }));
 
   app.post("/medico/pacientes/:pacienteId/neuro/objetivos", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const titulo = String(req.body?.titulo || "").trim();
     if (!titulo) throw new ErrorHttp(400, "El objetivo necesita un título");
 
@@ -147,7 +163,7 @@ module.exports = function (app) {
   // ─── REGISTRAR UNA SESIÓN DE TRABAJO SOBRE EL OBJETIVO ───────────────────
   app.post("/medico/neuro/objetivos/:id/progreso", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const objetivo = await obtenerOFallar(ObjetivoNeuro, { _id: req.params.id, medicoPhone }, "Objetivo no encontrado");
+    const objetivo = await objetoNeuroOFallar(req, ObjetivoNeuro, req.params.id, "Objetivo no encontrado");
 
     const intentos = Number(req.body?.intentos);
     const logros = Number(req.body?.logros);
@@ -172,7 +188,7 @@ module.exports = function (app) {
 
   app.patch("/medico/neuro/objetivos/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const objetivo = await obtenerOFallar(ObjetivoNeuro, { _id: req.params.id, medicoPhone }, "Objetivo no encontrado");
+    const objetivo = await objetoNeuroOFallar(req, ObjetivoNeuro, req.params.id, "Objetivo no encontrado");
     if (["activo", "logrado", "suspendido"].includes(req.body?.estado)) {
       objetivo.estado = req.body.estado;
       objetivo.fechaCierre = req.body.estado === "activo" ? null : new Date();
@@ -185,16 +201,22 @@ module.exports = function (app) {
 
   app.delete("/medico/neuro/objetivos/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const borrado = await ObjetivoNeuro.findOneAndDelete({ _id: req.params.id, medicoPhone });
-    if (!borrado) throw new ErrorHttp(404, "Objetivo no encontrado");
+    // Se busca con permiso de equipo y recién después se borra: findOneAndDelete
+    // con { medicoPhone } dejaría a un miembro sin poder borrar un objetivo
+    // que él mismo cargó en la ficha compartida.
+    const borrado = await objetoNeuroOFallar(req, ObjetivoNeuro, req.params.id, "Objetivo no encontrado");
+    await ObjetivoNeuro.deleteOne({ _id: borrado._id });
     registrar({ req, medicoPhone, accion: "borrar_objetivo_neuro", recurso: `ObjetivoNeuro:${req.params.id}` });
     res.json({ ok: true });
   }));
 
   // ═══ VIGILANCIA DE SALUD ═════════════════════════════════════════════════
   app.get("/medico/pacientes/:pacienteId/neuro/vigilancia", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const items = await VigilanciaSalud.find({ pacienteId: paciente._id, medicoPhone }).sort({ desdeMeses: 1 }).lean();
 
     // La edad se calcula acá y no en el navegador para que el estado
@@ -215,8 +237,11 @@ module.exports = function (app) {
   // volver a cargar la plantilla no borra los controles ya registrados ni
   // duplica la lista.
   app.post("/medico/pacientes/:pacienteId/neuro/vigilancia/plantilla", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const plantilla = PLANTILLAS_VIGILANCIA[String(req.body?.plantilla || "")];
     if (!plantilla) throw new ErrorHttp(400, "Plantilla desconocida");
 
@@ -231,8 +256,11 @@ module.exports = function (app) {
   }));
 
   app.post("/medico/pacientes/:pacienteId/neuro/vigilancia", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // La ficha puede no ser la del que pregunta: si el chico tiene equipo
+    // tratante, todos trabajan sobre la ficha titular. Ver
+    // services/equipoNeuro.js — la regla vive ahí y en ningún otro lado.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const nombre = String(req.body?.nombre || "").trim();
     if (!nombre) throw new ErrorHttp(400, "El control necesita un nombre");
     const num = (v, def) => (Number.isFinite(Number(v)) ? Number(v) : def);
@@ -249,7 +277,7 @@ module.exports = function (app) {
 
   app.post("/medico/neuro/vigilancia/:id/realizado", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const item = await obtenerOFallar(VigilanciaSalud, { _id: req.params.id, medicoPhone }, "Control no encontrado");
+    const item = await objetoNeuroOFallar(req, VigilanciaSalud, req.params.id, "Control no encontrado");
     item.realizados.push({
       fecha: req.body?.fecha ? new Date(req.body.fecha) : new Date(),
       resultado: String(req.body?.resultado || "").trim(),
@@ -262,8 +290,8 @@ module.exports = function (app) {
 
   app.delete("/medico/neuro/vigilancia/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const borrado = await VigilanciaSalud.findOneAndDelete({ _id: req.params.id, medicoPhone });
-    if (!borrado) throw new ErrorHttp(404, "Control no encontrado");
+    const borrado = await objetoNeuroOFallar(req, VigilanciaSalud, req.params.id, "Control no encontrado");
+    await VigilanciaSalud.deleteOne({ _id: borrado._id });
     res.json({ ok: true });
   }));
 };

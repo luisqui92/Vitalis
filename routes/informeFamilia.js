@@ -24,6 +24,7 @@ const { registrar } = require("../services/auditoria");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { armarBorrador, tieneAlgoQueContar, listaLimpia, PERIODO_DIAS } = require("../services/informeFamilia");
 const { CONFIG, log } = require("../config");
+const { fichaNeuroOFallar, objetoNeuroOFallar } = require("../services/equipoNeuro");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -69,8 +70,11 @@ function paraLaFamilia(inf) {
 module.exports = function (app) {
   // ─── LISTA ───────────────────────────────────────────────────────────────
   app.get("/medico/pacientes/:pacienteId/informes-familia", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // El informe a la familia lo puede armar y mandar cualquiera del equipo
+    // tratante, no solo quien tiene la ficha: es el informe DEL EQUIPO. Ver
+    // services/equipoNeuro.js.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const informes = await InformeFamilia.find({ pacienteId: paciente._id, medicoPhone })
       .sort({ createdAt: -1 }).limit(40).lean();
     res.json({
@@ -83,8 +87,11 @@ module.exports = function (app) {
   // Crea el informe ya lleno con lo que hay registrado. El profesional lo
   // abre, saca lo que no va, escribe su párrafo y recién ahí lo manda.
   app.post("/medico/pacientes/:pacienteId/informes-familia", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // El informe a la familia lo puede armar y mandar cualquiera del equipo
+    // tratante, no solo quien tiene la ficha: es el informe DEL EQUIPO. Ver
+    // services/equipoNeuro.js.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
 
     const hasta = fechaOFallar(req.body?.hasta, new Date());
     const desde = fechaOFallar(req.body?.desde, new Date(hasta.getTime() - PERIODO_DIAS * 86400000));
@@ -100,7 +107,10 @@ module.exports = function (app) {
         "(o ampliá las fechas) y el informe se arma solo.");
     }
 
-    const medico = await Medico.findOne({ phone: medicoPhone }).select("nombre").lean();
+    // Firma QUIEN LO ARMA, no el dueño de la ficha. En un equipo la ficha es
+    // de la psicopedagoga y el informe lo puede estar escribiendo la
+    // fonoaudióloga: poner el nombre de la otra sería firmar por ella.
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("nombre").lean();
     const informe = await InformeFamilia.create({
       pacienteId: paciente._id, medicoPhone,
       ...borrador,
@@ -114,14 +124,14 @@ module.exports = function (app) {
 
   app.get("/medico/informes-familia/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const informe = await obtenerOFallar(InformeFamilia, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
+    const informe = await objetoNeuroOFallar(req, InformeFamilia, req.params.id, "Informe no encontrado");
     res.json({ informe, enlace: enlaceDe(informe, req) });
   }));
 
   // ─── EDITAR (solo mientras es borrador) ──────────────────────────────────
   app.patch("/medico/informes-familia/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const informe = await obtenerOFallar(InformeFamilia, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
+    const informe = await objetoNeuroOFallar(req, InformeFamilia, req.params.id, "Informe no encontrado");
     if (informe.estado === "enviado") {
       throw new ErrorHttp(409, "Este informe ya lo recibió la familia y no se puede cambiar. Si hay un error, armá uno nuevo.");
     }
@@ -153,10 +163,14 @@ module.exports = function (app) {
   // ─── ENVIAR ──────────────────────────────────────────────────────────────
   app.post("/medico/informes-familia/:id/enviar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const informe = await obtenerOFallar(InformeFamilia, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
+    const informe = await objetoNeuroOFallar(req, InformeFamilia, req.params.id, "Informe no encontrado");
     if (informe.estado === "enviado") throw new ErrorHttp(409, "Este informe ya se envió.");
 
-    const paciente = await Paciente.findOne({ _id: informe.pacienteId, medicoPhone }).lean();
+    // La ficha es la del titular del equipo, no la de quien manda el informe,
+    // así que se busca por el dueño del informe. Con `medicoPhone` a secas un
+    // miembro del equipo no encontraba nunca el teléfono de la familia y le
+    // salía "cargalo en la ficha" sobre una ficha que sí lo tenía.
+    const paciente = await Paciente.findOne({ _id: informe.pacienteId, medicoPhone: informe.medicoPhone }).lean();
     const destino = String(req.body?.telefono || paciente?.telefono || "").replace(/\D/g, "");
     if (!destino) throw new ErrorHttp(400, "No hay un teléfono al que mandarlo. Cargalo en la ficha o escribilo acá.");
 
@@ -203,7 +217,7 @@ module.exports = function (app) {
 
   app.delete("/medico/informes-familia/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const informe = await obtenerOFallar(InformeFamilia, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
+    const informe = await objetoNeuroOFallar(req, InformeFamilia, req.params.id, "Informe no encontrado");
     // Mismo criterio que el informe firmado: borrarlo de la base no lo borra
     // del teléfono de la familia, solo destruye el registro de qué se dijo.
     if (informe.estado === "enviado") throw new ErrorHttp(409, "Un informe que la familia ya recibió no se borra.");

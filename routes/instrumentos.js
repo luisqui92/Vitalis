@@ -23,6 +23,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { avisarCambio } = require("../services/realtime");
+const { fichaNeuroOFallar, objetoNeuroOFallar } = require("../services/equipoNeuro");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -86,15 +87,19 @@ module.exports = function (app) {
   });
 
   app.get("/medico/pacientes/:pacienteId/instrumentos", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // Si el chico tiene equipo tratante, la ficha es la titular y no la de
+    // quien pregunta. Ver services/equipoNeuro.js.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
     const aplicados = await InstrumentoAplicado.find({ pacienteId: paciente._id, medicoPhone }).sort({ fecha: -1 }).lean();
     res.json({ aplicados });
   }));
 
   app.post("/medico/pacientes/:pacienteId/instrumentos", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // Si el chico tiene equipo tratante, la ficha es la titular y no la de
+    // quien pregunta. Ver services/equipoNeuro.js.
+    const { pacienteId, medicoPhone } = await fichaNeuroOFallar(req, req.params.pacienteId);
+    const paciente = { _id: pacienteId };
 
     const instrumento = String(req.body?.instrumento || "").trim();
     if (!instrumento) throw new ErrorHttp(400, "¿Qué instrumento se aplicó?");
@@ -138,7 +143,7 @@ module.exports = function (app) {
 
   app.patch("/medico/instrumentos/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const aplicado = await obtenerOFallar(InstrumentoAplicado, { _id: req.params.id, medicoPhone }, "Registro no encontrado");
+    const aplicado = await objetoNeuroOFallar(req, InstrumentoAplicado, req.params.id, "Registro no encontrado");
 
     for (const [campo, max] of [["instrumento", 80], ["version", 40], ["modulo", 40], ["aplicadoPor", 120], ["matricula", 40], ["clasificacion", 200], ["interpretacion", 4000]]) {
       if (req.body?.[campo] !== undefined) aplicado[campo] = String(req.body[campo]).trim().slice(0, max);
@@ -163,7 +168,7 @@ module.exports = function (app) {
 
   app.delete("/medico/instrumentos/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const aplicado = await obtenerOFallar(InstrumentoAplicado, { _id: req.params.id, medicoPhone }, "Registro no encontrado");
+    const aplicado = await objetoNeuroOFallar(req, InstrumentoAplicado, req.params.id, "Registro no encontrado");
     await InstrumentoAplicado.deleteOne({ _id: aplicado._id });
     registrar({ req, medicoPhone, accion: "borrar_instrumento", recurso: `InstrumentoAplicado:${req.params.id}` });
     avisarCambio(medicoPhone);

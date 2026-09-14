@@ -96,6 +96,7 @@ function pintarPerfilNeuro(pacienteId, perfil, caja) {
   const explorados = sensorial.filter(m => m.respuesta !== "sin_datos").length;
 
   caja.innerHTML = `
+    <div id="equipoNeuroBox"></div>
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">Perfil</div>
       <label>Condición</label>
@@ -208,6 +209,10 @@ function pintarPerfilNeuro(pacienteId, perfil, caja) {
   caja.querySelectorAll("[data-modalidad]").forEach(el => {
     el.onclick = () => abrirDetalleSensorial(pacienteId, perfil, el.dataset.modalidad, caja);
   });
+
+  // Sin await: si la consulta del equipo tarda o falla, el perfil se ve igual.
+  // El bloque aparece cuando llega, como el de persona en pacientes.js.
+  renderEquipoNeuro(pacienteId, caja.querySelector("#equipoNeuroBox"));
 }
 
 const MODALIDADES_SENSORIALES_ORDEN = ["auditivo", "tactil", "visual", "vestibular", "propioceptivo", "oral", "olfativo", "interoceptivo"];
@@ -940,5 +945,190 @@ function abrirBorradorFamilia(pacienteId, inf, enlace) {
       await api(`/medico/informes-familia/${inf._id}`, { method: "DELETE" });
       renderTabInformesFamilia(pacienteId);
     } catch (e) { alert(e.error || "No se pudo borrar"); }
+  };
+}
+
+// ═══ EL EQUIPO TRATANTE ════════════════════════════════════════════════════
+//
+// El porqué está en db/models.js. Lo que decide esta pantalla:
+//
+// · LA AUTORIZACIÓN ES EL PRIMER CAMPO, no una casilla al final. Compartir la
+//   ficha de un chico es una decisión de su familia, y el formulario tiene que
+//   pedirse como tal o se completa sin leer.
+//
+// · CUANDO LA FICHA ES COMPARTIDA, SE DICE. Un profesional que edita el perfil
+//   sensorial tiene que saber que lo van a leer otras tres personas — y que lo
+//   que ve no lo escribió necesariamente él.
+//
+// · SUMAR A ALGUIEN NO ES UN CLIC SUELTO. Se confirma, porque le está dando a
+//   otra persona acceso a la ficha de un chico.
+async function renderEquipoNeuro(pacienteId, caja) {
+  if (!caja) return;
+  caja.innerHTML = `<div class="hint">Cargando el equipo...</div>`;
+  let d;
+  try {
+    d = await api(`/medico/pacientes/${pacienteId}/equipo`);
+  } catch (e) {
+    caja.innerHTML = `<div class="error">${esc(e.error || "No se pudo cargar el equipo")}</div>`;
+    return;
+  }
+  pintarEquipoNeuro(pacienteId, d, caja);
+}
+
+function pintarEquipoNeuro(pacienteId, d, caja) {
+  const eq = d.equipo;
+
+  if (!eq) {
+    caja.innerHTML = `
+      <div class="card">
+        <div class="seccion-titulo" style="margin-top:0">Equipo tratante</div>
+        <div class="hint" style="margin-bottom:12px">
+          Si a este chico lo atienden varias personas del centro, pueden trabajar sobre
+          <b>una sola ficha</b> en vez de cuatro que no se ven entre sí. Comparten el perfil,
+          los objetivos con su progreso, la vigilancia de salud y los informes a la familia.
+          Las notas de cada sesión siguen siendo de cada profesional.
+        </div>
+        ${!d.tienePersona ? `
+          <div class="error">
+            Primero hay que asociar esta ficha a una persona del centro, en la pestaña Paciente.
+            Es lo que permite que los demás sepan que hablan del mismo chico.
+          </div>` : `
+          <div class="seccion-titulo">Lo autorizó la familia</div>
+          <div class="hint" style="margin-bottom:8px">
+            Sin esto no se arma. Compartir la ficha de un chico es una decisión de su familia,
+            no del centro.
+          </div>
+          <input id="eqQuien" type="text" placeholder="Quién autorizó (nombre y apellido)">
+          <input id="eqVinculo" type="text" placeholder="Qué es del chico (madre, padre, tutora…)" style="margin-top:8px">
+          <label>Cuándo</label>
+          <input id="eqFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
+          <input id="eqNota" type="text" placeholder="Nota (opcional): cómo se registró" style="margin-top:8px">
+          <div id="eqErr"></div>
+          <button class="secondary" id="btnEqCrear">Armar el equipo</button>`}
+      </div>`;
+
+    const btn = document.getElementById("btnEqCrear");
+    if (btn) btn.onclick = async () => {
+      const err = document.getElementById("eqErr");
+      btn.disabled = true;
+      try {
+        await api(`/medico/pacientes/${pacienteId}/equipo`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            autorizacion: {
+              porQuien: document.getElementById("eqQuien").value.trim(),
+              vinculo: document.getElementById("eqVinculo").value.trim(),
+              fecha: document.getElementById("eqFecha").value,
+              nota: document.getElementById("eqNota").value.trim(),
+            },
+          }),
+        });
+        renderEquipoNeuro(pacienteId, caja);
+      } catch (e) {
+        btn.disabled = false;
+        err.innerHTML = `<div class="error">${esc(e.error || "No se pudo armar el equipo")}</div>`;
+      }
+    };
+    return;
+  }
+
+  const a = eq.autorizacion || {};
+  caja.innerHTML = `
+    <div class="card">
+      <div class="top" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div class="seccion-titulo" style="margin:0">Equipo tratante</div>
+        <span class="eq-sello">ficha compartida</span>
+      </div>
+
+      <div class="hint" style="margin:8px 0 12px">
+        ${eq.soyTitular
+          ? "La ficha es tuya y la trabaja todo el equipo."
+          : "Estás trabajando sobre la ficha de otro profesional del equipo. Cada vez que la abrís queda registrado."}
+      </div>
+
+      ${eq.miembros.map(m => `
+        <div class="dato-row" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div>
+            <div style="font-weight:600">${esc(m.nombre || "—")}${m.soyYo ? " (vos)" : ""}</div>
+            ${m.rol ? `<div class="hint" style="margin:2px 0 0">${esc(m.rol)}</div>` : ""}
+          </div>
+          ${m.soyYo || m.esTitular ? "" : `<button class="link" data-eq-sacar="${esc(m.telefono)}" style="margin:0;width:auto;color:var(--danger)">Sacar</button>`}
+        </div>`).join("")}
+
+      <div class="seccion-titulo">Sumar a alguien del centro</div>
+      <div class="hint" style="margin-bottom:8px">
+        Tiene que tener cuenta de Symphomed Neurodesarrollo en este mismo centro.
+      </div>
+      <input id="eqTel" type="tel" placeholder="Su teléfono de Symphomed">
+      <input id="eqRol" type="text" placeholder="Qué hace con el chico (fonoaudiología, TO…)" style="margin-top:8px">
+      <div id="eqErr2"></div>
+      <button class="secondary" id="btnEqSumar">Sumar al equipo</button>
+    </div>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">La autorización de la familia</div>
+      <div class="paciente-info">
+        <b>${esc(a.porQuien || "—")}</b>${a.vinculo ? ` · ${esc(a.vinculo)}` : ""}
+      </div>
+      <div class="hint" style="margin-top:4px">
+        ${a.fecha ? new Date(a.fecha).toLocaleDateString("es-BO") : ""}${a.nota ? ` · ${esc(a.nota)}` : ""}
+      </div>
+      <button class="link" id="btnEqCerrar" style="color:var(--danger)">
+        Cerrar el equipo (la familia retiró la autorización)
+      </button>
+    </div>`;
+
+  document.getElementById("btnEqSumar").onclick = async () => {
+    const btn = document.getElementById("btnEqSumar");
+    const err = document.getElementById("eqErr2");
+    const tel = document.getElementById("eqTel").value.trim();
+    if (!tel) { err.innerHTML = `<div class="error">Poné el teléfono de la persona.</div>`; return; }
+    // Se confirma porque le está dando a otra persona acceso a la ficha de un
+    // chico. No es guardar un dato, es abrir una puerta.
+    if (!confirm("Esta persona va a ver la ficha completa de este chico: perfil, objetivos, salud e informes. ¿Va?")) return;
+    btn.disabled = true;
+    try {
+      const r = await api(`/medico/equipos/${eq._id}/miembros`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefono: tel, rol: document.getElementById("eqRol").value.trim() }),
+      });
+      // Si ya venía atendiendo al chico por su cuenta, lo suyo deja de verse
+      // (no se borra). Es lo primero que va a preguntar, así que se le dice
+      // ahora y no cuando abra la ficha y no encuentre sus objetivos.
+      const p = r.traeFichaPropia;
+      if (p) {
+        alert(
+          "Ojo: esta persona ya tenía su propia ficha de este chico" +
+          (p.objetivos ? ` (${p.objetivos} ${p.objetivos === 1 ? "objetivo" : "objetivos"}${p.perfil ? " y un perfil cargado" : ""})` : " con un perfil cargado") +
+          ".\n\nDesde ahora trabaja sobre la ficha del equipo, así que eso deja de verse. No se borró: " +
+          "si hay algo que quieran conservar, cárguenlo de nuevo acá. Symphomed no lo mezcla solo porque " +
+          "decidir cuál versión gana no le corresponde."
+        );
+      }
+      renderEquipoNeuro(pacienteId, caja);
+    } catch (e) {
+      btn.disabled = false;
+      err.innerHTML = `<div class="error">${esc(e.error || "No se pudo sumar")}</div>`;
+    }
+  };
+
+  caja.querySelectorAll("[data-eq-sacar]").forEach(el => {
+    const miembro = eq.miembros.find(m => m.telefono === el.dataset.eqSacar);
+    el.onclick = async () => {
+      if (!miembro) return;
+      if (!confirm(`${miembro.nombre} va a dejar de ver esta ficha. Lo que ya cargó queda. ¿Va?`)) return;
+      try {
+        await api(`/medico/equipos/${eq._id}/miembros/${encodeURIComponent(miembro.telefono)}`, { method: "DELETE" });
+        renderEquipoNeuro(pacienteId, caja);
+      } catch (e) { alert(e.error || "No se pudo"); }
+    };
+  });
+
+  document.getElementById("btnEqCerrar").onclick = async () => {
+    if (!confirm("Se cierra el equipo y cada profesional deja de ver esta ficha. ¿La familia retiró la autorización?")) return;
+    try {
+      await api(`/medico/equipos/${eq._id}`, { method: "DELETE" });
+      renderEquipoNeuro(pacienteId, caja);
+    } catch (e) { alert(e.error || "No se pudo cerrar"); }
   };
 }
