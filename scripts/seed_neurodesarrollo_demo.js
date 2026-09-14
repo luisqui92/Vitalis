@@ -27,7 +27,7 @@ const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const crypto = require("crypto");
 const {
-  Medico, Paciente, ConsultaMedica, Medicion,
+  Medico, Paciente, ConsultaMedica, Medicion, Recordatorio,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado,
   Clinica, PersonaClinica, EquipoNeuro, InformeFamilia, INSTRUMENTOS_NEURO,
 } = require("../db/models");
@@ -940,6 +940,28 @@ function avisarSiEsDebil(phone, password) {
     } else {
       console.log(`   · ${i.nombre} — sin avances registrados en el período, no se arma`);
     }
+  }
+
+  // ─── Un par de cosas que se pasaron ────────────────────────────────────
+  // El panel de "Lo que se pasó" (services/vencidos.js) es lo primero que ve
+  // el profesional al entrar, y con la demo limpia aparecía casi vacío. Estos
+  // recordatorios vencidos son lo que tiene cualquier consultorio real: cosas
+  // que uno se anotó y se le pasaron.
+  console.log("\n  Lo que se pasó:");
+  const olvidos = [
+    { nombre: "Mateo Ribera Quispe", titulo: "Pedir el informe de la fonoaudióloga del jardín", dias: 34 },
+    { nombre: "Thiago Núñez Salvatierra", titulo: "Reevaluar el Conners-4 con la maestra", dias: 71 },
+    { nombre: "Benjamín Suárez Antelo", titulo: "Llamar a la mamá por la derivación a neurología", dias: 12 },
+  ];
+  for (const o of olvidos) {
+    const ficha = fichas[o.nombre];
+    if (!ficha) { console.log(`   · ${o.nombre} — ya estaba, se saltea`); continue; }
+    if (await Recordatorio.findOne({ pacienteId: ficha._id, titulo: o.titulo })) continue;
+    await Recordatorio.create({
+      pacienteId: ficha._id, pacienteNombre: ficha.nombre, medicoPhone: phone,
+      tipo: "control", titulo: o.titulo, fecha: haceDias(o.dias),
+    });
+    console.log(`   ✓ ${o.nombre} — ${o.titulo} (hace ${o.dias} días)`);
   }
 
   console.log(`\n  Listo — ${creados} paciente${creados === 1 ? "" : "s"} nuevo${creados === 1 ? "" : "s"}.`);

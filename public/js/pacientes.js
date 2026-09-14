@@ -110,6 +110,7 @@ async function renderDashboard() {
     app.innerHTML = `
       ${avisoOperadorHtml()}
       ${avisoSaldoHtml()}
+      <div id="vencidosBox"></div>
       ${sinAsignar ? `
         <div class="card no-imprimir" style="border-color:var(--warning);cursor:pointer" id="avisoBandeja">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -131,6 +132,10 @@ async function renderDashboard() {
     `;
     engancharAvisoSaldo();
     engancharAvisoOperador();
+    // Sin await: recorre las fichas para calcular qué se pasó, así que si
+    // tarda o falla, el panel se abre igual y esto aparece cuando llega.
+    // Mismo criterio que la bandeja DICOM.
+    renderVencidos();
     const avisoBandeja = document.getElementById("avisoBandeja");
     if (avisoBandeja) avisoBandeja.onclick = () => renderBandejaDicom();
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;

@@ -152,6 +152,9 @@ require("./routes/informes")(app);
 require("./routes/memoriaClinica")(app);
 require("./routes/recetas")(app);
 require("./routes/recordatorios")(app);
+// El panel de lo que se pasó. Sirve para las ocho ramas con un solo
+// desarrollo — ver el encabezado de services/vencidos.js.
+require("./routes/vencidos")(app);
 require("./routes/citas")(app);
 require("./routes/whatsappSalud")(app);
 require("./routes/vapi")(app);
