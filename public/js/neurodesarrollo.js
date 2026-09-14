@@ -46,13 +46,17 @@ const MODALIDADES_LABEL = {
   interoceptivo: { nombre: "Interoceptivo", icono: "🫀", ejemplo: "avisar hambre, sed, ganas de baño, dolor" },
 };
 
+// Los colores salen de tokens propios (--sens-*) y no de los semánticos:
+// hipo y mixto eran el mismo cian con distinta claridad, y "hiper" estaba
+// pintado con el rojo de error — un chico hiperreactivo al ruido no tiene un
+// error, así procesa. Ver el bloque en public/estilos.css.
 const RESPUESTAS_LABEL = {
-  sin_datos: { texto: "Sin explorar", color: "var(--text-muted)", corto: "—" },
-  tipico: { texto: "Respuesta típica", color: "var(--success)", corto: "Típico" },
-  hiper: { texto: "Hiperreactivo — le resulta demasiado", color: "var(--danger)", corto: "Hiper" },
-  hipo: { texto: "Hiporreactivo — le llega poco", color: "var(--primary)", corto: "Hipo" },
-  busca: { texto: "Buscador — lo necesita y lo procura", color: "var(--warning)", corto: "Busca" },
-  mixto: { texto: "Mixto según el contexto", color: "var(--accent)", corto: "Mixto" },
+  sin_datos: { texto: "Sin explorar", color: "var(--text-muted)", corto: "Sin explorar" },
+  tipico: { texto: "Respuesta típica", color: "var(--sens-tipico)", corto: "Típico" },
+  hiper: { texto: "Hiperreactivo — le resulta demasiado", color: "var(--sens-hiper)", corto: "Hiper" },
+  hipo: { texto: "Hiporreactivo — le llega poco", color: "var(--sens-hipo)", corto: "Hipo" },
+  busca: { texto: "Buscador — lo necesita y lo procura", color: "var(--sens-busca)", corto: "Busca" },
+  mixto: { texto: "Mixto según el contexto", color: "var(--sens-mixto)", corto: "Mixto" },
 };
 
 const AREAS_LABEL = {
@@ -146,6 +150,7 @@ function pintarPerfilNeuro(pacienteId, perfil, caja) {
         Explorados ${explorados} de ${sensorial.length}. Tocá un sentido para cargar cómo responde,
         qué lo desregula y qué lo calma — es la información que más sirve en casa y en la escuela.
       </div>
+      ${mapaSensorialSvg(sensorial)}
       <div id="mapaSensorial">
         ${sensorial.map(m => {
           const r = RESPUESTAS_LABEL[m.respuesta] || RESPUESTAS_LABEL.sin_datos;
@@ -206,8 +211,16 @@ function pintarPerfilNeuro(pacienteId, perfil, caja) {
     }
   };
 
+  // Matchea los gajos del mapa y las filas de la lista: los dos caminos
+  // abren el mismo detalle. En el SVG el gajo es un <g>, así que el Enter no
+  // dispara solo como en un <button> — hay que atarlo a mano o el mapa queda
+  // fuera del alcance de quien no usa mouse.
   caja.querySelectorAll("[data-modalidad]").forEach(el => {
-    el.onclick = () => abrirDetalleSensorial(pacienteId, perfil, el.dataset.modalidad, caja);
+    const abrir = () => abrirDetalleSensorial(pacienteId, perfil, el.dataset.modalidad, caja);
+    el.onclick = abrir;
+    el.onkeydown = (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); abrir(); }
+    };
   });
 
   // Sin await: si la consulta del equipo tarda o falla, el perfil se ve igual.
@@ -216,6 +229,69 @@ function pintarPerfilNeuro(pacienteId, perfil, caja) {
 }
 
 const MODALIDADES_SENSORIALES_ORDEN = ["auditivo", "tactil", "visual", "vestibular", "propioceptivo", "oral", "olfativo", "interoceptivo"];
+
+// ═══ EL MAPA SENSORIAL, DIBUJADO ═══════════════════════════════════════════
+//
+// Esto es el odontograma de esta rama, y le faltaba por completo: el módulo
+// tenía mil líneas de lógica y nada que mirar.
+//
+// Por qué un círculo y no un cuerpo: de los ocho sentidos, tres no viven en
+// una parte del cuerpo que se pueda señalar —el vestibular, el propioceptivo
+// y el interoceptivo— así que una silueta obligaría a inventarles un lugar.
+// El círculo no miente sobre dónde está cada cosa: solo dice que son ocho
+// caras de la misma persona.
+//
+// Por qué el color es una CATEGORÍA y no una escala: hiper e hipo no son
+// "mucho" y "poco" de lo mismo, son dos direcciones opuestas desde lo típico.
+// Un gráfico de araña —que es como suelen presentarse estos perfiles— obliga
+// a ponerlos en un solo eje y eso es directamente falso.
+//
+// El dibujo es el vistazo; la lista de abajo sigue siendo el detalle, porque
+// lo que de verdad sirve en casa son los desencadenantes y las estrategias.
+// Mismo patrón que el odontograma: la figura arriba, la ficha de la pieza
+// abajo.
+function mapaSensorialSvg(sensorial) {
+  const CX = 120, CY = 120, R0 = 42, R1 = 106;
+  const n = sensorial.length;
+  const paso = (Math.PI * 2) / n;
+  const hueco = 0.035;   // separación entre gajos, en radianes
+  const punto = (r, a) => `${(CX + r * Math.cos(a)).toFixed(2)} ${(CY + r * Math.sin(a)).toFixed(2)}`;
+
+  const gajos = sensorial.map((m, i) => {
+    // −90° para que el primer sentido quede arriba y no a la derecha.
+    const a0 = -Math.PI / 2 + i * paso + hueco;
+    const a1 = -Math.PI / 2 + (i + 1) * paso - hueco;
+    const am = (a0 + a1) / 2;
+    const r = RESPUESTAS_LABEL[m.respuesta] || RESPUESTAS_LABEL.sin_datos;
+    const explorado = m.respuesta !== "sin_datos";
+    const info = MODALIDADES_LABEL[m.modalidad];
+    const d = `M ${punto(R0, a0)} L ${punto(R1, a0)} A ${R1} ${R1} 0 0 1 ${punto(R1, a1)} ` +
+              `L ${punto(R0, a1)} A ${R0} ${R0} 0 0 0 ${punto(R0, a0)} Z`;
+    return `
+      <g class="sens-gajo${explorado ? "" : " sin-datos"}" data-modalidad="${m.modalidad}" role="button" tabindex="0"
+         aria-label="${esc(info.nombre)}: ${esc(r.texto)}">
+        <title>${esc(info.nombre)} — ${esc(r.texto)}</title>
+        <path d="${d}" fill="${r.color}" />
+        <text x="${(CX + ((R0 + R1) / 2) * Math.cos(am)).toFixed(2)}"
+              y="${(CY + ((R0 + R1) / 2) * Math.sin(am)).toFixed(2)}"
+              class="sens-icono">${info.icono}</text>
+      </g>`;
+  }).join("");
+
+  const explorados = sensorial.filter(m => m.respuesta !== "sin_datos").length;
+  return `
+    <svg class="sens-mapa" viewBox="0 0 240 240" role="img"
+         aria-label="Mapa sensorial: ${explorados} de ${n} sentidos explorados">
+      ${gajos}
+      <circle cx="${CX}" cy="${CY}" r="${R0 - 5}" class="sens-centro" />
+      <text x="${CX}" y="${CY - 4}" class="sens-centro-num">${explorados}/${n}</text>
+      <text x="${CX}" y="${CY + 12}" class="sens-centro-lbl">explorados</text>
+    </svg>
+    <div class="sens-leyenda">
+      ${["hiper", "hipo", "busca", "tipico", "mixto", "sin_datos"].map(k => `
+        <span><i style="background:${RESPUESTAS_LABEL[k].color}"></i>${esc(RESPUESTAS_LABEL[k].corto)}</span>`).join("")}
+    </div>`;
+}
 
 function abrirDetalleSensorial(pacienteId, perfil, modalidad, caja) {
   const item = perfil.perfilSensorial.find(m => m.modalidad === modalidad) || { respuesta: "sin_datos", historial: [] };
@@ -429,34 +505,75 @@ function tarjetaObjetivo(o) {
     </div>`;
 }
 
-// Una barra por registro, en orden. Sin librerías y sin canvas: para diez
-// sesiones esto se lee mejor que un gráfico, y funciona igual en un celular
-// angosto.
+// ═══ LA CURVA DEL NIVEL DE AYUDA ══════════════════════════════════════════
 //
-// La ALTURA es el porcentaje de logro y el COLOR es cuánta ayuda necesitó,
-// del más pálido (ayuda física total) al más intenso (solo). Son dos cosas
-// distintas y las dos importan: un chico puede pasar de 8 de 10 con ayuda
-// física a 8 de 10 solo, y eso es un avance enorme que un gráfico de
-// porcentaje mostraría como una línea plana.
-const INTENSIDAD_AYUDA = {
-  fisica_total: 0.18, fisica_parcial: 0.35, gestual: 0.55, verbal: 0.75, independiente: 1,
+// Antes esto era una fila de barritas donde la ALTURA era el porcentaje y la
+// OPACIDAD era cuánta ayuda necesitó. Dos cosas peleando en el mismo dibujo,
+// y la más importante de las dos codificada en opacidad, que es de lo peor
+// que se puede usar para comparar: nadie distingue 0,4 de 0,6 mirando.
+//
+// Acá la ayuda pasa a ser el eje vertical, con las cinco etiquetas escritas
+// en castellano: "de la mano" abajo, "solo" arriba. Entonces la línea que
+// sube ES el avance, literalmente, y no hay que explicar el gráfico.
+//
+// Y ese es todo el argumento de venta de la vertical, dibujado: el
+// porcentaje puede bajar mientras el chico avanza —si pasó de que le tomen
+// la mano a que le señalen, avanzó aunque le salga menos veces— y ningún
+// gráfico de porcentaje puede mostrar eso. El porcentaje queda de dato
+// secundario, en el punto de cada sesión.
+const ESCALA_AYUDA = ["fisica_total", "fisica_parcial", "gestual", "verbal", "independiente"];
+const AYUDA_CORTA = {
+  fisica_total: "De la mano",
+  fisica_parcial: "Poca ayuda",
+  gestual: "Le señalan",
+  verbal: "Se lo recuerdan",
+  independiente: "Solo",
 };
 
 function barraProgresoObjetivo(prog) {
   const ultimos = prog.slice(-12);
+  if (!ultimos.length) return "";
+
+  const W = 320, H = 156, IZQ = 88, DER = 14, ARR = 12, ABA = 26;
+  const anchoUtil = W - IZQ - DER, altoUtil = H - ARR - ABA;
+  const filas = ESCALA_AYUDA.length;
+  const y = (ayuda) => {
+    const i = ESCALA_AYUDA.indexOf(ayuda);
+    // Índice 0 abajo (más ayuda), 4 arriba (sin ayuda).
+    return ARR + altoUtil - ((i < 0 ? 0 : i) / (filas - 1)) * altoUtil;
+  };
+  // Con una sola sesión no hay línea que trazar: el punto va al centro.
+  const x = (i) => ultimos.length === 1
+    ? IZQ + anchoUtil / 2
+    : IZQ + (i / (ultimos.length - 1)) * anchoUtil;
+
+  const puntos = ultimos.map((p, i) => ({ ...p, cx: x(i), cy: y(p.ayuda), pct: porcentaje(p) }));
+  const linea = puntos.map(p => `${p.cx.toFixed(1)},${p.cy.toFixed(1)}`).join(" ");
+  const ultimo = puntos[puntos.length - 1];
+  const primero = puntos[0];
+  const subio = ESCALA_AYUDA.indexOf(ultimo.ayuda) > ESCALA_AYUDA.indexOf(primero.ayuda);
+
   return `
-    <div style="display:flex;align-items:flex-end;gap:3px;height:58px;margin:10px 0 4px">
-      ${ultimos.map(p => {
-        const pct = porcentaje(p);
-        const intensidad = INTENSIDAD_AYUDA[p.ayuda] ?? 0.5;
-        return `<div title="${pct}% — ${p.logros}/${p.intentos} — ${esc(AYUDAS_LABEL[p.ayuda] || "")}"
-          style="flex:1;min-width:6px;height:${Math.max(8, pct)}%;border-radius:3px 3px 0 0;
-          background:rgba(var(--primary-rgb),${intensidad})"></div>`;
-      }).join("")}
-    </div>
-    <div class="hint" style="margin:0;font-size:11px">
-      Alto = cuánto le sale. Color más fuerte = menos ayuda necesitó.
-      Bajar la ayuda importa tanto como subir el porcentaje.
+    <svg class="ayuda-grafico" viewBox="0 0 ${W} ${H}" role="img"
+         aria-label="Nivel de ayuda a lo largo de ${ultimos.length} sesiones. Ahora: ${esc(AYUDAS_LABEL[ultimo.ayuda] || "")}">
+      ${ESCALA_AYUDA.map(a => `
+        <line x1="${IZQ}" y1="${y(a)}" x2="${W - DER}" y2="${y(a)}" class="ayuda-guia" />
+        <text x="${IZQ - 8}" y="${y(a) + 3.5}" class="ayuda-eje">${esc(AYUDA_CORTA[a])}</text>`).join("")}
+      ${puntos.length > 1 ? `<polyline points="${linea}" class="ayuda-linea" />` : ""}
+      ${puntos.map((p, i) => `
+        <circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${i === puntos.length - 1 ? 5.5 : 3.5}"
+                class="ayuda-punto${i === puntos.length - 1 ? " ultimo" : ""}">
+          <title>${p.logros} de ${p.intentos} · ${esc(AYUDAS_LABEL[p.ayuda] || "")}</title>
+        </circle>`).join("")}
+      <text x="${W - DER}" y="${H - 8}" class="ayuda-pie" text-anchor="end">
+        ${ultimo.intentos ? `${ultimo.logros} de ${ultimo.intentos} la última vez` : ""}
+      </text>
+      <text x="${IZQ}" y="${H - 8}" class="ayuda-pie">${ultimos.length} sesiones</text>
+    </svg>
+    <div class="hint" style="margin:0;font-size:11.5px">
+      ${subio
+        ? `Necesita <b>menos ayuda</b> que al empezar: de «${esc(AYUDAS_LABEL[primero.ayuda])}» a «${esc(AYUDAS_LABEL[ultimo.ayuda])}». Eso es el avance, aunque el porcentaje suba o baje.`
+        : `La línea que sube es el avance: cuanto más arriba, menos ayuda necesita.`}
     </div>`;
 }
 

@@ -44,6 +44,21 @@
   --success:#7bb98a; --success-bg:rgba(123,185,138,.14);
   --warning:#d8a64b; --warning-bg:rgba(216,166,75,.14);
   --danger:#e0674c;  --danger-bg:rgba(224,103,76,.14);
+  /* Las cinco respuestas del perfil sensorial son una escala CATEGÓRICA y
+     tienen sus propios colores, en vez de pedirlos prestados a los
+     semánticos. Dos motivos:
+
+     · Hipo usaba --primary y mixto usaba --accent, que son el mismo cian
+       con distinta claridad. En la lista casi no se notaba; en el mapa
+       quedan dos gajos pegados que no se distinguen.
+     · Hiperreactivo usaba --danger. Un chico hiperreactivo al ruido no
+       tiene un error: así procesa. Todo el módulo evita "sufre" y "padece"
+       y después lo pintaba de rojo de alerta. */
+  --sens-hiper:#e8825c;
+  --sens-hipo:#4f9fd8;
+  --sens-busca:#d8b84b;
+  --sens-tipico:#7bb98a;
+  --sens-mixto:#a98bd4;
   --gradient-vitalis:linear-gradient(135deg,#1290bc,#19b9ef);
 
   /* Sobre el color principal va tinta oscura, no blanca: el cian es claro y
@@ -971,3 +986,39 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    Ver db/models.js, equipoNeuroSchema. */
 .eq-sello{display:inline-block;background:rgba(var(--primary-rgb),.14);color:var(--primary);
   border-radius:99px;padding:3px 11px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+
+/* ─── El mapa sensorial y la curva de ayuda (neurodesarrollo) ─────────────
+   Son los dos dibujos de la rama, y hasta ahora no existían: el módulo
+   tenía mil líneas de lógica y nada que mirar. Ver el encabezado de
+   mapaSensorialSvg() y de barraProgresoObjetivo() en
+   public/js/neurodesarrollo.js para el porqué de cada decisión. */
+.sens-mapa{display:block;width:100%;max-width:280px;margin:4px auto 10px;overflow:visible}
+/* El gajo sin explorar se apaga en vez de desaparecer: que se vea el hueco
+   es el dato — dice qué falta trabajar. */
+.sens-gajo path{transition:opacity .15s ease,transform .1s ease;transform-origin:120px 120px;cursor:pointer}
+.sens-gajo.sin-datos path{opacity:.22}
+.sens-gajo:hover path,.sens-gajo:focus-visible path{opacity:1;transform:scale(1.035)}
+.sens-gajo:focus-visible{outline:none}
+.sens-gajo:focus-visible path{stroke:var(--text);stroke-width:1.5}
+.sens-icono{font-size:19px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.sens-centro{fill:var(--card);stroke:var(--border)}
+.sens-centro-num{fill:var(--text);font-family:var(--font-marca);font-size:17px;font-weight:600;text-anchor:middle}
+.sens-centro-lbl{fill:var(--text-muted);font-size:8.5px;text-anchor:middle;letter-spacing:.04em;text-transform:uppercase}
+.sens-leyenda{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;margin-bottom:14px;
+  font-size:11px;color:var(--text-muted)}
+.sens-leyenda span{display:inline-flex;align-items:center;gap:5px}
+.sens-leyenda i{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+.ayuda-grafico{display:block;width:100%;margin:10px 0 6px;overflow:visible}
+.ayuda-guia{stroke:var(--border);stroke-width:1;stroke-dasharray:2 4}
+.ayuda-eje{fill:var(--text-muted);font-size:10px;text-anchor:end}
+.ayuda-pie{fill:var(--text-muted);font-size:10px}
+.ayuda-linea{fill:none;stroke:var(--primary);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.ayuda-punto{fill:var(--card);stroke:var(--primary);stroke-width:2}
+.ayuda-punto.ultimo{fill:var(--primary);stroke:var(--card);stroke-width:2.5}
+
+@media(max-width:400px){
+  .sens-mapa{max-width:240px}
+  .sens-icono{font-size:16px}
+  .ayuda-eje{font-size:9px}
+}
