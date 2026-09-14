@@ -22,15 +22,19 @@
 //
 // Es idempotente: si la profesional ya existe no le toca la contraseña, y si
 // un paciente ya tiene perfil cargado, lo saltea.
+const path = require("path");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
+const crypto = require("crypto");
 const {
   Medico, Paciente, ConsultaMedica, Medicion,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado,
+  Clinica, PersonaClinica, EquipoNeuro, InformeFamilia, INSTRUMENTOS_NEURO,
 } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 const { PLANTILLAS_VIGILANCIA } = require("../services/vigilancia");
 const { siguienteCodigo } = require("../services/codigos");
+const { armarBorrador } = require("../services/informeFamilia");
 
 // ─── FECHAS ───────────────────────────────────────────────────────────────
 const DIA = 24 * 60 * 60 * 1000;
@@ -658,8 +662,12 @@ async function crearPaciente(medicoPhone, d) {
       instrumento: i.instrumento,
       modulo: i.modulo || "",
       fecha: haceDias(i.dias),
-      aplicadoPor: "Lic. Fernanda Suárez",
-      matricula: "PSI-4471",
+      aplicadoPor: i.aplicadoPor || "Lic. Fernanda Suárez",
+      matricula: i.matricula || "PSI-4471",
+      // La calificación que pedía ese instrumento el día que se cargó. Un
+      // M-CHAT es de uso libre; un ADOS-2 es nivel C. Ver el comentario de
+      // CALIFICACIONES_INSTRUMENTO en db/models.js.
+      quienPuede: (INSTRUMENTOS_NEURO.find(x => x.nombre === i.instrumento) || {}).quienPuede || "profesional",
       puntajes: (i.puntajes || []).map(([nombre, valor]) => ({ nombre, valor })),
       clasificacion: i.clasificacion || "",
       interpretacion: i.interpretacion || "",
@@ -682,6 +690,167 @@ async function crearPaciente(medicoPhone, d) {
   return paciente;
 }
 
+// ─── EL CENTRO Y EL EQUIPO ────────────────────────────────────────────────
+//
+// Un centro de neurodesarrollo no es una profesional sola: son cuatro
+// personas sobre el mismo chico. La demo tiene que mostrar eso, porque es
+// exactamente lo que Symphomed hace y un cuaderno no puede hacer.
+//
+// Ver db/models.js (equipoNeuroSchema) para la regla: el equipo tratante de
+// ESTE chico comparte SU ficha, la familia autoriza, y ser director no
+// alcanza.
+const COLEGAS = [
+  { sufijo: "01", nombre: "Lic. Marina Rojas", especialidad: "Fonoaudiología" },
+  { sufijo: "02", nombre: "Lic. Andrés Melgar", especialidad: "Terapia ocupacional" },
+  { sufijo: "03", nombre: "Dra. Paola Ibáñez", especialidad: "Psiquiatría infantil" },
+];
+
+async function armarCentro(phone, password, nombreMedico) {
+  let centro = await Clinica.findOne({ nombre: "Centro Aprender (demo)" });
+  if (!centro) centro = await Clinica.create({ nombre: "Centro Aprender (demo)", ciudad: "Santa Cruz de la Sierra" });
+
+  await Medico.updateOne({ phone }, { $set: { clinicaId: centro._id } });
+
+  // Las colegas cuelgan del teléfono de la cuenta principal para no chocar
+  // con números reales: si la demo entra con "123", ellas son "123-01" y
+  // demás. Feo de leer y sin riesgo de pisarle la cuenta a nadie.
+  const creados = [];
+  for (const c of COLEGAS) {
+    const suPhone = `${phone}-${c.sufijo}`;
+    let m = await Medico.findOne({ phone: suPhone });
+    if (!m) {
+      m = await Medico.create({
+        phone: suPhone, nombre: c.nombre, especialidad: c.especialidad,
+        tipoEspecialidad: "neurodesarrollo", clinicaId: centro._id,
+        passwordHash: await hashPassword(password), activo: true,
+      });
+    } else {
+      m.clinicaId = centro._id; await m.save();
+    }
+    creados.push(m);
+  }
+  console.log(`  Centro: ${centro.nombre} — ${nombreMedico} + ${creados.length} colegas`);
+  return { centro, colegas: creados };
+}
+
+// Arma el equipo tratante de un chico: lo asocia a una persona del centro y
+// suma a las colegas. La autorización de la familia NO es decorativa — sin
+// ella el modelo ni siquiera deja crear el documento.
+async function armarEquipo(paciente, medicoPhone, centro, colegas, datos) {
+  if (!paciente.personaId) {
+    const persona = await PersonaClinica.create({
+      clinicaId: centro._id,
+      nombre: paciente.nombre,
+      fechaNacimiento: paciente.fechaNacimiento,
+      telefono: paciente.telefono,
+    });
+    paciente.personaId = persona._id;
+    await paciente.save();
+  }
+  if (await EquipoNeuro.findOne({ personaId: paciente.personaId })) return null;
+
+  return EquipoNeuro.create({
+    clinicaId: centro._id,
+    personaId: paciente.personaId,
+    pacienteIdTitular: paciente._id,
+    medicoPhoneTitular: medicoPhone,
+    miembros: [
+      { medicoPhone, nombre: datos.titularNombre, rol: "Psicología del neurodesarrollo", agregadoPor: medicoPhone },
+      ...datos.suma.map(i => ({
+        medicoPhone: colegas[i].phone, nombre: colegas[i].nombre,
+        rol: colegas[i].especialidad, agregadoPor: medicoPhone, agregadoEn: haceDias(datos.dias),
+      })),
+    ],
+    autorizacion: {
+      porQuien: datos.autoriza, vinculo: datos.vinculo, fecha: haceDias(datos.dias),
+      registradaPor: medicoPhone, nota: datos.nota || "",
+    },
+  });
+}
+
+// ─── EL INFORME PARA LA FAMILIA ───────────────────────────────────────────
+//
+// Se arma con el MISMO servicio que usa la pantalla (armarBorrador), no con
+// datos escritos a mano: así la demo muestra lo que el producto produce de
+// verdad con los objetivos que ya están cargados. Si mañana cambia cómo se
+// redacta, la demo cambia sola.
+async function armarInformeFamilia(paciente, medicoPhone, { nota, profesional, centro, enviado }) {
+  if (await InformeFamilia.findOne({ pacienteId: paciente._id })) return null;
+  const hasta = new Date();
+  const desde = new Date(hasta.getTime() - 60 * 86400000);
+  const borrador = await armarBorrador({ pacienteId: paciente._id, medicoPhone, desde, hasta });
+  if (!borrador) return null;
+
+  return InformeFamilia.create({
+    pacienteId: paciente._id, medicoPhone,
+    ...borrador,
+    nota, profesional, centro,
+    ...(enviado ? {
+      estado: "enviado",
+      enviadoEn: haceDias(6),
+      enviadoA: paciente.telefono || "",
+      // Un token de demo, largo como uno real para que la ruta lo acepte.
+      tokenPublico: "demo" + crypto.randomBytes(18).toString("base64url"),
+      tokenExpira: new Date(Date.now() + 365 * 86400000),
+      vistas: 3, vistoEn: haceDias(5),
+    } : {}),
+  });
+}
+
+// ─── BORRAR LA DEMO ───────────────────────────────────────────────────────
+//
+// Existe porque la demo se deja puesta. Una cuenta con contraseña de
+// demostración en el mismo servidor donde hay miles de historias clínicas
+// reales es una puerta abierta, y lo único que hace que se cierre es que
+// cerrarla sea un comando y no una tarde de borrar a mano.
+async function borrarDemo(phone) {
+  const telefonos = [phone, ...COLEGAS.map(c => `${phone}-${c.sufijo}`)];
+  const pacientes = await Paciente.find({ medicoPhone: { $in: telefonos } }).select("_id personaId").lean();
+  const ids = pacientes.map(p => p._id);
+  const personas = pacientes.map(p => p.personaId).filter(Boolean);
+
+  const borrados = {};
+  for (const [nombre, Modelo] of [
+    ["perfiles", PerfilNeuro], ["objetivos", ObjetivoNeuro], ["vigilancia", VigilanciaSalud],
+    ["instrumentos", InstrumentoAplicado], ["informes", InformeFamilia],
+    ["consultas", ConsultaMedica], ["medidas", Medicion],
+  ]) {
+    borrados[nombre] = (await Modelo.deleteMany({ pacienteId: { $in: ids } })).deletedCount;
+  }
+  borrados.equipos = (await EquipoNeuro.deleteMany({ personaId: { $in: personas } })).deletedCount;
+  borrados.personas = (await PersonaClinica.deleteMany({ _id: { $in: personas } })).deletedCount;
+  borrados.pacientes = (await Paciente.deleteMany({ _id: { $in: ids } })).deletedCount;
+  borrados.cuentas = (await Medico.deleteMany({ phone: { $in: telefonos } })).deletedCount;
+  // El centro solo si quedó vacío: si alguien le colgó cuentas de verdad,
+  // borrarlo se llevaría puesto a un cliente.
+  const centro = await Clinica.findOne({ nombre: "Centro Aprender (demo)" });
+  if (centro && !(await Medico.exists({ clinicaId: centro._id }))) {
+    await Clinica.deleteOne({ _id: centro._id });
+    borrados.centro = 1;
+  }
+  return borrados;
+}
+
+// Una contraseña de demostración es cómoda para mostrar y es una credencial
+// real mientras la cuenta exista. Se avisa fuerte, con el comando para
+// sacarla, porque el problema de estas cuentas nunca es crearlas: es que
+// nadie se acuerda de que quedaron.
+function avisarSiEsDebil(phone, password) {
+  const debil = phone.replace(/\D/g, "").length < 7
+    || password.length < 12
+    || /symphomed|demo|1234|password|admin/i.test(password);
+  if (!debil) return;
+  console.log("");
+  console.log("  ⚠️  ESTA CUENTA ES DE DEMOSTRACIÓN, NO LA DEJES EN PRODUCCIÓN");
+  console.log("");
+  console.log(`      "${phone}" con una contraseña adivinable es una credencial válida`);
+  console.log("      mientras exista, en el mismo servidor donde están las historias");
+  console.log("      clínicas reales. Sirve para mostrar Symphomed y para nada más.");
+  console.log("");
+  console.log(`      Cuando termines la demostración:  node ${path.basename(__filename)} ${phone} --borrar`);
+  console.log("");
+}
+
 // ─── PRINCIPAL ────────────────────────────────────────────────────────────
 (async () => {
   const phone = String(process.argv[2] || "").trim();
@@ -694,6 +863,14 @@ async function crearPaciente(medicoPhone, d) {
 
   await mongoose.connect(CONFIG.MONGODB_URI);
   console.log("\n  Symphomed Neurodesarrollo — demo de psicología infantil\n");
+
+  if (process.argv.includes("--borrar")) {
+    const b = await borrarDemo(phone);
+    console.log(`  Demo borrada: ${b.cuentas} cuenta(s), ${b.pacientes} paciente(s), ${b.equipos} equipo(s), ${b.informes} informe(s).`);
+    console.log(`  ${b.objetivos} objetivos, ${b.instrumentos} instrumentos, ${b.vigilancia} controles y ${b.personas} personas del centro.\n`);
+    await mongoose.disconnect();
+    return;
+  }
 
   let medico = await Medico.findOne({ phone });
   if (medico) {
@@ -714,14 +891,62 @@ async function crearPaciente(medicoPhone, d) {
     console.log(`  Cuenta creada: ${phone} / ${password}`);
   }
 
+  const { centro, colegas } = await armarCentro(phone, password, medico.nombre);
+
   console.log("\n  Pacientes:");
   let creados = 0;
+  const fichas = {};
   for (const d of PACIENTES) {
-    if (await crearPaciente(phone, d)) creados++;
+    const p = await crearPaciente(phone, d);
+    if (p) { creados++; fichas[d.nombre] = p; }
+  }
+
+  // ─── Dos equipos tratantes, para que se vea la ficha compartida ────────
+  // Mateo lo ven tres personas; Emilia, dos. El resto no tiene equipo a
+  // propósito: así en la demo se ve la pantalla de "todavía no hay equipo"
+  // al lado de una que sí lo tiene.
+  console.log("\n  Equipos tratantes:");
+  const equipos = [
+    { nombre: "Mateo Ribera Quispe", suma: [0, 1], autoriza: "Carla Quispe", vinculo: "madre", dias: 95,
+      nota: "Conversado en la reunión de devolución. Pidió que la escuela también reciba el informe." },
+    { nombre: "Emilia Vargas Roca", suma: [2], autoriza: "Rodrigo Vargas", vinculo: "padre", dias: 40,
+      nota: "Autorizó por escrito en la primera entrevista." },
+  ];
+  for (const e of equipos) {
+    const ficha = fichas[e.nombre];
+    if (!ficha) { console.log(`   · ${e.nombre} — ya estaba, se saltea`); continue; }
+    const eq = await armarEquipo(ficha, phone, centro, colegas, { ...e, titularNombre: medico.nombre });
+    if (eq) console.log(`   ✓ ${e.nombre} — ${eq.miembros.length} profesionales · autorizó ${e.autoriza} (${e.vinculo})`);
+  }
+
+  // ─── Informes de avance para la familia ────────────────────────────────
+  // Uno ya enviado y abierto por la madre, y uno en borrador esperando que
+  // lo lean. Son los dos estados que el profesional va a ver en su pantalla.
+  console.log("\n  Informes para la familia:");
+  const informes = [
+    { nombre: "Mateo Ribera Quispe", enviado: true,
+      nota: "Este bimestre Mateo se soltó mucho con los compañeros nuevos. Lo de pedir agua señalando fue de un día para el otro: lo hizo solo un martes y desde entonces no deja que nadie le adelante el vaso.\n\nSi en casa lo ven trabado con algo, esperen diez segundos antes de ayudarlo. Le cuesta arrancar, pero arranca." },
+    { nombre: "Luana Ortiz Camacho", enviado: false,
+      nota: "" },
+  ];
+  for (const i of informes) {
+    const ficha = fichas[i.nombre];
+    if (!ficha) { console.log(`   · ${i.nombre} — ya estaba, se saltea`); continue; }
+    const inf = await armarInformeFamilia(ficha, phone, {
+      nota: i.nota, profesional: medico.nombre, centro: centro.nombre, enviado: i.enviado,
+    });
+    if (inf) {
+      console.log(`   ✓ ${i.nombre} — ${inf.estado}${inf.tokenPublico ? ` · /avance/${inf.tokenPublico}` : ""}`);
+    } else {
+      console.log(`   · ${i.nombre} — sin avances registrados en el período, no se arma`);
+    }
   }
 
   console.log(`\n  Listo — ${creados} paciente${creados === 1 ? "" : "s"} nuevo${creados === 1 ? "" : "s"}.`);
-  console.log(`  Entrá con ${phone}${creados ? ` / ${password}` : ""} y abrí la pestaña Perfil de cualquiera.\n`);
+  console.log(`\n  Entrá con ${phone} / ${password}`);
+  console.log(`  Las colegas del centro entran con ${phone}-01, ${phone}-02 y ${phone}-03, misma contraseña.`);
+  console.log(`  Probá con ${phone}-01 y vas a ver SOLO a Mateo: la ficha compartida es por chico, no por centro.`);
+  avisarSiEsDebil(phone, password);
   await mongoose.disconnect();
 })().catch(async (e) => {
   console.error("\n  ✖", e.message, "\n");
