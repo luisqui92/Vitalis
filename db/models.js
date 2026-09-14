@@ -1250,6 +1250,83 @@ const INSTRUMENTOS_NEURO = [
   { nombre: "Otro", modulos: [], puntajes: [], nota: "" },
 ];
 
+// ─── EL INFORME DE AVANCE PARA LA FAMILIA ─────────────────────────────────
+// Nace de una frase de una madre de un chico con autismo leve: le serviría
+// un informe de avance como el que le dan en la clase de programación de su
+// hijo, "en el cual mencionaba sus fortalezas". Y las dos razones por las
+// que no todas las familias podrían usarlo: el tema monetario, y que no
+// saben usar muy bien el celular.
+//
+// Esas dos frases decidieron tres cosas de este modelo:
+//
+// · LA FAMILIA NO PAGA NI SE REGISTRA. Se entra por un enlace que vence,
+//   igual que el informe con membrete. No hay cuenta que crear.
+//
+// · EL CONTENIDO SE CONGELA AL ENVIAR. Acá se guardan las frases ya
+//   armadas, no los ids de los objetivos: el informe que la madre abre en
+//   marzo tiene que seguir diciendo en julio lo que decía en marzo, aunque
+//   el objetivo se haya cerrado o el perfil haya cambiado. Un informe que
+//   se reescribe solo no es un informe.
+//
+// · NACE COMO BORRADOR. Nada sobre un chico sale a su familia sin que una
+//   persona lo haya leído. services/informeFamilia.js arma el borrador con
+//   lo que ya está registrado —para que escribirlo no cueste media hora—
+//   pero el envío es un acto del profesional.
+const avanceObjetivoSchema = new mongoose.Schema({
+  titulo: { type: String, default: "" },
+  area: { type: String, default: "" },
+  sesiones: { type: Number, default: 0 },
+  // "8 de 10", no "80%": el porcentaje hay que traducirlo y además esconde
+  // si fueron diez intentos o dos.
+  veces: { type: String, default: "" },
+  // Lo que de verdad cambió. El comentario de ObjetivoNeuro ya lo decía:
+  // el objetivo real casi siempre es bajar la ayuda, no subir el porcentaje.
+  ayudaAhora: { type: String, default: "" },
+  // La misma cosa dicha como frase suelta, para cuando la ayuda no cambió:
+  // "Lo hace con que se lo recuerden" no es castellano.
+  ayudaSola: { type: String, default: "" },
+  bajoLaAyuda: { type: Boolean, default: false },
+  ayudaAntes: { type: String, default: "" },
+  logrado: { type: Boolean, default: false },
+}, { _id: false });
+
+const informeFamiliaSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  desde: { type: Date, required: true },
+  hasta: { type: Date, required: true },
+
+  // ─── El contenido, en el orden en que se lee ───
+  nombre: { type: String, default: "" },
+  // Primero las fortalezas. Es lo único que la madre mencionó del informe de
+  // su otro hijo, y es lo contrario de lo que le llega siempre: todo lo que
+  // sale de la escuela y del consultorio está escrito en déficit.
+  fortalezas: { type: [String], default: [] },
+  intereses: { type: [String], default: [] },
+  avances: { type: [avanceObjetivoSchema], default: [] },
+  // Las estrategias que SÍ funcionan, para usarlas en casa. Hoy quedan
+  // encerradas en la ficha del profesional y la familia las descubre por
+  // ensayo y error, o no las descubre.
+  enCasa: { type: [String], default: [] },
+  siguiendo: { type: [String], default: [] },
+  // El párrafo escrito a mano. Es lo que hace que el informe se sienta
+  // escrito por una persona, y es lo que la madre va a leer dos veces.
+  nota: { type: String, default: "" },
+  profesional: { type: String, default: "" },
+  centro: { type: String, default: "" },
+
+  estado: { type: String, enum: ["borrador", "enviado"], default: "borrador", index: true },
+  enviadoEn: { type: Date, default: null },
+  enviadoA: { type: String, default: "" },
+
+  tokenPublico: { type: String, default: null, index: true },
+  tokenExpira: { type: Date, default: null },
+  vistoEn: { type: Date, default: null },
+  vistas: { type: Number, default: 0 },
+}, { timestamps: true });
+informeFamiliaSchema.index({ pacienteId: 1, createdAt: -1 });
+const InformeFamilia = mongoose.model("InformeFamilia", informeFamiliaSchema);
+
 
 // ═══ INFORMES CON MEMBRETE ════════════════════════════════════════════════
 // El informe ES el producto que vende un centro de imagen: el paciente no
@@ -1800,5 +1877,6 @@ module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, Consul
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, Informe,
+  InformeFamilia,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,
   InvitacionReporte };

@@ -6,9 +6,9 @@ Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
 mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
 de antemano.
 
-De los cinco lugares donde Symphomed manda algo por WhatsApp, el único que
+De los seis lugares donde Symphomed manda algo por WhatsApp, el único que
 siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
-acaba de escribir. Los otros cuatro los inicia la plataforma, y el paciente
+acaba de escribir. Los otros cinco los inicia la plataforma, y el paciente
 puede no haber escrito nunca:
 
 | Qué manda | Dónde | Cae fuera de la ventana |
@@ -18,6 +18,11 @@ puede no haber escrito nunca:
 | Confirmación de cita (reserva desde la web) | `routes/reservaPublica.js` | casi siempre |
 | Aviso de reconsulta | `routes/consultaMedica.js` | casi siempre |
 | Informe al paciente | `routes/informes.js` | a menudo |
+| Informe de avance a la familia | `routes/informeFamilia.js` | **casi siempre** |
+
+La última es la que más va a depender de la plantilla: la familia de un chico
+en seguimiento de neurodesarrollo no le escribe al consultorio entre sesión y
+sesión, así que la ventana de 24 h prácticamente nunca está abierta.
 
 El código intenta **primero el texto libre** y solo cae a la plantilla cuando
 Meta lo rechaza con el código `131047`. Así el paciente que está conversando
@@ -27,7 +32,7 @@ recibe el mensaje natural y completo, y la plantilla queda de red.
 
 `business.facebook.com` → WhatsApp Manager → **Message templates** → Create.
 
-Para las tres: categoría **Utility** (no Marketing — Marketing se cobra más
+Para las cuatro: categoría **Utility** (no Marketing — Marketing se cobra más
 caro y se aprueba peor), idioma **Spanish** (`es`).
 
 > **El acoplamiento frágil de todo esto:** el orden de los `{{1}}, {{2}}…`
@@ -108,6 +113,40 @@ que se encuentre.
 Nada clínico más allá del nombre del estudio: la vista previa de WhatsApp
 aparece en la pantalla bloqueada de un teléfono que a veces es compartido.
 El detalle vive detrás del enlace.
+
+---
+
+### 4. `avance_familia`
+
+Cuerpo:
+
+```
+Hola. Le compartimos el informe de avance de {{1}}, de parte de {{2}}.
+
+Es un resumen de cómo le fue en estas semanas. No hace falta contraseña ni instalar nada: toque el enlace y se abre.
+
+{{3}}
+
+Si algo no se entiende, escríbanos por acá.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del chico o la chica | `Leo` |
+| `{{2}}` | centro o profesional que lo manda | `Centro Aprender` |
+| `{{3}}` | enlace al informe | `https://app.symphomed.com/avance/abc123` |
+
+**Acá el cuidado con la vista previa importa más que en las otras tres.** El
+mensaje no nombra ninguna condición, ni ningún objetivo, ni la palabra
+"terapia": la notificación de WhatsApp se ve en la pantalla bloqueada de un
+teléfono que en muchas casas es compartido, y una condición del
+neurodesarrollo no se anuncia ahí. Todo el contenido vive detrás del enlace.
+
+El vencimiento del enlace (un año, `DIAS_VALIDEZ_ENLACE` en
+`routes/informeFamilia.js`) **no** va escrito en la plantilla, al revés que en
+`informe_listo`. Es a propósito: este informe la familia lo vuelve a abrir —se
+lo muestra a la escuela, al pediatra— y una fecha de vencimiento en el mensaje
+invita a archivarlo antes de tiempo.
 
 ---
 

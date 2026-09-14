@@ -684,3 +684,261 @@ function tarjetaVigilancia(i) {
         ? `<button class="item-action" data-vig-hecho="${i._id}" style="margin-top:10px">✅ Registrar que se hizo</button>` : ""}
     </div>`;
 }
+
+// ═══ EL INFORME DE AVANCE PARA LA FAMILIA ══════════════════════════════════
+//
+// Del otro lado de esta pantalla hay una madre. El porqué completo está en
+// services/informeFamilia.js; acá importa lo que decide la interfaz:
+//
+// · EL BORRADOR SE ARMA SOLO. Si el profesional tuviera que escribirlo de
+//   cero, esta función no existiría en la práctica: nadie tiene media hora
+//   por familia por mes. Sale de lo que el equipo ya cargó sesión por sesión.
+//
+// · PERO NO SE MANDA SOLO. El botón de enviar está lejos del de armar, y en
+//   el medio está el borrador entero para leer. Nada sobre un chico sale a
+//   su familia sin que una persona lo haya leído — y lo que se lee acá es
+//   exactamente lo que la familia va a ver, no un resumen de lo que se va a
+//   mandar.
+//
+// · ENVIADO ES ENVIADO. Después no se edita ni se borra. La madre ya lo leyó.
+async function renderTabInformesFamilia(pacienteId) {
+  const caja = document.getElementById("informesFamiliaBox");
+  if (!caja) return;
+  caja.innerHTML = `<div class="loading"><div class="spinner"></div>Cargando informes...</div>`;
+  let data;
+  try {
+    data = await api(`/medico/pacientes/${pacienteId}/informes-familia`);
+  } catch (e) {
+    caja.innerHTML = `<div class="error">${esc(e.error || "No se pudieron cargar los informes")}</div>`;
+    return;
+  }
+  pintarInformesFamilia(pacienteId, data, caja);
+}
+
+function fechaCortaIF(f) {
+  return new Date(f).toLocaleDateString("es-BO", { day: "numeric", month: "short" });
+}
+
+function pintarInformesFamilia(pacienteId, data, caja) {
+  const informes = data.informes || [];
+  const dias = data.periodoDias || 60;
+
+  caja.innerHTML = `
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">Nuevo informe para la familia</div>
+      <div class="hint" style="margin-bottom:12px">
+        Se arma con lo que ya está cargado en los objetivos y en el perfil:
+        las fortalezas, en qué avanzó y qué ayuda necesita ahora. Después lo
+        leés, escribís tu párrafo y recién ahí se manda.
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label>Desde</label>
+          <input id="ifDesde" type="date" value="${new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10)}">
+        </div>
+        <div style="flex:1">
+          <label>Hasta</label>
+          <input id="ifHasta" type="date" value="${new Date().toISOString().slice(0, 10)}">
+        </div>
+      </div>
+      <button class="secondary" id="btnIFNuevo">Armar el borrador</button>
+    </div>
+
+    ${informes.length === 0 ? `<div class="empty">Todavía no se le mandó ningún informe a esta familia.</div>` : ""}
+    ${informes.map(i => tarjetaInformeFamilia(i)).join("")}`;
+
+  document.getElementById("btnIFNuevo").onclick = async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      const r = await api(`/medico/pacientes/${pacienteId}/informes-familia`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          desde: document.getElementById("ifDesde").value,
+          hasta: document.getElementById("ifHasta").value,
+        }),
+      });
+      abrirBorradorFamilia(pacienteId, r.informe);
+    } catch (e) {
+      btn.disabled = false;
+      alert(e.error || "No se pudo armar el informe");
+    }
+  };
+
+  caja.querySelectorAll("[data-if-abrir]").forEach(el => {
+    el.onclick = async () => {
+      const r = await api(`/medico/informes-familia/${el.dataset.ifAbrir}`);
+      abrirBorradorFamilia(pacienteId, r.informe, r.enlace);
+    };
+  });
+}
+
+function tarjetaInformeFamilia(i) {
+  const enviado = i.estado === "enviado";
+  // Si la familia no lo abrió, eso se dice. No es curiosidad: un informe que
+  // nunca se abrió es la señal de que hay que llamar por teléfono, que es
+  // justo lo que esto sirve para detectar.
+  const visto = enviado
+    ? (i.vistas ? `👀 Lo abrieron ${i.vistas === 1 ? "una vez" : `${i.vistas} veces`}` : "⏳ Todavía no lo abrieron")
+    : "📝 Borrador — no se mandó";
+  return `
+    <div class="item" data-if-abrir="${i._id}">
+      <div class="top">
+        <div class="nombre">${fechaCortaIF(i.desde)} — ${fechaCortaIF(i.hasta)}</div>
+        <div class="fecha">${enviado ? new Date(i.enviadoEn).toLocaleDateString("es-BO") : ""}</div>
+      </div>
+      <div class="paciente-info">${visto}${i.avances?.length ? ` · ${i.avances.length} ${i.avances.length === 1 ? "avance" : "avances"}` : ""}</div>
+    </div>`;
+}
+
+// La pantalla del borrador. Lo que se ve acá es lo que va a ver la familia,
+// con los mismos textos — no una previsualización aproximada. Un botón de
+// "enviar" debajo de un resumen distinto de lo que sale es una trampa.
+function abrirBorradorFamilia(pacienteId, inf, enlace) {
+  const enviado = inf.estado === "enviado";
+  const caja = document.getElementById("informesFamiliaBox");
+  if (!caja) return;
+
+  const linea = (a) => {
+    const partes = [];
+    if (a.area) partes.push(a.area);
+    if (a.bajoLaAyuda && a.ayudaAntes) partes.push(`antes ${a.ayudaAntes} → ahora ${a.ayudaAhora}`);
+    else if (a.ayudaAhora) partes.push(a.ayudaAhora);
+    if (a.veces) partes.push(`${a.veces} veces`);
+    if (a.sesiones) partes.push(`${a.sesiones} ${a.sesiones === 1 ? "encuentro" : "encuentros"}`);
+    return partes.join(" · ");
+  };
+
+  caja.innerHTML = `
+    <button class="back" id="ifVolver">← Volver a los informes</button>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">
+        ${enviado ? "Informe enviado" : "Borrador"} · ${fechaCortaIF(inf.desde)} — ${fechaCortaIF(inf.hasta)}
+      </div>
+      ${enviado ? `
+        <div class="exito">Se envió el ${new Date(inf.enviadoEn).toLocaleDateString("es-BO")}. Ya no se puede cambiar.</div>
+        ${enlace ? `<div class="hint" style="margin-top:10px;word-break:break-all">${esc(enlace)}</div>` : ""}
+      ` : `
+        <div class="hint">
+          Esto es exactamente lo que va a ver la familia. Revisalo antes de mandarlo.
+        </div>`}
+    </div>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">Lo que hace bien</div>
+      ${inf.fortalezas?.length
+        ? `<div class="paciente-info">${inf.fortalezas.map(esc).join(" · ")}</div>`
+        : `<div class="hint">Vacío. Es lo primero que lee la familia y lo único que ninguna
+             escuela le manda escrito: cargalo en la pestaña Perfil antes de enviar.</div>`}
+      ${inf.intereses?.length ? `<div class="paciente-info" style="margin-top:8px">Le gusta: ${inf.intereses.map(esc).join(" · ")}</div>` : ""}
+    </div>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">En qué avanzó</div>
+      ${(inf.avances || []).length ? inf.avances.map(a => `
+        <div class="dato-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-weight:600">${esc(a.titulo)}${a.logrado ? " ✅" : ""}</div>
+            <div class="hint" style="margin:2px 0 0">${esc(linea(a))}</div>
+          </div>
+          ${enviado ? "" : `<button class="link" data-if-quitar="${esc(a.titulo)}" style="margin:0;width:auto;color:var(--danger)">✕</button>`}
+        </div>`).join("") : `<div class="hint">Sin avances registrados en este período.</div>`}
+    </div>
+
+    ${(inf.enCasa || []).length ? `
+      <div class="card">
+        <div class="seccion-titulo" style="margin-top:0">Lo que pueden hacer en casa</div>
+        <div class="paciente-info">${inf.enCasa.map(esc).join(" · ")}</div>
+        <div class="hint">Sale de las estrategias del perfil sensorial. Es lo más útil que se
+          puede compartir y hoy queda encerrado en la ficha.</div>
+      </div>` : ""}
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">Unas palabras del equipo</div>
+      ${enviado
+        ? `<div class="paciente-info" style="white-space:pre-wrap">${esc(inf.nota || "—")}</div>`
+        : `<div class="hint" style="margin-bottom:8px">
+             Es lo que la madre va a leer dos veces. El resto es el andamio.
+           </div>
+           <textarea id="ifNota" rows="5" placeholder="Ej: Este bimestre Leo se soltó mucho con los compañeros nuevos...">${esc(inf.nota || "")}</textarea>
+           <input id="ifCentro" type="text" placeholder="Centro o consultorio (opcional)" value="${esc(inf.centro || "")}" style="margin-top:8px">
+           <input id="ifProfesional" type="text" placeholder="Quién firma" value="${esc(inf.profesional || "")}" style="margin-top:8px">
+           <button class="secondary" id="ifGuardar">Guardar el borrador</button>`}
+    </div>
+
+    ${enviado ? "" : `
+      <div class="card">
+        <div class="seccion-titulo" style="margin-top:0">Mandarlo por WhatsApp</div>
+        <div class="hint" style="margin-bottom:10px">
+          Le llega un enlace, sin contraseña y sin instalar nada. El mensaje no
+          nombra ninguna condición: la vista previa de WhatsApp se ve en la
+          pantalla bloqueada de un teléfono que a veces es compartido.
+        </div>
+        <input id="ifTelefono" type="tel" placeholder="Teléfono (vacío = el de la ficha)">
+        <button class="primary" id="ifEnviar">Enviar a la familia</button>
+        <button class="link" id="ifBorrar" style="color:var(--danger)">Borrar este borrador</button>
+      </div>`}`;
+
+  document.getElementById("ifVolver").onclick = () => renderTabInformesFamilia(pacienteId);
+  if (enviado) return;
+
+  const guardar = async () => api(`/medico/informes-familia/${inf._id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      nota: document.getElementById("ifNota").value,
+      centro: document.getElementById("ifCentro").value,
+      profesional: document.getElementById("ifProfesional").value,
+    }),
+  });
+
+  document.getElementById("ifGuardar").onclick = async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      const r = await guardar();
+      abrirBorradorFamilia(pacienteId, r.informe);
+    } catch (e) { btn.disabled = false; alert(e.error || "No se pudo guardar"); }
+  };
+
+  caja.querySelectorAll("[data-if-quitar]").forEach(el => {
+    el.onclick = async () => {
+      const dejar = (inf.avances || []).filter(a => a.titulo !== el.dataset.ifQuitar);
+      const r = await api(`/medico/informes-familia/${inf._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avances: dejar }),
+      });
+      abrirBorradorFamilia(pacienteId, r.informe);
+    };
+  });
+
+  document.getElementById("ifEnviar").onclick = async (ev) => {
+    // La confirmación nombra que no se puede deshacer, porque de verdad no se
+    // puede: una vez que el mensaje salió, está en el teléfono de la familia.
+    if (!confirm("Se le manda ahora a la familia y después no se puede cambiar. ¿Va?")) return;
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    try {
+      // Se guarda primero: si no, el párrafo recién escrito y todavía sin
+      // guardar no viaja, y el informe sale sin lo único que lo hace personal.
+      await guardar();
+      const r = await api(`/medico/informes-familia/${inf._id}/enviar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefono: document.getElementById("ifTelefono").value }),
+      });
+      abrirBorradorFamilia(pacienteId, r.informe, r.enlace);
+    } catch (e) { btn.disabled = false; alert(e.error || "No se pudo enviar"); }
+  };
+
+  document.getElementById("ifBorrar").onclick = async () => {
+    if (!confirm("¿Borrar este borrador?")) return;
+    try {
+      await api(`/medico/informes-familia/${inf._id}`, { method: "DELETE" });
+      renderTabInformesFamilia(pacienteId);
+    } catch (e) { alert(e.error || "No se pudo borrar"); }
+  };
+}

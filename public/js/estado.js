@@ -254,6 +254,11 @@ const TABS_KARDEX_NEURO = {
   // instrumento: son propiedad de sus editoriales y requieren entrenamiento.
   instrumentos: { icono: ICONOS.clipboard, claveLabel: "tab.instrumentos" },
   salud: { icono: ICONOS.jeringa, claveLabel: "tab.salud" },
+  // El informe de avance que recibe la familia. Es la única pestaña del
+  // Kardex cuyo destinatario no es un profesional, y por eso tiene pantalla
+  // propia en vez de ser un botón dentro de "objetivos": el informe se lee
+  // entero antes de mandarlo, no se dispara de un clic.
+  familia: { icono: ICONOS.documento, claveLabel: "tab.familia" },
   crecimiento: { icono: ICONOS.tendencia, claveLabel: "tab.crecimiento" },
   medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
   antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },

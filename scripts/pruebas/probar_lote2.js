@@ -141,11 +141,36 @@ vm.runInContext(fs.readFileSync(`${RAIZ}/public/js/estado.js`, "utf8"), sEstado)
 const viejoEstado = entorno(null);
 vm.runInContext(deMain("public/js/estado.js"), viejoEstado);
 
+// Mismo criterio que sinCajasNuevas: esto ataja que el i18n cambie las
+// pestañas SIN QUERER, no congela el Kardex. Una pestaña nueva y deliberada
+// se declara acá y se descuenta de los dos lados — lo que la prueba sigue
+// cuidando es que ninguna de las otras se mueva, se renombre o cambie de
+// orden al tocarla.
+//
+// "familia" es el informe de avance que recibe la familia de un chico en
+// seguimiento de neurodesarrollo (ver routes/informeFamilia.js).
+const PESTANAS_NUEVAS = new Set(["familia"]);
+const listaDePestanas = (ctx, esp) => JSON.parse(
+  vm.runInContext(`JSON.stringify(Object.entries(tabsKardexPara(${JSON.stringify(esp)})).map(([k, v]) => [k, v.label]))`, ctx));
+const sinPestanasNuevas = (pares) => JSON.stringify(pares.filter(([k]) => !PESTANAS_NUEVAS.has(k)));
+
 for (const esp of ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"]) {
-  const antes = vm.runInContext(`JSON.stringify(Object.entries(tabsKardexPara(${JSON.stringify(esp)})).map(([k, v]) => [k, v.label]))`, viejoEstado);
-  const ahora = vm.runInContext(`JSON.stringify(Object.entries(tabsKardexPara(${JSON.stringify(esp)})).map(([k, v]) => [k, v.label]))`, sEstado);
+  const antes = sinPestanasNuevas(listaDePestanas(viejoEstado, esp));
+  const ahora = sinPestanasNuevas(listaDePestanas(sEstado, esp));
   if (antes === ahora) console.log(`✅ pestañas/${esp}: idénticas`);
   else { fallos++; console.log(`❌ pestañas/${esp}:\n   antes: ${antes}\n   ahora: ${ahora}`); }
+}
+
+// Y que la pestaña declarada como nueva EXISTA de verdad donde tiene que
+// existir. Sin esto, la lista de arriba sería una forma de tapar un borrado:
+// alguien saca "familia" del Kardex, la declara acá y nadie se entera.
+const neuroAhora = listaDePestanas(sEstado, "neurodesarrollo").map(([k]) => k);
+const enOtra = listaDePestanas(sEstado, "medicina_general").map(([k]) => k);
+if (neuroAhora.includes("familia") && !enOtra.includes("familia")) {
+  console.log("✅ pestañas: «familia» está en neurodesarrollo y solo ahí");
+} else {
+  fallos++;
+  console.log("❌ pestañas: «familia» tiene que estar en neurodesarrollo y en ninguna otra especialidad");
 }
 
 // La trampa: cambiar el idioma DESPUÉS de cargar estado.js tiene que cambiar

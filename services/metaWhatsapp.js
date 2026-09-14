@@ -93,6 +93,10 @@ const PLANTILLAS = {
   citaConfirmada: "cita_confirmada",
   reconsulta: "reconsulta_sugerida",
   informeListo: "informe_listo",
+  // El informe de avance para la familia de un chico en seguimiento de
+  // neurodesarrollo. Es la que MÁS va a caer fuera de la ventana de las 24 h:
+  // la familia no le escribe al consultorio entre sesión y sesión.
+  avanceFamilia: "avance_familia",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es

@@ -42,9 +42,9 @@ for (const m of DOC.matchAll(/###[^`\n]*`([a-z_]+)`\n+Cuerpo:\n+```\n([\s\S]*?)`
   documentadas[nombre] = { cuerpo: cuerpo.trim(), numeros };
 }
 
-console.log("── 1. El documento tiene las tres plantillas ──");
+console.log("── 1. El documento tiene todas las plantillas ──");
 const esperadas = Object.values(PLANTILLAS);
-verificar(`el código conoce ${esperadas.length}: ${esperadas.join(", ")}`, esperadas.length === 3);
+verificar(`el código conoce ${esperadas.length}: ${esperadas.join(", ")}`, esperadas.length === 4);
 esperadas.forEach(n => verificar(`  «${n}» está documentada`, Boolean(documentadas[n])));
 
 console.log("\n── 2. Reglas de Meta que hacen que rechacen la plantilla ──");
@@ -67,7 +67,7 @@ console.log("\n── 3. El código pasa tantos valores como variables tiene ─
 // que se lea el TEXTO y no se ejecute: ejecutarlas pediría una base, una
 // consulta y un paciente, y lo que importa acá es una sola cosa —cuántos
 // valores se pasan— que se ve leyendo.
-const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes"];
+const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia"];
 const llamadas = [];
 for (const r of RUTAS) {
   const codigo = fs.readFileSync(path.join(RAIZ, "routes", `${r}.js`), "utf8");
@@ -85,7 +85,7 @@ for (const r of RUTAS) {
   }
 }
 
-verificar(`se encontraron las ${llamadas.length} llamadas con respaldo de plantilla`, llamadas.length === 5);
+verificar(`se encontraron las ${llamadas.length} llamadas con respaldo de plantilla`, llamadas.length === 6);
 for (const l of llamadas) {
   const doc = documentadas[l.nombre];
   const pide = doc ? [...new Set(doc.numeros)].length : -1;

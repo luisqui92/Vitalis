@@ -871,3 +871,82 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .plan-opcion:active{transform:scale(.99);}
 .plan-nombre{font-weight:600;font-size:14.5px;}
 .plan-precio{font-family:var(--font-marca);font-size:22px;font-weight:600;color:var(--primary);margin-top:2px;letter-spacing:-.01em;}
+
+/* ─── EL INFORME DE AVANCE PARA LA FAMILIA ────────────────────────────────
+   Ver el encabezado de public/js/informeFamilia.js para el porqué de cada
+   decisión. En una línea: lo lee una madre que "no sabe usar muy bien el
+   celular", de noche, en un teléfono barato, y después lo imprime para
+   llevarlo a la escuela.
+
+   La hoja va SIEMPRE clara, aunque Symphomed esté en oscuro — mismo criterio
+   que el informe con membrete. Y los tamaños de letra no son "grandes por
+   accesibilidad": 18 px es el piso para que esto se lea, y por eso están
+   escritos en px y no heredan nada de la app. */
+.av-barra{display:flex;justify-content:center;padding:12px;background:#15151a;position:sticky;top:0;z-index:2}
+.av-btn{background:var(--primary);color:#04222e;border:none;border-radius:8px;
+  padding:13px 22px;font-size:16px;font-weight:600;width:auto;margin:0}
+
+.av-hoja{
+  background:#fff;color:#1b2a33;max-width:640px;margin:18px auto 32px;padding:34px 32px;
+  border-radius:6px;box-shadow:0 6px 28px rgba(0,0,0,.35);
+  font-size:18px;line-height:1.65;
+}
+.av-cabecera{border-bottom:3px solid var(--primary);padding-bottom:16px;margin-bottom:8px}
+.av-eyebrow{margin:0;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#6b8290;font-weight:600}
+.av-hoja h1{font-family:var(--font-marca);font-size:34px;line-height:1.15;margin:6px 0 0;color:#0d3b4d;text-wrap:balance}
+.av-periodo{margin:6px 0 0;font-size:16px;color:#5c7482}
+
+.av-bloque{margin-top:30px}
+.av-bloque h2{font-family:var(--font-marca);font-size:22px;margin:0 0 10px;color:#0d3b4d;text-wrap:balance}
+.av-bloque p{margin:0 0 10px}
+
+/* Lo que hace bien va primero y va destacado. Es lo único que la madre
+   mencionó del informe que le gustó, y es lo contrario de lo que recibe
+   siempre: todo lo que le llega de la escuela está escrito en déficit. */
+.av-destacado{background:#f0fafe;border-left:5px solid var(--primary);border-radius:0 8px 8px 0;padding:18px 20px}
+.av-destacado h2{margin-top:0}
+
+.av-lista{margin:0;padding-left:0;list-style:none}
+.av-lista li{position:relative;padding-left:28px;margin-bottom:10px}
+/* Un punto dibujado y no una viñeta del navegador: las viñetas chicas se
+   pierden en una pantalla rayada, que es donde esto se lee. */
+.av-lista li::before{content:"";position:absolute;left:6px;top:.62em;width:9px;height:9px;
+  border-radius:50%;background:var(--primary)}
+
+.av-avance{margin-bottom:20px}
+.av-avance h3{font-size:19px;margin:0 0 4px;color:#15414f;font-weight:600;line-height:1.35}
+.av-avance p{margin:0;color:#314855}
+.av-avance b{color:#0d3b4d}
+.av-logrado{display:inline-block;background:#1a7f52;color:#fff;border-radius:99px;
+  padding:3px 12px;font-size:14px;font-weight:600;vertical-align:middle;white-space:nowrap}
+
+.av-casa{background:#f6f8f4;border-radius:10px;padding:20px}
+.av-casa-intro{color:#4a5f4a}
+.av-nota{background:#fdf9f0;border-radius:10px;padding:20px}
+.av-nota p{margin:0 0 10px}
+.av-nota p:last-child{margin-bottom:0}
+
+.av-pie{margin-top:36px;border-top:1px solid #dde5e9;padding-top:18px}
+.av-pie p{margin:0 0 4px;font-size:16px;color:#5c7482}
+.av-firma{font-weight:600;color:#0d3b4d !important;font-size:18px !important}
+.av-pie-nota{margin-top:14px !important;font-size:15px !important;line-height:1.55}
+
+.av-aviso{text-align:center;padding:20px 0}
+.av-aviso-icono{font-size:46px;margin-bottom:10px}
+.av-aviso h1{font-size:26px}
+.av-aviso p{font-size:17px;color:#5c7482;margin-top:10px}
+
+.av-guardalo{max-width:640px;margin:0 auto 48px;padding:0 24px;text-align:center;
+  font-size:15px;line-height:1.6;color:var(--text-muted)}
+
+@media print{
+  .av-hoja{box-shadow:none;margin:0;padding:0;max-width:none;border-radius:0;font-size:12pt}
+  .av-bloque,.av-avance{page-break-inside:avoid}
+  @page{margin:16mm}
+}
+@media(max-width:640px){
+  .av-hoja{margin:10px;padding:24px 20px;font-size:17px}
+  .av-hoja h1{font-size:28px}
+  .av-bloque h2{font-size:20px}
+  .av-avance h3{font-size:18px}
+}

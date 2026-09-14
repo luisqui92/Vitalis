@@ -144,6 +144,7 @@ require("./routes/estudios")(app);
 require("./routes/rayos")(app);
 require("./routes/cajaDicom")(app);
 require("./routes/neurodesarrollo")(app);
+require("./routes/informeFamilia")(app);
 require("./routes/vacunasPet")(app);
 require("./routes/instrumentos")(app);
 require("./routes/informes")(app);
@@ -238,6 +239,12 @@ require("./routes/mapa")(app);
 // de login de siempre — que es exactamente lo que se quiere.
 app.get(["/", "/app", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+// /avance/<token> es el informe de avance que abre la FAMILIA de un chico en
+// seguimiento de neurodesarrollo. La ruta se llama "avance" y no "informe"
+// por una razón que no es cosmética: es lo que se ve en la barra del
+// navegador y en la vista previa de WhatsApp, y ahí no va a decir nada que
+// insinúe un diagnóstico. Ver public/js/informeFamilia.js.
+app.get("/avance/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 // La sala del paciente: mismo frontend, el JS detecta la ruta (ver
 // public/js/teleconsulta.js) y muestra el consentimiento en vez del login.
 app.get("/teleconsulta/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));

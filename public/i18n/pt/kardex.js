@@ -27,6 +27,7 @@ Object.assign(I18N.pt, {
   "tab.objetivos": "Objetivos",
   "tab.instrumentos": "Instrumentos",
   "tab.salud": "Saúde",
+  "tab.familia": "Família",
 
   "marca.base": "Symphomed",
   "marca.dental": "Symphomed Dental",
