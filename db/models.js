@@ -1197,9 +1197,21 @@ const instrumentoAplicadoSchema = new mongoose.Schema({
   modulo: { type: String, default: "" },
   fecha: { type: Date, required: true },
   // Quién lo aplicó y con qué matrícula. En un instrumento que requiere
-  // entrenamiento, esto no es burocracia: es parte del resultado.
+  // entrenamiento, esto no es burocracia: es parte del resultado, y en los
+  // de nivel C la ruta no deja guardar sin esto (ver routes/instrumentos.js).
+  //
+  // Y es un campo aparte del dueño de la cuenta porque el caso real más
+  // común es justamente ese: el centro deriva el ADOS-2 a una evaluadora
+  // externa certificada y después carga el resultado. Que el registro diga
+  // quién lo hizo de verdad es lo correcto y además lo que necesita el
+  // centro para responder si alguien pregunta.
   aplicadoPor: { type: String, default: "" },
   matricula: { type: String, default: "" },
+  // Qué calificación pedía ese instrumento el día que se cargó. Se CONGELA
+  // en el registro en vez de mirarse en el catálogo al dibujarlo: si mañana
+  // se corrige la tabla, un informe viejo tiene que seguir diciendo con qué
+  // criterio se guardó. Ver CALIFICACIONES_INSTRUMENTO más abajo.
+  quienPuede: { type: String, enum: ["libre", "profesional", "certificado"], default: "profesional" },
   puntajes: {
     type: [{
       nombre: { type: String, required: true },  // "Total del algoritmo", "Puntaje de comparación"
@@ -1227,27 +1239,80 @@ const InstrumentoAplicado = mongoose.model("InstrumentoAplicado", instrumentoApl
 // arroja es descriptivo y está publicado en toda la literatura — no son ni
 // los ítems ni el algoritmo ni los puntos de corte, que son justamente lo
 // que no puede estar acá.
+//
+// ═══ QUIÉN PUEDE APLICAR QUÉ, Y POR QUÉ ESTÁ EN EL MODELO ══════════════════
+//
+// Un M-CHAT-R/F son veinte preguntas de dominio público que cualquier
+// pediatra usa en el control del año y medio. Un WISC-V es nivel C de
+// Pearson: hace falta posgrado en evaluación psicológica para comprarlo
+// siquiera. Un ADOS-2 además pide un curso formal de administración.
+//
+// Hasta acá Symphomed los trataba igual: un desplegable donde todos valían
+// lo mismo. Eso no habilita a nadie a nada —los ítems no están en Symphomed,
+// así que no hay forma de "aplicarlo" desde la pantalla— pero sí le daba a
+// la lista un aire de menú, como si elegir "ADOS-2" fuera una función del
+// sistema en vez de un registro de algo que pasó afuera.
+//
+// Tres niveles, que es como lo publican los propios editores:
+//
+//   libre        — sin requisito de calificación (dominio público)
+//   profesional  — nivel B: título en un campo relacionado y formación en
+//                  evaluación. Es el grueso.
+//   certificado  — nivel C y/o curso formal de administración. Acá entra el
+//                  ADOS-2, y es el caso que más se presta a confusión.
+//
+// ⚠️ ESTO REFLEJA LO QUE PUBLICAN LOS EDITORES, NO ES ASESORAMIENTO LEGAL.
+// El nivel exigido lo fija el editor y lo hace cumplir el distribuidor de
+// cada país, y no siempre coinciden. Mismo criterio que services/vigilancia.js
+// y services/esquemaVacunas.js: es un punto de partida informado, y quien
+// decide qué puede aplicar es el profesional con su colegio y su
+// distribuidor. Symphomed no verifica ninguna credencial y no está en
+// condiciones de hacerlo.
+const CALIFICACIONES_INSTRUMENTO = {
+  libre: {
+    etiqueta: "Sin requisito de calificación",
+    aviso: "",
+  },
+  profesional: {
+    etiqueta: "Requiere formación en evaluación (nivel B)",
+    aviso: "El editor pide título en un campo relacionado y formación en administración e interpretación de pruebas.",
+  },
+  certificado: {
+    etiqueta: "Requiere certificación específica (nivel C)",
+    aviso: "Solo puede administrarlo e interpretarlo quien tenga la calificación que exige el editor —y, en varios casos, un curso formal de administración. Symphomed guarda el resultado; no habilita a nadie a aplicarlo ni verifica credenciales.",
+  },
+};
+
 const INSTRUMENTOS_NEURO = [
-  { nombre: "ADOS-2", modulos: ["T", "1", "2", "3", "4"],
+  { nombre: "ADOS-2", editor: "WPS", quienPuede: "certificado", modulos: ["T", "1", "2", "3", "4"],
     puntajes: ["Total del algoritmo", "Puntaje de comparación (1-10)"],
-    nota: "Requiere entrenamiento formal. Es una observación estandarizada: se interpreta junto con la historia del desarrollo, no sola." },
-  { nombre: "ADI-R", modulos: [],
+    nota: "Requiere entrenamiento formal de administración, además de la calificación del editor. Es una observación estandarizada: se interpreta junto con la historia del desarrollo, no sola." },
+  { nombre: "ADI-R", editor: "WPS", quienPuede: "certificado", modulos: [],
     puntajes: ["Interacción social recíproca", "Comunicación", "Conductas restringidas y repetitivas", "Edad de inicio"],
-    nota: "Entrevista al cuidador. Complementa al ADOS-2 con la historia del desarrollo." },
-  { nombre: "CARS-2", modulos: ["ST", "HF"], puntajes: ["Puntaje total"], nota: "" },
-  { nombre: "SCQ", modulos: ["Vida entera", "Actual"], puntajes: ["Puntaje total"], nota: "Cuestionario de tamizaje, no diagnóstico." },
-  { nombre: "SRS-2", modulos: [], puntajes: ["Puntaje T total"], nota: "" },
-  { nombre: "M-CHAT-R/F", modulos: [], puntajes: ["Puntaje total", "Nivel de riesgo"],
-    nota: "Tamizaje entre los 16 y 30 meses. Un resultado positivo indica derivar a evaluación, no diagnostica." },
-  { nombre: "Vineland-3", modulos: ["Entrevista", "Padres/cuidadores", "Docente"],
-    puntajes: ["Conducta adaptativa (compuesto)", "Comunicación", "Habilidades de la vida diaria", "Socialización", "Motricidad"], nota: "" },
-  { nombre: "WISC-V", modulos: [], puntajes: ["CI total", "Comprensión verbal", "Visoespacial", "Razonamiento fluido", "Memoria de trabajo", "Velocidad de procesamiento"], nota: "" },
-  { nombre: "WPPSI-IV", modulos: [], puntajes: ["CI total"], nota: "" },
-  { nombre: "Bayley-4", modulos: [], puntajes: ["Cognitiva", "Lenguaje", "Motora", "Socioemocional", "Conducta adaptativa"], nota: "" },
-  { nombre: "Battelle-2", modulos: [], puntajes: ["Cociente de desarrollo total"], nota: "" },
-  { nombre: "Conners-4", modulos: ["Padres", "Docente", "Autoinforme"], puntajes: ["Inatención", "Hiperactividad/impulsividad"], nota: "" },
-  { nombre: "PEP-3", modulos: [], puntajes: ["Comunicación", "Motricidad", "Conductas desadaptativas"], nota: "" },
-  { nombre: "Otro", modulos: [], puntajes: [], nota: "" },
+    nota: "Entrevista al cuidador, con entrenamiento formal. Complementa al ADOS-2 con la historia del desarrollo." },
+  { nombre: "CARS-2", editor: "WPS", quienPuede: "profesional", modulos: ["ST", "HF"], puntajes: ["Puntaje total"], nota: "" },
+  { nombre: "SCQ", editor: "WPS", quienPuede: "profesional", modulos: ["Vida entera", "Actual"], puntajes: ["Puntaje total"],
+    nota: "Cuestionario de tamizaje, no diagnóstico." },
+  { nombre: "SRS-2", editor: "WPS", quienPuede: "profesional", modulos: [], puntajes: ["Puntaje T total"], nota: "" },
+  { nombre: "M-CHAT-R/F", editor: "Robins, Fein y Barton", quienPuede: "libre", modulos: [],
+    puntajes: ["Puntaje total", "Nivel de riesgo"],
+    nota: "De uso libre para tamizaje entre los 16 y 30 meses. Un resultado positivo indica derivar a evaluación, no diagnostica." },
+  { nombre: "Vineland-3", editor: "Pearson", quienPuede: "profesional", modulos: ["Entrevista", "Padres/cuidadores", "Docente"],
+    puntajes: ["Conducta adaptativa (compuesto)", "Comunicación", "Habilidades de la vida diaria", "Socialización", "Motricidad"],
+    nota: "La forma de entrevista pide entrenamiento propio; las de cuidadores y docente no." },
+  { nombre: "WISC-V", editor: "Pearson", quienPuede: "certificado", modulos: [],
+    puntajes: ["CI total", "Comprensión verbal", "Visoespacial", "Razonamiento fluido", "Memoria de trabajo", "Velocidad de procesamiento"], nota: "" },
+  { nombre: "WPPSI-IV", editor: "Pearson", quienPuede: "certificado", modulos: [], puntajes: ["CI total"], nota: "" },
+  { nombre: "Bayley-4", editor: "Pearson", quienPuede: "certificado", modulos: [],
+    puntajes: ["Cognitiva", "Lenguaje", "Motora", "Socioemocional", "Conducta adaptativa"], nota: "" },
+  { nombre: "Battelle-2", editor: "PRO-ED / Riverside", quienPuede: "profesional", modulos: [], puntajes: ["Cociente de desarrollo total"], nota: "" },
+  { nombre: "Conners-4", editor: "MHS", quienPuede: "profesional", modulos: ["Padres", "Docente", "Autoinforme"],
+    puntajes: ["Inatención", "Hiperactividad/impulsividad"], nota: "" },
+  { nombre: "PEP-3", editor: "PRO-ED", quienPuede: "profesional", modulos: [], puntajes: ["Comunicación", "Motricidad", "Conductas desadaptativas"], nota: "" },
+  // "Otro" queda como profesional y no como libre a propósito: lo que no
+  // está en la lista se trata con el criterio más prudente, no con el más
+  // cómodo.
+  { nombre: "Otro", editor: "", quienPuede: "profesional", modulos: [], puntajes: [], nota: "" },
 ];
 
 // ─── EL INFORME DE AVANCE PARA LA FAMILIA ─────────────────────────────────
@@ -1877,6 +1942,7 @@ module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, Consul
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, Informe,
+  CALIFICACIONES_INSTRUMENTO,
   InformeFamilia,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,
   InvitacionReporte };

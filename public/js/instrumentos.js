@@ -11,6 +11,7 @@
 // encontrable dentro de dos años cuando haya que reaplicar.
 
 let instrumentosCatalogo = null;
+let instrumentosCalificaciones = null;
 
 async function renderTabInstrumentos(pacienteId) {
   const caja = document.getElementById("instrumentosBox");
@@ -21,10 +22,13 @@ async function renderTabInstrumentos(pacienteId) {
   try {
     const [d, cat] = await Promise.all([
       api(`/medico/pacientes/${pacienteId}/instrumentos`),
-      instrumentosCatalogo ? Promise.resolve({ instrumentos: instrumentosCatalogo }) : api("/medico/instrumentos/catalogo"),
+      instrumentosCatalogo
+        ? Promise.resolve({ instrumentos: instrumentosCatalogo, calificaciones: instrumentosCalificaciones })
+        : api("/medico/instrumentos/catalogo"),
     ]);
     aplicados = d.aplicados || [];
     instrumentosCatalogo = cat.instrumentos || [];
+    instrumentosCalificaciones = cat.calificaciones || {};
   } catch (e) {
     caja.innerHTML = `<div class="error">${esc(e.error || "No se pudieron cargar")}</div>`;
     return;
@@ -83,7 +87,8 @@ function pintarInstrumentos(pacienteId, aplicados) {
       <div class="card">
         <div class="top" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
-            <div style="font-weight:600">${esc(a.instrumento)}${a.modulo ? ` · módulo ${esc(a.modulo)}` : ""}</div>
+            <div style="font-weight:600">${esc(a.instrumento)}${a.modulo ? ` · módulo ${esc(a.modulo)}` : ""}${
+              a.quienPuede === "certificado" ? ` <span class="in-sello">certificación</span>` : ""}</div>
             <div class="fecha">${fecha(a.fecha)}${a.aplicadoPor ? ` · ${esc(a.aplicadoPor)}` : ""}${a.matricula ? ` (Reg. ${esc(a.matricula)})` : ""}</div>
           </div>
           <button class="link" data-borrar-instrumento="${a._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
@@ -134,8 +139,48 @@ function pintarInstrumentos(pacienteId, aplicados) {
       cajaMod.style.display = "none";
       selMod.innerHTML = "";
     }
-    caja.querySelector("#inNota").innerHTML = elegido?.nota
-      ? `<div class="hint" style="color:var(--warning);margin:-4px 0 8px">${esc(elegido.nota)}</div>` : "";
+    // Qué calificación pide ESTE instrumento, dicho ANTES de que empiece a
+    // cargar y no al apretar "Guardar". Un M-CHAT son veinte preguntas de
+    // dominio público; un WISC-V es nivel C de Pearson. Hasta ahora la
+    // pantalla los mostraba igual, y esa lista pareja es lo que hacía que el
+    // desplegable se leyera como un menú de cosas que Symphomed te da.
+    const nivel = elegido?.quienPuede || "";
+    const cal = (instrumentosCalificaciones || {})[nivel];
+    const certificado = nivel === "certificado";
+    caja.querySelector("#inNota").innerHTML = [
+      cal && nivel !== "libre"
+        ? `<div class="in-calificacion ${certificado ? "estricta" : ""}">
+             <b>${certificado ? "⚠️ " : ""}${esc(cal.etiqueta)}</b>
+             ${cal.aviso ? `<div>${esc(cal.aviso)}</div>` : ""}
+             ${elegido?.editor ? `<div class="in-editor">Editor: ${esc(elegido.editor)}. Symphomed no está afiliado ni vende sus materiales.</div>` : ""}
+           </div>` : "",
+      elegido?.nota ? `<div class="hint" style="color:var(--warning);margin:-4px 0 8px">${esc(elegido.nota)}</div>` : "",
+    ].join("");
+
+    // En los de nivel C la firma no es opcional: la ruta no guarda sin ella.
+    // Que el formulario lo diga evita que el profesional cargue todo, apriete
+    // Guardar y recién ahí se entere.
+    const campoQuien = caja.querySelector("#inQuien");
+    campoQuien.placeholder = certificado
+      ? "Nombre de quien lo aplicó (obligatorio)" : "Nombre del profesional";
+    caja.querySelector("#inMatricula").placeholder = certificado
+      ? "Matrícula / registro (obligatorio)" : "Matrícula / registro";
+
+    // En un nivel C el campo se VACÍA si traía puesto el dueño de la cuenta.
+    // Venía prellenado con MEDICO_NOMBRE, que es cómodo para un M-CHAT y es
+    // exactamente la respuesta equivocada acá: quien paga la cuenta no es
+    // necesariamente quien tiene la certificación, y el caso más común es
+    // que el ADOS-2 lo haya hecho una evaluadora externa. Un campo ya
+    // completo se acepta sin leerlo; uno vacío obliga a pensar quién fue.
+    //
+    // Solo se borra lo que puso Symphomed: si el profesional ya escribió
+    // otra cosa, no se le toca.
+    if (certificado && campoQuien.value.trim() === String(MEDICO_NOMBRE || "").trim()) {
+      campoQuien.value = "";
+    } else if (!certificado && !campoQuien.value.trim()) {
+      campoQuien.value = MEDICO_NOMBRE || "";
+    }
+
     reiniciarPuntajes(elegido?.puntajes || []);
   };
 

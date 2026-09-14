@@ -17,7 +17,7 @@
 // El profesional lo aplica con sus materiales y su licencia; Symphomed anota
 // qué hizo y qué le dio, igual que anota una glucemia sin ser el
 // laboratorio.
-const { Paciente, InstrumentoAplicado, INSTRUMENTOS_NEURO, Estudio } = require("../db/models");
+const { Paciente, InstrumentoAplicado, INSTRUMENTOS_NEURO, CALIFICACIONES_INSTRUMENTO, Estudio } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
@@ -25,6 +25,42 @@ const { registrar } = require("../services/auditoria");
 const { avisarCambio } = require("../services/realtime");
 
 const requireMedico = requireAuth(["medico"]);
+
+// Qué calificación pide el instrumento que se está cargando. El nombre llega
+// como texto libre —hay una opción "Otro" y hay quien escribe "WISC V" sin
+// guion— así que se normaliza antes de buscarlo. Lo que no se reconoce cae
+// en "profesional", que es el criterio prudente y no el cómodo.
+const normalizar = (s) => String(s || "").toLowerCase()
+  .normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/[^a-z0-9]/g, "");
+
+function calificacionDe(nombreInstrumento) {
+  const buscado = normalizar(nombreInstrumento);
+  const enCatalogo = INSTRUMENTOS_NEURO.find(i => normalizar(i.nombre) === buscado);
+  return enCatalogo?.quienPuede || "profesional";
+}
+
+// ═══ LA ÚNICA REGLA QUE SYMPHOMED PUEDE HACER CUMPLIR DE VERDAD ════════════
+//
+// Symphomed NO puede verificar una certificación: no hay registro público
+// de quién tiene el curso de ADOS-2, y fingir que sí lo verifica sería peor
+// que no controlar nada, porque le daría al centro una garantía falsa.
+//
+// Lo que sí puede hacer, y hace acá: no dejar que un instrumento de nivel C
+// quede registrado SIN EL NOMBRE Y LA MATRÍCULA de quien lo aplicó. No
+// habilita ni deshabilita a nadie —eso no le corresponde— pero convierte
+// "alguien cargó un ADOS-2" en "lo aplicó tal persona, con tal matrícula,
+// tal día". Que es exactamente lo que hay que poder contestar si algún día
+// alguien pregunta, y lo que hoy no quedaba registrado en ningún lado.
+function exigirFirmaSiCorresponde(nivel, aplicadoPor, matricula) {
+  if (nivel !== "certificado") return;
+  if (!aplicadoPor || !matricula) {
+    throw new ErrorHttp(400,
+      "Este instrumento exige la calificación que pide su editor. Symphomed no verifica credenciales, " +
+      "pero no guarda el resultado sin el nombre y la matrícula de quien lo aplicó. " +
+      "Si lo hizo una evaluadora externa, poné sus datos.");
+  }
+}
 
 function limpiarPuntajes(v) {
   if (!Array.isArray(v)) return [];
@@ -43,7 +79,10 @@ module.exports = function (app) {
   // arroja está publicado en toda la literatura — no son los ítems, ni el
   // algoritmo, ni los puntos de corte.
   app.get("/medico/instrumentos/catalogo", limitMedico, requireMedico, (_req, res) => {
-    res.json({ instrumentos: INSTRUMENTOS_NEURO });
+    // Va también la tabla de calificaciones: la pantalla tiene que poder
+    // decir, ANTES de que el profesional empiece a cargar, qué pide el
+    // instrumento que eligió. Enterarse al apretar "Guardar" sería tarde.
+    res.json({ instrumentos: INSTRUMENTOS_NEURO, calificaciones: CALIFICACIONES_INSTRUMENTO });
   });
 
   app.get("/medico/pacientes/:pacienteId/instrumentos", limitMedico, requireMedico, asyncRoute(async (req, res) => {
@@ -74,14 +113,18 @@ module.exports = function (app) {
       estudioId = est._id;
     }
 
+    const aplicadoPor = String(req.body?.aplicadoPor || "").trim().slice(0, 120);
+    const matricula = String(req.body?.matricula || "").trim().slice(0, 40);
+    const quienPuede = calificacionDe(instrumento);
+    exigirFirmaSiCorresponde(quienPuede, aplicadoPor, matricula);
+
     const aplicado = await InstrumentoAplicado.create({
       pacienteId: paciente._id, medicoPhone,
       instrumento: instrumento.slice(0, 80),
       version: String(req.body?.version || "").trim().slice(0, 40),
       modulo: String(req.body?.modulo || "").trim().slice(0, 40),
       fecha,
-      aplicadoPor: String(req.body?.aplicadoPor || "").trim().slice(0, 120),
-      matricula: String(req.body?.matricula || "").trim().slice(0, 40),
+      aplicadoPor, matricula, quienPuede,
       puntajes: limpiarPuntajes(req.body?.puntajes),
       clasificacion: String(req.body?.clasificacion || "").trim().slice(0, 200),
       interpretacion: String(req.body?.interpretacion || "").trim().slice(0, 4000),
@@ -105,6 +148,13 @@ module.exports = function (app) {
       if (!isNaN(f.getTime())) aplicado.fecha = f;
     }
     if (req.body?.puntajes !== undefined) aplicado.puntajes = limpiarPuntajes(req.body.puntajes);
+
+    // La misma regla que al crear, porque si no la edición sería la puerta
+    // de atrás: guardar el ADOS-2 con la firma puesta y después vaciarla de
+    // un PATCH. Se recalcula el nivel además, por si lo que cambió fue el
+    // nombre del instrumento.
+    aplicado.quienPuede = calificacionDe(aplicado.instrumento);
+    exigirFirmaSiCorresponde(aplicado.quienPuede, aplicado.aplicadoPor, aplicado.matricula);
 
     await aplicado.save();
     avisarCambio(medicoPhone);
