@@ -266,6 +266,24 @@ const TABS_KARDEX_NEURO = {
   recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
   informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
 };
+// Symphomed Fisioterapia. "evaluacion" es el mapa de dolor sobre la silueta,
+// "movilidad" la goniometría contra el rango de referencia y "objetivos" el
+// seguimiento sesión a sesión. "plan" es el mismo backend de Odonto/Estética
+// y acá sirve para el bono de sesiones, que es como se cobra rehabilitación.
+const TABS_KARDEX_FISIOTERAPIA = {
+  paciente: { icono: ICONOS.persona, claveLabel: "tab.paciente" },
+  evaluacion: { icono: ICONOS.clipboard, claveLabel: "tab.evaluacion" },
+  movilidad: { icono: ICONOS.tendencia, claveLabel: "tab.movilidad" },
+  objetivos: { icono: ICONOS.tendencia, claveLabel: "tab.objetivos" },
+  consultas: { icono: ICONOS.mic, claveLabel: "tab.sesiones" },
+  plan: { icono: ICONOS.clipboard, claveLabel: "tab.procedimientos" },
+  evolucion: { icono: ICONOS.tendencia, claveLabel: "tab.evolucion" },
+  antecedentes: { icono: ICONOS.clipboard, claveLabel: "tab.antecedentes" },
+  estudios: { icono: ICONOS.frasco, claveLabel: "tab.estudios" },
+  medicamentos: { icono: ICONOS.pastilla, claveLabel: "tab.medicamentos" },
+  recetas: { icono: ICONOS.documento, claveLabel: "tab.recetas" },
+  informes: { icono: ICONOS.documento, claveLabel: "tab.informes" },
+};
 // Los mapas de arriba guardan la CLAVE del texto, no el texto. La traducción
 // se resuelve acá, en cada llamada, y no al cargar el archivo: estado.js se
 // carga antes del login, cuando todavía no se sabe en qué idioma trabaja el
@@ -280,6 +298,7 @@ function tabsKardexPara(tipoEspecialidad) {
     tipoEspecialidad === "oftalmologia" ? TABS_KARDEX_OFTALMOLOGIA :
     tipoEspecialidad === "veterinaria" ? TABS_KARDEX_VETERINARIA :
     tipoEspecialidad === "ginecologia" ? TABS_KARDEX_GINECOLOGIA :
+    tipoEspecialidad === "fisioterapia" ? TABS_KARDEX_FISIOTERAPIA :
     TABS_KARDEX_MEDICINA_GENERAL;
   const salida = {};
   for (const clave of Object.keys(mapa)) {

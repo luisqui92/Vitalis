@@ -433,7 +433,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
-  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: `<div id="objetivosNeuroBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, familia: `<div id="informesFamiliaBox"></div>`, instrumentos: `<div id="instrumentosBox"></div>`, informes: `<div id="informesBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
+  const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: MEDICO_TIPO_ESPECIALIDAD === "fisioterapia" ? `<div id="objetivosFisioBox"></div>` : `<div id="objetivosNeuroBox"></div>`, evaluacion: `<div id="fisioEvaluacionBox"></div>`, movilidad: `<div id="fisioMovilidadBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, familia: `<div id="informesFamiliaBox"></div>`, instrumentos: `<div id="instrumentosBox"></div>`, informes: `<div id="informesBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `
     <button class="back" id="btnBack">${t("kardex.volver")}</button>
@@ -493,8 +493,21 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     renderTabPerfilNeuro(p._id);
   }
 
+  // "objetivos" es la única pestaña que comparten dos especialidades con
+  // pantallas distintas. Neuro y fisio miden lo mismo —sesión a sesión,
+  // bajando la ayuda— pero contra modelos separados (ver db/models.js), así
+  // que la que se dibuja depende de quién esté mirando.
   if (tabActiva === "objetivos") {
-    renderTabObjetivosNeuro(p._id);
+    if (MEDICO_TIPO_ESPECIALIDAD === "fisioterapia") renderTabObjetivosFisio(p._id);
+    else renderTabObjetivosNeuro(p._id);
+  }
+
+  if (tabActiva === "evaluacion") {
+    renderTabFisioEvaluacion(p._id);
+  }
+
+  if (tabActiva === "movilidad") {
+    renderTabFisioMovilidad(p._id);
   }
 
   if (tabActiva === "salud") {

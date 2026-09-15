@@ -1,0 +1,205 @@
+// Symphomed — Português · Fisioterapia: mapa de dor sobre a silhueta,
+// goniometria contra a amplitude de referência e objetivos funcionais.
+//
+// As UNIDADES não se traduzem: graus são graus e a escala de dor vai de 0 a
+// 10 em todo lugar. O que muda com o idioma são os nomes das regiões, dos
+// movimentos e os textos de tela.
+Object.assign(I18N.pt, {
+  // ─── Abas ──────────────────────────────────────────────────────────────
+  "tab.evaluacion": "Avaliação",
+  "tab.movilidad": "Mobilidade",
+
+  // ─── Gerais do módulo ──────────────────────────────────────────────────
+  "fisio.cargando": "Carregando...",
+  "fisio.errCargar": "Não foi possível carregar",
+  "fisio.errGuardar": "Não foi possível salvar",
+  "fisio.guardar": "Salvar",
+  "fisio.guardado": "Salvo",
+  "fisio.cancelar": "Cancelar",
+  "fisio.opcional": "Opcional",
+
+  // ─── Mapa de dor ───────────────────────────────────────────────────────
+  "fisio.mapa.titulo": "Onde dói",
+  "fisio.mapa.ayuda": "Toque na silhueta onde o paciente refere dor.",
+  "fisio.mapa.vacio": "Ainda não há nada marcado nesta vista.",
+  "fisio.vista.frente": "De frente",
+  "fisio.vista.espalda": "De costas",
+
+  "fisio.puntos.titulo": "Pontos marcados",
+  "fisio.puntos.confirmarBorrar": "Retirar este ponto do mapa? As medidas anteriores são mantidas.",
+
+  "fisio.dolor.titulo": "Marcar dor",
+  "fisio.dolor.ladoAviso": "de frente, a esquerda da tela é o lado direito do paciente",
+  "fisio.dolor.region": "Região",
+  "fisio.dolor.lado": "Lado",
+  "fisio.dolor.intensidad": "Intensidade",
+  "fisio.dolor.tipo": "Tipo de dor",
+  "fisio.dolor.notas": "Observações",
+  "fisio.dolor.marcar": "Marcar",
+
+  // ─── Avaliação ─────────────────────────────────────────────────────────
+  "fisio.ev.titulo": "Avaliação inicial",
+  "fisio.ev.motivo": "Queixa principal",
+  "fisio.ev.motivoPh": "Ex.: dor lombar ao levantar",
+  "fisio.ev.mecanismo": "Como aconteceu",
+  "fisio.ev.mecanismoPh": "Ex.: levantou uma caixa girando o tronco",
+  "fisio.ev.desde": "Desde quando",
+  "fisio.ev.notas": "Notas",
+  "fisio.ev.notasPh": "Opcional",
+
+  // ─── Bandeiras vermelhas ───────────────────────────────────────────────
+  "fisio.banderas.titulo": "Bandeiras vermelhas",
+  "fisio.banderas.ayuda": "Sinais que obrigam a encaminhar antes de tratar. Marque os presentes.",
+  "fisio.banderas.hay": "Há bandeiras vermelhas marcadas",
+  "fisio.banderas.aviso": "É uma lista de alerta, não um diagnóstico: a conduta você decide.",
+  "fisio.bandera.dolor_nocturno_no_cede": "Dor noturna que não cede com repouso",
+  "fisio.bandera.perdida_peso_inexplicada": "Perda de peso sem explicação",
+  "fisio.bandera.fiebre": "Febre",
+  "fisio.bandera.antecedente_oncologico": "Antecedente oncológico",
+  "fisio.bandera.trauma_significativo": "Trauma importante",
+  "fisio.bandera.deficit_neurologico_progresivo": "Déficit neurológico progressivo",
+  "fisio.bandera.alteracion_esfinteres": "Alteração de esfíncteres",
+  "fisio.bandera.anestesia_silla_montar": "Anestesia em sela",
+  "fisio.bandera.dolor_toracico_esfuerzo": "Dor torácica ao esforço",
+  "fisio.bandera.corticoides_prolongados": "Corticoides por tempo prolongado",
+
+  // ─── Regiões do corpo ──────────────────────────────────────────────────
+  "reg.cervical": "Cervical",
+  "reg.hombro": "Ombro",
+  "reg.codo": "Cotovelo",
+  "reg.muneca": "Punho",
+  "reg.mano": "Mão",
+  "reg.torax": "Tórax",
+  "reg.abdomen": "Abdome",
+  "reg.dorsal": "Dorsal",
+  "reg.lumbar": "Lombar",
+  "reg.sacroiliaca": "Sacroilíaca",
+  "reg.cadera": "Quadril",
+  "reg.muslo": "Coxa",
+  "reg.rodilla": "Joelho",
+  "reg.pierna": "Perna",
+  "reg.tobillo": "Tornozelo",
+  "reg.pie": "Pé",
+  "reg.otra": "Outra",
+
+  // ─── Lados ─────────────────────────────────────────────────────────────
+  "lado.izquierdo": "Esquerdo",
+  "lado.derecho": "Direito",
+  "lado.central": "Central",
+  "lado.bilateral": "Bilateral",
+
+  // ─── Tipos de dor ──────────────────────────────────────────────────────
+  "dolor.mecanico": "Mecânica",
+  "dolor.inflamatorio": "Inflamatória",
+  "dolor.neuropatico": "Neuropática",
+  "dolor.referido": "Referida",
+  "dolor.sin_clasificar": "Sem classificar",
+
+  // ─── Mobilidade / goniometria ──────────────────────────────────────────
+  "fisio.rom.nueva": "Tomar uma medida",
+  "fisio.rom.actual": "Última medida de cada movimento",
+  "fisio.rom.historial": "Histórico",
+  "fisio.rom.vacio": "Ainda não há medidas registradas.",
+  "fisio.rom.articulacion": "Articulação",
+  "fisio.rom.movimiento": "Movimento",
+  "fisio.rom.lado": "Lado",
+  "fisio.rom.grados": "Graus",
+  "fisio.rom.gradosPh": "Ex.: 95",
+  "fisio.rom.fecha": "Data",
+  "fisio.rom.referencia": "Amplitude de referência: {n}°",
+  "fisio.rom.contra": "de {n}° de referência — {p}%",
+  "fisio.rom.extensionCompleta": "Extensão completa",
+  "fisio.rom.faltaExtension": "Faltam {g}° para a extensão completa",
+  "fisio.rom.confirmarBorrar": "Apagar esta medida?",
+
+  // ─── Articulações ──────────────────────────────────────────────────────
+  "art.hombro": "Ombro",
+  "art.codo": "Cotovelo",
+  "art.muneca": "Punho",
+  "art.cervical": "Cervical",
+  "art.lumbar": "Lombar",
+  "art.cadera": "Quadril",
+  "art.rodilla": "Joelho",
+  "art.tobillo": "Tornozelo",
+
+  // ─── Movimentos ────────────────────────────────────────────────────────
+  "mov.flexion": "Flexão",
+  "mov.extension": "Extensão",
+  "mov.abduccion": "Abdução",
+  "mov.aduccion": "Adução",
+  "mov.rotacion": "Rotação",
+  "mov.rotacion_interna": "Rotação interna",
+  "mov.rotacion_externa": "Rotação externa",
+  "mov.pronacion": "Pronação",
+  "mov.supinacion": "Supinação",
+  "mov.inclinacion": "Inclinação",
+  "mov.desviacion_radial": "Desvio radial",
+  "mov.desviacion_cubital": "Desvio ulnar",
+  "mov.flexion_dorsal": "Dorsiflexão",
+  "mov.flexion_plantar": "Flexão plantar",
+  "mov.inversion": "Inversão",
+  "mov.eversion": "Eversão",
+
+  // ─── Objetivos funcionais ──────────────────────────────────────────────
+  "fisio.obj.nuevo": "Novo objetivo",
+  "fisio.obj.titulo": "Objetivo",
+  "fisio.obj.tituloPh": "Ex.: subir um lance de escada sem corrimão",
+  "fisio.obj.area": "Área",
+  "fisio.obj.criterio": "Quando se considera alcançado",
+  "fisio.obj.criterioPh": "Ex.: 10 degraus alternando os pés, sem apoio",
+  "fisio.obj.criterioAyuda": "Escreva de um jeito que dê para contar: quantas repetições, em que condições.",
+  "fisio.obj.crear": "Criar objetivo",
+  "fisio.obj.vacio": "Ainda não há objetivos registrados.",
+  "fisio.obj.sinSesiones": "Ainda não foi registrada nenhuma sessão.",
+  "fisio.obj.registrar": "Registrar sessão",
+  "fisio.obj.marcarLogrado": "Marcar alcançado",
+  "fisio.obj.reabrir": "Reabrir",
+  "fisio.obj.borrar": "Apagar",
+  "fisio.obj.confirmarBorrar": "Apagar este objetivo e todas as suas sessões?",
+  "fisio.obj.sesiones": "{n} sessões",
+  "fisio.obj.ultima": "{a} de {b} da última vez",
+  "fisio.obj.dolorTit": "dor",
+  "fisio.obj.graficoAlt": "Nível de ajuda ao longo de {n} sessões, com a dor de cada uma na cor do ponto.",
+  "fisio.obj.leyenda": "A linha que sobe é o avanço: quanto mais alto, menos ajuda precisa. A cor do ponto é a dor daquela sessão.",
+  "fisio.obj.mejora": "Precisa de <b>menos ajuda</b> do que no começo: de «{a}» para «{b}». Isso é o avanço, mesmo que a porcentagem suba ou desça.",
+  "fisio.obj.ojoDolor": "Precisa de menos ajuda, mas <b>com mais dor do que no início</b>. Vale revisar se está compensando antes de dar como alcançado.",
+
+  // ─── Áreas do objetivo ─────────────────────────────────────────────────
+  "areaFisio.movilidad": "Mobilidade",
+  "areaFisio.fuerza": "Força",
+  "areaFisio.equilibrio": "Equilíbrio",
+  "areaFisio.marcha": "Marcha",
+  "areaFisio.dolor": "Dor",
+  "areaFisio.funcional": "Funcional",
+  "areaFisio.respiratorio": "Respiratório",
+  "areaFisio.postural": "Postural",
+
+  // ─── Estado do objetivo ────────────────────────────────────────────────
+  "estadoObj.activo": "Ativo",
+  "estadoObj.logrado": "Alcançado",
+  "estadoObj.suspendido": "Suspenso",
+
+  // ─── Níveis de ajuda ───────────────────────────────────────────────────
+  "ayuda.independiente": "Sozinho, sem ajuda",
+  "ayuda.verbal": "Basta lembrarem",
+  "ayuda.gestual": "Basta apontarem",
+  "ayuda.fisica_parcial": "Com um pouco de ajuda física",
+  "ayuda.fisica_total": "Segurando a mão",
+  "ayudaCorta.independiente": "Sozinho",
+  "ayudaCorta.verbal": "Lembrando",
+  "ayudaCorta.gestual": "Apontando",
+  "ayudaCorta.fisica_parcial": "Ajuda parcial",
+  "ayudaCorta.fisica_total": "Pela mão",
+
+  // ─── Registrar uma sessão ──────────────────────────────────────────────
+  "fisio.sesion.titulo": "Registrar sessão",
+  "fisio.sesion.fecha": "Data",
+  "fisio.sesion.intentos": "Quantas repetições foram tentadas",
+  "fisio.sesion.intentosPh": "Ex.: 10",
+  "fisio.sesion.logros": "Quantas saíram",
+  "fisio.sesion.logrosPh": "Ex.: 6",
+  "fisio.sesion.ayuda": "Quanta ajuda precisou",
+  "fisio.sesion.dolor": "Dor durante o exercício",
+  "fisio.sesion.dolorAyuda": "Se saíram todas mas com dor alta, o objetivo ainda não está alcançado.",
+  "fisio.sesion.notas": "Observações",
+});

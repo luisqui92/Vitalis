@@ -3,7 +3,7 @@
 // Las áreas, en el orden en que se ofrecen al registrarse. Los valores son
 // los que guarda la base y NO se traducen nunca: son identificadores, no
 // texto. Lo que se traduce es la etiqueta, con t("area." + valor).
-const AREAS = ["medicina_general", "odontologia", "estetica", "oftalmologia", "ginecologia", "pediatria", "neurodesarrollo", "veterinaria"];
+const AREAS = ["medicina_general", "odontologia", "estetica", "oftalmologia", "ginecologia", "pediatria", "neurodesarrollo", "fisioterapia", "veterinaria"];
 
 // ─── SELECTOR DE IDIOMA (solo antes de entrar) ────────────────────────────
 // Antes del login el sistema todavía no sabe quién es el médico, así que no

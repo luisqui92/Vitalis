@@ -84,7 +84,7 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"], default: "medicina_general" },
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo", "fisioterapia"], default: "medicina_general" },
   // Idioma en el que este médico trabaja: la interfaz, sus notas clínicas y
   // lo que sus pacientes reciben por WhatsApp. Va acá y no en el servidor
   // porque es un ajuste profesional, no de infraestructura — el mismo
@@ -1315,6 +1315,230 @@ const INSTRUMENTOS_NEURO = [
   { nombre: "Otro", editor: "", quienPuede: "profesional", modulos: [], puntajes: [], nota: "" },
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Symphomed Fisioterapia
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ═══ POR QUÉ NO ALCANZABA CON LO QUE YA HABÍA ══════════════════════════════
+//
+// El Mapa Corporal que ya existe es VETERINARIO: sus regiones son hocico,
+// grupa, cola, miembro anterior y posterior. Sirve para marcar una lesión en
+// un perro y no le sirve a un kinesiólogo ni un poco.
+//
+// Los objetivos de Neurodesarrollo, en cambio, sí sirven —y mucho—. La
+// escala de ayuda que usa ese módulo (independiente → verbal → gestual →
+// física parcial → física total) es LA MISMA que usa fisioterapia para
+// registrar cuánta asistencia necesitó el paciente. No es un parecido: es
+// el mismo concepto clínico con las mismas palabras.
+//
+// Aun así van en modelos separados y no reusando ObjetivoNeuro. La razón no
+// es técnica: un objetivo de neuro se mide en "salió 8 de 10 veces" y uno de
+// fisio se mide igual, pero las áreas, los criterios y el vocabulario del
+// informe divergen apenas se los usa en serio. Compartir la tabla obligaría
+// a que los dos módulos se muevan juntos para siempre, y el que no cambió
+// paga el riesgo del que sí.
+//
+// ═══ POR QUÉ EL DOLOR Y LA MOVILIDAD VAN EN COLECCIÓN APARTE ═══════════════
+//
+// Podrían ir como arreglo adentro de la evaluación, que es lo que hace el
+// resto de Symphomed (los pagos adentro del plan, los realizados adentro de
+// la vigilancia). Acá no, porque son SERIES DE TIEMPO: se carga una medición
+// por sesión, y un tratamiento de rehabilitación son treinta o cuarenta
+// sesiones. Un arreglo que crece una entrada por sesión y nunca se poda
+// termina siendo un documento que hay que traer entero para graficar los
+// últimos tres puntos.
+//
+// En colección aparte, con índice por {paciente, clase, fecha}, pedir "las
+// últimas diez mediciones de flexión de hombro" es una consulta indexada y
+// con límite, y el documento de la evaluación queda chico para siempre.
+
+// Regiones del cuerpo humano, agrupadas como las agrupa la clínica y no como
+// las agrupa la anatomía: "lumbar" y no "L1-L5", porque el dolor que
+// describe el paciente no viene con nivel vertebral.
+const REGIONES_CUERPO = [
+  "cervical", "hombro", "codo", "muneca", "mano",
+  "torax", "abdomen",                      // se marcan de frente
+  "dorsal", "lumbar", "sacroiliaca",       // se marcan de espalda
+  "cadera", "muslo", "rodilla", "pierna", "tobillo", "pie",
+  "otra",
+];
+
+// De qué lado. "central" existe porque la columna no tiene lado, y forzar a
+// elegir izquierdo o derecho para un dolor lumbar medio ensucia el dato.
+const LADOS_FISIO = ["izquierdo", "derecho", "central", "bilateral"];
+
+// Qué tipo de dolor. Importa porque cambia la conducta: uno que aumenta con
+// el movimiento y cede con el reposo se trata distinto de uno que despierta
+// al paciente de noche.
+const TIPOS_DOLOR = ["mecanico", "inflamatorio", "neuropatico", "referido", "sin_clasificar"];
+
+// ═══ BANDERAS ROJAS ════════════════════════════════════════════════════════
+//
+// Signos que obligan a parar y derivar, no a tratar. Van en el modelo y no
+// en un texto libre porque el objetivo es que se VEAN: si hay una marcada,
+// la pantalla la muestra arriba de todo, antes que cualquier objetivo o
+// ejercicio.
+//
+// ⚠️ Es una lista de alerta, no un protocolo ni un diagnóstico. Quien decide
+// qué hacer con una bandera roja es el profesional que está tratando. Mismo
+// criterio que services/vigilancia.js y services/esquemaVacunas.js.
+const BANDERAS_ROJAS = [
+  "dolor_nocturno_no_cede",
+  "perdida_peso_inexplicada",
+  "fiebre",
+  "antecedente_oncologico",
+  "trauma_significativo",
+  "deficit_neurologico_progresivo",
+  "alteracion_esfinteres",
+  "anestesia_silla_montar",
+  "dolor_toracico_esfuerzo",
+  "corticoides_prolongados",
+];
+
+// ═══ RANGOS ARTICULARES DE REFERENCIA ══════════════════════════════════════
+//
+// Acá está el valor real del módulo. Un kinesiólogo mide 95° de flexión de
+// hombro y ese número solo no dice nada; contra los 180° de referencia dice
+// que está en la mitad. Symphomed guarda el número y muestra la comparación.
+//
+// Los valores son los rangos de movilidad activa que publica la Academia
+// Americana de Cirujanos Ortopédicos (AAOS) y que replican los manuales de
+// goniometría de uso corriente. Son REFERENCIA, no un objetivo a alcanzar:
+// varían con la edad, el biotipo y la actividad, y quien decide qué es
+// normal para ESE paciente es quien lo está tratando.
+const ARTICULACIONES_ROM = [
+  { articulacion: "hombro", movimientos: [
+    { clave: "flexion", normal: 180 }, { clave: "extension", normal: 60 },
+    { clave: "abduccion", normal: 180 }, { clave: "rotacion_interna", normal: 70 },
+    { clave: "rotacion_externa", normal: 90 } ] },
+  { articulacion: "codo", movimientos: [
+    { clave: "flexion", normal: 150 }, { clave: "extension", normal: 0 },
+    { clave: "pronacion", normal: 80 }, { clave: "supinacion", normal: 80 } ] },
+  { articulacion: "muneca", movimientos: [
+    { clave: "flexion", normal: 80 }, { clave: "extension", normal: 70 },
+    { clave: "desviacion_radial", normal: 20 }, { clave: "desviacion_cubital", normal: 30 } ] },
+  { articulacion: "cervical", movimientos: [
+    { clave: "flexion", normal: 45 }, { clave: "extension", normal: 45 },
+    { clave: "inclinacion", normal: 45 }, { clave: "rotacion", normal: 60 } ] },
+  { articulacion: "lumbar", movimientos: [
+    { clave: "flexion", normal: 60 }, { clave: "extension", normal: 25 },
+    { clave: "inclinacion", normal: 25 }, { clave: "rotacion", normal: 30 } ] },
+  { articulacion: "cadera", movimientos: [
+    { clave: "flexion", normal: 120 }, { clave: "extension", normal: 30 },
+    { clave: "abduccion", normal: 45 }, { clave: "aduccion", normal: 30 },
+    { clave: "rotacion_interna", normal: 45 }, { clave: "rotacion_externa", normal: 45 } ] },
+  { articulacion: "rodilla", movimientos: [
+    { clave: "flexion", normal: 135 }, { clave: "extension", normal: 0 } ] },
+  { articulacion: "tobillo", movimientos: [
+    { clave: "flexion_dorsal", normal: 20 }, { clave: "flexion_plantar", normal: 50 },
+    { clave: "inversion", normal: 35 }, { clave: "eversion", normal: 15 } ] },
+];
+
+// ─── LA EVALUACIÓN: una por paciente, se edita, no crece ───────────────────
+const evaluacionFisioSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  motivo: { type: String, default: "" },
+  // Cómo se produjo. En fisioterapia el mecanismo de lesión orienta el
+  // tratamiento mejor que la etiqueta diagnóstica: "se dobló el tobillo
+  // bajando un cordón" dice más que "esguince".
+  mecanismo: { type: String, default: "" },
+  desde: { type: Date, default: null },
+  // Marcadas de BANDERAS_ROJAS. Lista de claves y no texto libre, porque lo
+  // que importa es que se puedan contar y mostrar arriba de todo.
+  banderasRojas: { type: [String], default: [] },
+  // El mapa de dolor ACTUAL. Es una foto del estado de hoy y se edita en el
+  // lugar — la evolución del dolor en el tiempo vive en MedicionFisio, que
+  // es donde corresponde. Está acotado por la anatomía: nadie marca
+  // cincuenta puntos, y si lo hiciera el problema sería otro.
+  puntosDolor: {
+    type: [{
+      region: { type: String, enum: REGIONES_CUERPO, default: "otra" },
+      lado: { type: String, enum: LADOS_FISIO, default: "central" },
+      // Sobre qué silueta se marcó, y dónde cayó el clic en porcentaje del
+      // ancho y del alto. Se guardan las coordenadas además de la región
+      // para que el punto vuelva a aparecer exactamente donde lo pusieron.
+      vista: { type: String, enum: ["frente", "espalda"], default: "frente" },
+      x: { type: Number, default: 50 },
+      y: { type: Number, default: 50 },
+      intensidad: { type: Number, min: 0, max: 10, default: 0 },
+      tipo: { type: String, enum: TIPOS_DOLOR, default: "sin_clasificar" },
+      notas: { type: String, default: "" },
+    }],
+    default: [],
+  },
+  notas: { type: String, default: "" },
+}, { timestamps: true });
+evaluacionFisioSchema.index({ pacienteId: 1, medicoPhone: 1 });
+const EvaluacionFisio = mongoose.model("EvaluacionFisio", evaluacionFisioSchema);
+
+// ─── LAS MEDICIONES: muchas por paciente, serie de tiempo ─────────────────
+//
+// Una sola colección para dolor y goniometría en vez de dos. Son la misma
+// forma —un número con fecha, atado a una zona y un lado— y separarlas
+// obligaría a consultar dos veces para dibujar la evolución de una sesión.
+// "clase" distingue qué se midió.
+const medicionFisioSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  clase: { type: String, enum: ["dolor", "goniometria"], required: true },
+  // Para dolor: una región de REGIONES_CUERPO. Para goniometría: una
+  // articulación de ARTICULACIONES_ROM. Se valida en la ruta según la clase
+  // y no acá, porque un enum con la unión de las dos listas dejaría pasar
+  // "flexión de sacroilíaca".
+  zona: { type: String, required: true },
+  movimiento: { type: String, default: "" },   // solo goniometría
+  lado: { type: String, enum: LADOS_FISIO, default: "central" },
+  // Dolor: 0 a 10 (escala visual analógica). Goniometría: grados.
+  valor: { type: Number, required: true },
+  fecha: { type: Date, required: true },
+  notas: { type: String, default: "" },
+}, { timestamps: true });
+// El orden importa: filtra por paciente y clase, ordena por fecha. Sin
+// "clase" en el medio, pedir la evolución del dolor obligaría a ordenar en
+// memoria — que es exactamente el problema que tiene Medicion hoy.
+medicionFisioSchema.index({ pacienteId: 1, clase: 1, fecha: -1 });
+const MedicionFisio = mongoose.model("MedicionFisio", medicionFisioSchema);
+
+// ─── LOS OBJETIVOS FUNCIONALES ────────────────────────────────────────────
+//
+// En qué se parece al objetivo de Neurodesarrollo: se mide sesión a sesión, y
+// el logro real casi nunca es subir el porcentaje sino BAJAR LA AYUDA.
+//
+// En qué se diferencia: acá hay dolor. Un ejercicio que sale 10 de 10 pero
+// con dolor 7 no es un objetivo logrado, y el modelo tiene que poder decirlo.
+const AREAS_OBJETIVO_FISIO = ["movilidad", "fuerza", "equilibrio", "marcha", "dolor", "funcional", "respiratorio", "postural"];
+
+const objetivoFisioSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  medicoPhone: { type: String, index: true, required: true },
+  titulo: { type: String, required: true },
+  area: { type: String, enum: AREAS_OBJETIVO_FISIO, default: "movilidad" },
+  // Observable y contable, igual que en neuro: "sube 10 escalones alternando
+  // pies y sin baranda", no "mejora la marcha".
+  criterio: { type: String, default: "" },
+  fechaInicio: { type: Date, default: Date.now },
+  fechaCierre: { type: Date, default: null },
+  estado: { type: String, enum: ["activo", "logrado", "suspendido"], default: "activo" },
+  progreso: {
+    type: [{
+      fecha: { type: Date, default: Date.now },
+      logros: { type: Number, default: 0 },
+      intentos: { type: Number, default: 0 },
+      ayuda: { type: String, enum: ["independiente", "verbal", "gestual", "fisica_parcial", "fisica_total"], default: "independiente" },
+      // Cuánto dolor hubo durante el ejercicio, 0 a 10. Es el campo que este
+      // modelo tiene y el de neuro no, y el que evita registrar como logro
+      // algo que el paciente hizo aguantando.
+      dolor: { type: Number, min: 0, max: 10, default: 0 },
+      notas: { type: String, default: "" },
+      profesional: { type: String, default: "" },
+    }],
+    default: [],
+  },
+}, { timestamps: true });
+objetivoFisioSchema.index({ pacienteId: 1, estado: 1 });
+const ObjetivoFisio = mongoose.model("ObjetivoFisio", objetivoFisioSchema);
+
 // ─── EL EQUIPO TRATANTE DE UN CHICO ───────────────────────────────────────
 //
 // ═══ POR QUÉ ESTO EXISTE Y POR QUÉ NO EXISTÍA ══════════════════════════════
@@ -2043,4 +2267,6 @@ module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, Consul
   CALIFICACIONES_INSTRUMENTO,
   InformeFamilia, EquipoNeuro,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,
+  EvaluacionFisio, MedicionFisio, ObjetivoFisio,
+  REGIONES_CUERPO, LADOS_FISIO, TIPOS_DOLOR, BANDERAS_ROJAS, ARTICULACIONES_ROM, AREAS_OBJETIVO_FISIO,
   InvitacionReporte };

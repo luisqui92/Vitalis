@@ -1023,6 +1023,33 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
   .ayuda-eje{font-size:9px}
 }
 
+/* ─── Symphomed Fisioterapia ──────────────────────────────────────────────
+   La silueta tiene un ancho máximo chico a propósito: agrandarla no agrega
+   precisión —las regiones son cajas, no contornos anatómicos— y sí hace que
+   haya que scrollear para ver el cuerpo entero, que es justo lo que se
+   necesita mirar de una sola vez. */
+.fisio-vistas{display:flex;gap:8px;margin-bottom:8px}
+.fisio-vistas button{flex:1;margin:0}
+.fisio-vistas button.activo{border-color:var(--primary);color:var(--primary)}
+
+.fisio-silueta-caja{display:flex;justify-content:center;margin:6px 0}
+.fisio-silueta{width:100%;max-width:220px;height:auto;cursor:crosshair;touch-action:manipulation}
+.fisio-punto{cursor:pointer}
+.fisio-punto-num{fill:var(--sobre-primary);font-size:9px;font-weight:700;text-anchor:middle;pointer-events:none}
+
+.fisio-check{display:flex;align-items:flex-start;gap:8px;padding:6px 0;cursor:pointer;line-height:1.4}
+.fisio-check input{width:auto;margin:2px 0 0;flex:0 0 auto}
+
+.fisio-rom-fila{padding:10px 0;border-bottom:1px solid var(--border)}
+.fisio-rom-fila:last-child{border-bottom:0;padding-bottom:0}
+.fisio-rom-encabezado{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.fisio-rom-grados{font-weight:700;font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* La barra contra el rango de referencia. Sin ella el número es un dato
+   suelto; con ella se lee de un vistazo cuánto falta. */
+.fisio-barra{height:7px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:6px}
+.fisio-barra-relleno{height:100%;border-radius:4px;transition:width .25s ease}
+
 /* ─── El panel de lo que se pasó ──────────────────────────────────────────
    Lo primero que ve el profesional al entrar, y lo único de la pantalla que
    le habla de pacientes que NO tiene adelante. Ver el encabezado de
