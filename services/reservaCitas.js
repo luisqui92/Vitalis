@@ -172,6 +172,29 @@ function esConsultaDeMedico(texto) {
   return sinTildes(texto).includes("symphomed");
 }
 
+// ═══ EL «HOLA» DE ALGUIEN QUE YA SE PRESENTÓ ══════════════════════════════
+//
+// La heurística de arriba mira si el mensaje nombra a Symphomed, y para el
+// primer contacto está bien: el 99 % de quien escribe a este número es un
+// paciente que quiere una cita, y ese es el flujo que tiene que ganar.
+//
+// El problema es el segundo día. Un médico que ayer preguntó por Symphomed
+// hoy escribe "Hola" y le contesta el bot de reservas: "¿cuál de nuestros
+// consultorios buscás?". Queda como que el sistema no se acuerda de él —y
+// justo con la persona a la que le estamos vendiendo memoria.
+//
+// Entonces: si de este número YA hay un interesado registrado y todavía no
+// lo contactó nadie, un saludo suelto sigue la conversación de ventas. No
+// alcanza con que exista el registro: si ya está "contactado" o
+// "descartado", eso lo movió una persona y el bot no lo pisa.
+const SALUDOS = /^(hola|buenas|buen dia|buenas tardes|buenas noches|hey|que tal|holi)[\s!.,¡]*$/;
+
+async function saludoDeUnInteresado(numero, texto) {
+  if (!SALUDOS.test(sinTildes(texto).trim().toLowerCase())) return false;
+  const i = await Interesado.findOne({ numero }).select("estado").lean();
+  return Boolean(i) && (i.estado === "nuevo" || i.estado === "interesado");
+}
+
 // Cuánto se guarda de la conversación. Seis vueltas alcanzan para que la IA
 // no repregunte lo que ya le dijeron, y evitan que una charla larga se coma
 // el contexto —y el costo— de cada mensaje siguiente.
@@ -185,7 +208,10 @@ async function atenderComoMedico(numero, texto, sesion, nombrePerfil) {
   const historial = sesion.paso === "medico" ? (sesion.datos?.historial || []) : [];
   const idioma = interesado?.idioma || "es";
 
-  const r = await atenderMedico(texto, historial, idioma);
+  // Se le pasa lo que ya quedó guardado de él: el historial de la charla se
+  // vence a la hora, el contacto no. Sin esto, alguien que hace un mes dijo
+  // que era veterinario vuelve a escribir y le preguntamos lo mismo.
+  const r = await atenderMedico(texto, historial, idioma, interesado);
 
   // La IA dice que en realidad es un paciente: se devuelve null y el mensaje
   // sigue al flujo de reserva. Se limpia la sesión para que el próximo no
@@ -255,7 +281,7 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
   // Y si igual se equivoca no se rompe nada: el asistente de ventas devuelve
   // intención "paciente" y el mensaje sigue de largo al flujo de reserva. La
   // heurística rutea, la IA corrige.
-  if (sesion.paso === "medico" || esConsultaDeMedico(t)) {
+  if (sesion.paso === "medico" || esConsultaDeMedico(t) || await saludoDeUnInteresado(numero, t)) {
     const r = await atenderComoMedico(numero, texto, sesion, nombrePerfil);
     if (r) return r;
     // Era un paciente que nombró Symphomed. Sigue por el camino normal.

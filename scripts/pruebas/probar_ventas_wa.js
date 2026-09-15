@@ -158,6 +158,55 @@ verificar("el modelo guarda con qué llamarlo",
 verificar("y el número es único: un médico, un contacto",
   campos.numero.unique === true);
 
+console.log("\n── 6b. El mensaje que decide si atiende el teléfono ──");
+// Salió de una conversación real. Un médico escribió "quiero ver una
+// demostración de Symphomed" y el bot contestó:
+//
+//   «Confirmo que le escriben en breve para coordinar la demostración.»
+//
+// Obedeció al prompt al pie de la letra —decía "respondé confirmando que le
+// escriben en breve"— y el resultado suena a formulario automático: voz
+// pasiva, sin sujeto, sin cuándo, y sin preguntar lo único que hacía falta
+// saber. El contacto quedó guardado sin especialidad, así que quien lo
+// llame no sabe si mostrarle un odontograma o un esquema de vacunas.
+// `ventas` ya es el módulo requerido arriba; acá hace falta el TEXTO del
+// archivo, porque lo que se revisa es el prompt y no una función.
+const codigoVentas = fs.readFileSync(path.join(RAIZ, "services", "asistenteVentas.js"), "utf8");
+verificar("el prompt ya no manda contestar «le escriben en breve»",
+  !/Respondé confirmando que le escriben en breve/.test(codigoVentas));
+verificar("y prohíbe explícitamente esa frase y la voz pasiva",
+  /NUNCA escribas "le escriben en breve"/.test(codigoVentas) && /voz pasiva/.test(codigoVentas));
+verificar("si no sabe la especialidad, la pregunta en la misma respuesta",
+  /SI NO SABÉS LA ESPECIALIDAD/.test(codigoVentas));
+verificar("  ...y si ya la sabe, no la repregunta",
+  /SI YA SABÉS LA ESPECIALIDAD/.test(codigoVentas));
+
+// El historial de la charla se vence a la hora; el contacto no. Sin pasarle
+// lo guardado, alguien que el mes pasado dijo que era veterinario vuelve a
+// escribir y se lo preguntamos de nuevo — con la persona a la que le estamos
+// vendiendo, justamente, memoria.
+verificar("al armar la respuesta se le pasa lo que ya se sabe del contacto",
+  /async function atenderMedico\(mensaje, historial = \[\], idioma = "es", sabido = null\)/.test(codigoVentas));
+verificar("  ...y se le dice que no lo vuelva a preguntar",
+  /no se lo vuelvas a preguntar/i.test(codigoVentas));
+verificar("  ...y la ruta se lo pasa de verdad",
+  /atenderMedico\(texto, historial, idioma, interesado\)/.test(bot));
+
+console.log("\n── 6c. El «Hola» del segundo día ──");
+// En la misma conversación real: el médico había escrito "Hola" antes y le
+// contestó el bot de PACIENTES («¿cuál de nuestros consultorios buscás?»).
+// Queda como que el sistema no se acuerda de él, justo con quien estamos
+// vendiendo memoria. Si ya hay un interesado registrado, un saludo suelto
+// sigue la conversación de ventas.
+verificar("un saludo de alguien ya registrado entra por ventas",
+  /saludoDeUnInteresado\(numero, t\)/.test(bot));
+verificar("  ...pero solo si nadie lo contactó todavía",
+  /estado === "nuevo" \|\| i\.estado === "interesado"/.test(bot));
+// El 99 % de quien escribe a este número es un paciente: si un "hola"
+// cualquiera entrara por ventas, se rompería el flujo que de verdad se usa.
+verificar("un saludo de un número desconocido sigue yendo a reservas",
+  /if \(!i\)|Boolean\(i\) &&/.test(bot));
+
 console.log("\n── 7. La regla que hace seguro compartir número ──");
 // Meta le pone UNA calificación de calidad al número, para todo. Si un médico
 // que no pidió nada bloquea o reporta, el que deja de recibir mensajes es el

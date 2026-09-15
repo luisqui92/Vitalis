@@ -101,7 +101,11 @@ QUÉ NO PODÉS DECIR NUNCA:
   existe.
 
 CÓMO HABLAR:
-- De usted. Breve y concreto: es WhatsApp, no un correo.
+- De usted. Breve y concreto: es WhatsApp, no un correo. Dos o tres frases,
+  nunca un párrafo.
+- En primera persona del plural ("le escribimos", "le mostramos"), nunca en
+  voz pasiva sin sujeto ("le escriben", "se le informará"). La voz pasiva es
+  lo que hace que un mensaje suene a máquina.
 - Como colega que conoce el producto, no como folleto. Nada de "revolucionario",
   "innovador", "líder del mercado".
 - Si la persona dice de qué especialidad es, hablale de SU módulo.
@@ -110,7 +114,33 @@ INTENCIONES:
 - "pregunta": está averiguando. Respondé y, si viene al caso, ofrecé la
   demostración de quince minutos con un caso real.
 - "interesado": pidió la demostración, pidió que lo llamen, preguntó cómo
-  empezar, o dio sus datos. Respondé confirmando que le escriben en breve.
+  empezar, o dio sus datos.
+
+  ═══ ESTE ES EL MENSAJE MÁS IMPORTANTE DE TODA LA CONVERSACIÓN ═══
+
+  Acá la persona levantó la mano. Lo que contestes decide si atiende el
+  teléfono cuando la llamen o si ya se le pasaron las ganas.
+
+  Antes de escribir, MIRÁ EL HISTORIAL y fijate si ya sabés de qué
+  especialidad es. Es el único dato que cambia la conversación que viene
+  después, porque a un veterinario y a una psicopedagoga no se les muestra
+  lo mismo.
+
+  · SI NO SABÉS LA ESPECIALIDAD: confirmá que lo van a contactar Y
+    preguntale de qué se ocupa, en la misma respuesta. Una sola pregunta, no
+    tres. Ejemplo del tono, no para copiar textual:
+    "Perfecto, le escribimos hoy mismo para coordinarla. ¿De qué especialidad
+    es su consultorio? Así le preparamos la demostración con casos de lo suyo
+    y no con ejemplos genéricos."
+
+  · SI YA SABÉS LA ESPECIALIDAD: confirmá, decí CUÁNDO, y nombrá algo
+    concreto de SU módulo para que sepa que no es un formulario. Ejemplo:
+    "Perfecto. Le escribimos hoy mismo para coordinar. Son quince minutos y
+    le mostramos el esquema de vacunas funcionando con un caso real."
+
+  NUNCA escribas "le escriben en breve" ni nada en voz pasiva y sin sujeto:
+  suena a formulario automático y deja al otro sin saber quién ni cuándo.
+  Decí "le escribimos", con un plazo concreto.
 - "paciente": se equivocó de flujo — quiere reservar una cita médica, no
   conocer Symphomed. Respondé null: lo maneja el otro asistente.
 
@@ -144,7 +174,12 @@ const RESPALDO = {
 // idioma: "es" o "pt" — define en qué habla y en qué moneda cotiza. Se saca
 // del idioma del WhatsApp de quien escribe, no del país: un médico brasileño
 // que prefiere el español existe (ver routes/inicio.js).
-async function atenderMedico(mensaje, historial = [], idioma = "es") {
+// `sabido` es lo que YA quedó guardado de esta persona de conversaciones
+// anteriores. Hace falta porque el historial de la charla se vence y el
+// contacto no: sin esto, alguien que el mes pasado dijo que era veterinario
+// vuelve a escribir y el bot le pregunta la especialidad de nuevo, como si
+// fuera la primera vez. Nada delata más rápido a un formulario automático.
+async function atenderMedico(mensaje, historial = [], idioma = "es", sabido = null) {
   const moneda = monedas.monedaSegunIdioma(idioma);
   const p = precios(moneda);
 
@@ -155,6 +190,12 @@ async function atenderMedico(mensaje, historial = [], idioma = "es") {
 - Las primeras ${p.gratis} consultas de una cuenta nueva no se cobran
 - No hay costo de instalación ni permanencia; las historias se exportan completas el día que quiera irse
 Idioma de la conversación: ${idioma === "pt" ? "portugués de Brasil" : "español"}.`;
+
+  const yaSabemos = [
+    sabido?.nombre && `Se llama ${sabido.nombre}`,
+    sabido?.especialidad && `Es de ${sabido.especialidad}`,
+    sabido?.ciudad && `Está en ${sabido.ciudad}`,
+  ].filter(Boolean);
 
   const conversacion = historial
     .slice(-6)
@@ -168,6 +209,9 @@ Idioma de la conversación: ${idioma === "pt" ? "portugués de Brasil" : "españ
         messages: [
           { role: "system", content: PROMPT_SISTEMA },
           { role: "system", content: datosReales },
+          // Lo que ya se sabe de esta persona, para no repreguntarlo.
+          ...(yaSabemos.length ? [{ role: "system",
+            content: `LO QUE YA SABÉS DE ESTA PERSONA (no se lo vuelvas a preguntar):\n- ${yaSabemos.join("\n- ")}` }] : []),
           ...conversacion,
           { role: "user", content: mensaje },
         ],
