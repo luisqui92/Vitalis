@@ -192,6 +192,29 @@ verificar("  ...y se le dice que no lo vuelva a preguntar",
 verificar("  ...y la ruta se lo pasa de verdad",
   /atenderMedico\(texto, historial, idioma, interesado\)/.test(bot));
 
+// Un prompt lleno de adjetivos ("como colega, no como folleto") no mueve el
+// tono de un modelo: los adjetivos no se pueden imitar. Los EJEMPLOS sí. Si
+// alguien saca los pares «así no / así sí», el bot vuelve a escribir como un
+// folleto y nadie se entera hasta que un médico deja de contestar.
+verificar("el prompt enseña el tono con ejemplos, no solo con adjetivos",
+  /ASÍ NO \/ ASÍ SÍ/.test(codigoVentas));
+verificar("  ...y el ejemplo de la respuesta que falló está adentro",
+  /Confirmo que le escriben en breve para coordinar la demostración/.test(codigoVentas));
+verificar("prohíbe la jerga de folleto que ningún médico usa",
+  ["revolucionario", "solución", "optimizar", "potenciar"].every(x => codigoVentas.includes(x)));
+verificar("pide una sola pregunta por mensaje",
+  /UNA sola pregunta por mensaje/.test(codigoVentas));
+verificar("y prohíbe viñetas: nadie escribe con guiones en un chat",
+  /Sin viñetas ni listas/.test(codigoVentas));
+
+// El prompt describía el producto como un catálogo de módulos. Un modelo con
+// un catálogo adentro escupe catálogo. Ahora arranca por el problema del
+// médico y las funciones quedan abajo, para cuando vengan al caso.
+verificar("el prompt empieza por el problema, no por la lista de funciones",
+  codigoVentas.indexOf("EL PROBLEMA QUE RESOLVEMOS") < codigoVentas.indexOf("Cada especialidad tiene su propia ficha"));
+verificar("  ...y dice explícitamente que las funciones van después",
+  /Lo de abajo son funciones/.test(codigoVentas));
+
 console.log("\n── 6c. El «Hola» del segundo día ──");
 // En la misma conversación real: el médico había escrito "Hola" antes y le
 // contestó el bot de PACIENTES («¿cuál de nuestros consultorios buscás?»).
