@@ -139,7 +139,17 @@ function irAPantallaInicial() {
     return renderDetalle(pedida);
   }
 
-  if (typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde()) return renderInicioEscritorio();
+  // El escritorio se arma ANTES de mirar la dirección: las pantallas pintan
+  // adentro de su contenedor, así que si se restaura una ficha sin el shell
+  // armado, se dibuja en el lugar equivocado.
+  const hayEscritorio = typeof activarEscritorioSiCorresponde === "function" && activarEscritorioSiCorresponde();
+
+  // Si la barra de direcciones apunta a una pantalla concreta —una recarga
+  // con la ficha abierta, un enlace que le pasaron— se abre esa. Ver
+  // public/js/rutas.js.
+  if (typeof abrirDesdeLaDireccion === "function" && abrirDesdeLaDireccion()) return;
+
+  if (hayEscritorio) return renderInicioEscritorio();
   renderDashboard();
 }
 

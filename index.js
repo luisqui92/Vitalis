@@ -245,6 +245,23 @@ require("./routes/mapa")(app);
 // patrones con token. "/app" no matchea ninguno, así que cae en la pantalla
 // de login de siempre — que es exactamente lo que se quiere.
 app.get(["/", "/app", "/veterinaria"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+
+// ═══ LAS PANTALLAS DE ADENTRO TAMBIÉN SON DIRECCIONES ══════════════════════
+//
+// /app/paciente/<id>, /app/agenda, /app/consulta/<id>... El ruteo lo hace el
+// navegador (ver public/js/rutas.js), pero el servidor tiene que devolver la
+// misma página en cualquiera de esas direcciones. Sin esto, recargar con la
+// ficha abierta da 404 — peor que el problema que se vino a arreglar.
+//
+// Va DESPUÉS de todas las rutas de la API y de los estáticos, así que no
+// puede taparle el camino a ninguna: para cuando un pedido llega acá, ya se
+// descartó que sea /medico/..., /admin/... o un archivo.
+//
+// Y no devuelve nada sensible: es el mismo index.html que ya se sirve sin
+// sesión. Quien entre a /app/paciente/<id> sin token ve el login, igual que
+// entrando a /app.
+app.get("/app/*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+
 app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 // /avance/<token> es el informe de avance que abre la FAMILIA de un chico en
 // seguimiento de neurodesarrollo. La ruta se llama "avance" y no "informe"

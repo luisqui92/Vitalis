@@ -125,6 +125,10 @@
 <script src="/js/clinica.js"></script>
 <script src="/js/escritorio.js"></script>
 <script src="/js/realtime.js"></script>
+<!-- Las rutas van ANTES de main.js y DESPUÉS de todas las pantallas:
+     envuelven funciones que ya tienen que existir, y main.js es quien
+     dispara la primera. -->
+<script src="/js/rutas.js"></script>
 <script src="/js/main.js"></script>
 </body>
 </html>
