@@ -46,7 +46,7 @@ function esPaginaInformeFamilia() {
 // y sin día de la semana.
 function diaYMes(f) {
   try {
-    return new Date(f).toLocaleDateString("es-BO", { day: "numeric", month: "long" });
+    return new Date(f).toLocaleDateString(localeActual(), { day: "numeric", month: "long" });
   } catch (_) { return ""; }
 }
 

@@ -28,6 +28,8 @@ Object.assign(I18N.pt, {
   "tab.instrumentos": "Instrumentos",
   "tab.salud": "Saúde",
   "tab.familia": "Família",
+  "kardex.masAcciones": "Mais ações",
+  "kardex.seccionesAria": "Seções do prontuário",
 
   "marca.base": "Symphomed",
   "marca.dental": "Symphomed Dental",

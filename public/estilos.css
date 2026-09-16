@@ -124,6 +124,34 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
 .item .fecha{font-size:11px;color:var(--text-muted);margin-top:4px;}
 .item .preview{font-size:12.5px;color:var(--text-muted);margin-top:6px;}
 .item-paciente{display:flex;align-items:center;gap:12px;}
+/* La lista de pacientes pasó de <div> a <button> para que se pueda abrir con
+   el teclado. Un <button> trae su propia tipografía, color y centrado del
+   navegador, así que hay que devolverle los del resto de la app — si no, la
+   lista cambia de aspecto solo por haberla hecho accesible. */
+button.item{width:100%;text-align:left;font-family:inherit;font-size:inherit;color:inherit;display:block;}
+button.item-paciente{display:flex;}
+button.item .nombre,button.item .paciente-info{display:block;}
+/* El anillo de foco es el punto de todo esto: si no se ve dónde está parado
+   el teclado, poder llegar con Tab no sirve de nada. */
+button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
+  outline:2px solid var(--primary);outline-offset:2px;
+}
+
+/* ─── "Más acciones" del Kardex ─────────────────────────────────────────
+   Lo administrativo —vincular la persona, armar la videoconsulta— plegado
+   abajo del contenido clínico. <details> nativo: se abre con teclado y lo
+   anuncia cualquier lector de pantalla sin una línea de JavaScript. */
+.kardex-mas{margin-top:18px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);}
+.kardex-mas summary{
+  cursor:pointer;padding:13px 16px;font-size:13.5px;font-weight:600;
+  color:var(--text-muted);list-style:none;display:flex;align-items:center;gap:8px;
+}
+.kardex-mas summary::-webkit-details-marker{display:none}
+.kardex-mas summary::before{content:"▸";transition:transform .15s ease;display:inline-block}
+.kardex-mas[open] summary::before{transform:rotate(90deg)}
+.kardex-mas[open] summary{color:var(--text);border-bottom:1px solid var(--border)}
+.kardex-mas-cuerpo{padding:4px 12px 12px}
+@media(prefers-reduced-motion:reduce){.kardex-mas summary::before{transition:none}}
 .item-action{display:inline-block;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;font-size:12px;font-weight:600;color:var(--primary);}
 .badge{font-size:10.5px;padding:3px 10px;border-radius:20px;white-space:nowrap;font-weight:600;letter-spacing:.02em;}
 .badge-procesando{background:var(--warning-bg);color:var(--warning);}
@@ -330,6 +358,20 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    así que el sidebar y el contenido heredan la identidad visual sin tocar
    nada más — ver escritorio.js para cómo se arma/activa. */
 .escr-shell{display:none;min-height:100vh;}
+/* ─── Salvaguarda de ancho ──────────────────────────────────────────────
+   El JavaScript ya escucha el cambio de ancho y rearma la pantalla, pero
+   entre que la ventana se achica y que el repintado termina hay un instante
+   con el shell de escritorio adentro de una ventana angosta. Y si el script
+   fallara, ese instante sería permanente.
+
+   Estas dos reglas son el piso: por debajo de 1024px el shell no se muestra
+   nunca, lo haga o no el JavaScript. Una salvaguarda que depende del mismo
+   código que está salvaguardando no es una salvaguarda. */
+@media(max-width:1023px){
+  .escr-shell{display:none!important;}
+  /* Y nada, en ninguna pantalla, puede empujar la página a lo ancho. */
+  html,body{max-width:100%;overflow-x:hidden;}
+}
 .escr-sidebar{width:230px;flex:0 0 auto;background:var(--card);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;}
 .escr-marca{display:flex;align-items:center;gap:10px;padding:0 8px 20px;}
 .escr-logo{width:30px;height:30px;object-fit:contain;}

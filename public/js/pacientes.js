@@ -1,6 +1,11 @@
 // Symphomed — Dashboard (lista de pacientes) y el Kardex de cada paciente
 // (pestañas: Paciente, Consultas, Medicación, Antecedentes, Vacunas).
 
+// Si la última pestaña se cambió con el teclado. Cambiar de pestaña repinta
+// todo el Kardex, y al repintar se pierde el foco: sin esta bandera la
+// primera flecha funciona y la segunda no, porque el foco quedó en el body.
+let kardexFocoEnTabs = false;
+
 // La barra de pestañas del celular — la pantalla que el médico ve primero y
 // desde la que llega a todo lo demás.
 //
@@ -60,14 +65,22 @@ function pacienteItemHtml(p) {
           : (edadDesde(p.fechaNacimiento) != null ? t("pacientes.anos", { n: edadDesde(p.fechaNacimiento) }) : "");
         return `${edad}${edad && p.sexo ? " · " : ""}${p.sexo || ""}`;
       })();
+  // <button> y no <div>: se alcanza con Tab, se abre con Enter y con espacio,
+  // y un lector de pantalla lo anuncia como algo que se puede activar. Con un
+  // div más un onclick, un médico que navega con teclado —o cualquiera con un
+  // mouse roto— simplemente no puede abrir una ficha.
+  //
+  // type="button" es obligatorio aunque no haya formulario a la vista: el
+  // valor por omisión de un <button> es "submit", y el día que alguien meta
+  // esta lista adentro de un form, cada clic recarga la página.
   return `
-    <div class="item item-paciente" data-id="${p._id}" data-nombre="${esc(p.nombre.toLowerCase())}">
-      <div class="avatar avatar-xs">${esc(iniciales(p.nombre))}</div>
-      <div>
-        <div class="nombre">${esc(p.nombre)}</div>
-        <div class="paciente-info">${esc(info)}</div>
-      </div>
-    </div>`;
+    <button type="button" class="item item-paciente" data-id="${p._id}" data-nombre="${esc(p.nombre.toLowerCase())}">
+      <span class="avatar avatar-xs" aria-hidden="true">${esc(iniciales(p.nombre))}</span>
+      <span>
+        <span class="nombre">${esc(p.nombre)}</span>
+        <span class="paciente-info">${esc(info)}</span>
+      </span>
+    </button>`;
 }
 
 // ─── DASHBOARD = LISTA DE PACIENTES ─────────────────────────────────────
@@ -439,14 +452,33 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     <button class="back" id="btnBack">${t("kardex.volver")}</button>
     <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
     ${bloquePersonaHtml()}
-    ${typeof teleMedCajaHtml === "function" ? teleMedCajaHtml() : ""}
-    <div class="tabs">
-      ${Object.entries(tabsKardex).map(([key, t]) => `
-        <button class="tab ${tabActiva === key ? "activo" : ""}" data-tab="${key}">
-          <span class="tab-icono">${t.icono}</span>${t.label}
+    <div class="tabs" role="tablist" aria-label="${esc(t("kardex.seccionesAria"))}">
+      ${Object.entries(tabsKardex).map(([key, et]) => `
+        <button class="tab ${tabActiva === key ? "activo" : ""}" data-tab="${key}"
+                role="tab" id="tab-${key}" aria-controls="tabContent"
+                aria-selected="${tabActiva === key}" tabindex="${tabActiva === key ? "0" : "-1"}">
+          <span class="tab-icono" aria-hidden="true">${et.icono}</span>${et.label}
         </button>`).join("")}
     </div>
-    <div id="tabContent">${tabs[tabActiva] || tabConsultas}</div>
+    <div id="tabContent" role="tabpanel" aria-labelledby="tab-${tabActiva}" tabindex="0">${tabs[tabActiva] || tabConsultas}</div>
+
+    <!-- ═══ LO ADMINISTRATIVO, ABAJO Y PLEGADO ═══════════════════════════
+         Vincular la persona de la clínica y armar una videoconsulta estaban
+         ARRIBA de las pestañas, empujando la ficha clínica cientos de
+         píxeles hacia abajo en celular. Pasan una vez por paciente; la
+         ficha se abre veinte veces.
+
+         <details> nativo a propósito: se abre con teclado, lo anuncia
+         cualquier lector de pantalla y no necesita una línea de JavaScript.
+         Escribirlo a mano con un div y un onclick sería más código y menos
+         accesible. -->
+    <details class="kardex-mas">
+      <summary>${esc(t("kardex.masAcciones"))}</summary>
+      <div class="kardex-mas-cuerpo">
+        ${typeof bloquePersonaAccionesHtml === "function" ? bloquePersonaAccionesHtml() : ""}
+        ${typeof teleMedCajaHtml === "function" ? teleMedCajaHtml() : ""}
+      </div>
+    </details>
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
@@ -457,9 +489,47 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
   // igual. El bloque aparece cuando llega.
   cargarBloquePersona(p);
-  document.querySelectorAll(".tab").forEach(btn => {
-    btn.onclick = () => pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios, recetas, btn.dataset.tab);
+
+  // ═══ LAS PESTAÑAS, CON TECLADO ═══════════════════════════════════════════
+  //
+  // Declarar role="tablist" obliga a que funcionen las flechas: un lector de
+  // pantalla le anuncia al usuario "pestaña 3 de 12" y que se mueve con las
+  // flechas, y si no se mueven queda peor que sin la semántica — prometido y
+  // no cumplido.
+  //
+  // Es el patrón de tabindex rodante: solo la pestaña activa es alcanzable
+  // con Tab, y adentro del grupo se navega con flechas. Así Tab no obliga a
+  // pasar por las doce pestañas para llegar al contenido.
+  const irATab = (clave, porTeclado) => {
+    kardexFocoEnTabs = !!porTeclado;
+    pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios, recetas, clave);
+  };
+
+  const pestanas = [...document.querySelectorAll(".tab")];
+  pestanas.forEach((btn, i) => {
+    btn.onclick = () => irATab(btn.dataset.tab);
+    btn.onkeydown = (e) => {
+      const salto = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      let destino = null;
+      if (salto) {
+        // Da la vuelta en las dos puntas, que es lo que espera quien navega
+        // así y lo que dice el patrón de ARIA.
+        destino = pestanas[(i + salto + pestanas.length) % pestanas.length];
+      } else if (e.key === "Home") destino = pestanas[0];
+      else if (e.key === "End") destino = pestanas[pestanas.length - 1];
+      if (!destino) return;
+      e.preventDefault();
+      irATab(destino.dataset.tab, true);
+    };
   });
+
+  // Al cambiar de pestaña con el teclado se repinta todo, y con eso se pierde
+  // el foco. Se devuelve a la pestaña activa para que la siguiente flecha
+  // siga funcionando; sin esto, la primera flecha anda y la segunda no.
+  if (kardexFocoEnTabs) {
+    document.getElementById(`tab-${tabActiva}`)?.focus();
+    kardexFocoEnTabs = false;
+  }
 
   if (tabActiva === "odontograma") {
     renderTabOdontograma(p._id);

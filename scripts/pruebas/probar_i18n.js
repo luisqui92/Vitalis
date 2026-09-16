@@ -91,14 +91,35 @@ const viejo = correr(marcaVieja(antes), null);
 const nuevo = correr(ahora, "es");
 
 let fallos = 0;
+// ═══ LA HORA CAMBIÓ A PROPÓSITO ═══════════════════════════════════════════
+//
+// La agenda formateaba la hora con timeZone: "America/La_Paz" escrito a
+// mano. Para un consultorio de Bolivia daba bien por casualidad; para uno de
+// Brasil daba TODAS las horas corridas sesenta minutos, porque Brasil está
+// en UTC−3 y Bolivia en UTC−4. Un turno que dice 14:00 cuando es 15:00 es un
+// paciente que llega tarde.
+//
+// Ahora usa horaCorta(), que toma la zona del aparato de quien mira y el
+// reloj de 24 horas. Eso cambia el texto de la hora, y esta prueba —que
+// existe para atajar que el trabajo de idiomas mueva el dibujo SIN QUERER—
+// lo estaba reportando como si nadie lo hubiera escrito a propósito.
+//
+// Se tapa la hora en LOS DOS lados: así se sigue comparando todo el resto
+// del dibujo, que es lo que la prueba vino a cuidar.
+const sinHora = (html) => html.replace(/\d{1,2}:\d{2}(\s*[ap]\.?\s*m\.?)?/gi, "«hora»");
+
 for (const pantalla of ["agendaHtml", "agendaSinWa", "horarioHtml"]) {
-  const a = viejo[pantalla], b = nuevo[pantalla];
+  const a = sinHora(viejo[pantalla]), b = sinHora(nuevo[pantalla]);
   if (a === b) {
     console.log(`✅ ${pantalla}: idéntico (${a.length} caracteres)`);
   } else {
     fallos++;
     console.log(`❌ ${pantalla}: DIFIERE`);
-    const i = [...a].findIndex((c, k) => c !== b[k]);
+    // Por unidad UTF-16 en los dos lados: el [...a] recorría code points
+    // y b[k] indexaba UTF-16, así que con un emoji antes del conflicto
+    // señalaba una posición que no era.
+    let i = 0;
+    while (i < Math.min(a.length, b.length) && a[i] === b[i]) i++;
     console.log(`   primera diferencia en el carácter ${i}`);
     console.log(`   antes: ...${JSON.stringify(a.slice(Math.max(0, i - 60), i + 60))}`);
     console.log(`   ahora: ...${JSON.stringify(b.slice(Math.max(0, i - 60), i + 60))}`);

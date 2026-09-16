@@ -500,7 +500,7 @@ function pintarEstadoCrecimiento(paciente, mediciones) {
     <div style="color:${lect.color};font-weight:600;margin-top:2px">${esc(lect.texto)}</div>
     <div class="hint" style="margin-top:2px">
       Mediana esperada a esta edad: ${esc(valorTexto(ev.mediana, crecimientoIndicadorActivo))} ${esc(cfg.unidad)} ·
-      medido el ${new Date(ultima.fecha).toLocaleDateString("es-BO")}
+      medido el ${fechaCorta(ultima.fecha)}
     </div>
     ${tendencia}`;
 }
@@ -520,7 +520,7 @@ function pintarHistorialCrecimiento(paciente, mediciones) {
           <div class="nombre">${esc(valorTexto(m.valor, crecimientoIndicadorActivo))} ${esc(cfg.unidad)}${ev.ok ? ` · ${esc(percentilTexto(ev.percentil))}` : ""}</div>
           <button class="link" data-borrar-medicion="${m._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(m.fecha).toLocaleDateString("es-BO")} · ${edad ? (edad.corregida ? textoMeses(Math.round(edad.meses)) : edadPediatricaTexto(paciente.fechaNacimiento, m.fecha)) : ""}${edad?.corregida ? " (corregida)" : ""}</div>
+        <div class="fecha">${fechaCorta(m.fecha)} · ${edad ? (edad.corregida ? textoMeses(Math.round(edad.meses)) : edadPediatricaTexto(paciente.fechaNacimiento, m.fecha)) : ""}${edad?.corregida ? " (corregida)" : ""}</div>
       </div>`;
   }).join("");
 }

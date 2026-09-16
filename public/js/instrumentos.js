@@ -39,7 +39,7 @@ async function renderTabInstrumentos(pacienteId) {
 
 function pintarInstrumentos(pacienteId, aplicados) {
   const caja = document.getElementById("instrumentosBox");
-  const fecha = (f) => new Date(f).toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const fecha = (f) => new Date(f).toLocaleDateString(localeActual(), { day: "2-digit", month: "2-digit", year: "numeric" });
 
   caja.innerHTML = `
     <div class="card">

@@ -116,7 +116,7 @@ function pintarAgenda(citas, pacientes, wa) {
             <div class="nombre">${ORIGEN_ICONO[c.origen] || ""} ${esc(c.pacienteNombre)}</div>
             <button class="link" data-cancelar-cita="${c._id}" style="margin:0;width:auto;color:var(--danger)">${t("agenda.cancelar")}</button>
           </div>
-          <div class="fecha">${new Date(c.fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", timeZone: "America/La_Paz" })}</div>
+          <div class="fecha">${horaCorta(c.fecha)}</div>
           ${c.motivo ? `<div class="paciente-info">${esc(c.motivo)}</div>` : ""}
           ${!c.pacienteId ? `
             <button class="link" data-abrir-crear-paciente="${c._id}" style="margin:6px 0 0">➕ ${t("agenda.ficha.crear")}</button>

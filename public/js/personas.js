@@ -17,8 +17,33 @@
 // La persona elegida en el alta, mientras el formulario está abierto.
 let personaElegidaAlta = null;
 
-// ─── AVISO DE ALERGIAS (arriba del Kardex) ────────────────────────────────
+// ═══ POR QUÉ SON DOS CAJAS Y NO UNA ════════════════════════════════════════
+//
+// Hasta acá esto era un solo bloque arriba del Kardex, y arrastraba consigo
+// el formulario de alergias, el de vincular persona y el botón de
+// desvincular. El resultado, medido en un celular: entre el nombre del
+// paciente y la primera pestaña clínica había cientos de píxeles de cosas
+// que el médico no está mirando. Abría la ficha y tenía que scrollear para
+// llegar a lo que vino a ver.
+//
+// Ahora se parte en dos por CRITERIO CLÍNICO, no por acomodar la pantalla:
+//
+//   ALERTA  — la alergia. Va arriba de las pestañas, siempre, sin que nadie
+//             la busque. Es el único dato de acá que puede cambiar una
+//             receta, y una alergia que hay que ir a buscar no protege a
+//             nadie.
+//   ACCIÓN  — editar esas alergias, vincular la persona, desvincularla. Son
+//             trámites: importantes, no urgentes, y pasan una vez por
+//             paciente en vez de una vez por consulta.
+//
+// La regla para el que venga a agregar algo acá: si no cambia lo que el
+// médico va a hacer en los próximos cinco minutos, va abajo.
 function bloquePersonaHtml() {
+  return `<div id="personaAlertaBox"></div>`;
+}
+
+// Lo administrativo, que vive abajo del contenido clínico (ver pacientes.js).
+function bloquePersonaAccionesHtml() {
   return `<div id="personaBox"></div>`;
 }
 
@@ -41,12 +66,20 @@ async function cargarBloquePersona(paciente) {
 
 function pintarConPersona(caja, paciente, persona, fichas) {
   const alergias = persona.alergias || [];
-  caja.innerHTML = `
-    ${alergias.length ? `
-      <div class="persona-alergias">
+
+  // La alerta va a su propia caja, arriba de las pestañas. role="alert" para
+  // que un lector de pantalla la anuncie al aparecer en vez de esperar a que
+  // alguien navegue hasta ella.
+  const alerta = document.getElementById("personaAlertaBox");
+  if (alerta) {
+    alerta.innerHTML = alergias.length ? `
+      <div class="persona-alergias" role="alert">
         <div class="persona-alergias-titulo">⚠️ ${t("persona.alergias")}</div>
         <div class="persona-alergias-lista">${alergias.map(a => `<span>${esc(a)}</span>`).join("")}</div>
-      </div>` : ""}
+      </div>` : "";
+  }
+
+  caja.innerHTML = `
     <div class="card card-secundaria">
       <div class="seccion-titulo" style="margin-top:0">${t("persona.titulo")}</div>
       <div class="hint" style="margin:0 0 10px">
@@ -98,6 +131,12 @@ function pintarConPersona(caja, paciente, persona, fichas) {
 // sistema proponga "¿será este?" apenas se abre una ficha invita a decir
 // que sí sin mirar.
 function pintarSinPersona(caja, paciente) {
+  // Sin persona vinculada no hay alergias que avisar. Se limpia la caja de
+  // arriba explícitamente: si quedara la alerta del paciente anterior, el
+  // médico estaría viendo la alergia de otro sobre esta ficha.
+  const alerta = document.getElementById("personaAlertaBox");
+  if (alerta) alerta.innerHTML = "";
+
   caja.innerHTML = `
     <div class="card card-secundaria">
       <div class="hint" style="margin:0 0 10px">${t("persona.sinVincular")}</div>

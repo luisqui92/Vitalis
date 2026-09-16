@@ -128,7 +128,7 @@ function pintarDetalleEstructura(pacienteId, ojo, item) {
               <div class="odonto-timeline-item">
                 <div class="odonto-timeline-icono" style="background:${info.color}">${info.icono}</div>
                 <div class="odonto-timeline-contenido">
-                  <div class="odonto-timeline-fecha">${new Date(h.fecha).toLocaleDateString("es-BO")}${h.fuente === "voz" ? " · 🎙️ por voz" : ""}</div>
+                  <div class="odonto-timeline-fecha">${fechaCorta(h.fecha)}${h.fuente === "voz" ? " · 🎙️ por voz" : ""}</div>
                   <div class="odonto-timeline-titulo">${esc(info.label)}</div>
                   ${h.notas ? `<div class="odonto-timeline-notas">${esc(h.notas)}</div>` : ""}
                 </div>

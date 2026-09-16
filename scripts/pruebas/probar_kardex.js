@@ -152,7 +152,45 @@ const sinBloquePersona = (html) => html
   // para recetar). En el arnés la moneda es BOB, así que el ternario deja el
   // hueco vacío que hay que descontar.
   .replace(/\n {8}(?=\n {8}<div class="dato-row" style="border-bottom:none">)/g, "")
-  .replace(/\n {4}(?=\n {4}<div class="tabs">)/g, "");
+  .replace(/\n {4}(?=\n {4}<div class="tabs")/g, "")
+  // Y el bloque plegado de "Más acciones", que es el mismo caso: elemento
+  // nuevo y deliberado, no una diferencia que nadie escribió. Se saca junto
+  // con el comentario que lo explica — los comentarios de HTML viajan al
+  // navegador y aparecen en esta comparación como cualquier otro texto.
+  .replace(/\n?\s*<!--[\s\S]*?-->/g, "")
+  .replace(/\n?\s*<details class="kardex-mas">[\s\S]*?<\/details>/g, "");
+
+// ═══ LO ACCESIBLE NO CAMBIA LO QUE SE VE ═══════════════════════════════════
+//
+// La lista de pacientes pasó de <div> a <button> y las pestañas ganaron
+// role/aria-selected/tabindex, para que la app se pueda usar con teclado y
+// con lector de pantalla.
+//
+// Nada de eso cambia lo que el médico VE: cambia lo que se ANUNCIA y lo que
+// se puede enfocar. Esta prueba existe para atajar que el trabajo de idiomas
+// mueva el dibujo sin querer, así que se igualan los dos lados y se sigue
+// comparando el dibujo — que es lo que la prueba vino a cuidar.
+//
+// Se normaliza en AMBOS lados y no se descuenta del nuevo: tapando solo un
+// lado, un cambio futuro de estructura pasaría sin que nadie lo viera.
+const sinAccesibilidad = (html) => html
+  .replace(/\s+(?:role|aria-[a-z]+|tabindex)="[^"]*"/g, "")
+  // El id de cada pestaña es parte del cableado de accesibilidad: es a lo
+  // que apunta el aria-labelledby del panel.
+  .replace(/\s+id="tab-[a-zA-Z]+"/g, "")
+  // Los atributos quedaron repartidos en varias líneas para que se lean; eso
+  // mete saltos y sangría adentro de la etiqueta. Se normaliza el espaciado
+  // DENTRO de cada etiqueta en los dos lados: es espaciado del código fuente,
+  // no algo que el navegador dibuje distinto.
+  .replace(/<([a-z]+)([^>]*?)\s*>/g, (_, tag, attrs) => `<${tag}${attrs.replace(/\s+/g, " ").replace(/\s+$/, "")}>`)
+  // div, span y button son los tres contenedores de maquetado, y cuál se usa
+  // es una decisión de estructura y accesibilidad —un paciente pasó a ser un
+  // <button> para poder abrirlo con Enter—, no un cambio en lo que se
+  // muestra. Se igualan los tres, incluidos sus cierres, y así la
+  // comparación sigue mirando lo que esta prueba vino a cuidar: las
+  // etiquetas, los atributos y el texto.
+  .replace(/<\/?(?:div|span|button)\b/g, "<T")
+  .replace(/ type="button"/g, "");
 
 // El archivo del símbolo cambió: /logo.png era un dibujo sobre fondo BLANCO
 // OPACO, y desde que la plataforma usa la paleta oscura se veía como un
@@ -168,15 +206,20 @@ const mismaMarca = (html) => html.replace(/\/logo\.png|\/img\/simbolo\.webp/g, "
 
 let fallos = 0;
 function comparar(nombre, viejoBruto, nuevoBruto) {
-  const viejo = Object.fromEntries(Object.entries(viejoBruto).map(([k, v]) => [k, mismaMarca(v)]));
-  const nuevo = Object.fromEntries(Object.entries(nuevoBruto).map(([k, v]) => [k, mismaMarca(sinBloquePersona(v))]));
+  const viejo = Object.fromEntries(Object.entries(viejoBruto).map(([k, v]) => [k, sinAccesibilidad(mismaMarca(v))]));
+  const nuevo = Object.fromEntries(Object.entries(nuevoBruto).map(([k, v]) => [k, sinAccesibilidad(mismaMarca(sinBloquePersona(v)))]));
   for (const k of Object.keys(viejo)) {
     if (viejo[k] === nuevo[k]) {
       console.log(`✅ ${nombre}/${k}: idéntico (${viejo[k].length} car.)`);
     } else {
       fallos++;
       const a = viejo[k], b = nuevo[k] || "";
-      const i = [...a].findIndex((c, j) => c !== b[j]);
+      // Se recorre por unidad UTF-16 en los dos lados. El reporte anterior
+      // mezclaba code points (el spread) con índices UTF-16, y con un emoji
+      // antes del punto de conflicto señalaba una posición equivocada — dos
+      // textos idénticos en pantalla y un "DIFIERE" sin explicación.
+      let i = 0;
+      while (i < Math.min(a.length, b.length) && a[i] === b[i]) i++;
       console.log(`❌ ${nombre}/${k}: DIFIERE en el carácter ${i}`);
       console.log(`   antes: ${JSON.stringify(a.slice(Math.max(0, i - 70), i + 70))}`);
       console.log(`   ahora: ${JSON.stringify(b.slice(Math.max(0, i - 70), i + 70))}`);

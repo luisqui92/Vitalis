@@ -312,7 +312,7 @@ async function enviarInformeWhatsApp() {
 
 function hojaInformeHtml(d, urlsImagenes) {
   const i = d.informe, p = d.paciente || {}, m = d.membrete || {};
-  const fecha = (f) => f ? new Date(f).toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+  const fecha = (f) => f ? new Date(f).toLocaleDateString(localeActual(), { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
 
   const bloque = (titulo, texto) => texto && texto.trim()
     ? `<div class="inf-bloque"><h3>${esc(titulo)}</h3><p>${esc(texto).replace(/\n/g, "<br>")}</p></div>` : "";

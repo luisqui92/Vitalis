@@ -760,7 +760,7 @@ async function abrirComparadorFotos(fotos) {
     return lista
       .slice()
       .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
-      .map(f => `<option value="${f._id}">${new Date(f.fecha).toLocaleDateString("es-BO")} — ${esc(f.nombre)}</option>`)
+      .map(f => `<option value="${f._id}">${fechaCorta(f.fecha)} — ${esc(f.nombre)}</option>`)
       .join("");
   }
 
@@ -813,8 +813,8 @@ async function pintarSlider(box, lista, idAntes, idDespues) {
         <img src="${urlDespues}" style="width:100%;height:100%;object-fit:cover">
       </div>
       <div id="sliderHandle" style="position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;box-shadow:0 0 6px rgba(0,0,0,.5);transform:translateX(-50%)"></div>
-      <div style="position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px">Antes · ${new Date(antes.fecha).toLocaleDateString("es-BO")}</div>
-      <div style="position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px">Después · ${new Date(despues.fecha).toLocaleDateString("es-BO")}</div>
+      <div style="position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px">Antes · ${fechaCorta(antes.fecha)}</div>
+      <div style="position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;padding:4px 10px;border-radius:6px;font-size:12px">Después · ${fechaCorta(despues.fecha)}</div>
     </div>`;
 
   const cont = box.querySelector("#sliderCont");

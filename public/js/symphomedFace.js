@@ -523,7 +523,7 @@ function vfPintar() {
                 <div class="vf-proc">
                   <div class="vf-proc-nombre">${esc(t.nombre)}</div>
                   <div class="vf-proc-meta">
-                    ${new Date(t.createdAt).toLocaleDateString("es-BO")}${t.regionFacial ? " · " + esc(t.regionFacial) : ""}
+                    ${fechaCorta(t.createdAt)}${t.regionFacial ? " · " + esc(t.regionFacial) : ""}
                     · ${esc({ pendiente: "pendiente", en_proceso: "en proceso", realizado: "realizado" }[t.estado] || t.estado)}
                   </div>
                 </div>`).join("")}
@@ -652,7 +652,7 @@ function vfPintar() {
                   <div class="vf-nota-texto">${esc(a.texto)}</div>
                   <div class="vf-nota-meta">
                     ${esc((vf.vistas.find(v => v.grados === a.angulo) || {}).label || "")}
-                    ${a.fecha ? " · " + new Date(a.fecha).toLocaleDateString("es-BO") : ""}
+                    ${a.fecha ? " · " + fechaCorta(a.fecha) : ""}
                   </div>
                 </div>
                 <button class="vf-nota-borrar" data-borrar-nota="${i}" title="Borrar">✕</button>

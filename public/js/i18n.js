@@ -54,6 +54,77 @@ function localeActual() {
   return MEDICO_IDIOMA === "pt" ? "pt-BR" : "es-BO";
 }
 
+// ═══ LAS FECHAS PASAN TODAS POR ACÁ ════════════════════════════════════════
+//
+// Había 60 lugares formateando fechas: 37 respetaban el idioma del médico y
+// 23 tenían "es-BO" escrito a mano. Ninguno estaba mal en el ORDEN —es-BO y
+// pt-BR usan los dos día/mes/año, así que nadie iba a leer un mes por un
+// día— pero los de mes largo sí se notaban, y el peor estaba en el informe
+// que recibe la familia: a una madre brasileña le llegaba "16 de septiembre"
+// en vez de "16 de setembro". Es el único documento de Symphomed que no lee
+// un profesional.
+//
+// Tres funciones y ninguna excepción:
+//   fechaCorta(f)  → 16/9/2026                 · la de todos los días
+//   fechaLarga(f)  → 16 de septiembre de 2026  · informes y documentos
+//   fechaHora(f)   → 16/09/2026 14:30          · agenda y turnos
+//
+// Toleran null y texto vacío porque la mitad de las fechas del sistema son
+// opcionales, y un "Invalid Date" impreso en una ficha clínica es peor que
+// un guion.
+function fechaCorta(f) {
+  if (!f) return "—";
+  const d = new Date(f);
+  return isNaN(d) ? "—" : d.toLocaleDateString(localeActual());
+}
+
+function fechaLarga(f, opciones) {
+  if (!f) return "—";
+  const d = new Date(f);
+  if (isNaN(d)) return "—";
+  return d.toLocaleDateString(localeActual(), opciones || { day: "numeric", month: "long", year: "numeric" });
+}
+
+function fechaHora(f) {
+  if (!f) return "—";
+  const d = new Date(f);
+  if (isNaN(d)) return "—";
+  return d.toLocaleString(localeActual(), {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+// ═══ LA HORA, EN LA ZONA DE QUIEN MIRA ═════════════════════════════════════
+//
+// La agenda tenía timeZone: "America/La_Paz" escrito a mano. Para un
+// consultorio de Bolivia daba bien por casualidad; para uno de Brasil daba
+// TODAS las horas corridas sesenta minutos, porque Brasil está en UTC−3 y
+// Bolivia en UTC−4.
+//
+// Un turno que dice 14:00 cuando en realidad es 15:00 no es un problema de
+// formato: es un paciente que llega una hora tarde, o un médico que lo
+// esperó una hora. Ya estaba anotado como pendiente en routes/admin.js.
+//
+// Sin timeZone, el navegador usa la del aparato — que es exactamente la del
+// lugar donde está parado quien mira la pantalla, que es lo correcto tanto
+// en La Paz como en São Paulo.
+//
+// ⚠️ PENDIENTE: el bot de WhatsApp (services/reservaCitas.js) manda las
+// horas desde el SERVIDOR, donde no hay navegador del cual sacar la zona.
+// Ese sigue con America/La_Paz y necesita un campo de zona horaria en
+// Medico para arreglarse de verdad.
+// hour12: false a propósito, en los dos idiomas. Sin eso, es-BO da "2:30
+// p. m." y pt-BR da "14:30" — cada uno correcto para su locale, pero en una
+// agenda clínica el reloj de 24 horas es la convención en los dos países y
+// no se presta a confundir las dos de la tarde con las dos de la mañana. El
+// bot de WhatsApp ya usaba este mismo criterio.
+function horaCorta(f) {
+  if (!f) return "—";
+  const d = new Date(f);
+  if (isNaN(d)) return "—";
+  return d.toLocaleTimeString(localeActual(), { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
 // Se llama al iniciar sesión (auth.js) y al cerrarla (estado.js). El
 // atributo lang del documento importa de verdad: es lo que usan el corrector
 // ortográfico de los campos de texto y los lectores de pantalla para saber

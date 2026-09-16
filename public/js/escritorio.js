@@ -5,7 +5,22 @@
 // función de pantalla se toca: todas ya escriben en `app`, así que alcanza
 // con reapuntar esa variable al contenedor del panel (#escritorioContent)
 // cuando corresponde.
-const ES_ESCRITORIO = window.matchMedia("(min-width: 1024px)").matches;
+// ═══ EL ANCHO SE MIRA CADA VEZ, NO UNA SOLA ════════════════════════════════
+//
+// Esto era una constante evaluada al cargar el archivo y nunca más. O sea:
+// la decisión de si estamos en escritorio o en celular se tomaba una sola
+// vez en la vida de la pestaña.
+//
+// El síntoma: alguien achica la ventana de escritorio a ancho de celular —o
+// gira una tablet, que es el caso más común— y la app sigue creyendo que
+// tiene 1400px. El shell de escritorio queda armado adentro de una ventana
+// angosta y aparece desborde horizontal hasta que se recarga.
+//
+// Ahora es una FUNCIÓN: cada quien que pregunta recibe la respuesta de ahora.
+// Y además se escucha el cambio, para rearmar la pantalla en el momento en
+// vez de esperar a que el usuario descubra solo que tiene que recargar.
+const CONSULTA_ESCRITORIO = window.matchMedia("(min-width: 1024px)");
+function esEscritorio() { return CONSULTA_ESCRITORIO.matches; }
 
 // Se arma recién con la primera pantalla real (Inicio), no en el login —
 // un login centrado sigue siendo lo más simple y claro incluso en una
@@ -41,7 +56,7 @@ if (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR) {
 }
 
 function escritorioShellActivo() {
-  return ES_ESCRITORIO && document.getElementById("escritorioShell").style.display !== "none";
+  return esEscritorio() && document.getElementById("escritorioShell").style.display !== "none";
 }
 
 // Envuelve una función de pantalla existente para que, cada vez que se
@@ -64,7 +79,7 @@ function envolverParaEscritorio(nombreFn, id, claveLabel) {
 }
 
 function activarEscritorioSiCorresponde() {
-  if (!ES_ESCRITORIO) return false;
+  if (!esEscritorio()) return false;
   document.getElementById("headerMobile").style.display = "none";
   document.getElementById("app").style.display = "none";
   document.querySelector(".footer.no-imprimir").style.display = "none";
@@ -78,7 +93,7 @@ function activarEscritorioSiCorresponde() {
 }
 
 function desactivarEscritorio() {
-  if (!ES_ESCRITORIO) return;
+  if (!esEscritorio()) return;
   document.getElementById("escritorioShell").style.display = "none";
   document.getElementById("headerMobile").style.display = "";
   document.querySelector(".footer.no-imprimir").style.display = "";
@@ -99,6 +114,49 @@ function pintarNavEscritorio() {
     };
   });
 }
+
+// ─── CUANDO LA VENTANA CRUZA EL UMBRAL ────────────────────────────────────
+//
+// Achicar la ventana, girar una tablet, abrir la consola del navegador: las
+// tres cruzan los 1024px y hasta acá ninguna cambiaba nada hasta recargar.
+//
+// Se vuelve a dibujar la pantalla que estuviera abierta en vez de solo
+// mostrar u ocultar el shell: las pantallas se arman distinto según el ancho
+// —el Kardex, la agenda— y dejar el HTML viejo adentro del contenedor nuevo
+// es justo el desborde horizontal que se quería arreglar.
+//
+// addEventListener y no el viejo addListener: este último está obsoleto y en
+// algunos navegadores ya no existe. Se deja el respaldo igual porque un
+// navegador viejo de un consultorio no es un caso hipotético.
+function alCambiarElAncho() {
+  // Antes de entrar (el login, por ejemplo) no hay nada que rearmar.
+  if (!MEDICO_NOMBRE) return;
+  if (esEscritorio()) activarEscritorioSiCorresponde();
+  else desactivarEscritorioForzado();
+
+  // Se repinta la pantalla actual. Si por algo no se puede, se cae al panel
+  // de siempre, que es preferible a quedarse con el layout roto.
+  const item = ESCR_NAV_ITEMS.find(i => i.id === escrActivo);
+  const volverA = item && typeof window[item.fn] === "function" ? window[item.fn] : window.renderDashboard;
+  try { volverA(); } catch { /* si falla, queda lo que había */ }
+}
+
+// desactivarEscritorio() arranca con `if (!esEscritorio()) return`, que
+// servía cuando el ancho no cambiaba nunca. Ahora hay que poder apagar el
+// shell JUSTO cuando la consulta dice que ya NO es escritorio, que es
+// exactamente el caso que ese return bloquea.
+function desactivarEscritorioForzado() {
+  const shell = document.getElementById("escritorioShell");
+  if (!shell || shell.style.display === "none") return;
+  shell.style.display = "none";
+  document.getElementById("headerMobile").style.display = "";
+  document.querySelector(".footer.no-imprimir").style.display = "";
+  document.getElementById("app").style.display = "";
+  app = document.getElementById("app");
+}
+
+if (CONSULTA_ESCRITORIO.addEventListener) CONSULTA_ESCRITORIO.addEventListener("change", alCambiarElAncho);
+else if (CONSULTA_ESCRITORIO.addListener) CONSULTA_ESCRITORIO.addListener(alCambiarElAncho);
 
 // Este script va al final del <body>, así que el DOM ya existe — no hace
 // falta esperar DOMContentLoaded.

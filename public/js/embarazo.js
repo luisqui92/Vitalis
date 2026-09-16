@@ -133,7 +133,7 @@ function pintarEmbarazo(pacienteId, activo, historial) {
       const fpp = new Date(fum.getTime() + 280 * 24 * 60 * 60 * 1000);
       const dias = Math.max(0, Math.floor((Date.now() - fum.getTime()) / (24 * 60 * 60 * 1000)));
       const semanas = Math.floor(dias / 7);
-      previewEl.textContent = `FPP estimada: ${fpp.toLocaleDateString("es-BO")} · Semanas actuales: ${semanas} (${trimestreDe(semanas)})`;
+      previewEl.textContent = `FPP estimada: ${fpp.toLocaleDateString(localeActual())} · Semanas actuales: ${semanas} (${trimestreDe(semanas)})`;
     };
 
     document.getElementById("btnIniciarEmbarazo").onclick = async () => {
@@ -171,8 +171,8 @@ function pintarEmbarazo(pacienteId, activo, historial) {
       ${barraProgresoEmbarazo(semanas)}
       <div class="hint">${faltan > 0 ? `Faltan unas ${faltan} semana${faltan === 1 ? "" : "s"} para la fecha probable de parto` : "Ya llegó a la fecha probable de parto"}</div>
       <div style="display:flex;justify-content:space-around;margin-top:16px;text-align:left">
-        <div><div class="hint">FUM</div><div style="font-weight:600">${new Date(activo.fum).toLocaleDateString("es-BO")}</div></div>
-        <div><div class="hint">FPP</div><div style="font-weight:600">${new Date(activo.fpp).toLocaleDateString("es-BO")}</div></div>
+        <div><div class="hint">FUM</div><div style="font-weight:600">${fechaCorta(activo.fum)}</div></div>
+        <div><div class="hint">FPP</div><div style="font-weight:600">${fechaCorta(activo.fpp)}</div></div>
       </div>
     </div>
 
@@ -239,7 +239,7 @@ function historialEmbarazoHtml(historial) {
           <div class="nombre">${DESENLACES_EMBARAZO_INFO[h.desenlace] || h.desenlace || "Finalizado"}</div>
           <button class="link" data-borrar-embarazo="${h._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">FUM ${new Date(h.fum).toLocaleDateString("es-BO")} · Finalizó ${h.fechaFin ? new Date(h.fechaFin).toLocaleDateString("es-BO") : "—"}</div>
+        <div class="fecha">FUM ${fechaCorta(h.fum)} · Finalizó ${h.fechaFin ? fechaCorta(h.fechaFin) : "—"}</div>
         ${h.notas ? `<div class="paciente-info">📝 ${esc(h.notas)}</div>` : ""}
       </div>`).join("")}`;
 }

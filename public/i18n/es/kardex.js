@@ -33,6 +33,8 @@ Object.assign(I18N.es, {
   "tab.instrumentos": "Instrumentos",
   "tab.salud": "Salud",
   "tab.familia": "Familia",
+  "kardex.masAcciones": "Más acciones",
+  "kardex.seccionesAria": "Secciones de la ficha",
 
   // La marca cambia según la especialidad. "Symphomed" es nombre propio y no
   // se traduce; lo que sigue, sí.

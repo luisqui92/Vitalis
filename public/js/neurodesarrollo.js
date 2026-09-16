@@ -324,7 +324,7 @@ function abrirDetalleSensorial(pacienteId, perfil, modalidad, caja) {
         ${item.historial.slice().reverse().slice(0, 8).map(h => `
           <div class="item" style="cursor:default">
             <div class="top"><div class="nombre">${esc(RESPUESTAS_LABEL[h.respuesta]?.corto || h.respuesta)}</div></div>
-            <div class="fecha">${new Date(h.fecha).toLocaleDateString("es-BO")}${h.fuente === "voz" ? " · 🎙️ desde la consulta" : ""}</div>
+            <div class="fecha">${fechaCorta(h.fecha)}${h.fuente === "voz" ? " · 🎙️ desde la consulta" : ""}</div>
             ${h.notas ? `<div class="paciente-info">${esc(h.notas)}</div>` : ""}
           </div>`).join("")}` : ""}
     </div>`;
@@ -482,7 +482,7 @@ function tarjetaObjetivo(o) {
           ${delta > 0 ? "▲ +" : delta < 0 ? "▼ " : "= "}${delta}% desde el inicio (${pctIni}% → ${pct}%)</div>` : ""}
       </div>
       ${barraProgresoObjetivo(prog)}
-      <div class="fecha">${prog.length} ${prog.length === 1 ? "registro" : "registros"} · último el ${new Date(ultimo.fecha).toLocaleDateString("es-BO")}</div>`;
+      <div class="fecha">${prog.length} ${prog.length === 1 ? "registro" : "registros"} · último el ${fechaCorta(ultimo.fecha)}</div>`;
   }
 
   return `
@@ -801,7 +801,7 @@ function tarjetaVigilancia(i) {
       </div>
       <div class="fecha">${esc(e.texto)}${i.categoria ? " · " + esc(i.categoria) : ""} · ${esc(cuando)}</div>
       ${i.nota ? `<div class="paciente-info">${esc(i.nota)}</div>` : ""}
-      ${i.ultimo ? `<div class="paciente-info">✅ Último: ${new Date(i.ultimo.fecha).toLocaleDateString("es-BO")}${i.ultimo.resultado ? " — " + esc(i.ultimo.resultado) : ""}</div>` : ""}
+      ${i.ultimo ? `<div class="paciente-info">✅ Último: ${fechaCorta(i.ultimo.fecha)}${i.ultimo.resultado ? " — " + esc(i.ultimo.resultado) : ""}</div>` : ""}
       ${["pendiente", "atrasado", "al_dia"].includes(i.estado)
         ? `<button class="item-action" data-vig-hecho="${i._id}" style="margin-top:10px">✅ Registrar que se hizo</button>` : ""}
     </div>`;
@@ -838,7 +838,7 @@ async function renderTabInformesFamilia(pacienteId) {
 }
 
 function fechaCortaIF(f) {
-  return new Date(f).toLocaleDateString("es-BO", { day: "numeric", month: "short" });
+  return new Date(f).toLocaleDateString(localeActual(), { day: "numeric", month: "short" });
 }
 
 function pintarInformesFamilia(pacienteId, data, caja) {
@@ -908,7 +908,7 @@ function tarjetaInformeFamilia(i) {
     <div class="item" data-if-abrir="${i._id}">
       <div class="top">
         <div class="nombre">${fechaCortaIF(i.desde)} — ${fechaCortaIF(i.hasta)}</div>
-        <div class="fecha">${enviado ? new Date(i.enviadoEn).toLocaleDateString("es-BO") : ""}</div>
+        <div class="fecha">${enviado ? fechaCorta(i.enviadoEn) : ""}</div>
       </div>
       <div class="paciente-info">${visto}${i.avances?.length ? ` · ${i.avances.length} ${i.avances.length === 1 ? "avance" : "avances"}` : ""}</div>
     </div>`;
@@ -940,7 +940,7 @@ function abrirBorradorFamilia(pacienteId, inf, enlace) {
         ${enviado ? "Informe enviado" : "Borrador"} · ${fechaCortaIF(inf.desde)} — ${fechaCortaIF(inf.hasta)}
       </div>
       ${enviado ? `
-        <div class="exito">Se envió el ${new Date(inf.enviadoEn).toLocaleDateString("es-BO")}. Ya no se puede cambiar.</div>
+        <div class="exito">Se envió el ${fechaCorta(inf.enviadoEn)}. Ya no se puede cambiar.</div>
         ${enlace ? `<div class="hint" style="margin-top:10px;word-break:break-all">${esc(enlace)}</div>` : ""}
       ` : `
         <div class="hint">
@@ -1188,7 +1188,7 @@ function pintarEquipoNeuro(pacienteId, d, caja) {
         <b>${esc(a.porQuien || "—")}</b>${a.vinculo ? ` · ${esc(a.vinculo)}` : ""}
       </div>
       <div class="hint" style="margin-top:4px">
-        ${a.fecha ? new Date(a.fecha).toLocaleDateString("es-BO") : ""}${a.nota ? ` · ${esc(a.nota)}` : ""}
+        ${a.fecha ? fechaCorta(a.fecha) : ""}${a.nota ? ` · ${esc(a.nota)}` : ""}
       </div>
       <button class="link" id="btnEqCerrar" style="color:var(--danger)">
         Cerrar el equipo (la familia retiró la autorización)

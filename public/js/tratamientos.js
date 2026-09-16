@@ -137,7 +137,7 @@ function itemPlanHtml(item) {
               <div class="nombre">${money(p.monto)}</div>
               <button class="link" data-borrar-pago="${item._id}:${p._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
             </div>
-            <div class="fecha">${new Date(p.fecha).toLocaleDateString("es-BO")}</div>
+            <div class="fecha">${fechaCorta(p.fecha)}</div>
           </div>`).join("")}
       ` : ""}
     </div>`;

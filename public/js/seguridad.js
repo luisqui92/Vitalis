@@ -82,7 +82,7 @@ function pintarSeguridad(dosFAActivo, eventos) {
             <div class="nombre" style="font-size:13px">${esc(ACCION_LABEL[ev.accion] || ev.accion)}</div>
             ${ev.exito === false ? `<span class="badge badge-error">falló</span>` : ""}
           </div>
-          <div class="fecha">${new Date(ev.createdAt).toLocaleString("es-BO")} · IP ${esc(ev.ip || "—")}</div>
+          <div class="fecha">${fechaHora(ev.createdAt)} · IP ${esc(ev.ip || "—")}</div>
         </div>`).join("")}
     </div>`;
 
@@ -203,7 +203,7 @@ async function pintarEstadoBackups() {
           <div class="hint" style="margin:0">${esc(hace(e.horasDesdeUltimo))}</div>
         </div>
         <div class="hint" style="margin-top:4px">
-          ${u.documentos.toLocaleString("es-BO")} registros · ${u.archivos} archivos · ${esc(pesoLegible(u.bytes))} · tardó ${u.segundos}s
+          ${u.documentos.toLocaleString(localeActual())} registros · ${u.archivos} archivos · ${esc(pesoLegible(u.bytes))} · tardó ${u.segundos}s
         </div>
         <div class="hint" style="margin-top:2px">
           ${e.cuantos} ${e.cuantos === 1 ? "copia guardada" : "copias guardadas"} ·
