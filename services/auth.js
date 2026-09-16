@@ -120,4 +120,32 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { hashPassword, verificarPassword, generarToken, verificarToken, requireAuth, requireAdmin };
+// Guardia de las rutas /socio. Exige rol "socio" —que NO es "medico" ni
+// "admin"— y un socioId en el token.
+//
+// ═══ POR QUÉ UN ROL PROPIO Y NO UNA BANDERA MÁS ════════════════════════════
+//
+// Porque así un socio no puede llegar a una ficha clínica ni por error. Las
+// rutas médicas piden requireAuth(["medico"]) y las de clínica piden la
+// bandera admin; con rol "socio" no pasa por ninguna de las dos, y eso no
+// depende de que nadie se acuerde de filtrar: es la misma puerta de siempre,
+// que simplemente no se le abre.
+//
+// Un socio es un vendedor. Ve cuántas cuentas tiene, cuánto consumen y
+// cuánto debe. No ve un solo paciente, y no hay ruta que se lo permita.
+function requireSocio(req, res, next) {
+  const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
+  const payload = verificarToken(token);
+  if (!payload) return res.status(401).json({ error: "No autorizado — iniciá sesión" });
+  if (payload.rol !== "socio" || !payload.socioId) {
+    return res.status(403).json({ error: "No tenés permiso para esta acción" });
+  }
+  req.adminUser = payload;
+  // Igual que clinicaId en requireAdmin: sale del token o no sale. Un
+  // socioId que llegue en el cuerpo del pedido es elegir de quién ver la
+  // cartera de clientes.
+  req.socioId = payload.socioId;
+  next();
+}
+
+module.exports = { hashPassword, verificarPassword, generarToken, verificarToken, requireAuth, requireAdmin, requireSocio };

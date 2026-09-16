@@ -32,6 +32,9 @@ const clinicaSchema = new mongoose.Schema({
   ciudad: { type: String, default: "" },
   telefono: { type: String, default: "" },
   activa: { type: Boolean, default: true },
+  // Qué socio la vendió y la atiende. null = cliente directo de Symphomed.
+  // Ver el bloque de SOCIOS más abajo.
+  socioId: { type: mongoose.Schema.Types.ObjectId, ref: "Socio", default: null, index: true },
 
   // ═══ EL PLAN DEL CENTRO ═════════════════════════════════════════════════
   //
@@ -100,6 +103,11 @@ const medicoSchema = new mongoose.Schema({
 
   // ─── Clínica (opcional: un médico solo no tiene ninguna) ───────────────
   clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", default: null, index: true },
+  // Qué socio lo vendió. Va también acá y no solo en Clinica porque
+  // Symphomed le vende a las dos cosas: a centros Y a profesionales
+  // sueltos. Un socio que solo pudiera vender centros se quedaría afuera
+  // del cliente más común. null = cliente directo.
+  socioId: { type: mongoose.Schema.Types.ObjectId, ref: "Socio", default: null, index: true },
   // "medico"   — lo de siempre.
   // "admin"    — administrativo. NO es médico: no ve ninguna ficha, ninguna
   //              consulta, ninguna receta. Solo números y cuentas.
@@ -2227,6 +2235,177 @@ const InvitacionReporte = mongoose.model("InvitacionReporte", invitacionReporteS
 // prima de la venta, y si quedara solo en el log se pierde: nadie lee un log
 // buscando clientes.
 //
+// ═══════════════════════════════════════════════════════════════════════════
+// SOCIOS — el canal de reventa
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ═══ QUÉ PROBLEMA RESUELVE ═════════════════════════════════════════════════
+//
+// Hasta acá Symphomed se vendía de una sola forma: Symphomed le vende al
+// médico. Eso pone un techo duro, y el techo es la cantidad de horas que
+// tiene el que vende. Diez vendedores no se pueden sumar porque no hay dónde
+// ponerlos: todos entrarían al mismo panel de operador y todos verían las
+// cuentas de todos.
+//
+// Un SOCIO es alguien que compra cupos al por mayor y los revende a SU
+// precio, atendiendo a sus propios clientes. Symphomed le factura al socio;
+// el socio le factura a su cliente. Es el modelo de Wialon, de los
+// distribuidores de software de gestión, y de casi cualquier producto que
+// creció por canal en vez de por fuerza de venta propia.
+//
+// ═══ POR QUÉ NO ES UN Medico CON UNA BANDERA ═══════════════════════════════
+//
+// Porque el propio auth.js lo dice: el ROL es lo que abre las rutas
+// clínicas. Un socio comercial no tiene por qué poder pedir NUNCA la ficha
+// de un paciente, y la forma de garantizarlo no es acordarse de filtrar en
+// cada ruta: es que su rol no pase por requireAuth(["medico"]).
+//
+// Va con modelo y credenciales propias, rol "socio", y sus rutas viven
+// aparte. Un socio no aparece en ninguna lista de profesionales, no tiene
+// especialidad y no tiene pacientes.
+//
+// ═══ LA REGLA QUE NO SE AFLOJA ═════════════════════════════════════════════
+//
+// UN SOCIO VE SOLO LO SUYO. Ni las cuentas de otro socio, ni las que vendió
+// Symphomed directo. Igual que con el equipo de neurodesarrollo, esa regla
+// vive en UN solo lugar (services/socios.js) y no repartida por las rutas.
+const socioSchema = new mongoose.Schema({
+  nombre: { type: String, required: true },
+  // El teléfono es la identidad, igual que para el médico: es con lo que
+  // entra y es por donde se le escribe.
+  phone: { type: String, required: true, unique: true, index: true },
+  email: { type: String, default: "" },
+  passwordHash: { type: String, required: true },
+  activo: { type: Boolean, default: true },
+
+  pais: { type: String, default: "BO" },
+  moneda: { type: String, default: "BOB" },
+
+  // Lo que Symphomed le cobra al socio por cupo y por mes. Lo que el socio
+  // le cobra a su cliente NO se guarda acá: es su negocio, su margen y su
+  // decisión, y meterlo sería pretender administrarle el precio.
+  precioMayoristaCentavos: { type: Number, default: 0 },
+
+  contacto: {
+    whatsapp: { type: String, default: "" },
+    direccion: { type: String, default: "" },
+    ciudad: { type: String, default: "" },
+  },
+  nota: { type: String, default: "" },
+}, { timestamps: true });
+const Socio = mongoose.model("Socio", socioSchema);
+
+// ─── EL INVENTARIO DE CUPOS ───────────────────────────────────────────────
+//
+// Un cupo es el derecho a tener UNA cuenta activa: un centro o un
+// profesional suelto. El socio compra lotes y los va gastando a medida que
+// da de alta clientes.
+//
+// Se guarda el LOTE y no un contador, por la misma razón por la que una
+// cuenta corriente guarda movimientos y no solo el saldo: con un contador,
+// el día que el número no cuadra no hay forma de saber qué pasó. Con lotes,
+// el disponible se calcula (comprados − asignados) y siempre se puede
+// reconstruir de dónde salió cada uno.
+const loteCuposSchema = new mongoose.Schema({
+  socioId: { type: mongoose.Schema.Types.ObjectId, ref: "Socio", required: true, index: true },
+  cantidad: { type: Number, required: true, min: 1 },
+  // Lo que pagó el socio por cada cupo de ESTE lote. Se congela acá y no se
+  // lee del socio al calcular: si mañana se le cambia el precio mayorista,
+  // un lote comprado el año pasado tiene que seguir valiendo lo que valió.
+  precioUnitarioCentavos: { type: Number, default: 0 },
+  moneda: { type: String, default: "BOB" },
+  fecha: { type: Date, default: Date.now },
+  referencia: { type: String, default: "" },   // comprobante de la transferencia
+  nota: { type: String, default: "" },
+  // Qué operador de Symphomed se lo cargó. Un lote es plata: tiene que
+  // saberse quién lo aprobó.
+  registradoPor: { type: String, default: "" },
+}, { timestamps: true });
+loteCuposSchema.index({ socioId: 1, fecha: -1 });
+const LoteCupos = mongoose.model("LoteCupos", loteCuposSchema);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INSUMOS — el stock del consultorio
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Esto es de otro dueño que los cupos, y conviene no confundirlos: los cupos
+// son inventario del SOCIO (cuántas cuentas puede vender). Los insumos son
+// inventario de la CLÍNICA (anestesia, guantes, resina, vacunas).
+//
+// ═══ POR QUÉ EL STOCK NO SE GUARDA COMO UN NÚMERO ══════════════════════════
+//
+// La tentación es un campo "stockActual" que se suma y se resta. Funciona
+// hasta el primer día en que el número no coincide con el estante, y ahí no
+// hay forma de saber si faltan veinte guantes porque se usaron, porque
+// alguien cargó mal, o porque se los llevaron.
+//
+// Entonces igual que con los cupos y que con el saldo del médico: se guardan
+// los MOVIMIENTOS y el stock es su suma. Más lento de leer y la única forma
+// de que el inventario se pueda auditar.
+//
+// El campo "stock" del Insumo existe igual, pero como CACHÉ: lo recalcula el
+// servicio en cada movimiento. Si alguna vez discrepa de la suma, la suma
+// manda y el caché se corrige — nunca al revés.
+const UNIDADES_INSUMO = ["unidad", "caja", "ml", "l", "g", "kg", "par", "frasco", "ampolla", "rollo"];
+
+const insumoSchema = new mongoose.Schema({
+  // De quién es el stock. Un centro lo comparte entre sus profesionales
+  // (clinicaId); un profesional solo lo tiene para él (medicoPhone). Uno de
+  // los dos, nunca los dos — lo valida la ruta.
+  clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", default: null, index: true },
+  medicoPhone: { type: String, default: "", index: true },
+
+  nombre: { type: String, required: true },
+  categoria: { type: String, default: "" },   // "anestesia", "descartables", "vacunas"...
+  unidad: { type: String, enum: UNIDADES_INSUMO, default: "unidad" },
+  // Caché de la suma de movimientos. Ver el comentario de arriba.
+  stock: { type: Number, default: 0 },
+  // Desde acá avisa que hay que reponer. 0 = no avisar nunca.
+  stockMinimo: { type: Number, default: 0 },
+  // Para saber cuánto vale el stock parado. Es el último costo conocido, no
+  // un promedio ponderado: un promedio exige recalcular toda la historia en
+  // cada compra y nadie en un consultorio lo va a auditar.
+  costoUnitarioCentavos: { type: Number, default: 0 },
+  moneda: { type: String, default: "BOB" },
+  // Los que vencen: la fecha más próxima que haya en stock.
+  venceEl: { type: Date, default: null },
+  activo: { type: Boolean, default: true },
+  nota: { type: String, default: "" },
+}, { timestamps: true });
+insumoSchema.index({ clinicaId: 1, activo: 1, nombre: 1 });
+insumoSchema.index({ medicoPhone: 1, activo: 1, nombre: 1 });
+const Insumo = mongoose.model("Insumo", insumoSchema);
+
+// entrada  — compra, devolución, carga inicial
+// salida   — se usó en un paciente, se venció, se rompió
+// ajuste   — el conteo físico no coincidía. Es su propio tipo a propósito:
+//            un ajuste escondido como salida hace imposible distinguir
+//            consumo real de error de carga, que es lo único que interesa
+//            cuando el stock no cuadra.
+const TIPOS_MOV_INSUMO = ["entrada", "salida", "ajuste"];
+
+const movimientoInsumoSchema = new mongoose.Schema({
+  insumoId: { type: mongoose.Schema.Types.ObjectId, ref: "Insumo", required: true, index: true },
+  clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", default: null, index: true },
+  medicoPhone: { type: String, default: "", index: true },
+  tipo: { type: String, enum: TIPOS_MOV_INSUMO, required: true },
+  // Siempre POSITIVA. El signo lo pone el tipo, no el número: un "-5" de
+  // entrada y un "5" de salida significan lo mismo y se prestan a cargar mal.
+  cantidad: { type: Number, required: true, min: 0 },
+  // Cómo quedó el stock después. Igual que en MovimientoSaldo: deja
+  // reconstruir el estado de cualquier día sin sumar toda la historia.
+  stockDespues: { type: Number, default: 0 },
+  costoUnitarioCentavos: { type: Number, default: 0 },
+  motivo: { type: String, default: "" },
+  // Si se gastó atendiendo a alguien, queda enganchado. Es lo que después
+  // deja calcular cuánto costó de verdad un tratamiento.
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", default: null },
+  registradoPor: { type: String, default: "" },
+  fecha: { type: Date, default: Date.now },
+}, { timestamps: true });
+movimientoInsumoSchema.index({ insumoId: 1, fecha: -1 });
+const MovimientoInsumo = mongoose.model("MovimientoInsumo", movimientoInsumoSchema);
+
 // NO es una cuenta. Un médico que se registra queda como Medico con
 // estadoCuenta "pendiente"; esto es de ANTES — alguien que todavía está
 // averiguando. Los dos no se mezclan a propósito: meter interesados en la
@@ -2269,4 +2448,6 @@ module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, Consul
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,
   EvaluacionFisio, MedicionFisio, ObjetivoFisio,
   REGIONES_CUERPO, LADOS_FISIO, TIPOS_DOLOR, BANDERAS_ROJAS, ARTICULACIONES_ROM, AREAS_OBJETIVO_FISIO,
+  Socio, LoteCupos,
+  Insumo, MovimientoInsumo, UNIDADES_INSUMO, TIPOS_MOV_INSUMO,
   InvitacionReporte };

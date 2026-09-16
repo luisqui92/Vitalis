@@ -148,6 +148,8 @@ require("./routes/equipoNeuro")(app);
 require("./routes/informeFamilia")(app);
 require("./routes/vacunasPet")(app);
 require("./routes/fisioterapia")(app);
+require("./routes/socio")(app);
+require("./routes/insumos")(app);
 require("./routes/instrumentos")(app);
 require("./routes/informes")(app);
 require("./routes/memoriaClinica")(app);
