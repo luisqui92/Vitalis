@@ -229,6 +229,35 @@ function verificar(descripcion, condicion) {
   verificar("y el rechazo es 404, que no confirma que exista",
     espia.estado === 404 && espiaObj.estado === 404);
 
+  // ═══ 6b. LOS FORMULARIOS SE ABREN DONDE SE TOCÓ ══════════════════════════
+  //
+  // Esto lo encontró el usuario probando en una computadora, no las pruebas.
+  // El formulario de marcar dolor se insertaba al PRINCIPIO de la pestaña, y
+  // en una pantalla grande eso queda tres tarjetas más arriba de la silueta:
+  // se tocaba el hombro, la página saltaba para arriba y parecía que no había
+  // pasado nada.
+  //
+  // Y el botón de confirmar no tenía clase, así que salía como un botón gris
+  // del navegador mientras «Cancelar» —que sí tenía class="secondary"— se
+  // veía como la acción principal. Justo al revés.
+  console.log("\n── 6b. Los formularios salen donde se tocó ──");
+  verificar("el formulario de dolor tiene su propio lugar abajo de la silueta",
+    /id="fisioFormDolorBox"/.test(fuentePantalla) &&
+    /getElementById\("fisioFormDolorBox"\)/.test(fuentePantalla));
+  verificar("y no se inserta al principio de la pestaña",
+    !/fisioEvaluacionBox"\);[\s\S]{0,400}?box\.prepend/.test(fuentePantalla));
+  verificar("el de sesión se abre pegado al objetivo que se tocó",
+    /insertAdjacentElement\("afterend"/.test(fuentePantalla));
+  // "nearest" es lo que hacía que el navegador decidiera no mover nada.
+  verificar("y los dos se desplazan hasta quedar a la vista",
+    (fuentePantalla.match(/scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/g) || []).length === 2 &&
+    !/block: "nearest"/.test(fuentePantalla));
+  // Todo botón que confirma algo tiene que verse como el botón principal.
+  const botonesSinClase = [...fuentePantalla.matchAll(/<button (?![^>]*class=)[^>]*>/g)];
+  verificar("ningún botón quedó sin clase (se vería gris del navegador)",
+    botonesSinClase.length === 0);
+  if (botonesSinClase.length) console.log("   sin clase:", botonesSinClase.map(m => m[0]).join(" "));
+
   // ═══ 7. QUE LA PANTALLA ESTÉ CABLEADA ════════════════════════════════════
   console.log("\n── 7. El módulo está enchufado a la app ──");
   const estado = require("fs").readFileSync(path.join(RAIZ, "public", "js", "estado.js"), "utf8");

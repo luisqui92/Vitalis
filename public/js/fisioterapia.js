@@ -212,6 +212,13 @@ function pintarFisioEvaluacion(pacienteId) {
       ${puntosVista.length === 0 ? `<div class="hint">${t("fisio.mapa.vacio")}</div>` : ""}
     </div>
 
+    <!-- El formulario de marcar dolor se dibuja ACÁ, pegado abajo de la
+         silueta. Antes se insertaba al principio de la pestaña y en una
+         pantalla de computadora aparecía tres tarjetas más arriba: se tocaba
+         el hombro y no pasaba nada visible. Mismo patrón que el mapa
+         corporal de veterinaria, que usa su propio contenedor. -->
+    <div id="fisioFormDolorBox"></div>
+
     ${(ev.puntosDolor || []).length ? `
       <div class="card">
         <div class="seccion-titulo" style="margin-top:0">${t("fisio.puntos.titulo")}</div>
@@ -314,10 +321,11 @@ function pintarFisioEvaluacion(pacienteId) {
 function abrirFormularioDolor(pacienteId, x, y) {
   const region = regionDeClic(fisioVista, x, y);
   const lado = ladoSegunVista(fisioVista, region, x);
-  const box = document.getElementById("fisioEvaluacionBox");
-
-  const previo = document.getElementById("fisioFormDolor");
-  if (previo) previo.remove();
+  // Su propio contenedor, justo abajo de la silueta. Ver el comentario en
+  // pintarFisioEvaluacion().
+  const box = document.getElementById("fisioFormDolorBox");
+  if (!box) return;
+  box.innerHTML = "";
 
   const form = document.createElement("div");
   form.className = "card";
@@ -349,10 +357,14 @@ function abrirFormularioDolor(pacienteId, x, y) {
     <label>${t("fisio.dolor.notas")}</label>
     <input id="dolorNotas" type="text" placeholder="${t("fisio.opcional")}">
     <div id="dolorErr"></div>
-    <button id="btnGuardarDolor">${t("fisio.dolor.marcar")}</button>
+    <button class="primary" id="btnGuardarDolor">${t("fisio.dolor.marcar")}</button>
     <button class="secondary" id="btnCancelarDolor">${t("fisio.cancelar")}</button>`;
-  box.prepend(form);
-  form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  box.appendChild(form);
+  // "start" y no "nearest": con "nearest" el navegador decide que ya está
+  // bastante cerca y no mueve nada, que es justo el síntoma —se toca la
+  // silueta y aparentemente no pasa nada—. Con "start" el formulario queda
+  // arriba de la pantalla, visible sí o sí.
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const rango = document.getElementById("dolorIntensidad");
   const txt = document.getElementById("dolorValorTxt");
@@ -732,6 +744,11 @@ function abrirSesionFisio(pacienteId, objetivo) {
   const previo = document.getElementById("fisioFormSesion");
   if (previo) previo.remove();
 
+  // El formulario va PEGADO al objetivo que se tocó, no al principio de la
+  // pestaña. Con varios objetivos cargados, abrirlo arriba de todo deja al
+  // profesional cargando una sesión sin ver de cuál objetivo era.
+  const tarjeta = box.querySelector(`[data-obj="${objetivo._id}"]`);
+
   const form = document.createElement("div");
   form.className = "card";
   form.id = "fisioFormSesion";
@@ -755,10 +772,11 @@ function abrirSesionFisio(pacienteId, objetivo) {
     <label>${t("fisio.sesion.notas")}</label>
     <input id="sesNotas" type="text" placeholder="${t("fisio.opcional")}">
     <div id="sesErr"></div>
-    <button id="btnGuardarSesion">${t("fisio.guardar")}</button>
+    <button class="primary" id="btnGuardarSesion">${t("fisio.guardar")}</button>
     <button class="secondary" id="btnCancelarSesion">${t("fisio.cancelar")}</button>`;
-  box.prepend(form);
-  form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (tarjeta) tarjeta.insertAdjacentElement("afterend", form);
+  else box.prepend(form);
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const rango = document.getElementById("sesDolor");
   const txt = document.getElementById("sesDolorTxt");
