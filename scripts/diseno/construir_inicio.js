@@ -19,7 +19,7 @@ const path = require("path");
 
 const {
   IDIOMAS, NOMBRES, RUTAS, WA_TEXTO, CABEZA, FRASES, AGENDA,
-  MODULOS_TXT, TECNO_TXT, FILAS, CARRUSEL_TXT, ESPECIALIDADES_EXTRA, SELECTOR,
+  MODULOS_TXT, TECNO_TXT, FILAS, CARRUSEL_TXT, ESPECIALIDADES_EXTRA, SELECTOR, BANDAS, FLOTANTE,
 } = require("./textos");
 
 const ORIGEN = path.join(__dirname, "inicio_original.html");
@@ -261,6 +261,51 @@ css = css.replace(
 // servidor. Tal como venía, "Inter" no se cargaba en ningún lado y la página
 // caía en la fuente del sistema.
 css = css.replace(/font-family:Inter,/, "font-family:InterVar,Inter,");
+
+// ─── La banda de WhatsApp ──────────────────────────────────────────────────
+//
+// Franja angosta, una sola línea y el botón al lado. Angosta a propósito: no
+// es una sección más —sería una interrupción— es un botón que aparece justo
+// donde alguien se termina de convencer.
+//
+// En celular el botón baja abajo del texto y ocupa todo el ancho, que es
+// donde cae el pulgar. Un botón chico y centrado a esa altura de la página se
+// falla más veces de las que se acierta.
+css += `
+.banda-wa{background:linear-gradient(100deg,#0b2b3d,#0f3d55);border-top:1px solid #16465e;border-bottom:1px solid #16465e}
+.banda-wa .container{display:flex;align-items:center;justify-content:space-between;gap:24px;padding-top:26px;padding-bottom:26px;flex-wrap:wrap}
+.banda-wa p{margin:0;color:#dbeaf2;font-size:19px;font-weight:500;line-height:1.45;max-width:620px}
+.banda-wa .btn{flex:0 0 auto;white-space:nowrap}
+@media(max-width:760px){
+  .banda-wa .container{flex-direction:column;align-items:stretch;text-align:center;gap:16px}
+  .banda-wa p{font-size:17px;max-width:none}
+  .banda-wa .btn{width:100%;justify-content:center}
+}
+
+/* ─── El botón fijo de celular ───────────────────────────────────────────
+   Oculto por defecto y en escritorio. Lo enciende el guion del pie recién
+   cuando se pasó la primera pantalla, y lo apaga cuando el bloque final
+   entra en cuadro — si no, taparía justo el botón hacia el que veníamos
+   empujando todo el scroll.
+
+   El padding de abajo suma el área segura del teléfono: sin eso, en un
+   iPhone el botón queda mitad tapado por la barra de gestos. */
+.wa-flotante{display:none}
+@media(max-width:760px){
+  .wa-flotante{
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    position:fixed;left:14px;right:14px;
+    bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index:60;padding:15px 18px;border-radius:999px;
+    background:linear-gradient(100deg,#1fb9ee,#54d8ff);color:#03131d;
+    font-weight:700;font-size:16px;text-decoration:none;
+    box-shadow:0 6px 24px rgba(0,0,0,.45);
+    opacity:0;transform:translateY(120%);pointer-events:none;
+    transition:opacity .22s ease,transform .22s ease;
+  }
+  .wa-flotante.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+}
+@media(prefers-reduced-motion:reduce){.wa-flotante{transition:none}}`;
 
 
 // ─── El cuerpo, un idioma a la vez ─────────────────────────────────────────
@@ -527,7 +572,50 @@ function construir(idioma) {
     .replace(/href="#technology"/g, 'href="#tecnologia"')
     .replace(/href="#security"/g, 'href="#confianza"');
 
+  // 9b. Las bandas de WhatsApp en el medio de la página.
+  //
+  //     Van pegadas al cierre de las dos secciones que convencen: la del
+  //     carrusel de módulos (#soluciones) y la de tecnología (#tecnologia).
+  //     Ver el comentario de BANDAS en textos.js para el porqué.
+  //
+  //     Se ancla en el id de la sección y no en un número de línea: el HTML
+  //     original se puede reordenar, y una inserción por posición dejaría la
+  //     banda en cualquier lado sin que nada falle.
+  const bandas = BANDAS[idioma];
+  const ponerBanda = (idSeccion, banda) => {
+    const abre = cuerpo.indexOf(`id="${idSeccion}"`);
+    if (abre === -1) throw new Error(`[${idioma}] no encontré la sección ${idSeccion}`);
+    const cierra = cuerpo.indexOf("</section>", abre);
+    if (cierra === -1) throw new Error(`[${idioma}] la sección ${idSeccion} no cierra`);
+    const html =
+      `<div class="banda-wa"><div class="container">` +
+      `<p>${banda.texto}</p>` +
+      `<a class="btn btn-primary" href="__WA__">${banda.boton}</a>` +
+      `</div></div>`;
+    const corte = cierra + "</section>".length;
+    cuerpo = cuerpo.slice(0, corte) + html + cuerpo.slice(corte);
+  };
+  ponerBanda("agenda", bandas[0]);
+  ponerBanda("soluciones", bandas[1]);
+  ponerBanda("tecnologia", bandas[2]);
+
+  // 9c. El botón fijo de celular. Ver FLOTANTE en textos.js.
+  //
+  //     Va al final del <body> y no dentro de una sección: tiene que quedar
+  //     por encima de todo, y un position:fixed adentro de un contenedor con
+  //     transform deja de ser fijo respecto de la ventana —es la forma más
+  //     común de que un botón flotante quede pegado a media página—.
+  const flotante =
+    `<a class="wa-flotante" id="waFlotante" href="__WA__" aria-hidden="true" tabindex="-1">` +
+    `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">` +
+    `<path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm5.8 14.2c-.2.7-1.2 1.3-1.9 1.4-.5.1-1.1.2-3.2-.7-2.7-1.1-4.4-3.9-4.5-4-.1-.2-1.1-1.4-1.1-2.7s.7-1.9 .9-2.2c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2.1 1.3 2.4 1.4.3.1.4.1.6-.1l.8-1c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.8-.1 1.5z"/>` +
+    `</svg><span>${FLOTANTE[idioma]}</span></a>`;
+  cuerpo += flotante;
+
   // 10. El WhatsApp, con el saludo en el idioma de quien lo va a escribir.
+  //     Va DESPUÉS de las bandas a propósito: así los enlaces recién
+  //     insertados también reciben el saludo traducido, en vez de quedarse
+  //     con el marcador crudo y hacer fallar la comprobación de más abajo.
   const wa = WA + "?text=" + encodeURIComponent(WA_TEXTO[idioma]);
   cuerpo = cuerpo.split("__WA__").join(wa);
 
@@ -691,6 +779,64 @@ const CONTROLES = `<script nonce="__NONCE__">
   });
 
   activar(0);
+})();
+
+// ─── El botón fijo de celular ──────────────────────────────────────────────
+// Se enciende cuando se pasó la primera pantalla y se apaga cuando el bloque
+// final entra en cuadro. Igual que el carrusel, esto es OPCIONAL: si el
+// script no corre, el botón se queda escondido y la página sigue teniendo
+// sus cinco enlaces de WhatsApp. Nunca al revés —nunca un botón encendido
+// tapando contenido sin nadie que lo apague—, y por eso arranca oculto.
+(function () {
+  var boton = document.getElementById("waFlotante");
+  var final = document.getElementById("demo");
+  if (!boton || !final) return;
+
+  // El botón fijo se apaga cuando ya hay uno igual en pantalla: las bandas y
+  // el bloque final. Dos botones idénticos a la vez no dan el doble de
+  // oportunidad de tocar, dan la impresión de que la página insiste.
+  var competencia = [].slice.call(document.querySelectorAll(".banda-wa"));
+  competencia.push(final);
+
+  // aria-hidden mientras está oculto: un lector de pantalla no tiene por qué
+  // anunciar un botón que en su pantalla no existe, y el enlace ya está
+  // cinco veces en el texto.
+  function mostrar(si) {
+    boton.classList.toggle("visible", si);
+    boton.setAttribute("aria-hidden", si ? "false" : "true");
+    if (si) boton.removeAttribute("tabindex"); else boton.setAttribute("tabindex", "-1");
+  }
+
+  // Cuántos de esos botones hay en cuadro ahora mismo. Se lleva la cuenta en
+  // vez de un booleano porque son varios y las entradas llegan de a una:
+  // con un booleano, salir de la primera banda apagaría la cuenta aunque el
+  // bloque final ya estuviera entrando.
+  var aLaVista = 0;
+  if (window.IntersectionObserver) {
+    var ojo = new IntersectionObserver(function (entradas) {
+      for (var i = 0; i < entradas.length; i++) {
+        aLaVista += entradas[i].isIntersecting ? 1 : -1;
+      }
+      if (aLaVista < 0) aLaVista = 0;
+      revisar();
+      // Sin margen: apaga en cuanto la banda asoma, aunque sea un renglón.
+      // Con margen negativo quedaban los dos botones juntos un rato —la
+      // banda entrando por abajo y el fijo todavía encendido—, que es
+      // exactamente lo que este bloque existe para evitar.
+    }, { rootMargin: "0px" });
+    competencia.forEach(function (e) { ojo.observe(e); });
+  }
+
+  function revisar() {
+    mostrar(window.scrollY > window.innerHeight * 0.8 && aLaVista === 0);
+  }
+
+  // passive: este oyente corre en cada cuadro del scroll y no llama a
+  // preventDefault. Sin la marca, el navegador tiene que esperar a ver si lo
+  // hace antes de mover la página, y el scroll se siente pegajoso.
+  window.addEventListener("scroll", revisar, { passive: true });
+  window.addEventListener("resize", revisar);
+  revisar();
 })();
 </script>`;
 

@@ -384,33 +384,51 @@ module.exports = { IDIOMAS, ES, PT, EN, NOMBRES, WA_TEXTO, CABEZA, FRASES, AGEND
 // Los datos de ejemplo (PA 150/95, 12,4 kg, CI total 94) NO se traducen: son
 // mediciones, y una medición se escribe igual en los tres idiomas. Lo que se
 // traduce son las etiquetas.
+// ═══ POR QUÉ ESTOS PÁRRAFOS SON CORTOS ═════════════════════════════════════
+//
+// Lo eran de 28 palabras cada uno. Alguien que miró la página de afuera dijo
+// lo que ya se veía en los números: de la mitad para abajo son tres mil
+// palabras, y el que entra se pierde antes de llegar al botón.
+//
+// El médico que mira esto no está estudiando el producto, está decidiendo en
+// veinte segundos si escribe o si cierra. El título de cada módulo y el dato
+// de ejemplo (las dos últimas entradas de cada fila) hacen casi todo el
+// trabajo: son concretos y se leen de un vistazo. El párrafo del medio solo
+// tiene que empujar hacia ellos, no explicar el módulo entero.
+//
+// Regla para el que venga a editar esto: si el párrafo no entra en dos
+// renglones de celular, sobra. Lo que falte se cuenta en la demo, que es de
+// lo que se trata el botón.
 const MODULOS_TXT = {
   es: [
-    ["ODONTOLOGÍA", "El odontograma, pieza por pieza.", "Cada diente con su historia, sus tratamientos y su evolución. La ficha dental deja de ser un dibujo a mano en una hoja.", "Pieza 36", "Caries oclusal · Tratamiento de conducto · En control"],
-    ["PEDIATRÍA", "Las curvas, calculadas solas.", "Peso, talla y perímetro cefálico se grafican sobre los percentiles de la OMS a medida que se cargan. El percentil no se busca en una tabla: ya está.", "Peso · percentil 62", "12,4 kg a los 24 meses · dentro de lo esperado"],
-    ["NEURODESARROLLO", "Quién lo aplicó, y con qué módulo.", "Symphomed no administra ni puntúa: eso lo hace quien tiene la calificación, con sus propios materiales. Acá queda el resultado fechado y firmado, para cuando haya que reaplicar.", "", "ADOS-2 · módulo 2 · Lic. Torres, Reg. 4821"],
-    ["GINECOLOGÍA Y OBSTETRICIA", "El control prenatal, semana a semana.", "Altura uterina, frecuencia cardíaca fetal y presión en cada control, sobre la misma línea de tiempo. Y el examen ginecológico con su mapa propio.", "", "Próximo control en 3 semanas · curva de tolerancia pendiente"],
-    ["OFTALMOLOGÍA", "La agudeza y la refracción, en su ficha.", "Cada ojo con su agudeza, su refracción y su presión intraocular, comparables contra el control anterior sin volver a leer la historia entera.", "", "El OI bajó de 20/25 a 20/40 desde el control de marzo"],
-    ["IMÁGENES Y LABORATORIO", "Los estudios, dentro de la ficha.", "Las radiografías se abren en un visor que permite medir, y los laboratorios quedan marcados como pendientes hasta que vuelven. El equipo de rayos sube directo.", "", "Lo pendiente aparece en el panel hasta que llega"],
-    ["SYMPHOMED PET", "La misma inteligencia. Otro paciente.", "Historia clínica completa para perros y gatos, con anatomía visual, esquema de vacunas propio y las particularidades de cada especie.", "", "Ficha por especie, no una ficha humana adaptada"],
+    ["ODONTOLOGÍA", "El odontograma, pieza por pieza.", "Cada diente con su historia. Se acabó el dibujo a mano en una hoja.", "Pieza 36", "Caries oclusal · Tratamiento de conducto · En control"],
+    ["PEDIATRÍA", "Las curvas, calculadas solas.", "El percentil no se busca en la tabla: ya está calculado.", "Peso · percentil 62", "12,4 kg a los 24 meses · dentro de lo esperado"],
+    // Este es el único que no se puede recortar más: la frase sobre qué NO
+    // hace Symphomed es lo que evita que alguien crea que la plataforma
+    // administra el instrumento.
+    ["NEURODESARROLLO", "Quién lo aplicó, y con qué módulo.", "Symphomed no administra ni puntúa: guarda el resultado, fechado y firmado.", "", "ADOS-2 · módulo 2 · Lic. Torres, Reg. 4821"],
+    ["GINECOLOGÍA Y OBSTETRICIA", "El control prenatal, semana a semana.", "Todos los controles sobre una sola línea de tiempo.", "", "Próximo control en 3 semanas · curva de tolerancia pendiente"],
+    ["OFTALMOLOGÍA", "La agudeza y la refracción, en su ficha.", "Cada ojo contra el control anterior, sin releer la historia.", "", "El OI bajó de 20/25 a 20/40 desde el control de marzo"],
+    ["IMÁGENES Y LABORATORIO", "Los estudios, dentro de la ficha.", "Radiografías con visor para medir. El equipo de rayos sube directo.", "", "Lo pendiente aparece en el panel hasta que llega"],
+    ["SYMPHOMED PET", "La misma inteligencia. Otro paciente.", "Perros y gatos, con anatomía visual y su propio esquema de vacunas.", "", "Ficha por especie, no una ficha humana adaptada"],
   ],
   pt: [
-    ["ODONTOLOGIA", "O odontograma, dente por dente.", "Cada dente com seu histórico, seus tratamentos e sua evolução. A ficha odontológica deixa de ser um desenho à mão numa folha.", "Dente 36", "Cárie oclusal · Tratamento de canal · Em controle"],
-    ["PEDIATRIA", "As curvas, calculadas sozinhas.", "Peso, altura e perímetro cefálico são plotados sobre os percentis da OMS conforme são lançados. O percentil não se procura numa tabela: já está lá.", "Peso · percentil 62", "12,4 kg aos 24 meses · dentro do esperado"],
-    ["NEURODESENVOLVIMENTO", "Quem aplicou, e com qual módulo.", "A Symphomed não administra nem pontua: isso faz quem tem a qualificação, com seus próprios materiais. Aqui fica o resultado datado e assinado, para quando for preciso reaplicar.", "", "ADOS-2 · módulo 2 · Lic. Torres, Reg. 4821"],
-    ["GINECOLOGIA E OBSTETRÍCIA", "O pré-natal, semana a semana.", "Altura uterina, frequência cardíaca fetal e pressão em cada consulta, na mesma linha do tempo. E o exame ginecológico com seu mapa próprio.", "", "Próximo retorno em 3 semanas · curva glicêmica pendente"],
-    ["OFTALMOLOGIA", "A acuidade e a refração, no prontuário.", "Cada olho com sua acuidade, sua refração e sua pressão intraocular, comparáveis com a consulta anterior sem reler o histórico inteiro.", "", "O OE caiu de 20/25 para 20/40 desde o retorno de março"],
-    ["IMAGEM E LABORATÓRIO", "Os exames, dentro do prontuário.", "As radiografias abrem num visualizador que permite medir, e os laboratoriais ficam marcados como pendentes até voltarem. O aparelho de raios-X envia direto.", "", "O que está pendente aparece no painel até chegar"],
-    ["SYMPHOMED PET", "A mesma inteligência. Outro paciente.", "Prontuário completo para cães e gatos, com anatomia visual, esquema de vacinas próprio e as particularidades de cada espécie.", "", "Ficha por espécie, não uma ficha humana adaptada"],
+    ["ODONTOLOGIA", "O odontograma, dente por dente.", "Cada dente com seu histórico. Acabou o desenho à mão numa folha.", "Dente 36", "Cárie oclusal · Tratamento de canal · Em controle"],
+    ["PEDIATRIA", "As curvas, calculadas sozinhas.", "O percentil não se procura na tabela: já está calculado.", "Peso · percentil 62", "12,4 kg aos 24 meses · dentro do esperado"],
+    ["NEURODESENVOLVIMENTO", "Quem aplicou, e com qual módulo.", "A Symphomed não administra nem pontua: guarda o resultado, datado e assinado.", "", "ADOS-2 · módulo 2 · Lic. Torres, Reg. 4821"],
+    ["GINECOLOGIA E OBSTETRÍCIA", "O pré-natal, semana a semana.", "Todas as consultas numa única linha do tempo.", "", "Próximo retorno em 3 semanas · curva glicêmica pendente"],
+    ["OFTALMOLOGIA", "A acuidade e a refração, no prontuário.", "Cada olho contra a consulta anterior, sem reler o histórico.", "", "O OE caiu de 20/25 para 20/40 desde o retorno de março"],
+    ["IMAGEM E LABORATÓRIO", "Os exames, dentro do prontuário.", "Radiografias com visualizador para medir. O raio-X envia direto.", "", "O que está pendente aparece no painel até chegar"],
+    ["SYMPHOMED PET", "A mesma inteligência. Outro paciente.", "Cães e gatos, com anatomia visual e esquema de vacinas próprio.", "", "Ficha por espécie, não uma ficha humana adaptada"],
   ],
   en: [
-    ["DENTAL", "The odontogram, tooth by tooth.", "Every tooth with its history, its treatments and its progress. The dental chart stops being a drawing on a sheet of paper.", "Tooth 36", "Occlusal caries · Root canal · Under review"],
-    ["PEDIATRICS", "Growth curves, plotted for you.", "Weight, height and head circumference are plotted against WHO percentiles as they're entered. You don't look the percentile up in a table: it's already there.", "Weight · 62nd percentile", "12.4 kg at 24 months · within the expected range"],
-    ["NEURODEVELOPMENT", "Who administered it, and with which module.", "Symphomed neither administers nor scores: that is done by whoever holds the qualification, with their own materials. What stays here is the result, dated and signed, for the next administration.", "", "ADOS-2 · module 2 · L. Torres, Reg. 4821"],
-    ["OBSTETRICS & GYNECOLOGY", "Prenatal care, week by week.", "Fundal height, fetal heart rate and blood pressure at every visit, on one timeline. Plus the gynecological exam with its own map.", "", "Next visit in 3 weeks · glucose tolerance test pending"],
-    ["OPHTHALMOLOGY", "Acuity and refraction, in the chart.", "Each eye with its acuity, refraction and intraocular pressure, comparable against the previous visit without rereading the whole history.", "", "Left eye dropped from 20/25 to 20/40 since the March visit"],
-    ["IMAGING & LAB", "Studies, inside the chart.", "X-rays open in a viewer that lets you measure, and lab work stays flagged as pending until it comes back. The X-ray unit uploads directly.", "", "What's pending shows on the dashboard until it arrives"],
-    ["SYMPHOMED PET", "Same intelligence. A different patient.", "Complete clinical records for dogs and cats, with visual anatomy, its own vaccine schedule and the particulars of each species.", "", "A chart per species, not a human chart adapted"],
+    ["DENTAL", "The odontogram, tooth by tooth.", "Every tooth with its history. No more drawing on a sheet of paper.", "Tooth 36", "Occlusal caries · Root canal · Under review"],
+    ["PEDIATRICS", "Growth curves, plotted for you.", "You don't look the percentile up in a table: it's already there.", "Weight · 62nd percentile", "12.4 kg at 24 months · within the expected range"],
+    ["NEURODEVELOPMENT", "Who administered it, and with which module.", "Symphomed neither administers nor scores: it keeps the result, dated and signed.", "", "ADOS-2 · module 2 · L. Torres, Reg. 4821"],
+    ["OBSTETRICS & GYNECOLOGY", "Prenatal care, week by week.", "Every visit on a single timeline.", "", "Next visit in 3 weeks · glucose tolerance test pending"],
+    ["OPHTHALMOLOGY", "Acuity and refraction, in the chart.", "Each eye against the previous visit, without rereading the history.", "", "Left eye dropped from 20/25 to 20/40 since the March visit"],
+    ["IMAGING & LAB", "Studies, inside the chart.", "X-rays in a viewer you can measure in. The X-ray unit uploads directly.", "", "What's pending shows on the dashboard until it arrives"],
+    ["SYMPHOMED PET", "Same intelligence. A different patient.", "Dogs and cats, with visual anatomy and their own vaccine schedule.", "", "A chart per species, not a human chart adapted"],
   ],
 };
 
@@ -418,30 +436,44 @@ const MODULOS_TXT = {
 // Cada una dice QUÉ LOGRA y nunca cómo está hecho. Ningún proveedor nombrado:
 // eso es lo que un competidor necesitaría para copiar, y no le aporta nada al
 // médico que está decidiendo si probar.
+//
+// ═══ LO QUE SE SACÓ DE ACÁ, Y POR QUÉ ══════════════════════════════════════
+//
+// La ficha de inteligencia artificial decía, en los tres idiomas, que
+// Symphomed «aprende de las correcciones de cada médico, así que la nota se
+// parece cada vez más a la suya». ERA FALSO. Las correcciones se guardan —hay
+// una colección CorreccionIA y todo— pero NADA las lee: no alimentan ningún
+// ajuste, ningún ejemplo, ninguna instrucción. La nota de hoy sale igual que
+// la del primer día.
+//
+// Una promesa de producto que el producto no cumple no es una exageración de
+// marketing, es algo que el primer médico atento va a notar a las dos semanas
+// —y justamente el que más corrige es el que más rápido se da cuenta—. Se
+// saca hasta que exista. Si algún día se construye, se vuelve a poner.
 const TECNO_TXT = {
   es: [
-    ["Inteligencia artificial", "Reconoce lo que importa de una conversación y lo ordena como nota clínica: motivo, antecedentes, examen y plan. Y aprende de las correcciones de cada médico, así que la nota se parece cada vez más a la suya y menos a una plantilla."],
-    ["Voz", "Transcribe la consulta mientras ocurre, con el vocabulario que una transcripción común no reconoce: nombres de fármacos, dosis, unidades y términos clínicos. Sin dictar y sin hablarle a la computadora: es la consulta normal."],
-    ["Lenguaje clínico", "Distingue lo que dijo el paciente de lo que observó el médico, separa los antecedentes de los hallazgos de hoy y entiende las negaciones —«sin fiebre» no es lo mismo que «fiebre»—. Ahí es donde una transcripción se vuelve una historia clínica."],
-    ["Datos estructurados", "Cada dato queda en su campo y no suelto en un párrafo. Por eso la presión de hoy se grafica junto a las de los controles anteriores, un estudio pedido puede figurar como pendiente, y una dosis se puede comparar con la anterior."],
-    ["Integraciones", "El consultorio no queda aislado: la agenda se sincroniza con el calendario, el equipo de rayos sube los estudios directo a la ficha del paciente, y en Brasil la receta sale por el sistema de firma digital que exige la norma."],
-    ["Seguridad", "Cada médico ve solo a sus pacientes, y eso no depende de que alguien se acuerde de filtrar: está sostenido por el código, en todas las pantallas a la vez. Y las historias se exportan completas el día que se quiera dejar de usar Symphomed."],
+    ["Inteligencia artificial", "Convierte la conversación en nota clínica: motivo, antecedentes, examen y plan."],
+    ["Voz", "Transcribe con vocabulario clínico: fármacos, dosis y unidades. Sin dictar."],
+    ["Lenguaje clínico", "Entiende que «sin fiebre» no es «fiebre». Ahí una transcripción se vuelve historia."],
+    ["Datos estructurados", "Cada dato en su campo. Por eso se grafica, se compara y queda pendiente."],
+    ["Integraciones", "Agenda sincronizada, rayos que suben solos y receta digital en Brasil."],
+    ["Seguridad", "Cada médico ve solo a sus pacientes. Y sus historias se exportan completas."],
   ],
   pt: [
-    ["Inteligência artificial", "Reconhece o que importa numa conversa e organiza como evolução: queixa, antecedentes, exame e conduta. E aprende com as correções de cada médico, então a evolução fica cada vez mais parecida com a dele e menos com um modelo pronto."],
-    ["Voz", "Transcreve a consulta enquanto ela acontece, com o vocabulário que uma transcrição comum não reconhece: nomes de medicamentos, doses, unidades e termos clínicos. Sem ditar e sem falar com o computador: é a consulta normal."],
-    ["Linguagem clínica", "Distingue o que o paciente disse do que o médico observou, separa os antecedentes dos achados de hoje e entende as negações — «sem febre» não é a mesma coisa que «febre». É aí que uma transcrição vira um prontuário."],
-    ["Dados estruturados", "Cada dado fica no seu campo, não solto num parágrafo. Por isso a pressão de hoje é plotada junto com as das consultas anteriores, um exame pedido pode constar como pendente, e uma dose pode ser comparada com a anterior."],
-    ["Integrações", "O consultório não fica isolado: a agenda sincroniza com o calendário, o aparelho de raios-X envia os exames direto ao prontuário, e no Brasil a receita sai pelo sistema de assinatura digital que a norma exige."],
-    ["Segurança", "Cada médico vê apenas os seus pacientes, e isso não depende de alguém lembrar de filtrar: está garantido pelo código, em todas as telas ao mesmo tempo. E os prontuários se exportam completos no dia em que se quiser parar de usar o Symphomed."],
+    ["Inteligência artificial", "Transforma a conversa em evolução: queixa, antecedentes, exame e conduta."],
+    ["Voz", "Transcreve com vocabulário clínico: medicamentos, doses e unidades. Sem ditar."],
+    ["Linguagem clínica", "Entende que «sem febre» não é «febre». Aí uma transcrição vira prontuário."],
+    ["Dados estruturados", "Cada dado no seu campo. Por isso se plota, se compara e fica pendente."],
+    ["Integrações", "Agenda sincronizada, raio-X que envia sozinho e receita digital no Brasil."],
+    ["Segurança", "Cada médico vê só os seus pacientes. E os prontuários se exportam completos."],
   ],
   en: [
-    ["Artificial intelligence", "It recognizes what matters in a conversation and lays it out as a clinical note: complaint, history, examination and plan. And it learns from each clinician's corrections, so the note reads more like theirs and less like a template."],
-    ["Voice", "It transcribes the consultation as it happens, with the vocabulary ordinary transcription misses: drug names, doses, units and clinical terms. No dictating, no talking to the computer: it's the normal consultation."],
-    ["Clinical language", "It tells what the patient said from what the clinician observed, separates history from today's findings, and understands negation — “no fever” is not “fever”. That's where a transcript becomes a clinical record."],
-    ["Structured data", "Every value lands in its own field instead of loose in a paragraph. That's why today's blood pressure plots alongside previous visits, an ordered test can show as pending, and a dose can be compared with the last one."],
-    ["Integrations", "The practice isn't an island: the calendar syncs, the X-ray unit uploads studies straight into the patient's chart, and in Brazil prescriptions go out through the digital signature system the law requires."],
-    ["Security", "Each clinician sees only their own patients, and that doesn't depend on someone remembering to filter: it's enforced in the code, across every screen at once. And records export in full the day you decide to stop using Symphomed."],
+    ["Artificial intelligence", "Turns the conversation into a clinical note: complaint, history, exam and plan."],
+    ["Voice", "Transcribes with clinical vocabulary: drugs, doses and units. No dictating."],
+    ["Clinical language", "It knows “no fever” isn't “fever”. That's where a transcript becomes a record."],
+    ["Structured data", "Every value in its own field. That's why it plots, compares and flags as pending."],
+    ["Integrations", "Calendar in sync, X-rays that upload themselves, digital prescriptions in Brazil."],
+    ["Security", "Each clinician sees only their patients. And records export in full."],
   ],
 };
 
@@ -534,6 +566,70 @@ const SELECTOR = {
 module.exports.CARRUSEL_TXT = CARRUSEL_TXT;
 module.exports.ESPECIALIDADES_EXTRA = ESPECIALIDADES_EXTRA;
 module.exports.SELECTOR = SELECTOR;
+
+// ═══ LAS BANDAS DE WHATSAPP ════════════════════════════════════════════════
+//
+// Antes había TRES botones de WhatsApp en toda la página: uno arriba, uno en
+// el medio y el de abajo de todo. Alguien que mira el carrusel de módulos y
+// se convence en ese momento tenía que seguir bajando por la sección de
+// confianza y la de tecnología para encontrar dónde escribir. La mayoría no
+// baja: cierra.
+//
+// Estas bandas van DESPUÉS de cada bloque que convence, para que el botón
+// esté siempre a un pulgar de distancia del momento en que se decidió.
+//
+// Cada una dice algo distinto a propósito. Tres veces "Escribinos por
+// WhatsApp" se lee como un banner y se ignora; lo que se mira es el texto de
+// al lado, y por eso cada banda levanta una objeción diferente: cuánto
+// cuesta empezar, cuánto tiempo lleva, y qué pasa si no me gusta.
+const BANDAS = {
+  es: [
+    { texto: "La agenda sola ya le devuelve el día. ¿Se la mostramos?",
+      boton: "Escribinos por WhatsApp →" },
+    { texto: "¿Quiere ver el módulo de su especialidad con un caso suyo?",
+      boton: "Escribinos por WhatsApp →" },
+    { texto: "Se lo mostramos en quince minutos. Las primeras 4 consultas no se cobran.",
+      boton: "Quiero una demostración →" },
+  ],
+  pt: [
+    { texto: "Só a agenda já devolve o seu dia. Quer ver?",
+      boton: "Fale conosco no WhatsApp →" },
+    { texto: "Quer ver o módulo da sua especialidade com um caso seu?",
+      boton: "Fale conosco no WhatsApp →" },
+    { texto: "Mostramos em quinze minutos. As primeiras 4 consultas não são cobradas.",
+      boton: "Quero uma demonstração →" },
+  ],
+  en: [
+    { texto: "The scheduling alone gives you your day back. Want to see it?",
+      boton: "Message us on WhatsApp →" },
+    { texto: "Want to see your specialty's module with one of your own cases?",
+      boton: "Message us on WhatsApp →" },
+    { texto: "We'll show you in fifteen minutes. The first 4 consultations are free.",
+      boton: "Book a demo →" },
+  ],
+};
+module.exports.BANDAS = BANDAS;
+
+// ═══ EL BOTÓN QUE SIGUE AL PULGAR ══════════════════════════════════════════
+//
+// El dato que lo justifica: la página son ONCE PANTALLAS de celular, y los
+// botones estaban en la 0, la 0,5 y la 10. Entre medio, siete pantallas y
+// media de scroll sin una sola forma de escribir. Alguien que se convence
+// mirando el odontograma —pantalla 5, más o menos— tiene que seguir bajando
+// medio minuto hasta encontrar dónde tocar. La mayoría no baja: cierra.
+//
+// Las bandas achican el hueco. Este botón lo elimina: a partir de la primera
+// pantalla queda fijo abajo y ya no se va. Se esconde solo cuando el bloque
+// final entra en cuadro, para no taparle su propio botón.
+//
+// Solo en celular. En una computadora hay una barra arriba con el botón
+// siempre visible y el ancho sobra; ahí un botón flotante sería estorbo.
+const FLOTANTE = {
+  es: "Escribinos por WhatsApp",
+  pt: "Fale conosco no WhatsApp",
+  en: "Message us on WhatsApp",
+};
+module.exports.FLOTANTE = FLOTANTE;
 
 // ─── Las rutas de cada versión ─────────────────────────────────────────────
 // El español vive en la raíz porque es el idioma del mercado donde Symphomed
