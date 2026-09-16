@@ -196,10 +196,9 @@ module.exports = function (app) {
   //
   // La hora se manda en ISO y la formatea el navegador en su propia zona. Para
   // un mostrador que está físicamente en la clínica eso da la hora correcta
-  // sin que haya que configurar nada. (El resto del sistema todavía tiene
-  // America/La_Paz escrito a mano en public/js/agenda.js — eso sigue pendiente
-  // y es un problema aparte, más grande, que aparece en cuanto la clínica esté
-  // en Brasil.)
+  // sin que haya que configurar nada. (Lo que antes estaba anotado acá como
+  // pendiente —America/La_Paz escrito a mano en el resto del sistema— ya está
+  // resuelto: cada cuenta guarda su zona. Ver services/zonaHoraria.js.)
   app.get("/admin/agenda", limitMedico, requireAdmin, asyncRoute(async (req, res) => {
     const medicos = await medicosDeLaClinica(req.clinicaId);
     const telefonos = medicos.map(m => m.phone);

@@ -109,10 +109,10 @@ function fechaHora(f) {
 // lugar donde está parado quien mira la pantalla, que es lo correcto tanto
 // en La Paz como en São Paulo.
 //
-// ⚠️ PENDIENTE: el bot de WhatsApp (services/reservaCitas.js) manda las
-// horas desde el SERVIDOR, donde no hay navegador del cual sacar la zona.
-// Ese sigue con America/La_Paz y necesita un campo de zona horaria en
-// Medico para arreglarse de verdad.
+// El bot de WhatsApp y el asistente de voz mandan las horas desde el
+// SERVIDOR, donde no hay navegador del cual sacar la zona. Ese caso se
+// resolvió aparte, con un campo de zona horaria en Medico: ver
+// services/zonaHoraria.js.
 // hour12: false a propósito, en los dos idiomas. Sin eso, es-BO da "2:30
 // p. m." y pt-BR da "14:30" — cada uno correcto para su locale, pero en una
 // agenda clínica el reloj de 24 horas es la convención en los dos países y

@@ -6,18 +6,21 @@
 // cita a mano) como la reserva conversacional por WhatsApp.
 const { Medico, Cita } = require("../db/models");
 const { obtenerOcupadoEnRango } = require("./googleCalendar");
-const { hoyBolivia, instanteBolivia } = require("./utils");
+const { hoyEnZona, instanteEnZona, ZONA_POR_DEFECTO } = require("./zonaHoraria");
 
 function seSuperponen(inicioA, finA, inicioB, finB) {
   return inicioA < finB && finA > inicioB;
 }
 
-// fechaDia: {anio, mesIndex, dia} de un día boliviano concreto (nunca un
-// Date de "hora local del server" — el server puede no correr en la
-// timezone de Bolivia, ver services/utils.js).
-function combinarFechaHora(fechaDia, horaStr) {
+// fechaDia: {anio, mesIndex, dia} de un día concreto EN LA ZONA DEL MÉDICO
+// (nunca un Date de "hora local del server" — en producción corre en UTC).
+//
+// La zona llega como parámetro y no se lee adentro: esta función se llama
+// una vez por cada casillero de cada día, y buscar al médico en cada llamada
+// sería un pedido a la base por casillero.
+function combinarFechaHora(zona, fechaDia, horaStr) {
   const [h, m] = String(horaStr || "00:00").split(":").map(Number);
-  return instanteBolivia(fechaDia.anio, fechaDia.mesIndex, fechaDia.dia, h, m);
+  return instanteEnZona(zona, fechaDia.anio, fechaDia.mesIndex, fechaDia.dia, h, m);
 }
 
 // [{ fecha: "2026-08-11", slots: [Date, ...] }, ...] — solo días con al
@@ -29,12 +32,13 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
   const horario = medico.horarioAtencion || [];
   if (horario.length === 0) return [];
 
-  // "Hoy" en Bolivia, no en la zona horaria del server (que en producción
-  // corre en UTC) — si no, cerca de la medianoche boliviana esto podía
-  // arrancar la ventana de 7 días un día antes o después del real.
-  const hoy = hoyBolivia();
+  // "Hoy" EN LA ZONA DEL MÉDICO, no en la del server (que en producción
+  // corre en UTC) — si no, cerca de la medianoche de su país esto arranca la
+  // ventana de 7 días un día antes o después del real.
+  const zona = medico.zonaHoraria || ZONA_POR_DEFECTO;
+  const hoy = hoyEnZona(zona);
   const desde = new Date();
-  const hasta = instanteBolivia(hoy.anio, hoy.mesIndex, hoy.dia + diasAdelante, 0, 0);
+  const hasta = instanteEnZona(zona, hoy.anio, hoy.mesIndex, hoy.dia + diasAdelante, 0, 0);
 
   const citasOcupadas = await Cita.find({
     medicoPhone, estado: "confirmada", fecha: { $gte: desde, $lt: hasta },
@@ -57,8 +61,8 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
 
     const slots = [];
     for (const bloque of bloques) {
-      let cursor = combinarFechaHora(fechaDia, bloque.horaInicio);
-      const fin = combinarFechaHora(fechaDia, bloque.horaFin);
+      let cursor = combinarFechaHora(zona, fechaDia, bloque.horaInicio);
+      const fin = combinarFechaHora(zona, fechaDia, bloque.horaFin);
       while (cursor.getTime() + duracion * 60000 <= fin.getTime()) {
         if (cursor.getTime() > Date.now()) {
           const inicioSlot = cursor.getTime();

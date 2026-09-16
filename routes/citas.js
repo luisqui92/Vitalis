@@ -5,7 +5,15 @@ const { Medico, Paciente, Cita } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { obtenerHorariosDisponibles } = require("../services/agenda");
-const { fechaLocalBoliviaAInstante } = require("../services/utils");
+const { localAInstante, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
+
+// La zona en la que trabaja esta cuenta. Se pregunta a la base y no se
+// asume: era un desfase fijo de −4h, y a un médico brasileño le guardaba
+// cada turno una hora corrido. Ver services/zonaHoraria.js.
+async function zonaDe(medicoPhone) {
+  const m = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  return m?.zonaHoraria || ZONA_POR_DEFECTO;
+}
 const { crearEvento, actualizarEvento, eliminarEvento } = require("../services/googleCalendar");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
@@ -63,11 +71,11 @@ module.exports = function (app) {
   app.post("/medico/citas", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     // Viene de un <input type="datetime-local"> ("YYYY-MM-DDTHH:mm", sin
-    // timezone) — el médico lo tipeó pensando en hora boliviana, no en la
-    // hora del server (que en producción corre en UTC). Un new Date(...)
-    // directo lo interpretaría como hora del server, corriendo la cita
-    // varias horas del horario real que se cargó.
-    const fecha = req.body?.fecha ? fechaLocalBoliviaAInstante(req.body.fecha) : null;
+    // timezone) — el médico lo tipeó pensando en SU hora de pared, no en la
+    // del server (que en producción corre en UTC). Un new Date(...) directo
+    // lo interpretaría como hora del server y correría la cita varias horas.
+    const zona = await zonaDe(medicoPhone);
+    const fecha = req.body?.fecha ? localAInstante(zona, req.body.fecha) : null;
     if (!fecha || isNaN(fecha.getTime())) throw new ErrorHttp(400, "fecha es requerida");
 
     let pacienteNombre = String(req.body?.pacienteNombre || "").trim();
@@ -147,7 +155,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const cita = await obtenerOFallar(Cita, { _id: req.params.id, medicoPhone }, "Cita no encontrada");
 
-    if (req.body?.fecha !== undefined) cita.fecha = fechaLocalBoliviaAInstante(req.body.fecha);
+    if (req.body?.fecha !== undefined) cita.fecha = localAInstante(await zonaDe(medicoPhone), req.body.fecha);
     if (req.body?.motivo !== undefined) cita.motivo = String(req.body.motivo).trim();
     if (req.body?.estado !== undefined && DIAS_VALIDOS.includes(req.body.estado)) cita.estado = req.body.estado;
     await cita.save();

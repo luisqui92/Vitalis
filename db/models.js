@@ -101,6 +101,24 @@ const medicoSchema = new mongoose.Schema({
   // pantalla no decide qué es el dinero (ver services/monedas.js).
   moneda: { type: String, enum: ["BOB", "BRL"], default: "BOB" },
 
+  // ═══ EN QUÉ HORA TRABAJA ESTA CUENTA ═══════════════════════════════════
+  //
+  // Toda la agenda estaba construida sobre un desfase fijo de −4 horas, la
+  // hora de Bolivia. Para un consultorio boliviano daba bien; para uno
+  // brasileño daba mal TODO, y no solo en la pantalla: los horarios libres
+  // se calculaban en hora boliviana, así que un profesional de São Paulo que
+  // atiende de 9 a 18 recibía turnos de 10 a 19, y el turno que tipeaba a
+  // mano se guardaba una hora corrido.
+  //
+  // Se guarda el NOMBRE de la zona y no un número de horas: Brasil tuvo
+  // horario de verano y puede volver a tenerlo, y un desfase fijo se
+  // equivoca dos veces por año —justo la semana en que nadie relaciona el
+  // turno corrido con el cambio de hora—. Ver services/zonaHoraria.js.
+  //
+  // Por omisión, la de siempre. Las cuentas que ya existen no cambian de
+  // comportamiento en nada.
+  zonaHoraria: { type: String, default: "America/La_Paz" },
+
   // ─── Clínica (opcional: un médico solo no tiene ninguna) ───────────────
   clinicaId: { type: mongoose.Schema.Types.ObjectId, ref: "Clinica", default: null, index: true },
   // Qué socio lo vendió. Va también acá y no solo en Clinica porque

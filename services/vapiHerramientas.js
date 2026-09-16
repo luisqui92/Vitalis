@@ -11,6 +11,7 @@ const { obtenerHorariosDisponibles } = require("./agenda");
 const { crearCitaConfirmada } = require("./crearCita");
 const { eliminarEvento } = require("./googleCalendar");
 const { formatearFechaCompleta } = require("./reservaCitas");
+const { ZONA_POR_DEFECTO } = require("./zonaHoraria");
 const { CONFIG } = require("../config");
 
 // "Súper número" de voz: la misma idea que el súper número de WhatsApp
@@ -82,8 +83,14 @@ async function consultarDisponibilidad(medicoPhoneFijo, { diasAdelante, especial
   if (!opciones.length) {
     return "No hay horarios disponibles cargados por ahora. Decile al paciente que se va a comunicar directo la clínica para coordinar.";
   }
+  // El asistente de voz le DICTA estas horas al paciente por teléfono, así
+  // que tienen que ser las del consultorio. Con la zona fija de Bolivia, un
+  // paciente brasileño escuchaba una hora y llegaba a otra.
+  const { Medico } = require("../db/models");
+  const m = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  const zona = m?.zonaHoraria || ZONA_POR_DEFECTO;
   return opciones
-    .map((s, i) => `Opción ${i + 1}: ${formatearFechaCompleta(s)} (fechaHora: ${s.toISOString()})`)
+    .map((s, i) => `Opción ${i + 1}: ${formatearFechaCompleta(s, zona)} (fechaHora: ${s.toISOString()})`)
     .join(". ");
 }
 

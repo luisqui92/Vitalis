@@ -11,6 +11,7 @@ const { enrutarMensaje } = require("./asistenteWhatsapp");
 const { atenderMedico } = require("./asistenteVentas");
 const { crearCitaConfirmada } = require("./crearCita");
 const { CONFIG, log } = require("../config");
+const { horaEnZona, fechaCompletaEnZona, ZONA_POR_DEFECTO } = require("./zonaHoraria");
 
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const DIAS_SEMANA_CORTO = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
@@ -24,11 +25,27 @@ function formatearDiaCorto(fechaStr) {
   const d = new Date(fechaStr + "T00:00:00Z");
   return `${DIAS_SEMANA_CORTO[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}`;
 }
-function formatearHora(fecha) {
-  return new Date(fecha).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/La_Paz" });
+// ═══ LA HORA QUE SE LE ESCRIBE AL PACIENTE ═════════════════════════════════
+//
+// Estas dos tenían timeZone: "America/La_Paz" escrito a mano. Para un
+// consultorio boliviano daba bien; para uno brasileño le decía al paciente
+// una hora que no era la de su turno.
+//
+// La zona entra como parámetro y no se lee adentro: son funciones de
+// formato, y una que consulta la base para poder escribir un texto termina
+// pegándole a Mongo una vez por cada renglón de la lista de horarios.
+function formatearHora(fecha, zona) {
+  return horaEnZona(zona || ZONA_POR_DEFECTO, fecha);
 }
-function formatearFechaCompleta(fecha) {
-  return new Date(fecha).toLocaleString("es-BO", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/La_Paz" });
+function formatearFechaCompleta(fecha, zona) {
+  return fechaCompletaEnZona(zona || ZONA_POR_DEFECTO, fecha);
+}
+
+// La zona de una cuenta. Es un findOne indexado con proyección: una consulta
+// barata, una vez por mensaje del bot.
+async function zonaDelMedico(medicoPhone) {
+  const m = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  return m?.zonaHoraria || ZONA_POR_DEFECTO;
 }
 
 // ─── Helpers para armar la respuesta (el webhook decide con qué función de
@@ -374,12 +391,12 @@ async function iniciarReserva(medicoPhone, numero) {
   );
 }
 
-function listaDeHorarios(dia) {
+function listaDeHorarios(dia, zona) {
   const slots = dia.slots.slice(0, 10);
   return comoLista(
     `Horarios para el ${formatearDiaCorto(dia.fecha)}:`,
     "Ver horarios",
-    slots.map((s, i) => ({ id: `hora_${i}`, title: formatearHora(s) })),
+    slots.map((s, i) => ({ id: `hora_${i}`, title: formatearHora(s, zona) })),
   );
 }
 
@@ -393,7 +410,7 @@ async function elegirDia(medicoPhone, numero, t, texto, datos, medico) {
     return comoTexto("Elegí uno de los días de la lista de arriba para seguir con tu cita (o escribí qué necesitás).");
   }
   await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: dia });
-  return listaDeHorarios(dia);
+  return listaDeHorarios(dia, medico?.zonaHoraria);
 }
 
 async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
@@ -413,7 +430,7 @@ async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
     const diaActualizado = diasActualizados.find(d => d.fecha === datos.diaElegido?.fecha);
     if (!diaActualizado) return comoTexto("Ups, ese horario se acaba de ocupar y no quedan más libres ese día. Escribí cualquier cosa para ver los días disponibles de nuevo.");
     await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: diaActualizado });
-    const lista = listaDeHorarios(diaActualizado);
+    const lista = listaDeHorarios(diaActualizado, medico?.zonaHoraria);
     return { ...lista, texto: `Ups, ese horario se acaba de ocupar. ${lista.texto}` };
   }
   await guardarSesion(numero, "pedir_nombre", { ...datos, horaElegida: slot });
@@ -449,18 +466,21 @@ async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
   }
 
   await limpiarSesion(numero);
-  return comoTexto(`✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" en cualquier momento.`);
+  return comoTexto(`✅ Listo, tu cita quedó confirmada para el ${formatearFechaCompleta(cita.fecha, medico?.zonaHoraria)}. Te esperamos.\n\nSi necesitás cancelarla, escribí "cancelar" en cualquier momento.`);
 }
 
 async function iniciarCancelacion(medicoPhone, numero) {
   const cita = await Cita.findOne({ medicoPhone, pacienteTelefono: numero, estado: "confirmada", fecha: { $gte: new Date() } }).sort({ fecha: 1 });
+  // Esta es la única del flujo que no recibe el médico ya cargado, así que
+  // acá sí hay que preguntar la zona.
+  const zona = await zonaDelMedico(medicoPhone);
   if (!cita) {
     await limpiarSesion(numero);
     return comoTexto("No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí cualquier cosa.");
   }
   await guardarSesion(numero, "confirmar_cancelacion", { medicoPhone, citaId: String(cita._id) });
   return comoBotones(
-    `Tenés una cita para el ${formatearFechaCompleta(cita.fecha)}. ¿Confirmás que querés cancelarla?`,
+    `Tenés una cita para el ${formatearFechaCompleta(cita.fecha, zona)}. ¿Confirmás que querés cancelarla?`,
     [{ id: "si_cancelar", title: "Sí, cancelar" }, { id: "no_cancelar", title: "No" }],
   );
 }

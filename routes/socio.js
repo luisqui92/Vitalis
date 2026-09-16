@@ -18,6 +18,7 @@ const { limitAuth, limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { cuposDe, exigirCupoLibre, clinicaDelSocio, medicoDelSocio, socioDeLaSesion } = require("../services/socios");
+const { zonaPorMoneda } = require("../services/zonaHoraria");
 const { log } = require("../config");
 
 // Cuántas cuentas devuelve la cartera de una vez. Un socio con mil clientes
@@ -178,6 +179,12 @@ module.exports = function (app) {
       tipoEspecialidad: String(req.body?.tipoEspecialidad || "medicina_general"),
       passwordHash: await hashPassword(password),
       socioId: socio._id,
+      // La moneda y la zona horaria salen del socio: un socio brasileño está
+      // vendiendo en Brasil. Es un punto de partida, no una atadura — las dos
+      // se pueden cambiar después. Sin esto, cada cuenta que dé de alta un
+      // socio de Brasil nace con la agenda en hora de Bolivia.
+      moneda: socio.moneda === "BRL" ? "BRL" : "BOB",
+      zonaHoraria: zonaPorMoneda(socio.moneda),
       // Entra directo: al socio ya lo aprobó Symphomed, y hacerle esperar la
       // cola de solicitudes a un cliente que él ya cobró sería mandarlo a
       // pedir permiso por algo que ya pagó.
