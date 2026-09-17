@@ -150,6 +150,44 @@ invita a archivarlo antes de tiempo.
 
 ---
 
+### 5. `historia_propia`
+
+Cuerpo:
+
+```
+Hola {{1}}. Este es el enlace a tu historia clínica.
+
+Desde ahí podés verla y, si vas a otro médico, generar un enlace para mostrársela. No hace falta contraseña.
+
+{{2}}
+
+Guardá este mensaje y no lo reenvíes: quien lo tenga puede abrir tu historia.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del paciente | `Carla` |
+| `{{2}}` | enlace a la llave | `https://app.symphomed.com/mi/abc123` |
+
+Esta es la **llave**, no un enlace para compartir: quien la tenga puede abrir
+la historia y además generar enlaces nuevos. Por eso la última línea del
+cuerpo es una advertencia y no una cortesía, y por eso está adentro de la
+plantilla —donde Meta la congela— en vez de quedar solo en la página.
+
+No nombra ninguna especialidad ni ningún diagnóstico, por lo mismo que
+`avance_familia`: la notificación se ve en la pantalla bloqueada.
+
+El nombre de la plantilla dice `historia_propia` y no `llave_paciente` porque
+es lo que se le muestra a Meta al pedir la aprobación, y "llave" en un mensaje
+sobre datos de salud se lee como un aviso de seguridad — que es otra categoría
+y se revisa distinto.
+
+Si se emite una llave nueva, la anterior queda revocada en el mismo acto
+(índice único parcial en `LlavePaciente`): un paciente tiene una sola llave
+viva, siempre.
+
+---
+
 ## Reglas de Meta que hacen que te la rechacen
 
 - El cuerpo **no puede empezar ni terminar con una variable**. Por eso las

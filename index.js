@@ -146,6 +146,10 @@ require("./routes/cajaDicom")(app);
 require("./routes/neurodesarrollo")(app);
 require("./routes/equipoNeuro")(app);
 require("./routes/informeFamilia")(app);
+// El resumen que el paciente se lleva a otro consultorio. Va acá arriba, con
+// el resto de lo clínico, aunque además abra dos puertas públicas (/mi y /r):
+// son rutas exactas, no comodines, así que no compiten con nada de abajo.
+require("./routes/resumenCompartido")(app);
 require("./routes/vacunasPet")(app);
 require("./routes/fisioterapia")(app);
 require("./routes/socio")(app);

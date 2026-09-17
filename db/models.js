@@ -2456,7 +2456,136 @@ const interesadoSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Interesado = mongoose.model("Interesado", interesadoSchema);
 
-module.exports = { Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+
+// ═══ EL RESUMEN QUE VIAJA CON EL PACIENTE ═════════════════════════════════
+//
+// Un paciente que va del clínico al cardiólogo hoy lleva un sobre de papeles,
+// o no lleva nada y le cuenta de memoria. Esto es ese sobre, hecho enlace.
+//
+// ═══ POR QUÉ NO ES «EL KARDEX COMPARTIDO» ═════════════════════════════════
+//
+// La tentación es mandar el kardex entero y listo. No se hace por dos razones,
+// y la primera es de producto:
+//
+//   · EL QUE RECIBE NO QUIERE CUARENTA CONSULTAS, QUIERE UNA PÁGINA. Un
+//     volcado completo se lee peor que nada: el cardiólogo lo abre, ve un
+//     muro, y lo cierra. El resumen curado existe para que lo lea.
+//
+//   · Y LO QUE SE ESCRIBE CAMBIA SI TODO ES REENVIABLE. Un médico que sabe
+//     que cada cosa que tipea está a un toque de llegarle a un colega deja de
+//     escribir las hipótesis, que es justo lo que hace útil una historia.
+//
+// Por eso hay dos alcances y los elige el médico: "resumen" (una página) y
+// "completo" (toda la historia). Y por eso hay cosas que NO salen en ninguno
+// de los dos — ver SIEMPRE_FUERA en services/resumenCompartido.js.
+//
+// ═══ POR QUÉ ES UNA INSTANTÁNEA Y NO UNA CONSULTA EN VIVO ═════════════════
+//
+// `contenido` guarda lo que se compartió, congelado, y no un puntero al
+// kardex. Cuesta espacio y obliga a regenerar para actualizar, y aun así es
+// lo correcto: con una consulta en vivo, la consulta que el médico cargue
+// mañana aparece en el enlace que compartió ayer sin que nadie lo haya
+// aprobado. Compartir es un acto con fecha, y lo que se compartió tiene que
+// poder mirarse tal como salió.
+//
+// ═══ EL CONSENTIMIENTO ════════════════════════════════════════════════════
+//
+// `generadoPor` no es una etiqueta de auditoría: cambia qué se puede
+// compartir. Cuando lo genera el médico, el acto es suyo y queda firmado con
+// su nombre. Cuando lo genera el paciente desde su llave, el consentimiento
+// es el acto mismo — nadie le entrega su historia a un médico sin querer— y
+// por eso el paciente NO necesita pedirle permiso a nadie para llevarse lo
+// suyo. Las dos puntas quedan en el registro de auditoría.
+const resumenCompartidoSchema = new mongoose.Schema({
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
+  // De qué consultorio salió. Un paciente puede tener ficha con varios
+  // médicos; cada resumen es de UNA de esas fichas, nunca de todas juntas.
+  medicoPhone: { type: String, required: true, index: true },
+
+  generadoPor: { type: String, enum: ["medico", "paciente"], required: true },
+  // Para la firma de la página y para que el que recibe sepa a quién llamar.
+  // Se copia al crear: si el médico después cambia de membrete, el resumen
+  // que ya salió sigue diciendo quién lo firmó ese día.
+  firmaNombre: { type: String, default: "" },
+  firmaCentro: { type: String, default: "" },
+  firmaTelefono: { type: String, default: "" },
+
+  alcance: { type: String, enum: ["resumen", "completo"], default: "resumen", index: true },
+  // Las claves de sección que SÍ entraron. Se guardan aunque estén todas: es
+  // lo que le permite al médico ver después qué mandó exactamente.
+  secciones: { type: [String], default: [] },
+  contenido: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+  // El enlace ES la credencial, igual que en /informe-familia y /teleconsulta.
+  // Un paciente que comparte su historia una vez no va a crear un usuario, y
+  // una cuenta más es superficie de ataque más.
+  token: { type: String, required: true, unique: true, index: true },
+  tokenExpira: { type: Date, required: true },
+  // Revocar es lo que hace que compartir no dé miedo: se manda, y si se mandó
+  // al número equivocado se corta. Un PDF no tiene esto.
+  revocadoEn: { type: Date, default: null },
+  revocadoPor: { type: String, default: "" },
+
+  vistas: { type: Number, default: 0 },
+  vistoEn: { type: Date, default: null },
+
+  // ─── El embudo ──────────────────────────────────────────────────────────
+  // Quién lo abrió siendo médico de Symphomed y lo importó a su kardex. Es la
+  // única medida de si esto sirve para lo que se construyó: sin el número, en
+  // seis meses nadie va a poder decir si el enlace trajo un cliente o no.
+  importadoPor: { type: [String], default: [] },
+  // Cuántas veces alguien tocó «soy profesional» sin tener cuenta. La mitad
+  // de arriba del embudo: interés que todavía no es una solicitud.
+  interesProfesional: { type: Number, default: 0 },
+}, { timestamps: true });
+resumenCompartidoSchema.index({ pacienteId: 1, createdAt: -1 });
+resumenCompartidoSchema.index({ medicoPhone: 1, createdAt: -1 });
+const ResumenCompartido = mongoose.model("ResumenCompartido", resumenCompartidoSchema);
+
+
+// ═══ LA LLAVE DEL PACIENTE ════════════════════════════════════════════════
+//
+// Para que el paciente pueda generar sus propios enlaces hace falta saber que
+// es él. La forma barata sería un login; no se hace, por lo mismo que no lo
+// hacen el informe de avance ni la teleconsulta: una cuenta que se usa dos
+// veces al año es una contraseña olvidada y una superficie de ataque nueva.
+//
+// La llave es un enlace largo y aleatorio que se le manda UNA vez por
+// WhatsApp al número que ya está en su ficha. Poseerlo es ser él, igual que
+// poseer el enlace del informe.
+//
+// ═══ LA LLAVE NO ES EL ENLACE QUE SE COMPARTE ═════════════════════════════
+//
+// Es la distinción de la que depende todo lo demás, y por eso la página se lo
+// dice con todas las letras: la llave abre y ADEMÁS deja generar enlaces; el
+// enlace que se le pasa a un médico solo abre, y vence. Si el paciente
+// reenvía su llave, le está dando a otro la posibilidad de compartir su
+// historia. Por eso se puede revocar y volver a emitir sin perder nada.
+const llavePacienteSchema = new mongoose.Schema({
+  // Sin `index: true`: el índice parcial de abajo ya cubre las dos únicas
+  // consultas que se hacen por pacienteId, y las dos filtran por
+  // `revocadaEn: null`. Declararlo en los dos lados crea un índice de más
+  // —Mongoose incluso avisa— que nadie usa y que igual hay que mantener en
+  // cada escritura.
+  pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true },
+  medicoPhone: { type: String, required: true, index: true },
+  token: { type: String, required: true, unique: true, index: true },
+  // Sin vencimiento corto a propósito: es la llave de lo suyo, no un enlace
+  // de un trámite. Se renueva cuando se emite de nuevo, y eso invalida la
+  // anterior (ver routes/resumenCompartido.js).
+  emitidaPor: { type: String, default: "" },
+  enviadaA: { type: String, default: "" },
+  revocadaEn: { type: Date, default: null },
+  usos: { type: Number, default: 0 },
+  ultimoUso: { type: Date, default: null },
+}, { timestamps: true });
+// Una llave viva por ficha. El índice parcial es lo que lo garantiza en la
+// base y no solo en el código: emitir una llave nueva revoca la anterior, y
+// si dos peticiones simultáneas intentaran crear dos, la segunda falla acá.
+llavePacienteSchema.index({ pacienteId: 1 }, { unique: true, partialFilterExpression: { revocadaEn: null } });
+const LlavePaciente = mongoose.model("LlavePaciente", llavePacienteSchema);
+
+module.exports = { ResumenCompartido, LlavePaciente, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

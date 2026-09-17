@@ -97,6 +97,11 @@ const PLANTILLAS = {
   // neurodesarrollo. Es la que MÁS va a caer fuera de la ventana de las 24 h:
   // la familia no le escribe al consultorio entre sesión y sesión.
   avanceFamilia: "avance_familia",
+  // El enlace a la historia clínica propia. Cae fuera de la ventana casi
+  // siempre: se emite cuando el médico se acuerda de emitirla, no cuando el
+  // paciente escribió. Y es de las pocas donde que no llegue importa de
+  // verdad — sin la llave el paciente no puede llevarse lo suyo a ningún lado.
+  llavePaciente: "historia_propia",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es

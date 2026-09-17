@@ -44,8 +44,20 @@ for (const m of DOC.matchAll(/###[^`\n]*`([a-z_]+)`\n+Cuerpo:\n+```\n([\s\S]*?)`
 
 console.log("── 1. El documento tiene todas las plantillas ──");
 const esperadas = Object.values(PLANTILLAS);
-verificar(`el código conoce ${esperadas.length}: ${esperadas.join(", ")}`, esperadas.length === 4);
+console.log(`   el código conoce ${esperadas.length}: ${esperadas.join(", ")}`);
 esperadas.forEach(n => verificar(`  «${n}» está documentada`, Boolean(documentadas[n])));
+
+// Y al revés. Acá había un número fijo (`esperadas.length === 4`) que había
+// que subir a mano cada vez que nacía una plantilla: una prueba que se rompe
+// al hacer bien las cosas y que se arregla cambiando un número sin mirar
+// nada. Esto comprueba lo mismo que aquel número —que ninguna quede sin
+// documentar, que ya lo hace la línea de arriba— y además lo que no veía: una
+// plantilla documentada que el código ya no usa. Esa es la peligrosa, porque
+// queda escrita como si existiera, alguien la carga en Meta, y nadie se
+// entera de que hace meses que no se manda.
+const deMas = Object.keys(documentadas).filter(n => !esperadas.includes(n));
+verificar("y no hay ninguna documentada que el código ya no use", deMas.length === 0);
+if (deMas.length) console.log("   sobran en el documento:", deMas.join(", "));
 
 console.log("\n── 2. Reglas de Meta que hacen que rechacen la plantilla ──");
 // Estas tres son las que más rechazos generan, y el rechazo llega por correo
