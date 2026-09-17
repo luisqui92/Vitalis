@@ -284,8 +284,12 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   // horario y la distancia además. En celular la chincheta marca y trae la
   // tarjeta; en escritorio, donde sobra lugar, el globo sigue abriendo.
   console.log("\n── 6. El globo no se come el mapa en celular ──");
+  // .matches sobre un MediaQueryList guardado se evalúa cada vez que se lee:
+  // es en vivo. Lo que NO puede haber es un booleano calculado al cargar, que
+  // deja la pantalla vertical comportándose como horizontal hasta recargar.
   verificar("el ancho se consulta en cada clic, no una sola vez al cargar",
-    /function esAngosto\(\)[\s\S]{0,140}?matchMedia\("\(max-width:860px\)"\)/.test(r.texto));
+    /var CONSULTA_ANGOSTO = window\.matchMedia\("\(max-width:860px\)"\);/.test(r.texto) &&
+    /function esAngosto\(\) \{ return CONSULTA_ANGOSTO\.matches; \}/.test(r.texto));
   verificar("  ...y en angosto se cierra el globo en vez de abrirlo",
     /if \(angosto\) mapa\.closePopup\(\);\s*\n\s*else marcadores\[i\]\.openPopup\(\);/.test(r.texto));
   verificar("en escritorio el globo tiene tope de ancho (sin eso Leaflet usa 300)",
@@ -294,8 +298,11 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   // Si la chincheta no abre globo Y la tarjeta queda fuera de pantalla,
   // tocarla no parece haber hecho nada, y el arreglo deja la página peor que
   // antes. Las dos mitades van juntas o no va ninguna.
+  // En celular la trae al tope de la lista (ver 9); en escritorio la acerca
+  // lo mínimo dentro de la columna.
   verificar("al tocar una chincheta, su tarjeta se trae a la vista",
-    /moverMapa === false\) \{\s*\n\s*elegida\.scrollIntoView/.test(r.texto));
+    /if \(!elegida \|\| !desdeElMapa\) return;/.test(r.texto) &&
+    /elegida\.scrollIntoView\(\{ block: "nearest", behavior: "smooth" \}\)/.test(r.texto));
   verificar("  ...y la tarjeta elegida se distingue de las demás en celular",
     /\.ficha\[aria-current="true"\]\{box-shadow:inset 3px 0 0 var\(--cian\)\}/.test(r.texto));
   // Y el mismo lugar tiene que llamarse igual en el mapa y en la lista.
@@ -373,8 +380,68 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
 
   // Y una vez que hay lugar, la tarjeta tiene que llegar alineada por arriba:
   // "nearest" mueve lo mínimo, y lo mínimo deja el nombre fuera de pantalla.
+  // ═══ 9. ABAJO VA UNO SOLO, NO LOS TRECE ═════════════════════════════════
+  //
+  // Aun con la lista en 267 px, debajo del mapa entraba una tarjeta y media
+  // de trece. Eso no es una lista: es esconder la única tarjeta que importa
+  // —la del lugar que se acaba de tocar— entre doce que no se ven.
+  //
+  // En celular, tocar una chincheta convierte la franja de abajo en la ficha
+  // de ESE lugar, y el mapa cede de 38vh a 24vh porque ya no hay nada que
+  // comparar: con 38 los tres botones de acción (reservar, llamar, cómo
+  // llegar) quedaban abajo del borde, o sea que se veía todo menos lo único
+  // accionable.
+  //
+  // En escritorio la lista es una columna al costado, no compite con nada y
+  // no se reduce.
+  console.log("\n── 9. Enfocado en uno, en celular ──");
+  verificar("hay un estado propio para «la lista se redujo a este»",
+    /var estado = \{[^}]*enfocado: null/.test(r.texto));
+  verificar("y pintar() muestra uno solo cuando está enfocado",
+    /var aMostrar = enfocado \? \[estado\.enfocado\] : visibles;/.test(r.texto) &&
+    /\$\("fichas"\)\.innerHTML = aMostrar\.map/.test(r.texto));
+  verificar("solo en celular: en escritorio la lista queda entera",
+    /var enfocado = esAngosto\(\) && estado\.enfocado !== null/.test(r.texto));
+  // Si el enfocado quedó fuera del filtro, mostrarlo contradice el filtro que
+  // el visitante acaba de tocar.
+  verificar("  ...y solo si sigue estando entre los resultados",
+    /visibles\.indexOf\(estado\.enfocado\) !== -1/.test(r.texto));
+  // Se entra desde el MAPA. Desde la lista no: ahí el visitante está
+  // recorriendo, y colapsarle la lista bajo el dedo es perderle el lugar.
+  verificar("se entra tocando una chincheta, no una tarjeta",
+    /if \(angosto && desdeElMapa && estado\.enfocado !== i\)/.test(r.texto));
+
+  console.log("   la salida:");
+  verificar("hay un botón de volver, y dice cuántas quedaron afuera",
+    /id="volverLista"[\s\S]{0,80}?← Ver los " \+ visibles\.length \+ " lugares/.test(r.texto));
+  verificar("  ...y al volver, la que venía mirando queda arriba de todo",
+    /function verTodos\([\s\S]{0,700}?scrollIntoView\(\{ block: "start" \}\)/.test(r.texto));
+  // Las tres salidas automáticas: quien filtra, busca u ordena quiere ver el
+  // resultado NUEVO, no seguir clavado en el lugar de antes.
+  const salidas = (r.texto.match(/estado\.enfocado = null/g) || []).length;
+  verificar(`filtrar, buscar, ordenar por cercanía y ensanchar también salen (${salidas} salidas)`,
+    salidas >= 4);
+  verificar("  ...y cruzar el breakpoint se escucha de verdad",
+    /CONSULTA_ANGOSTO\.addEventListener\("change", alCambiarElAncho\)/.test(r.texto) &&
+    /CONSULTA_ANGOSTO\.addListener\(alCambiarElAncho\)/.test(r.texto));
+
+  console.log("   el reparto cuando está enfocado:");
+  const vhEnf = Number((cel.match(/data-enfocado="si"\] \.cuerpo\{grid-template-rows:minmax\(0,([\d.]+)vh\)/) || [])[1] || 0);
+  verificar(`el mapa cede de ${vhMapa}vh a ${vhEnf}vh para que entren los botones de acción`,
+    vhEnf > 0 && vhEnf < vhMapa);
+  // Leaflet dibuja las tejas para el tamaño que conocía: sin avisarle del
+  // cambio de alto quedan franjas grises donde antes no había mapa.
+  verificar("  ...y se le avisa a Leaflet que su caja cambió de alto",
+    /requestAnimationFrame\(function \(\) \{ mapa\.invalidateSize\(\); \}\)/.test(r.texto));
+  verificar("  ...y la chincheta tocada se centra en el mapa ya achicado",
+    /requestAnimationFrame\(function \(\) \{ mapa\.panTo/.test(r.texto));
+  // pintar() se llama por muchos caminos; con aria-current="false" escrito a
+  // mano, cualquiera de ellos borraba la marca del lugar elegido.
+  verificar("el resaltado sale del estado y no se pierde al repintar",
+    /aria-current="' \+\s*\n?\s*\(i === estado\.activo \? "true" : "false"\)/.test(r.texto));
+
   verificar("la tarjeta llega alineada por arriba, con el nombre a la vista",
-    /block: angosto \? "start" : "nearest"/.test(r.texto));
+    /\$\("lista"\)\.scrollTop = 0;/.test(r.texto));
 
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
   process.exit(fallos === 0 ? 0 : 1);

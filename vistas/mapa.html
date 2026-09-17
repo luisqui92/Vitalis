@@ -70,7 +70,21 @@ a{color:inherit;text-decoration:none}
 /* ── El cuerpo: lista + mapa ──────────────────────────────────────── */
 .cuerpo{flex:1;display:grid;grid-template-columns:minmax(320px,400px) 1fr;min-height:0}
 .lista{overflow-y:auto;border-right:1px solid var(--linea);padding:8px 0}
-.cuenta{padding:8px 20px 12px;color:var(--tinta3);font-size:12.5px}
+/* margin:0 explícito: es un <p> y traía los ~12px de arriba y abajo que pone
+   el navegador por su cuenta. En escritorio no se notan; en celular eran 25
+   de los 72 que tardaba la tarjeta en empezar. */
+.cuenta{margin:0;padding:8px 20px 12px;color:var(--tinta3);font-size:12.5px}
+/* La salida del modo enfocado. Es un <button> y no un enlace porque no
+   navega a ningún lado, y lleva el número adentro: «← Ver los 13 lugares»
+   dice a la vez qué hace y cuántos quedaron afuera. Sin el número, ver una
+   sola tarjeta parece que el filtro se rompió. */
+.volver-lista{
+  background:transparent;border:1px solid var(--linea2);border-radius:999px;
+  padding:6px 14px;font:inherit;font-size:12.5px;color:var(--tinta2);cursor:pointer;
+  transition:border-color .15s,color .15s;
+}
+.volver-lista:hover{border-color:var(--cian);color:var(--cian2)}
+.volver-lista:focus-visible{outline:2px solid var(--cian);outline-offset:2px}
 /* La tarjeta ya no es un botón: es un contenedor con el cuerpo clicable
    adentro y las acciones aparte. El resaltado se queda en la tarjeta —que es
    lo que se selecciona— y el foco visible en el cuerpo, que es lo que recibe
@@ -202,6 +216,28 @@ a{color:inherit;text-decoration:none}
   .mapa-caja{order:1;min-height:0}
 
   .aviso{padding:8px 16px;font-size:12.5px}
+  .cuenta{padding:8px 16px 10px}
+
+  /* ═══ ENFOCADO EN UNO: EL MAPA CEDE ═══════════════════════════════════
+     Con la lista completa, 38vh de mapa y 250 de lista es un reparto justo:
+     arriba se compara, abajo se lee.
+
+     Enfocado ya no hay nada que comparar —el visitante eligió— y sí hay algo
+     que hacer: reservar, llamar o pedir cómo llegar, que son los tres
+     botones del pie de la tarjeta. Con 38vh esos botones quedaban abajo del
+     borde, o sea que la pantalla mostraba todo menos lo único accionable.
+
+     El mapa baja a 24vh (unos 180 px: sigue ubicando la chincheta entre las
+     otras) y esos 105 px van a la tarjeta, que entra entera. El resto son
+     unos pocos píxeles de aire que se le sacan a la tarjeta misma, que es lo
+     que hace que también entre en un teléfono más bajo. */
+  body[data-enfocado="si"] .cuerpo{grid-template-rows:minmax(0,24vh) minmax(230px,1fr)}
+  body[data-enfocado="si"] .lista{padding-top:4px}
+  body[data-enfocado="si"] .cuenta{padding:5px 16px 6px}
+  body[data-enfocado="si"] .volver-lista{padding:5px 13px}
+  body[data-enfocado="si"] .ficha-cuerpo{padding-bottom:8px}
+  body[data-enfocado="si"] .subs,body[data-enfocado="si"] .dir{margin-top:6px}
+  body[data-enfocado="si"] .acciones{padding-bottom:12px}
   .buscador{padding:10px 16px;gap:9px}
   .campo input{padding:11px 18px;font-size:14.5px}
   /* Una fila que se desliza, no tres que se apilan. Las categorías se ven
@@ -401,7 +437,10 @@ function coincide(lugar, consulta) {
 
 // ═══ LA PANTALLA ══════════════════════════════════════════════════════════
 var $ = function (id) { return document.getElementById(id); };
-var estado = { q: "", cat: "todos", activo: null, aqui: null };
+// `enfocado` es distinto de `activo`: activo es cuál está resaltado, enfocado
+// es «la lista de abajo se redujo a este». Solo existe en celular y solo se
+// entra desde el mapa. Ver `seleccionar`.
+var estado = { q: "", cat: "todos", activo: null, enfocado: null, aqui: null };
 var marcadores = [];
 
 var mapa = L.map("mapa", { scrollWheelZoom: true, zoomControl: true })
@@ -530,22 +569,54 @@ LUGARES.forEach(function (l, i) {
   marcadores.push(m);
 });
 
-// ═══ EN CELULAR EL GLOBO NO ABRE ══════════════════════════════════════════
+// ═══ EN CELULAR EL GLOBO NO ABRE, Y LA LISTA SE REDUCE A UNO ══════════════
 //
-// El mapa tiene 46vh en celular. Un globo de Leaflet ahí adentro tapa las
+// El mapa tiene 38vh en celular. Un globo de Leaflet ahí adentro tapa las
 // demás chinchetas —o sea, tapa exactamente lo que uno está mirando cuando
 // compara consultorios— para decir el nombre, la especialidad y la dirección.
 //
 // Esas tres cosas ya están en la tarjeta de abajo, con el horario y la
 // distancia además, y con tamaño de lectura. Así que en celular tocar una
-// chincheta hace lo mismo que abrir el globo pero al revés: marca la
-// chincheta y trae la tarjeta a la vista. El mapa queda entero.
+// chincheta hace lo mismo que abrir el globo pero al revés: en vez de tapar
+// el mapa con un cartel, la franja de abajo se convierte en la ficha de ESE
+// lugar. El mapa queda entero y abajo no hay nada que no sea lo que tocaste.
 //
-// Se consulta en cada llamada y no una vez al cargar: girar el teléfono
-// cambia la respuesta, y calcularlo al inicio deja la pantalla vertical
-// comportándose como una horizontal hasta recargar.
-function esAngosto() {
-  return window.matchMedia("(max-width:860px)").matches;
+// Debajo de los 860 px la franja de abajo mide unos 250: nunca hubo lugar
+// para una lista ahí. Dejar las otras doce tarjetas abajo no era ofrecer una
+// lista, era esconder la única tarjeta que importaba entre doce que no se
+// veían. Y no se pierde nada: se vuelve con el botón de arriba, que además
+// dice cuántas hay.
+//
+// En escritorio la lista es una columna entera al costado y no compite con
+// nada, así que ahí no se reduce: se recorre, que es para lo que sirve.
+var CONSULTA_ANGOSTO = window.matchMedia("(max-width:860px)");
+function esAngosto() { return CONSULTA_ANGOSTO.matches; }
+
+// Girar el teléfono, o achicar la ventana en una computadora, cruza el
+// breakpoint sin recargar. Sin esto, una pantalla que pasó a ancha se queda
+// mostrando una sola tarjeta en una columna donde entran seis.
+function alCambiarElAncho() {
+  if (!esAngosto()) estado.enfocado = null;
+  pintar();
+}
+if (CONSULTA_ANGOSTO.addEventListener) CONSULTA_ANGOSTO.addEventListener("change", alCambiarElAncho);
+else CONSULTA_ANGOSTO.addListener(alCambiarElAncho);  // navegadores viejos
+
+// Volver a la lista completa. Lo llaman el botón de arriba y todo lo que
+// cambia el conjunto de resultados: si el visitante filtra o busca, lo que
+// quiere ver es el resultado nuevo, no seguir clavado en el de antes.
+function verTodos(volverALaTarjeta) {
+  var venia = estado.enfocado;
+  if (venia === null) return;
+  estado.enfocado = null;
+  pintar();
+  // Si vuelve por el botón, la lista aparece donde estaba: la tarjeta que
+  // estaba mirando, arriba. Caer en el primer lugar de la lista después de
+  // mirar el séptimo hace perder el hilo.
+  if (volverALaTarjeta) {
+    var f = $("fichas").querySelector('[data-i="' + venia + '"]');
+    if (f) f.scrollIntoView({ block: "start" });
+  }
 }
 
 function seleccionar(i, moverMapa) {
@@ -559,6 +630,20 @@ function seleccionar(i, moverMapa) {
   if (angosto) mapa.closePopup();
   else marcadores[i].openPopup();
 
+  // Desde el mapa (moverMapa === false) y en celular: la franja de abajo pasa
+  // a ser la ficha de este lugar. Desde la lista no, porque ahí el visitante
+  // está recorriendo y colapsarle la lista bajo el dedo es perderle el lugar.
+  var desdeElMapa = moverMapa === false;
+  if (angosto && desdeElMapa && estado.enfocado !== i) {
+    estado.enfocado = i;
+    pintar();  // vuelve a armar las tarjetas: abajo queda solo esta
+    // El mapa se achicó de 38vh a 24vh, así que la chincheta que se acaba de
+    // tocar puede haber quedado abajo del borde nuevo. Se centra después del
+    // invalidateSize que encoló pintar(): los callbacks de requestAnimationFrame
+    // corren en el orden en que se registran.
+    requestAnimationFrame(function () { mapa.panTo([LUGARES[i].lat, LUGARES[i].lng]); });
+  }
+
   var elegida = null;
   [].slice.call($("fichas").children).forEach(function (f) {
     var esta = Number(f.getAttribute("data-i")) === i;
@@ -566,21 +651,17 @@ function seleccionar(i, moverMapa) {
     if (esta) elegida = f;
   });
 
-  // Solo cuando el clic vino del mapa (moverMapa === false): si vino de la
-  // tarjeta, la tarjeta ya está donde el dedo la dejó y moverla de golpe es
-  // desconcertante.
-  //
-  // Va también en escritorio: con trece lugares la lista ya no entra entera,
-  // y tocar una chincheta de las de abajo dejaba su tarjeta fuera de la
-  // pantalla. block:"nearest" mueve lo mínimo, así que si ya se ve no hace
-  // nada.
-  //
-  // En celular va "start" y no "nearest": la tarjeta mide unos 300 px y la
-  // lista, aun después de agrandarla, unos 250. "nearest" mueve lo mínimo, y
-  // lo mínimo es dejar el nombre del consultorio fuera de la pantalla por
-  // arriba —justo lo que dice qué estás mirando—. "start" lo pone primero.
-  if (elegida && moverMapa === false) {
-    elegida.scrollIntoView({ block: angosto ? "start" : "nearest", behavior: "smooth" });
+  if (!elegida || !desdeElMapa) return;
+  if (angosto) {
+    // Enfocado hay una sola tarjeta y arriba de ella el botón de volver, que
+    // tiene que verse: si se hiciera scrollIntoView sobre la tarjeta, el
+    // botón quedaría justo fuera de pantalla y la salida sería invisible.
+    $("lista").scrollTop = 0;
+  } else {
+    // En escritorio, con trece lugares la columna ya no entra entera y tocar
+    // una chincheta de las de abajo dejaba su tarjeta fuera de pantalla.
+    // "nearest" mueve lo mínimo, así que si ya se ve no hace nada.
+    elegida.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
 
@@ -595,6 +676,9 @@ function pintarFiltros() {
   [].slice.call($("filtros").children).forEach(function (b) {
     b.addEventListener("click", function () {
       estado.cat = b.getAttribute("data-c");
+      // Quien filtra quiere ver el resultado nuevo, no quedarse enfocado en
+      // el lugar que venía mirando.
+      estado.enfocado = null;
       pintarFiltros(); pintar();
     });
   });
@@ -623,9 +707,39 @@ function pintar() {
     });
   }
 
-  $("cuenta").textContent = visibles.length === 0 ? "" :
-    visibles.length + (visibles.length === 1 ? " lugar" : " lugares") +
-    (estado.aqui ? " · del más cercano" : "");
+  // ═══ ENFOCADO: ABAJO VA UNO SOLO ═══════════════════════════════════════
+  //
+  // Se comprueba contra `visibles` y no solo contra `estado.enfocado`: si el
+  // visitante filtra por Farmacias mientras tenía enfocado un consultorio, el
+  // enfocado ya no está entre los resultados y mostrarlo sería contradecir el
+  // filtro que acaba de tocar. En ese caso se cae solo a la lista.
+  var enfocado = esAngosto() && estado.enfocado !== null &&
+    visibles.indexOf(estado.enfocado) !== -1;
+  var aMostrar = enfocado ? [estado.enfocado] : visibles;
+
+  // El reparto vertical entre mapa y ficha lo hace el CSS a partir de esta
+  // marca; acá solo se dice en qué modo está. Ver el bloque de @media.
+  var marca = enfocado ? "si" : "no";
+  if (document.body.getAttribute("data-enfocado") !== marca) {
+    document.body.setAttribute("data-enfocado", marca);
+    // Leaflet no se entera solo de que su caja cambió de alto: dibuja las
+    // tejas para el tamaño viejo y quedan franjas grises donde antes no
+    // había mapa. Va en el cuadro siguiente, cuando el navegador ya rehizo
+    // el layout con la marca nueva.
+    requestAnimationFrame(function () { mapa.invalidateSize(); });
+  }
+
+  if (enfocado) {
+    // El botón dice cuántas quedan afuera: sin el número parece que el filtro
+    // se rompió y que solo hay un lugar.
+    $("cuenta").innerHTML = '<button class="volver-lista" type="button" id="volverLista">' +
+      "← Ver los " + visibles.length + " lugares</button>";
+    $("volverLista").addEventListener("click", function () { verTodos(true); });
+  } else {
+    $("cuenta").textContent = visibles.length === 0 ? "" :
+      visibles.length + (visibles.length === 1 ? " lugar" : " lugares") +
+      (estado.aqui ? " · del más cercano" : "");
+  }
 
   if (!visibles.length) {
     $("fichas").innerHTML = '<p class="vacio">No encontramos nada con eso.<br>Probá con «pediatra», «laboratorio» o «farmacia».</p>';
@@ -638,7 +752,7 @@ function pintar() {
   // y los navegadores lo resuelven cada uno a su manera: el enlace de llamar
   // puede no funcionar, o funcionar y además seleccionar la tarjeta.
   var ahora = ahoraEnBolivia();
-  $("fichas").innerHTML = visibles.map(function (i) {
+  $("fichas").innerHTML = aMostrar.map(function (i) {
     var l = LUGARES[i], cat = CATEGORIAS[l.c];
     var h = estadoHorario(l.h, ahora);
     var chips = "";
@@ -647,7 +761,12 @@ function pintar() {
       chips += '<span class="chip dist">' +
         formatearDistancia(distanciaKm(estado.aqui.lat, estado.aqui.lng, l.lat, l.lng)) + "</span>";
     }
-    return '<article class="ficha" data-i="' + i + '" aria-current="false">' +
+    // El resaltado sale del estado y no de un valor fijo: pintar() se llama
+    // por muchos caminos —filtrar, buscar, ordenar por cercanía, girar el
+    // teléfono— y con "false" escrito a mano cualquiera de ellos borraba la
+    // marca del lugar que el visitante tenía elegido.
+    return '<article class="ficha" data-i="' + i + '" aria-current="' +
+      (i === estado.activo ? "true" : "false") + '">' +
       '<button class="ficha-cuerpo" type="button" data-i="' + i + '">' +
         '<span class="avatar" style="background:' + cat.color + '" aria-hidden="true">' + cat.signo + "</span>" +
         "<span>" +
@@ -706,6 +825,9 @@ $("cerca").addEventListener("click", function () {
       radius: 7, color: "#e9f6fc", weight: 3, fillColor: "#19b9ef", fillOpacity: 1,
     }).addTo(mapa).bindPopup("Estás acá");
     mapa.setView([estado.aqui.lat, estado.aqui.lng], 14);
+    // Ordenar por cercanía cambia la lista entera: enfocado en uno no se
+    // vería el orden nuevo, que es justo lo que se acaba de pedir.
+    estado.enfocado = null;
     pintar();
   }, function (err) {
     // El motivo importa: "lo bloqueaste" se arregla en el candado del
@@ -718,7 +840,11 @@ $("cerca").addEventListener("click", function () {
 
 $("q").addEventListener("input", function () {
   clearTimeout(espera);
-  espera = setTimeout(function () { estado.q = $("q").value; pintar(); }, 120);
+  espera = setTimeout(function () {
+    estado.q = $("q").value;
+    estado.enfocado = null;  // igual que al filtrar: lo que importa es el resultado nuevo
+    pintar();
+  }, 120);
 });
 
 pintarFiltros();
