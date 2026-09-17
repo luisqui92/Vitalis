@@ -125,10 +125,19 @@ a{color:inherit;text-decoration:none}
   width:46px;height:46px;border-radius:12px;display:grid;place-items:center;
   font-weight:700;font-size:17px;color:#03131d;
 }
-.ficha h3{margin:0;font-size:15px;font-weight:600;line-height:1.3}
-.esp{color:var(--cian2);font-size:12.5px;margin-top:3px}
-.resena{color:var(--tinta2);font-size:13px;margin:7px 0 0;line-height:1.55}
-.dir{color:var(--tinta3);font-size:12px;margin-top:7px}
+/* ═══ LA DESCRIPCIÓN ES LO QUE SE LEE, NO UN PIE DE FOTO ══════════════════
+   Estaba en 13px sobre un color atenuado. En una pantalla de escritorio se
+   perdona; en un celular, que es desde donde va a entrar casi todo el mundo,
+   la reseña —que es LA razón por la que alguien elige un consultorio y no el
+   de al lado— quedaba más chica que los chips de horario.
+
+   Ahora la reseña sube a 14.5px y en celular a 15px, que es el mismo tamaño
+   que el nombre: deja de leerse como una aclaración al pie y pasa a ser el
+   cuerpo de la tarjeta. El resto de la jerarquía se acomoda alrededor. */
+.ficha h3{margin:0;font-size:16px;font-weight:600;line-height:1.3}
+.esp{color:var(--cian2);font-size:13px;margin-top:3px}
+.resena{color:var(--tinta);font-size:14.5px;margin:9px 0 0;line-height:1.6}
+.dir{color:var(--tinta2);font-size:12.5px;margin-top:8px}
 .subs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .sub{border:1px solid var(--linea2);border-radius:999px;padding:2px 9px;font-size:11px;color:var(--tinta2)}
 .reservar{
@@ -146,8 +155,8 @@ a{color:inherit;text-decoration:none}
 .leaflet-container{background:#0a1a24}
 .leaflet-popup-content-wrapper{background:var(--panel);color:var(--tinta);border-radius:12px}
 .leaflet-popup-tip{background:var(--panel)}
-.leaflet-popup-content{margin:14px 16px;font-size:13px;line-height:1.55}
-.leaflet-popup-content b{display:block;font-size:14px;margin-bottom:4px}
+.leaflet-popup-content{margin:12px 14px;font-size:13px;line-height:1.5}
+.leaflet-popup-content b{display:block;font-size:14px;margin-bottom:3px}
 .leaflet-popup-content em{font-style:normal;color:var(--cian2);font-size:12px}
 .leaflet-control-attribution{background:rgba(3,16,26,.8)!important;color:#7f97a6!important}
 .leaflet-control-attribution a{color:#a8bdc9!important}
@@ -171,6 +180,31 @@ a{color:inherit;text-decoration:none}
   .cuerpo{grid-template-columns:1fr;grid-template-rows:46vh 1fr}
   .lista{border-right:0;border-top:1px solid var(--linea);order:2}
   .mapa-caja{order:1;min-height:0}
+  /* El mapa mide 46vh: en un celular de 640 px de alto son 294 px. Un globo
+     de Leaflet sin tope se lleva ~300 px de ancho y unos 90 de alto, o sea
+     casi todo el mapa, y tapa justamente las otras chinchetas que uno está
+     comparando. Acá no se abre ninguno (ver `seleccionar`), pero el tope de
+     ancho queda igual para el globo de "Estás acá" y para cualquiera que
+     se abra por otro camino. */
+  .leaflet-popup-content-wrapper{max-width:78vw}
+  .leaflet-popup-content{font-size:12.5px}
+
+  /* En celular la tarjeta seleccionada es la que REEMPLAZA al globo: si no se
+     distingue del resto, tocar una chincheta no parece haber hecho nada. El
+     riel cian es la misma señal que el aro de la chincheta, del otro lado. */
+  .ficha[aria-current="true"]{box-shadow:inset 3px 0 0 var(--cian)}
+  .ficha h3{font-size:16.5px}
+  .resena{font-size:15px;line-height:1.62}
+  .esp{font-size:13.5px}
+  .dir{font-size:13px}
+  /* El texto largo se cortaba en "pediatra, n" en un teléfono angosto, que es
+     peor que no sugerir nada: parece un error de la página. */
+  #q::placeholder{font-size:13.5px}
+}
+@media(max-width:430px){
+  .ficha-cuerpo{grid-template-columns:38px 1fr;gap:11px;padding:15px 16px 10px}
+  .avatar{width:38px;height:38px;font-size:15px;border-radius:10px}
+  .acciones{padding:0 16px 15px 16px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -191,7 +225,7 @@ a{color:inherit;text-decoration:none}
   <label class="campo">
     <span class="sr-only" hidden>Buscar</span>
     <input id="q" type="search" autocomplete="off"
-      placeholder="Buscá una especialidad: pediatra, neonatólogo, laboratorio…">
+      placeholder="Buscá: pediatra, laboratorio, farmacia…">
   </label>
   <!-- "Cerca de mí" va JUNTO a los filtros y no adentro: no filtra, ORDENA.
        Y no puede ir dentro de #filtros porque pintarFiltros() reescribe ese
@@ -452,11 +486,36 @@ function chincheta(color, activa) {
 
 LUGARES.forEach(function (l, i) {
   var m = L.marker([l.lat, l.lng], { icon: chincheta(CATEGORIAS[l.c].color, false), title: l.n })
-    .bindPopup("<b>" + l.n + "</b><em>" + l.e + "</em><br>" + l.d)
+    // maxWidth: sin tope, Leaflet usa 300 px y el globo sale más ancho que
+    // alto. autoPanPadding deja aire contra los bordes para que el globo no
+    // quede pegado al marco del mapa ni debajo de la atribución.
+    // Sin " (ejemplo)": la tarjeta ya lo saca del título y lo pone como
+    // etiqueta aparte. Dejarlo acá hacía que el mismo lugar se llamara
+    // distinto en el mapa y en la lista.
+    .bindPopup("<b>" + l.n.replace(" (ejemplo)", "") + "</b><em>" + l.e + "</em><br>" + l.d,
+      { maxWidth: 240, autoPanPadding: [16, 16] })
     .addTo(mapa);
   m.on("click", function () { seleccionar(i, false); });
   marcadores.push(m);
 });
+
+// ═══ EN CELULAR EL GLOBO NO ABRE ══════════════════════════════════════════
+//
+// El mapa tiene 46vh en celular. Un globo de Leaflet ahí adentro tapa las
+// demás chinchetas —o sea, tapa exactamente lo que uno está mirando cuando
+// compara consultorios— para decir el nombre, la especialidad y la dirección.
+//
+// Esas tres cosas ya están en la tarjeta de abajo, con el horario y la
+// distancia además, y con tamaño de lectura. Así que en celular tocar una
+// chincheta hace lo mismo que abrir el globo pero al revés: marca la
+// chincheta y trae la tarjeta a la vista. El mapa queda entero.
+//
+// Se consulta en cada llamada y no una vez al cargar: girar el teléfono
+// cambia la respuesta, y calcularlo al inicio deja la pantalla vertical
+// comportándose como una horizontal hasta recargar.
+function esAngosto() {
+  return window.matchMedia("(max-width:860px)").matches;
+}
 
 function seleccionar(i, moverMapa) {
   estado.activo = i;
@@ -464,10 +523,29 @@ function seleccionar(i, moverMapa) {
     m.setIcon(chincheta(CATEGORIAS[LUGARES[j].c].color, j === i));
   });
   if (moverMapa !== false) mapa.panTo([LUGARES[i].lat, LUGARES[i].lng]);
-  marcadores[i].openPopup();
+
+  var angosto = esAngosto();
+  if (angosto) mapa.closePopup();
+  else marcadores[i].openPopup();
+
+  var elegida = null;
   [].slice.call($("fichas").children).forEach(function (f) {
-    f.setAttribute("aria-current", Number(f.getAttribute("data-i")) === i ? "true" : "false");
+    var esta = Number(f.getAttribute("data-i")) === i;
+    f.setAttribute("aria-current", esta ? "true" : "false");
+    if (esta) elegida = f;
   });
+
+  // Solo cuando el clic vino del mapa (moverMapa === false): si vino de la
+  // tarjeta, la tarjeta ya está donde el dedo la dejó y moverla de golpe es
+  // desconcertante.
+  //
+  // Va también en escritorio: con trece lugares la lista ya no entra entera,
+  // y tocar una chincheta de las de abajo dejaba su tarjeta fuera de la
+  // pantalla. block:"nearest" mueve lo mínimo, así que si ya se ve no hace
+  // nada.
+  if (elegida && moverMapa === false) {
+    elegida.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
 }
 
 function pintarFiltros() {

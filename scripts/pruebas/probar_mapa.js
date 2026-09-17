@@ -272,6 +272,66 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   // llegar buscando un laboratorio de verdad y encontrar uno inventado.
   verificar("pide noindex mientras sea demostración", /noindex/.test(r.texto));
 
+  // ═══ EN CELULAR EL GLOBO TAPABA EL MAPA ═════════════════════════════════
+  //
+  // Esto salió de una captura de pantalla: en un teléfono, tocar una
+  // chincheta abría un globo de Leaflet que se comía casi todo el mapa —que
+  // ahí mide 46vh, unos 290 px— y tapaba las OTRAS chinchetas, o sea
+  // exactamente lo que uno está mirando cuando compara consultorios.
+  //
+  // El arreglo no fue achicar el globo: fue no abrirlo. Todo lo que decía
+  // (nombre, especialidad, dirección) ya está en la tarjeta de abajo, con el
+  // horario y la distancia además. En celular la chincheta marca y trae la
+  // tarjeta; en escritorio, donde sobra lugar, el globo sigue abriendo.
+  console.log("\n── 6. El globo no se come el mapa en celular ──");
+  verificar("el ancho se consulta en cada clic, no una sola vez al cargar",
+    /function esAngosto\(\)[\s\S]{0,140}?matchMedia\("\(max-width:860px\)"\)/.test(r.texto));
+  verificar("  ...y en angosto se cierra el globo en vez de abrirlo",
+    /if \(angosto\) mapa\.closePopup\(\);\s*\n\s*else marcadores\[i\]\.openPopup\(\);/.test(r.texto));
+  verificar("en escritorio el globo tiene tope de ancho (sin eso Leaflet usa 300)",
+    /maxWidth: 240/.test(r.texto));
+  verificar("  ...y aire contra el borde del mapa", /autoPanPadding: \[16, 16\]/.test(r.texto));
+  // Si la chincheta no abre globo Y la tarjeta queda fuera de pantalla,
+  // tocarla no parece haber hecho nada, y el arreglo deja la página peor que
+  // antes. Las dos mitades van juntas o no va ninguna.
+  verificar("al tocar una chincheta, su tarjeta se trae a la vista",
+    /moverMapa === false\) \{\s*\n\s*elegida\.scrollIntoView/.test(r.texto));
+  verificar("  ...y la tarjeta elegida se distingue de las demás en celular",
+    /\.ficha\[aria-current="true"\]\{box-shadow:inset 3px 0 0 var\(--cian\)\}/.test(r.texto));
+  // Y el mismo lugar tiene que llamarse igual en el mapa y en la lista.
+  verificar("el globo tampoco arrastra «(ejemplo)» en el título",
+    /bindPopup\("<b>" \+ l\.n\.replace\(" \(ejemplo\)", ""\)/.test(r.texto));
+
+  // ═══ LA RESEÑA ES LO QUE SE LEE ═════════════════════════════════════════
+  //
+  // La otra mitad de la misma observación: la descripción de la tarjeta
+  // estaba en 13px y atenuada —más chica que los chips de horario— cuando es
+  // LA razón por la que alguien elige un consultorio y no el de al lado.
+  //
+  // Se mide en píxeles y no "que se vea grande" porque el número es lo único
+  // falsable, y porque es lo que se rompe solo: alguien toca el CSS buscando
+  // otra cosa y lo baja sin darse cuenta.
+  console.log("\n── 7. La descripción se puede leer ──");
+  const px = (re, donde) => Number(((donde || r.texto).match(re) || [])[1] || 0);
+  const resenaBase = px(/\.resena\{[^}]*font-size:([\d.]+)px/);
+  verificar(`la reseña arranca en 14.5px o más (está en ${resenaBase})`, resenaBase >= 14.5);
+  // El bloque de celular es el que importa: es desde donde entra casi todo el
+  // mundo, y es donde la letra chica se nota.
+  const enCelular = (r.texto.match(/@media\(max-width:860px\)\{([\s\S]*?)\n\}/) || [])[1] || "";
+  const resenaCel = px(/\.resena\{font-size:([\d.]+)px/, enCelular);
+  verificar(`  ...y en celular sube a 15px o más (está en ${resenaCel})`, resenaCel >= 15);
+  verificar("el nombre del lugar sigue siendo lo más grande de la tarjeta",
+    px(/\.ficha h3\{[^}]*font-size:([\d.]+)px/) >= resenaBase);
+  // El tamaño sin el contraste no arregla nada: 14.5px sobre --tinta2 se lee
+  // peor que 13px sobre --tinta.
+  verificar("y usa el color de texto principal, no el atenuado",
+    /\.resena\{color:var\(--tinta\);/.test(r.texto));
+  // El texto largo se cortaba en "pediatra, n" en un teléfono angosto, que es
+  // peor que no sugerir nada: parece un error de la página.
+  const sugerencia = (r.texto.match(/id="q"[\s\S]{0,160}?placeholder="([^"]+)"/) || [])[1] || "";
+  verificar(`la sugerencia del buscador entra en un teléfono (${sugerencia.length} caracteres)`,
+    sugerencia.length > 0 && sugerencia.length <= 45);
+
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
   process.exit(fallos === 0 ? 0 : 1);
 })();
