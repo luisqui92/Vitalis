@@ -332,6 +332,50 @@ verificar("y el buscador vacío los muestra todos", buscar("").length === LUGARE
   verificar(`la sugerencia del buscador entra en un teléfono (${sugerencia.length} caracteres)`,
     sugerencia.length > 0 && sugerencia.length <= 45);
 
+  // ═══ 8. EL REPARTO VERTICAL ═════════════════════════════════════════════
+  //
+  // Agrandar la letra no sirve de nada si la tarjeta no entra en pantalla, y
+  // no entraba. Medido en un teléfono real (390×747 útiles):
+  //
+  //   barra 49 + aviso 41 + buscador 216 + mapa 344 = 650
+  //   → a la lista le quedaban 99 px, para una tarjeta de 301.
+  //
+  // Se veía un tercio de una tarjeta y NUNCA el nombre del consultorio. De
+  // los 216 del buscador, 120 eran los filtros envueltos en tres renglones.
+  //
+  // Todo esto es aritmética de píxeles y no se puede comprobar leyendo texto,
+  // así que lo que se prueba acá son las tres decisiones que la producen. Si
+  // alguien deshace cualquiera de las tres, la lista vuelve a desaparecer.
+  console.log("\n── 8. Abajo del mapa queda lugar para leer ──");
+  const cel = (r.texto.match(/@media\(max-width:860px\)\{([\s\S]*?)\n\}/) || [])[1] || "";
+
+  // (1) Los filtros en UNA fila que se desliza, no tres que se apilan: 120px
+  //     de alto pasan a 40, y esos 80 van enteros a la lista.
+  verificar("los filtros no se apilan en tres renglones en celular",
+    /\.controles\{[^}]*flex-wrap:nowrap/.test(cel) && /\.filtros\{flex-wrap:nowrap\}/.test(cel));
+  verificar("  ...se deslizan de costado, así que no se esconde ninguna categoría",
+    /\.controles\{[^}]*overflow-x:auto/.test(cel));
+  verificar("  ...y las cápsulas no se achatan para entrar",
+    /\.filtro,\.cerca\{flex:0 0 auto;white-space:nowrap\}/.test(cel));
+
+  // (2) El mapa deja de quedarse con casi la mitad de la pantalla.
+  const vhMapa = Number((cel.match(/grid-template-rows:minmax\(0,([\d.]+)vh\)/) || [])[1] || 0);
+  verificar(`el mapa se queda con 38vh o menos, no con 46 (está en ${vhMapa}vh)`,
+    vhMapa > 0 && vhMapa <= 38);
+
+  // (3) La salvaguarda, que es lo que evita que esto vuelva a pasar en una
+  //     pantalla más baja: cuando no alcanza, lo que cede es el MAPA. Un mapa
+  //     de 150px sigue sirviendo; una lista de 99 no.
+  const pisoLista = Number((cel.match(/grid-template-rows:minmax\([^)]+\) minmax\((\d+)px,1fr\)/) || [])[1] || 0);
+  verificar(`la lista nunca baja de 230px, ceda lo que ceda (piso: ${pisoLista}px)`, pisoLista >= 230);
+  verificar("  ...y el que cede es el mapa, que tiene mínimo cero",
+    /grid-template-rows:minmax\(0,/.test(cel));
+
+  // Y una vez que hay lugar, la tarjeta tiene que llegar alineada por arriba:
+  // "nearest" mueve lo mínimo, y lo mínimo deja el nombre fuera de pantalla.
+  verificar("la tarjeta llega alineada por arriba, con el nombre a la vista",
+    /block: angosto \? "start" : "nearest"/.test(r.texto));
+
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
   process.exit(fallos === 0 ? 0 : 1);
 })();
