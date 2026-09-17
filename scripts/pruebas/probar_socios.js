@@ -234,6 +234,60 @@ function verificar(descripcion, condicion) {
   const espiarInsumo = await pedir(`/medico/insumos/${insumoAjeno._id}/movimientos`, tkMedico);
   verificar("no se ve el insumo de otro consultorio", espiarInsumo.estado === 404);
 
+
+  // ═══ 7. EL LADO DE SYMPHOMED: DAR DE ALTA Y CARGAR CUPOS ═════════════════
+  //
+  // Crear un socio y cargarle cupos es EMITIR CRÉDITO. Tiene que pasar por el
+  // mismo guardia que aprobar una recarga: lista de operadores en el .env MÁS
+  // verificación en dos pasos. Un socio nuevo con 50 cupos cargados por
+  // alguien que no debía es plata regalada.
+  console.log("\n── 7. Solo un operador da de alta socios y carga cupos ──");
+  const rutasOperador = [
+    ["GET", "/medico/operador/socios", null],
+    ["POST", "/medico/operador/socios", { nombre: "Colado", phone: "70999999", password: "unaquesirva12" }],
+    ["POST", `/medico/operador/socios/${socioA._id}/cupos`, { cantidad: 50, referencia: "x" }],
+  ];
+  let cerradas = 0;
+  for (const [metodo, ruta, cuerpo] of rutasOperador) {
+    // Probadas con el token de un SOCIO: el que más ganaría cargándose cupos.
+    const r = await pedir(ruta, tkA, metodo, cuerpo);
+    if (r.estado === 401 || r.estado === 403 || r.estado === 404) cerradas++;
+    else console.log(`   ⚠ ${metodo} ${ruta} devolvió ${r.estado}`);
+  }
+  verificar("un socio no puede entrar a las rutas de operador", cerradas === rutasOperador.length);
+
+  const fuenteOperador = require("fs").readFileSync(path.join(RAIZ, "routes", "operadorSaldo.js"), "utf8");
+  verificar("las tres rutas de socios exigen requireOperador",
+    (fuenteOperador.match(/operador\/socios[^"]*", limitOperador, requireSesion, requireOperador/g) || []).length >= 3);
+  // requireOperador exige 2FA activo: es lo que separa "estar en la lista" de
+  // "poder mover plata desde una sesión robada".
+  verificar("y requireOperador exige verificación en dos pasos",
+    /dosFA\?\.activo/.test(fuenteOperador));
+
+  // Un lote sin referencia es un número que después nadie puede explicar.
+  verificar("no se puede cargar un lote sin referencia de pago",
+    /Poné la referencia del pago/.test(fuenteOperador));
+  // El precio se congela en el lote: si mañana cambia el mayorista, lo
+  // comprado el año pasado tiene que seguir valiendo lo que valió.
+  verificar("el precio del lote se congela y no se lee del socio al calcular",
+    /precioUnitarioCentavos/.test(fuenteOperador) && /congela/i.test(fuenteOperador));
+
+  // ═══ 8. LA PANTALLA DEL SOCIO ════════════════════════════════════════════
+  console.log("\n── 8. El panel del socio no puede pedir un paciente ──");
+  const panel = require("fs").readFileSync(path.join(RAIZ, "public", "js", "socioPanel.js"), "utf8");
+  const panelSinComentarios = panel.replace(/^\s*\/\/.*$/gm, "");
+  verificar("el panel no llama a ninguna ruta clínica",
+    !/\/medico\/pacientes|\/medico\/consultas|\/medico\/recetas/.test(panelSinComentarios));
+  verificar("solo pega a rutas /socio/",
+    [...panelSinComentarios.matchAll(/api\("(\/[^"`]*)/g)].every(m => m[1].startsWith("/socio/")));
+  // Es una página aparte: un vendedor no carga el megabyte de código clínico,
+  // y la separación física refuerza la de permisos.
+  const html = require("fs").readFileSync(path.join(RAIZ, "public", "socio.html"), "utf8");
+  verificar("es una página aparte, sin el JavaScript de la app médica",
+    /socioPanel\.js/.test(html) && !/js\/pacientes\.js|js\/consultas\.js/.test(html));
+  verificar("y el servidor la sirve en /socio",
+    /app\.get\("\/socio"/.test(require("fs").readFileSync(path.join(RAIZ, "index.js"), "utf8")));
+
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();

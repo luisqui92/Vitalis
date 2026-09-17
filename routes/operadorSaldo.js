@@ -28,12 +28,15 @@
 //
 // Lo que este archivo NO hace: crear cuentas, cambiar contraseñas, ver
 // historias clínicas. Un operador de recargas administra plata y nada más.
-const { Clinica, Medico, SolicitudRecarga, MovimientoSaldo } = require("../db/models");
+const { Clinica, Medico, SolicitudRecarga, MovimientoSaldo, Socio, LoteCupos } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { rateLimitPorClave, claveDeMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { esOperador } = require("../services/operadores");
+const { hashPassword } = require("../services/auth");
+const { cuposDe } = require("../services/socios");
+const { zonaPorMoneda } = require("../services/zonaHoraria");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
 const monedas = require("../services/monedas");
@@ -599,5 +602,133 @@ module.exports = function (app) {
       }
       throw e;
     }
+  }));
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOCIOS — el canal de reventa
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Va en este archivo y no en uno propio porque es lo mismo que todo lo de
+  // acá: PLATA. Dar de alta un socio y cargarle cupos es emitir crédito, y
+  // tiene que pasar por el mismo guardia —lista de operadores en el .env MÁS
+  // verificación en dos pasos— que aprobar una recarga.
+  //
+  // El socio NO tiene ninguna ruta para cargarse lotes a sí mismo (ver
+  // routes/socio.js): eso sería un botón de emitir crédito contra Symphomed.
+
+  app.get("/medico/operador/socios", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const socios = await Socio.find({})
+      .select("nombre phone email activo moneda precioMayoristaCentavos contacto createdAt")
+      .sort({ nombre: 1 }).limit(200).lean();
+
+    // Cada socio con su estado de cupos. Son pocas cuentas —un canal de
+    // reventa son decenas, no miles— así que traerlos todos y contarles los
+    // cupos es aceptable acá y no lo sería en la lista de pacientes.
+    const conCupos = await Promise.all(socios.map(async (s) => ({
+      ...s,
+      cupos: await cuposDe(s._id),
+    })));
+
+    res.json({
+      socios: conCupos.map(s => ({
+        _id: s._id, nombre: s.nombre, phone: s.phone, email: s.email,
+        activo: s.activo, moneda: s.moneda,
+        precioMayoristaCentavos: s.precioMayoristaCentavos,
+        contacto: s.contacto, desde: s.createdAt,
+        comprados: s.cupos.comprados, usados: s.cupos.usados,
+        disponibles: s.cupos.disponibles,
+        // Lo que ese socio le factura a Symphomed por mes: es el número que
+        // dice a quién hay que cobrarle.
+        mensualCentavos: s.cupos.usados * (s.precioMayoristaCentavos || 0),
+      })),
+    });
+  }));
+
+  app.post("/medico/operador/socios", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const nombre = String(req.body?.nombre || "").trim();
+    const phone = String(req.body?.phone || "").trim();
+    const password = String(req.body?.password || "");
+    if (!nombre || !phone) throw new ErrorHttp(400, "nombre y phone son requeridos");
+    if (password.length < 10) throw new ErrorHttp(400, "La contraseña de un socio tiene que tener al menos 10 caracteres");
+    if (await Socio.findOne({ phone })) throw new ErrorHttp(409, "Ya existe un socio con ese teléfono");
+
+    const moneda = req.body?.moneda === "BRL" ? "BRL" : "BOB";
+    const socio = await Socio.create({
+      nombre, phone,
+      email: String(req.body?.email || "").trim(),
+      passwordHash: await hashPassword(password),
+      moneda,
+      // Se guarda para que las cuentas que dé de alta nazcan con la zona de
+      // su país. Ver services/zonaHoraria.js.
+      pais: moneda === "BRL" ? "BR" : "BO",
+      precioMayoristaCentavos: Math.max(0, Number(req.body?.precioMayoristaCentavos) || 0),
+      contacto: {
+        whatsapp: String(req.body?.whatsapp || "").trim(),
+        ciudad: String(req.body?.ciudad || "").trim(),
+      },
+      nota: String(req.body?.nota || "").trim().slice(0, 500),
+      activo: true,
+    });
+    registrar({
+      req, medicoPhone: req.adminUser.usuario, accion: "alta_socio",
+      recurso: `Socio:${socio._id}`, detalle: `${nombre} (${phone})`,
+    });
+    log.info(`[SOCIOS] alta de socio: ${nombre} (${phone}) por ${req.adminUser.usuario}`);
+    res.status(201).json({ ok: true, socio: { _id: socio._id, nombre, phone } });
+  }));
+
+  // ─── CARGARLE CUPOS (cuando pagó) ────────────────────────────────────────
+  //
+  // Esto es acreditar crédito, igual que una recarga de saldo. Queda auditado
+  // con quién lo hizo y contra qué comprobante — un lote sin referencia es un
+  // número que después nadie puede explicar.
+  app.post("/medico/operador/socios/:id/cupos", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const socio = await Socio.findById(req.params.id);
+    if (!socio) throw new ErrorHttp(404, "Socio no encontrado");
+
+    const cantidad = Number(req.body?.cantidad);
+    if (!Number.isInteger(cantidad) || cantidad < 1) throw new ErrorHttp(400, "La cantidad de cupos tiene que ser un entero de 1 o más");
+    const referencia = String(req.body?.referencia || "").trim();
+    if (!referencia) throw new ErrorHttp(400, "Poné la referencia del pago: sin eso, el lote no se puede explicar después");
+
+    const lote = await LoteCupos.create({
+      socioId: socio._id,
+      cantidad,
+      // Si no se dice otra cosa, vale el precio mayorista de hoy. Se CONGELA
+      // en el lote: si mañana se le cambia el precio al socio, lo que compró
+      // el año pasado tiene que seguir valiendo lo que valió.
+      precioUnitarioCentavos: req.body?.precioUnitarioCentavos !== undefined
+        ? Math.max(0, Number(req.body.precioUnitarioCentavos) || 0)
+        : (socio.precioMayoristaCentavos || 0),
+      moneda: socio.moneda,
+      referencia,
+      nota: String(req.body?.nota || "").trim().slice(0, 300),
+      registradoPor: req.adminUser.usuario,
+    });
+    registrar({
+      req, medicoPhone: req.adminUser.usuario, accion: "cargar_cupos_socio",
+      recurso: `Socio:${socio._id}`, detalle: `${cantidad} cupos ref:${referencia}`,
+    });
+    log.info(`[SOCIOS] ${cantidad} cupos a ${socio.nombre} por ${req.adminUser.usuario} (ref ${referencia})`);
+    res.status(201).json({ ok: true, lote, cupos: await cuposDe(socio._id) });
+  }));
+
+  // ─── SUSPENDER O REACTIVAR ───────────────────────────────────────────────
+  app.patch("/medico/operador/socios/:id", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const socio = await Socio.findById(req.params.id);
+    if (!socio) throw new ErrorHttp(404, "Socio no encontrado");
+
+    if (req.body?.activo !== undefined) socio.activo = !!req.body.activo;
+    if (req.body?.precioMayoristaCentavos !== undefined) {
+      socio.precioMayoristaCentavos = Math.max(0, Number(req.body.precioMayoristaCentavos) || 0);
+    }
+    if (req.body?.nota !== undefined) socio.nota = String(req.body.nota).trim().slice(0, 500);
+    await socio.save();
+
+    registrar({
+      req, medicoPhone: req.adminUser.usuario, accion: "editar_socio",
+      recurso: `Socio:${socio._id}`, detalle: socio.activo ? "activo" : "suspendido",
+    });
+    res.json({ ok: true, socio: { _id: socio._id, nombre: socio.nombre, activo: socio.activo } });
   }));
 };

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panel de socio · Symphomed</title>
+<link rel="icon" href="/img/simbolo-192.png">
+<link rel="stylesheet" href="/estilos.css">
+</head>
+<!--
+  ═══ POR QUÉ ESTA PÁGINA ES APARTE Y NO UNA PANTALLA MÁS DE LA APP ═════════
+
+  Un socio es un vendedor, no un profesional de la salud. Meterlo adentro de
+  /app significaría bajarle el megabyte de JavaScript clínico —odontograma,
+  neurodesarrollo, transcripción— a alguien que no va a abrir una ficha nunca.
+
+  Pero la razón de fondo no es el peso: es que la separación física refuerza
+  la de permisos. Las pantallas del socio no tienen forma de pedir un
+  paciente porque ni siquiera está cargado el código que sabe pedirlos. El
+  rol "socio" ya lo impide del lado del servidor (ver services/auth.js); esto
+  lo hace evidente también del lado del navegador.
+-->
+<body>
+
+<div class="header no-imprimir">
+  <div class="brand">
+    <img src="/img/simbolo.webp" alt="" class="logo" width="34" height="34">
+    <div>
+      <h1>Symphomed</h1>
+      <p id="headerSub">Panel de socio</p>
+    </div>
+  </div>
+  <button id="btnSalir" style="display:none">Salir</button>
+</div>
+
+<div class="wrap" id="app">
+  <div class="loading"><div class="spinner"></div>Cargando...</div>
+</div>
+
+<div class="footer no-imprimir">Symphomed SmartKardex</div>
+
+<script src="/js/socioPanel.js"></script>
+</body>
+</html>

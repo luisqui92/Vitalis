@@ -262,6 +262,12 @@ app.get(["/", "/app", "/veterinaria"], (_req, res) => res.sendFile(path.join(__d
 // entrando a /app.
 app.get("/app/*", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
+// El panel del socio: página aparte de la app del médico, a propósito. Ver el
+// comentario del encabezado de public/socio.html — un vendedor no tiene por
+// qué cargar el código clínico, y la separación física refuerza la de
+// permisos.
+app.get("/socio", (_req, res) => res.sendFile(path.join(PUBLICO, "socio.html")));
+
 app.get("/informe/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 // /avance/<token> es el informe de avance que abre la FAMILIA de un chico en
 // seguimiento de neurodesarrollo. La ruta se llama "avance" y no "informe"
