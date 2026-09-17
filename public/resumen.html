@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Resumen clínico · Symphomed</title>
+<!-- Que no lo levante un buscador. Es una historia clínica detrás de un
+     enlace no adivinable: que además quede indexada sería el peor final
+     posible de una función que existe para compartir con UNA persona. -->
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="/img/simbolo-192.png">
+<link rel="stylesheet" href="/resumen.css">
+</head>
+<!--
+  ═══ POR QUÉ ESTA PÁGINA ES APARTE Y NO UNA PANTALLA DE LA APP ═════════════
+
+  Mismo criterio que socio.html, y acá pesa más: quien abre este enlace es un
+  médico que NO es cliente todavía, con un paciente sentado enfrente. Esta
+  página es lo primero que va a ver de Symphomed en su vida.
+
+  Meterla adentro de /app significaría que esa primera impresión incluya bajar
+  el megabyte de JavaScript clínico —odontograma, neurodesarrollo,
+  transcripción— para leer una hoja. Con la conexión de un consultorio a las
+  once de la mañana eso son varios segundos mirando una pantalla en blanco, y
+  no hay banda de conversión que arregle esa primera impresión.
+
+  Y la razón de fondo es la misma que allá: la separación física refuerza la
+  de permisos. Esta página no tiene forma de pedir un paciente porque ni
+  siquiera está cargado el código que sabe pedirlos. Lo único que sabe hacer
+  es leer un resumen ya congelado.
+-->
+<body>
+
+<div class="barra no-imprimir">
+  <span class="marca"><i></i>SYMPHOMED</span>
+  <span class="barra-nota">Resumen clínico compartido</span>
+</div>
+
+<div class="envoltorio" id="app">
+  <div class="cargando">Abriendo el resumen…</div>
+</div>
+
+<script src="/js/resumenVista.js"></script>
+<script src="/js/resumenPublico.js"></script>
+</body>
+</html>

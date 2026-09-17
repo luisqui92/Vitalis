@@ -283,6 +283,21 @@ app.get("/avance/:token", (_req, res) => res.sendFile(path.join(__dirname, "inde
 // public/js/teleconsulta.js) y muestra el consentimiento en vez del login.
 app.get("/teleconsulta/:token", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
+// ─── EL RESUMEN QUE VIAJA CON EL PACIENTE ─────────────────────────────────
+//
+// Estas dos NO sirven index.html: son páginas propias, como /socio. Quien abre
+// /r es un médico que todavía no es cliente, con un paciente enfrente, y esa
+// es la primera vez que ve Symphomed en su vida — bajarle el megabyte de
+// JavaScript clínico para leer una hoja arruina esa primera impresión antes
+// de que empiece. Quien abre /mi es un paciente, que ni siquiera tiene por qué
+// tener el código clínico en su teléfono. El porqué largo está arriba de cada
+// archivo.
+//
+// Rutas cortas a propósito: son enlaces que se mandan por WhatsApp y que a
+// veces alguien dicta por teléfono.
+app.get("/r/:token", (_req, res) => res.sendFile(path.join(__dirname, "public", "resumen.html")));
+app.get("/mi/:llave", (_req, res) => res.sendFile(path.join(__dirname, "public", "mi.html")));
+
 // ─── SERVER ───────────────────────────────────────────────────────────────
 // http.createServer (en vez del app.listen de siempre) porque el
 // WebSocket del tiempo real necesita colgarse del mismo servidor, no de

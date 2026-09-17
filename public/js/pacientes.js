@@ -477,6 +477,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       <div class="kardex-mas-cuerpo">
         ${typeof bloquePersonaAccionesHtml === "function" ? bloquePersonaAccionesHtml() : ""}
         ${typeof teleMedCajaHtml === "function" ? teleMedCajaHtml() : ""}
+        ${typeof compartirResumenCajaHtml === "function" ? compartirResumenCajaHtml() : ""}
       </div>
     </details>
   `;
@@ -485,6 +486,9 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   // Aparte y sin await: si el proveedor de video tarda en contestar, la
   // ficha del paciente tiene que estar en pantalla igual.
   if (typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
+  // Mismo criterio: pide la lista de lo ya compartido, y si tarda o falla la
+  // ficha se abre igual.
+  if (typeof compartirResumenPintar === "function") compartirResumenPintar(p._id);
   if (typeof memedCablearCpf === "function") memedCablearCpf(p);
   // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
   // igual. El bloque aparece cuando llega.

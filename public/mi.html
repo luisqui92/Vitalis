@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mi historia clínica</title>
+<!-- El título no nombra Symphomed y la página no se indexa. Acá el criterio
+     vuelve a ser el del informe de avance y no el de /r: esto lo abre el
+     paciente en SU teléfono, y el historial del navegador de un teléfono es
+     una lista que ve cualquiera que lo levante de la mesa. -->
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="/img/simbolo-192.png">
+<link rel="stylesheet" href="/resumen.css">
+</head>
+<body>
+
+<div class="barra no-imprimir">
+  <span class="marca"><i></i>MI HISTORIA</span>
+  <span class="barra-nota">Tus datos, para llevarlos donde quieras</span>
+</div>
+
+<div class="envoltorio" id="app">
+  <div class="cargando">Abriendo tu historia…</div>
+</div>
+
+<script src="/js/resumenVista.js"></script>
+<script src="/js/miHistoria.js"></script>
+</body>
+</html>

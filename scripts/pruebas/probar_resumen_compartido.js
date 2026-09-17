@@ -305,5 +305,116 @@ verificar("  ...pero sí avisa que no hay que reenviarla",
 verificar("y si WhatsApp falla, la llave no se pierde: se le da el enlace al médico",
   /return res\.json\(\{ ok: true, enlace, enviadaA: null/.test(RUTA_CODIGO));
 
+// ═══ 9. LAS PANTALLAS ══════════════════════════════════════════════════════
+console.log("\n── 9. Las tres pantallas ──");
+
+const leer = (...p) => fs.readFileSync(path.join(RAIZ, ...p), "utf8");
+const HTML_R = leer("public", "resumen.html");
+const HTML_MI = leer("public", "mi.html");
+const JS_R = leer("public", "js", "resumenPublico.js");
+const JS_MI = leer("public", "js", "miHistoria.js");
+const JS_MED = leer("public", "js", "compartirResumen.js");
+const CSS = leer("public", "resumen.css");
+const INDEX_JS = sinComentarios(leer("index.js"));
+const INDEX_HTML = leer("index.html");
+
+// Una sola función dibuja el resumen en los tres lados. Si se separaran, un
+// día el paciente compartiría algo que se ve distinto de lo que él miró, y no
+// habría forma de saber cuál de las dos versiones es la buena.
+verificar("las tres pantallas dibujan el resumen con la MISMA función",
+  /resumenVista\.js/.test(HTML_R) && /resumenVista\.js/.test(HTML_MI) && /resumenVista\.js/.test(INDEX_HTML));
+verificar("  ...y la previa del médico también, que es lo que hace que aprobar signifique algo",
+  /resumenVistaHtml\(r\.contenido/.test(JS_MED));
+
+// Peso: quien abre /r es un médico que todavía no es cliente, y esa es la
+// primera vez que ve Symphomed. Bajarle el JavaScript clínico para leer una
+// hoja arruina esa impresión antes de que empiece. Mismo criterio que socio.html.
+for (const [nombre, html] of [["/r", HTML_R], ["/mi", HTML_MI]]) {
+  const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+  verificar(`${nombre} no baja la app: solo ${scripts.length} scripts propios`,
+    scripts.length <= 2 && !scripts.some(s => /main\.js|pacientes\.js|estado\.js|i18n/.test(s)));
+}
+verificar("y el servidor les sirve su propia página, no index.html",
+  /app\.get\("\/r\/:token", .*?"public", "resumen\.html"/.test(INDEX_JS) &&
+  /app\.get\("\/mi\/:llave", .*?"public", "mi\.html"/.test(INDEX_JS));
+
+// Una historia clínica detrás de un enlace no adivinable que además quede
+// indexada sería el peor final posible de esta función.
+for (const [nombre, html] of [["/r", HTML_R], ["/mi", HTML_MI]]) {
+  verificar(`${nombre} pide no ser indexada`, /name="robots" content="noindex/.test(html));
+  verificar(`  ...y no filtra el enlace por el Referer al salir`, /name="referrer" content="no-referrer"/.test(html));
+}
+// El título de /mi no nombra Symphomed: el historial del navegador de un
+// teléfono es una lista que ve cualquiera que lo levante de la mesa. El de /r
+// sí, porque lo abre un profesional en su consultorio — son dos audiencias.
+verificar("el título de la página del paciente no nombra el producto",
+  /<title>Mi historia clínica<\/title>/.test(HTML_MI));
+
+// La banda de producto va DESPUÉS del documento. Un cartel arriba de una
+// historia clínica convierte el documento en el envoltorio de un anuncio.
+// Se mide dentro de renderResumen() y no en todo el archivo: el primer
+// `app.innerHTML` del archivo es el de pintarError(), que no tiene nada que
+// ver con el orden de la página. Medido sobre el archivo entero daba un falso
+// negativo, porque bandaHtml se DEFINE antes de usarse.
+const cuerpoR = JS_R.slice(JS_R.indexOf("async function renderResumen"));
+verificar("la banda de Symphomed va después del resumen, nunca antes",
+  cuerpoR.indexOf("resumenVistaHtml") > 0 &&
+  cuerpoR.indexOf("resumenVistaHtml") < cuerpoR.indexOf("bandaHtml"));
+// Y en papel no sale: un cartel de producto impreso encima de una historia
+// clínica no tiene ninguna excusa.
+const bloqueImprimir = CSS.slice(CSS.indexOf("@media print"));
+verificar("  ...y al imprimir no sale ni la banda ni los botones",
+  /\.barra,\.acciones,\.banda,\.panel,\.no-imprimir\{display:none!important\}/.test(bloqueImprimir));
+
+// El botón principal tiene que hacer lo que dice. Sin sesión ofrece pedir
+// cuenta y avisa de la revisión: prometer «empezá ahora» y que después haya
+// que esperar una aprobación quema al único médico que vino solo.
+verificar("con sesión de médico, el botón importa de verdad",
+  /\/importar`, \{ method: "POST" \}/.test(JS_R));
+verificar("  ...y sin sesión ofrece pedir cuenta, diciendo que hay una revisión",
+  /btnCuenta/.test(JS_R) && /se revisan una por una/.test(JS_R));
+verificar("  ...y después de importar se ofrece abrir la ficha, no buscarla",
+  /\/app\/paciente\/\$\{esc\(r2\.pacienteId\)\}/.test(JS_R));
+
+// ─── Lo del paciente: sin una sola palabra de consultorio ────────────────
+//
+// Se mira SOLO el texto que llega a la pantalla —lo que queda entre `>` y
+// `<`— y no el archivo entero. Buscar la palabra en todo el archivo agarraba
+// nombres de variables y rutas de la API, que nadie lee: una prueba en rojo
+// por `/revocar` adentro de una URL no dice nada sobre lo que ve el paciente.
+const textoVisible = (js) => [...js.matchAll(/>([^<>{}`]{3,})</g)].map(m => m[1]).join(" ");
+const visibleMi = textoVisible(JS_MI);
+const jerga = ["revocar", "token", "alcance", "kardex", "API"].filter(p => new RegExp(p, "i").test(visibleMi));
+verificar(`la página del paciente no usa palabras de consultorio${jerga.length ? " — aparece: " + jerga.join(", ") : ""}`,
+  jerga.length === 0);
+// Y sí usa las de una persona. Sin esto, la de arriba se cumpliría con una
+// pantalla que no dijera nada.
+verificar("  ...dice «cortar el enlace», que es lo que hace",
+  /Cortar enlace/.test(visibleMi) && /Compartir con un médico/.test(visibleMi));
+verificar("  ...y el aviso de la llave va ARRIBA de la historia, donde se lee",
+  JS_MI.indexOf("Ojo con este enlace") < JS_MI.indexOf("resumenVistaHtml(DATOS.contenido"));
+
+// Las fijas se muestran deshabilitadas y diciendo por qué: esconderlas dejaría
+// la sensación de que falta algo, y permitirlas es lo que no puede pasar.
+verificar("las secciones fijas se ven, pero no se pueden destildar",
+  /\$\{s\.fija \? "disabled" : ""\}/.test(JS_MI) && /\$\{s\.fija \? "disabled" : ""\}/.test(JS_MED));
+// Cambiar de alcance vuelve a lo que corresponde por defecto: si conservara
+// las casillas destildadas, «historia completa» podría mandar menos que
+// «resumen», que es lo contrario de lo que dice el botón.
+verificar("cambiar de alcance reinicia las casillas en las dos pantallas",
+  /ELEGIDAS = \(DATOS\.porDefecto \|\| \{\}\)\[ALCANCE\]/.test(JS_MI) &&
+  /crElegidas = \(crPorDefecto\[crAlcance\] \|\| \[\]\)\.slice\(\)/.test(JS_MED));
+
+// Y la caja del médico va en «Más acciones», no como pestaña trece.
+const PACIENTES = leer("public", "js", "pacientes.js");
+const bloqueMas = PACIENTES.slice(PACIENTES.indexOf('class="kardex-mas"'),
+                                  PACIENTES.indexOf("</details>", PACIENTES.indexOf('class="kardex-mas"')));
+verificar("en el kardex va dentro de «Más acciones», no como una pestaña más",
+  /compartirResumenCajaHtml/.test(bloqueMas));
+// El mismo patrón que teleconsulta: si la lista tarda o falla, la ficha se
+// abre igual.
+verificar("  ...y si su consulta falla, la ficha del paciente se abre igual",
+  /typeof compartirResumenPintar === "function"/.test(PACIENTES));
+
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

@@ -341,4 +341,93 @@ module.exports = (app) => {
 
     res.json({ resumen: paraElQueLoRecibe(r) });
   }));
+
+  // ═══ EL EMBUDO ══════════════════════════════════════════════════════════
+  //
+  // Un médico que abre este enlace es el único que llega a Symphomed sin que
+  // nadie lo haya ido a buscar: lo trajo su propio paciente, y ya vio el
+  // producto funcionando sobre un caso que le importa.
+  //
+  // Sin estos dos números, en seis meses nadie va a poder decir si esto trajo
+  // un cliente o si fue una función linda que no movió nada. Y esa respuesta
+  // decide si se le pone más trabajo encima o se deja como está.
+
+  // Tocó «importar» sin tener cuenta. Es interés, no una solicitud: la mitad
+  // de arriba del embudo, que es la que no se ve en ningún otro lado.
+  app.post("/r/:token/interes", limitPublico, asyncRoute(async (req, res) => {
+    await ResumenCompartido.updateOne({ token: req.params.token }, { $inc: { interesProfesional: 1 } });
+    res.json({ ok: true });
+  }));
+
+  // ═══ IMPORTAR A MI KARDEX ═══════════════════════════════════════════════
+  //
+  // Lo que de verdad quiere el médico que recibe el enlace: no volver a
+  // tipear a este paciente. Es la única parte de todo esto que le ahorra
+  // trabajo a ÉL, y por eso es el botón principal de la página.
+  //
+  // ═══ QUÉ SE IMPORTA, Y POR QUÉ TAN POCO ═════════════════════════════════
+  //
+  // Se crea una ficha con la identidad y las alergias, y el resumen queda
+  // adjunto como una nota con su enlace. NO se copian las consultas del otro
+  // médico adentro de la ficha nueva.
+  //
+  // Es deliberado y es lo más importante de esta función: las consultas de
+  // otro consultorio no son las de este. Copiadas adentro quedan
+  // indistinguibles de las propias, y en un año nadie sabe cuáles escribió él
+  // y cuáles heredó — con su firma encima de las dos. Lo que se hereda es el
+  // contexto, no la autoría.
+  //
+  // Las alergias sí se copian, por lo mismo que se comparten entre médicos de
+  // una clínica (ver PersonaClinica en db/models.js): no son un diagnóstico,
+  // son una advertencia sobre qué NO darle, y es exactamente el dato que hace
+  // falta antes de la primera receta.
+  app.post("/r/:token/importar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const r = await ResumenCompartido.findOne({ token: req.params.token });
+    if (!r) throw new ErrorHttp(404, "Este resumen no existe o el enlace ya no es válido.");
+    if (r.revocadoEn) throw new ErrorHttp(410, "Quien compartió este resumen dio de baja el enlace.");
+    if (r.tokenExpira < new Date()) throw new ErrorHttp(410, "Este enlace venció.");
+
+    // Su propio resumen no se importa: le crearía una ficha duplicada del
+    // paciente que ya tiene abierto.
+    if (r.medicoPhone === medicoPhone) {
+      throw new ErrorHttp(409, "Este resumen salió de tu propio consultorio: el paciente ya está en tu kardex.");
+    }
+
+    const ident = r.contenido?.identidad || {};
+    const nombre = String(ident.nombre || "").trim();
+    if (!nombre) throw new ErrorHttp(422, "Este resumen no trae el nombre del paciente, así que no se puede crear la ficha.");
+
+    // Si ya lo importó antes, se le devuelve el que hay en vez de crear otro.
+    // Tocar dos veces el botón —que va a pasar— no puede dejarle dos fichas
+    // del mismo paciente, que después hay que fusionar a mano.
+    const yaEsta = await Paciente.findOne({ medicoPhone, nombre,
+      ...(ident.fechaNacimiento ? { fechaNacimiento: new Date(ident.fechaNacimiento) } : {}) }).lean();
+    if (yaEsta) return res.json({ ok: true, pacienteId: yaEsta._id, yaExistia: true });
+
+    const alergias = r.contenido?.alergias?.lista || [];
+    const deDonde = r.firmaCentro || r.firmaNombre || "otro consultorio";
+    const paciente = await Paciente.create({
+      medicoPhone, nombre,
+      fechaNacimiento: ident.fechaNacimiento ? new Date(ident.fechaNacimiento) : null,
+      sexo: ident.sexo || "",
+      // Las alergias entran como antecedente porque esta ficha todavía no
+      // está vinculada a ninguna PersonaClinica —eso lo confirma el médico a
+      // mano, nunca el sistema—. Prefijadas para que se vean como lo que son:
+      // algo que llegó de afuera y que conviene confirmar con el paciente.
+      antecedentesPersonales: alergias.map(a => `Alergia: ${a} (según resumen de ${deDonde})`),
+      notas: `Ficha creada desde un resumen clínico compartido por el paciente.\n` +
+             `Origen: ${deDonde}.\n` +
+             `El resumen completo está en ${base(req)}/r/${r.token} (vence el ${r.tokenExpira.toISOString().slice(0, 10)}).`,
+    });
+
+    if (!r.importadoPor.includes(medicoPhone)) {
+      r.importadoPor.push(medicoPhone);
+      await r.save();
+    }
+
+    registrar({ req, medicoPhone, accion: "importar_resumen",
+      recurso: `Paciente:${paciente._id}`, detalle: `de ${r.medicoPhone}` });
+    res.json({ ok: true, pacienteId: paciente._id, yaExistia: false });
+  }));
 };

@@ -1,0 +1,216 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Symphomed — El resumen clínico visto desde afuera
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Esta hoja la usan /r (el médico que recibe) y /mi (el paciente). Es propia y
+   no estilos.css por lo mismo que socio.html tiene lo suyo: estas páginas no
+   bajan la app, y bajarle un megabyte de CSS clínico a alguien que va a leer
+   una hoja sería pagar el peso entero por el 2%.
+
+   ═══ CLARO Y NO OSCURO, AL REVÉS QUE TODO SYMPHOMED ═══════════════════════
+
+   La app es oscura porque un médico la tiene abierta ocho horas. Esto es un
+   documento: se lee una vez, con el paciente enfrente, y muchas veces se
+   imprime. Un documento clínico en blanco es lo que todo el mundo espera, y
+   además es lo que sale bien de una impresora sin que nadie toque nada. */
+:root{
+  --papel:#ffffff;
+  --tinta:#16212b;
+  --tinta2:#4a5c6a;
+  --tinta3:#7b8b98;
+  --linea:#dfe6ec;
+  --acento:#0d7fa8;
+  --alerta-fondo:#fff4f1;
+  --alerta-borde:#e4a695;
+  --alerta-tinta:#8d2f12;
+  --aviso-fondo:#fffaf0;
+  --aviso-borde:#e0c893;
+  --aviso-tinta:#7a5a17;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:#eef2f5;color:var(--tinta);
+  font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+
+/* ═══ LA BARRA DE ARRIBA ═════════════════════════════════════════════════
+   Acá SÍ va la marca, al revés que en el informe de avance de la familia.
+   No es una inconsistencia: aquel lo abre una madre en un teléfono que en
+   muchas casas es compartido, y nombrar la app en el historial del navegador
+   era un dato de más. Este lo abre un profesional en su consultorio. */
+.barra{
+  background:#0b1b24;color:#e9f6fc;padding:11px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+}
+.marca{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:2.2px;font-size:12px}
+.marca i{width:7px;height:7px;border-radius:50%;background:#19b9ef;display:block}
+.barra-nota{font-size:12.5px;color:#9fb6c4}
+
+.envoltorio{max-width:760px;margin:0 auto;padding:22px 16px 60px}
+
+.rv-hoja{
+  background:var(--papel);border:1px solid var(--linea);border-radius:14px;
+  padding:30px 30px 26px;box-shadow:0 1px 3px rgba(11,27,36,.07);
+}
+@media(max-width:560px){ .rv-hoja{padding:22px 18px 20px;border-radius:12px} .envoltorio{padding:14px 12px 44px} }
+
+.rv-cabecera{border-bottom:2px solid var(--tinta);padding-bottom:13px;margin-bottom:6px}
+.rv-cabecera h1{margin:0;font-size:25px;line-height:1.25;letter-spacing:-.2px}
+.rv-datos{margin:5px 0 0;color:var(--tinta2);font-size:14.5px}
+
+.rv-bloque{padding:17px 0;border-bottom:1px solid var(--linea)}
+.rv-bloque:last-of-type{border-bottom:0}
+.rv-bloque h2{
+  margin:0 0 9px;font-size:12px;font-weight:700;letter-spacing:1.3px;
+  text-transform:uppercase;color:var(--tinta3);
+}
+.rv-subtitulo{margin:13px 0 5px;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--tinta3)}
+
+.rv-lista{margin:0;padding-left:20px}
+.rv-lista li{margin:3px 0}
+.rv-medicacion{list-style:none;padding-left:0}
+.rv-medicacion li{padding:6px 0;border-bottom:1px dotted var(--linea)}
+.rv-medicacion li:last-child{border-bottom:0}
+.rv-terminado{color:var(--tinta2)}
+.rv-etiqueta{
+  display:inline-block;margin-left:7px;font-size:11px;color:var(--tinta3);
+  border:1px solid var(--linea);border-radius:999px;padding:1px 8px;
+}
+
+/* ═══ LAS ALERGIAS ════════════════════════════════════════════════════════
+   El único bloque con color de toda la hoja. Si algo más lo tuviera, este
+   dejaría de saltar — y saltar es su única función. */
+.rv-alerta{
+  background:var(--alerta-fondo);border:1px solid var(--alerta-borde);
+  border-radius:10px;padding:14px 16px;margin:14px 0;
+}
+.rv-alerta h2{color:var(--alerta-tinta)}
+.rv-chips{list-style:none;display:flex;flex-wrap:wrap;gap:7px;margin:0;padding:0}
+.rv-chip-alerta{
+  background:#fff;border:1px solid var(--alerta-borde);color:var(--alerta-tinta);
+  border-radius:999px;padding:4px 13px;font-weight:700;font-size:14.5px;
+}
+/* «No hay ninguna registrada» se ve distinto de «no tiene»: es un aviso, no
+   un dato tranquilizador. */
+.rv-sinDato{
+  background:var(--aviso-fondo);border:1px solid var(--aviso-borde);
+  border-radius:10px;padding:14px 16px;margin:14px 0;
+}
+.rv-sinDato h2{color:var(--aviso-tinta)}
+.rv-sinDato p{margin:0;font-size:14.5px;color:var(--aviso-tinta)}
+
+.rv-consulta{padding:11px 0;border-bottom:1px dotted var(--linea)}
+.rv-consulta:last-child{border-bottom:0}
+.rv-consulta h3{margin:2px 0 5px;font-size:16.5px;line-height:1.35}
+.rv-fecha{margin:0;font-size:12.5px;color:var(--tinta3);font-variant-numeric:tabular-nums}
+.rv-dx,.rv-campo{margin:3px 0;font-size:15px}
+.rv-dx{font-weight:600}
+/* La etiqueta del campo, en versalitas y atenuada: se salta al leer si no se
+   la busca, y se encuentra enseguida si sí. */
+.rv-dx span,.rv-campo span{
+  display:inline-block;min-width:78px;font-size:11px;font-weight:700;
+  letter-spacing:.9px;text-transform:uppercase;color:var(--tinta3);
+}
+.rv-campo{color:var(--tinta2)}
+.rv-aviso-corte{
+  margin:12px 0 0;font-size:13.5px;color:var(--tinta2);
+  background:#f5f8fa;border-left:3px solid var(--linea);padding:9px 12px;border-radius:0 6px 6px 0;
+}
+
+.rv-pie{margin-top:22px;padding-top:15px;border-top:2px solid var(--tinta);font-size:14px}
+.rv-firma{margin:0;font-weight:700}
+.rv-pie p{margin:2px 0;color:var(--tinta2)}
+.rv-pie a{color:var(--acento)}
+.rv-pie-dato{font-size:12.5px;color:var(--tinta3)}
+
+/* ─── Botones ─────────────────────────────────────────────────────────── */
+.acciones{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 15px}
+.btn{
+  border:1px solid var(--linea);background:#fff;color:var(--tinta);
+  border-radius:999px;padding:9px 17px;font:inherit;font-size:14px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+}
+.btn:hover{border-color:var(--acento);color:var(--acento)}
+.btn:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
+.btn.primario{background:var(--acento);border-color:var(--acento);color:#fff;font-weight:600}
+.btn.primario:hover{filter:brightness(1.07);color:#fff}
+.btn:disabled{opacity:.55;cursor:default}
+
+.cargando,.error{
+  background:#fff;border:1px solid var(--linea);border-radius:14px;
+  padding:40px 26px;text-align:center;color:var(--tinta2);
+}
+.error h1{margin:0 0 8px;font-size:19px;color:var(--tinta)}
+.error p{margin:0;font-size:15px}
+
+/* ═══ LA BANDA DEL COLEGA ═════════════════════════════════════════════════
+   Va DESPUÉS del documento y nunca antes. Un cartel de producto arriba de una
+   historia clínica convierte el documento en el envoltorio de un anuncio, y
+   el médico que lo recibe lo trata como tal.
+
+   Abajo, en cambio, aparece justo cuando terminó de leer algo que le sirvió —
+   que es el único momento en que la pregunta «¿y esto qué es?» es sincera. */
+.banda{
+  margin-top:20px;background:#0b1b24;color:#dcebf3;
+  border-radius:14px;padding:20px 22px;
+}
+.banda h2{margin:0 0 6px;font-size:17px;color:#fff;letter-spacing:-.2px}
+.banda p{margin:0 0 13px;font-size:14.5px;color:#9fb6c4;line-height:1.55}
+.banda .btn{background:transparent;border-color:#2b4a5c;color:#cfe4ee}
+.banda .btn:hover{border-color:#19b9ef;color:#19b9ef}
+.banda .btn.primario{background:#19b9ef;border-color:#19b9ef;color:#04202c}
+
+/* ─── Lo del paciente (/mi) ───────────────────────────────────────────── */
+.panel{
+  background:#fff;border:1px solid var(--linea);border-radius:14px;
+  padding:20px 22px;margin-bottom:16px;
+}
+.panel h2{margin:0 0 5px;font-size:17px}
+.panel p.ayuda{margin:0 0 14px;color:var(--tinta2);font-size:14.5px}
+.casillas{display:grid;gap:7px;margin:12px 0 16px}
+.casilla{display:flex;gap:9px;align-items:flex-start;font-size:15px;cursor:pointer}
+.casilla input{margin-top:4px;width:17px;height:17px;accent-color:var(--acento);flex:0 0 auto}
+.casilla.fija{color:var(--tinta2);cursor:default}
+.casilla .porque{display:block;font-size:12.5px;color:var(--tinta3)}
+.opciones{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:6px}
+.opcion{
+  border:1px solid var(--linea);border-radius:10px;padding:11px 15px;cursor:pointer;
+  font-size:14.5px;flex:1 1 200px;
+}
+.opcion[aria-pressed="true"]{border-color:var(--acento);background:#f2fafd;box-shadow:inset 0 0 0 1px var(--acento)}
+.opcion b{display:block;margin-bottom:2px}
+.opcion span{color:var(--tinta2);font-size:13px}
+
+.enlace-listo{
+  background:#f2fafd;border:1px solid #bfe4f2;border-radius:10px;
+  padding:13px 15px;margin-top:13px;
+}
+.enlace-listo code{
+  display:block;font-size:13px;word-break:break-all;color:var(--tinta);
+  background:#fff;border:1px solid var(--linea);border-radius:7px;padding:9px 11px;margin:8px 0 10px;
+}
+.compartidos{list-style:none;margin:10px 0 0;padding:0}
+.compartidos li{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;
+  padding:10px 0;border-bottom:1px dotted var(--linea);font-size:14px;
+}
+.compartidos li:last-child{border-bottom:0}
+.compartidos .estado{color:var(--tinta3);font-size:12.5px}
+.vencido{color:var(--tinta3);text-decoration:line-through}
+
+/* ═══ IMPRIMIR ════════════════════════════════════════════════════════════
+   Es la mitad de por qué esto reemplaza al PDF: el enlace se puede revocar y
+   además se imprime. Lo que no puede salir impreso es nada de la aplicación —
+   ni la barra, ni los botones, ni la banda de Symphomed: en papel, un cartel
+   de producto sobre una historia clínica no tiene ninguna excusa. */
+@media print{
+  body{background:#fff}
+  .barra,.acciones,.banda,.panel,.no-imprimir{display:none!important}
+  .envoltorio{max-width:none;padding:0}
+  .rv-hoja{border:0;border-radius:0;box-shadow:none;padding:0}
+  .rv-alerta,.rv-sinDato{border:1.5px solid #000;background:#fff}
+  .rv-chip-alerta{border-color:#000;color:#000}
+  .rv-alerta h2,.rv-sinDato h2,.rv-sinDato p{color:#000}
+  .rv-consulta{page-break-inside:avoid}
+}
