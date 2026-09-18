@@ -2,8 +2,6 @@
 // Prueba focalizada del respaldo seguro: configuración cerrada, cifrado
 // autenticado y rechazo de una clave insuficiente.
 const assert = require("assert");
-const path = require("path");
-const { spawnSync } = require("child_process");
 
 process.env.MONGODB_URI ||= "mongodb://127.0.0.1:27017/symphomed_prueba";
 process.env.OPENAI_KEY ||= "prueba";
@@ -32,19 +30,15 @@ assert.throws(
   "AES-GCM debe detectar una copia modificada"
 );
 
-const modulo = path.join(__dirname, "..", "..", "services", "backup.js");
-const hijo = spawnSync(process.execPath, ["-e", [
-  'process.env.MONGODB_URI="mongodb://127.0.0.1:27017/x"',
-  'process.env.OPENAI_KEY="x"',
-  'process.env.JWT_SECRET="x"',
-  'process.env.BACKUP_CLAVE="corta"',
-  'process.env.BACKUP_COMANDO_SUBIDA="true {archivo}"',
-  'process.env.BACKUP_COMANDO_VERIFICAR="true {archivo}"',
-  'process.env.BACKUP_EXIGIR_SEGURO="1"',
-  `require(${JSON.stringify(modulo)}).validarConfiguracionBackup()`,
-].join(";")], { encoding: "utf8" });
-
-assert.notEqual(hijo.status, 0, "el modo cerrado debe rechazar una clave corta");
-assert.match(hijo.stderr, /Configuración de respaldos insegura/, "el error debe explicar que la configuración es insegura");
+assert.throws(
+  () => backup.validarConfiguracionBackup({
+    estricto: true,
+    clave: "corta",
+    comandoSubida: "true {archivo}",
+    comandoVerificar: "true {archivo}",
+  }),
+  /Configuración de respaldos insegura/,
+  "el modo cerrado debe rechazar una clave corta"
+);
 
 console.log("✓ backup seguro: configuración, cifrado autenticado y rechazo fail-closed");
