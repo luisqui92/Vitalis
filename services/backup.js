@@ -73,22 +73,31 @@ const COMANDO_SUBIDA = process.env.BACKUP_COMANDO_SUBIDA || "";
 const COMANDO_VERIFICAR = process.env.BACKUP_COMANDO_VERIFICAR || "";
 const EXIGIR_SEGURO = process.env.BACKUP_EXIGIR_SEGURO === "1";
 
-function erroresConfiguracionBackup() {
+function erroresConfiguracionBackup({
+  clave = CLAVE,
+  comandoSubida = COMANDO_SUBIDA,
+  comandoVerificar = COMANDO_VERIFICAR,
+} = {}) {
   const errores = [];
-  if (Buffer.byteLength(CLAVE, "utf8") < 32) errores.push("BACKUP_CLAVE debe tener al menos 32 bytes");
-  if (!COMANDO_SUBIDA) errores.push("falta BACKUP_COMANDO_SUBIDA");
-  if (!COMANDO_VERIFICAR) errores.push("falta BACKUP_COMANDO_VERIFICAR");
-  if (COMANDO_SUBIDA && !COMANDO_SUBIDA.includes("{archivo}")) {
+  if (Buffer.byteLength(clave, "utf8") < 32) errores.push("BACKUP_CLAVE debe tener al menos 32 bytes");
+  if (!comandoSubida) errores.push("falta BACKUP_COMANDO_SUBIDA");
+  if (!comandoVerificar) errores.push("falta BACKUP_COMANDO_VERIFICAR");
+  if (comandoSubida && !comandoSubida.includes("{archivo}")) {
     errores.push("BACKUP_COMANDO_SUBIDA debe incluir {archivo}");
   }
-  if (COMANDO_VERIFICAR && !COMANDO_VERIFICAR.includes("{archivo}")) {
+  if (comandoVerificar && !comandoVerificar.includes("{archivo}")) {
     errores.push("BACKUP_COMANDO_VERIFICAR debe incluir {archivo}");
   }
   return errores;
 }
 
-function validarConfiguracionBackup({ estricto = EXIGIR_SEGURO } = {}) {
-  const errores = erroresConfiguracionBackup();
+function validarConfiguracionBackup({
+  estricto = EXIGIR_SEGURO,
+  clave = CLAVE,
+  comandoSubida = COMANDO_SUBIDA,
+  comandoVerificar = COMANDO_VERIFICAR,
+} = {}) {
+  const errores = erroresConfiguracionBackup({ clave, comandoSubida, comandoVerificar });
   if (estricto && errores.length) {
     throw new Error("Configuración de respaldos insegura: " + errores.join(" · "));
   }
