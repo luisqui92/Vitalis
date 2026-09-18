@@ -65,6 +65,36 @@ const CLAVE = process.env.BACKUP_CLAVE || "";
 // ilegibles todos los respaldos viejos — que es justo cuando uno se entera.
 const MAGIA = Buffer.from("VITALISBK1");
 
+// En producción se activa BACKUP_EXIGIR_SEGURO=1. Desde ese momento la app
+// se niega a arrancar si falta cifrado, subida o verificación externa. La
+// bandera permite preparar el destino antes del despliegue sin dejar una
+// ventana en la que el proceso arranque creyendo que está protegido.
+const COMANDO_SUBIDA = process.env.BACKUP_COMANDO_SUBIDA || "";
+const COMANDO_VERIFICAR = process.env.BACKUP_COMANDO_VERIFICAR || "";
+const EXIGIR_SEGURO = process.env.BACKUP_EXIGIR_SEGURO === "1";
+
+function erroresConfiguracionBackup() {
+  const errores = [];
+  if (Buffer.byteLength(CLAVE, "utf8") < 32) errores.push("BACKUP_CLAVE debe tener al menos 32 bytes");
+  if (!COMANDO_SUBIDA) errores.push("falta BACKUP_COMANDO_SUBIDA");
+  if (!COMANDO_VERIFICAR) errores.push("falta BACKUP_COMANDO_VERIFICAR");
+  if (COMANDO_SUBIDA && !COMANDO_SUBIDA.includes("{archivo}")) {
+    errores.push("BACKUP_COMANDO_SUBIDA debe incluir {archivo}");
+  }
+  if (COMANDO_VERIFICAR && !COMANDO_VERIFICAR.includes("{archivo}")) {
+    errores.push("BACKUP_COMANDO_VERIFICAR debe incluir {archivo}");
+  }
+  return errores;
+}
+
+function validarConfiguracionBackup({ estricto = EXIGIR_SEGURO } = {}) {
+  const errores = erroresConfiguracionBackup();
+  if (estricto && errores.length) {
+    throw new Error("Configuración de respaldos insegura: " + errores.join(" · "));
+  }
+  return { ok: errores.length === 0, estricto, errores };
+}
+
 function derivarClave(sal) {
   return crypto.scryptSync(CLAVE, sal, 32);
 }
@@ -146,6 +176,7 @@ async function archivarUploads(destinoTar) {
   // respaldo se pueda restaurar en un servidor con otra estructura de
   // carpetas sin tener que editar nada.
   await ejecutar("tar", ["-czf", destinoTar, "-C", path.dirname(DIR_UPLOADS), path.basename(DIR_UPLOADS)], { maxBuffer: 64 * 1024 * 1024 });
+  await fsp.chmod(destinoTar, 0o600);
   return { archivos, bytes };
 }
 
@@ -154,24 +185,47 @@ function nombreDeAhora() {
   return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
-async function hacerBackup({ verificar = true } = {}) {
-  // Si Mongo está caído o reconectando, no hay nada que respaldar. Sin este
-  // chequeo el respaldo automático deja un [ERROR] en el log cada vez que la
-  // base tose, y un log lleno de errores rojos que no significan nada es la
-  // forma más rápida de que nadie mire el log cuando importe.
+let respaldoEnCurso = null;
+
+async function sha256Archivo(ruta) {
+  const hash = crypto.createHash("sha256");
+  for await (const bloque of fs.createReadStream(ruta)) hash.update(bloque);
+  return hash.digest("hex");
+}
+
+async function escribirJsonAtomico(ruta, valor) {
+  const temporal = ruta + ".tmp";
+  await fsp.writeFile(temporal, JSON.stringify(valor, null, 2), { mode: 0o600 });
+  await fsp.rename(temporal, ruta);
+}
+
+// Todas las entradas —automática y manual— comparten esta promesa. Dos clics,
+// dos timers o un reinicio del frontend no pueden hacer dos volcados enormes
+// al mismo tiempo ni subir dos juegos con la misma marca.
+async function hacerBackup(opciones = {}) {
+  if (respaldoEnCurso) return respaldoEnCurso;
+  respaldoEnCurso = hacerBackupInterno(opciones);
+  try {
+    return await respaldoEnCurso;
+  } finally {
+    respaldoEnCurso = null;
+  }
+}
+
+async function hacerBackupInterno({ verificar = true } = {}) {
   if (mongoose.connection.readyState !== 1) {
     log.warn("[BACKUP] se saltea este respaldo: MongoDB no está conectado ahora mismo");
     return { salteado: true, motivo: "sin_conexion" };
   }
 
   const arrancó = Date.now();
-  await fsp.mkdir(DIR_BACKUPS, { recursive: true });
+  await fsp.mkdir(DIR_BACKUPS, { recursive: true, mode: 0o700 });
+  await fsp.chmod(DIR_BACKUPS, 0o700).catch(() => {});
   const marca = nombreDeAhora();
   const base = path.join(DIR_BACKUPS, `vitalis-${marca}`);
 
   log.info("[BACKUP] arrancando respaldo", marca);
 
-  // 1. La base
   const volcado = await volcarBaseDeDatos();
   const paquete = {
     version: 1,
@@ -183,22 +237,22 @@ async function hacerBackup({ verificar = true } = {}) {
   const comprimido = await gzip(Buffer.from(JSON.stringify(paquete), "utf8"));
   const { buffer: datosFinales, cifrado } = cifrar(comprimido);
   const rutaBase = base + ".vitalisbk";
-  await fsp.writeFile(rutaBase, datosFinales);
+  await fsp.writeFile(rutaBase, datosFinales, { mode: 0o600 });
 
-  // 2. Los archivos
   const rutaTar = base + "-archivos.tar.gz";
   const uploads = await archivarUploads(rutaTar);
   let rutaArchivos = null;
   if (uploads.archivos > 0) {
-    // El tar también se cifra, con el mismo criterio que la base.
     if (cifrado) {
       const crudo = await fsp.readFile(rutaTar);
-      await fsp.writeFile(rutaTar, cifrar(crudo).buffer);
+      await fsp.writeFile(rutaTar, cifrar(crudo).buffer, { mode: 0o600 });
     }
+    await fsp.chmod(rutaTar, 0o600);
     rutaArchivos = rutaTar;
   }
 
   const manifiesto = {
+    version: 2,
     fecha: paquete.fecha,
     marca,
     cifrado,
@@ -207,14 +261,22 @@ async function hacerBackup({ verificar = true } = {}) {
     documentos: Object.values(volcado.conteos).reduce((a, b) => a + b, 0),
     archivoBase: path.basename(rutaBase),
     bytesBase: (await fsp.stat(rutaBase)).size,
+    sha256Base: await sha256Archivo(rutaBase),
     archivoArchivos: rutaArchivos ? path.basename(rutaArchivos) : null,
     archivos: uploads.archivos,
     bytesArchivos: rutaArchivos ? (await fsp.stat(rutaArchivos)).size : 0,
+    sha256Archivos: rutaArchivos ? await sha256Archivo(rutaArchivos) : null,
     verificado: null,
+    externo: {
+      configurado: Boolean(COMANDO_SUBIDA && COMANDO_VERIFICAR),
+      estado: "pendiente",
+      verificado: false,
+      fecha: null,
+      archivos: [],
+    },
     segundos: 0,
   };
 
-  // 3. La verificación: se restaura de verdad y se cuenta.
   if (verificar) {
     try {
       const r = await verificarBackup(rutaBase);
@@ -228,14 +290,42 @@ async function hacerBackup({ verificar = true } = {}) {
     }
   }
 
-  manifiesto.segundos = Math.round((Date.now() - arrancó) / 1000);
-  await fsp.writeFile(base + ".json", JSON.stringify(manifiesto, null, 2));
+  const rutaManifiesto = base + ".json";
+  const rutasDatos = [rutaBase, rutaArchivos].filter(Boolean);
 
-  log.info(`[BACKUP] listo: ${manifiesto.documentos} documentos, ${manifiesto.archivos} archivos, ${manifiesto.segundos}s, ${cifrado ? "cifrado" : "SIN CIFRAR"}, verificado=${manifiesto.verificado}`);
+  // Solo sale del servidor lo que está cifrado y ya demostró que restaura.
+  // La copia externa también se verifica: "el comando terminó" no alcanza.
+  if (manifiesto.verificado === true) {
+    manifiesto.externo = await subirAfuera(manifiesto, rutasDatos);
+  } else {
+    manifiesto.externo.estado = "omitido_sin_verificacion_local";
+  }
+
+  manifiesto.segundos = Math.round((Date.now() - arrancó) / 1000);
+  await escribirJsonAtomico(rutaManifiesto, manifiesto);
+
+  // El manifiesto viaja último. Si existe afuera, describe un juego completo
+  // que ya pasó tanto la restauración local como la comprobación remota.
+  if (manifiesto.externo.verificado === true) {
+    manifiesto.externo.manifiestoSubido = true;
+    await escribirJsonAtomico(rutaManifiesto, manifiesto);
+    const resultadoManifiesto = await subirArchivoAfuera(manifiesto, rutaManifiesto);
+    if (!resultadoManifiesto.verificado) {
+      manifiesto.externo.estado = "fallo";
+      manifiesto.externo.verificado = false;
+      manifiesto.externo.manifiestoSubido = false;
+      manifiesto.externo.error = "No se pudo guardar o verificar el manifiesto externo";
+      manifiesto.externo.archivos.push(resultadoManifiesto);
+      await escribirJsonAtomico(rutaManifiesto, manifiesto);
+    }
+  }
+
+  log.info(
+    `[BACKUP] listo: ${manifiesto.documentos} documentos, ${manifiesto.archivos} archivos, ${manifiesto.segundos}s, ` +
+    `${cifrado ? "cifrado" : "SIN CIFRAR"}, local=${manifiesto.verificado}, externo=${manifiesto.externo.verificado}`
+  );
 
   await aplicarRetencion();
-  if (manifiesto.verificado !== false) await subirAfuera(manifiesto, [rutaBase, rutaArchivos].filter(Boolean));
-
   return manifiesto;
 }
 
@@ -322,26 +412,109 @@ async function aplicarRetencion() {
 // ni meter un SDK adentro de Symphomed.
 //
 // BACKUP_COMANDO_SUBIDA="rclone copy {archivo} b2:vitalis-respaldos/"
-async function subirAfuera(manifiesto, rutas) {
-  const plantilla = process.env.BACKUP_COMANDO_SUBIDA;
-  if (!plantilla) return;
-
-  // Mandar afuera datos clínicos sin cifrar es exactamente lo que no hay que
-  // hacer, así que esto se frena aunque esté configurado.
-  if (!manifiesto.cifrado) {
-    log.error("[BACKUP] no se sube afuera: el respaldo no está cifrado (falta BACKUP_CLAVE)");
-    return;
-  }
-
-  for (const ruta of rutas) {
-    try {
-      const partes = plantilla.split(/\s+/).filter(Boolean).map(p => p.replace("{archivo}", ruta));
-      await ejecutar(partes[0], partes.slice(1), { timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
-      log.info("[BACKUP] subido afuera:", path.basename(ruta));
-    } catch (e) {
-      log.error("[BACKUP] falló la subida afuera de", path.basename(ruta), "—", e.message);
+function separarComando(texto) {
+  const partes = [];
+  let actual = "";
+  let comilla = null;
+  let escapado = false;
+  for (const c of String(texto || "")) {
+    if (escapado) { actual += c; escapado = false; continue; }
+    if (c === "\\") { escapado = true; continue; }
+    if (comilla) {
+      if (c === comilla) comilla = null;
+      else actual += c;
+      continue;
+    }
+    if (c === '"' || c === "'") { comilla = c; continue; }
+    if (/\s/.test(c)) {
+      if (actual) { partes.push(actual); actual = ""; }
+    } else {
+      actual += c;
     }
   }
+  if (escapado) actual += "\\";
+  if (comilla) throw new Error("Hay una comilla sin cerrar en el comando de backup");
+  if (actual) partes.push(actual);
+  return partes;
+}
+
+function comandoPara(plantilla, manifiesto, ruta) {
+  const valores = {
+    archivo: ruta,
+    nombre: path.basename(ruta),
+    marca: manifiesto.marca,
+  };
+  return separarComando(plantilla).map(parte =>
+    parte.replace(/\{(archivo|nombre|marca)\}/g, (_m, clave) => valores[clave])
+  );
+}
+
+async function ejecutarComandoBackup(plantilla, manifiesto, ruta) {
+  const partes = comandoPara(plantilla, manifiesto, ruta);
+  if (!partes.length) throw new Error("El comando de backup está vacío");
+  return ejecutar(partes[0], partes.slice(1), {
+    timeout: 30 * 60 * 1000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+}
+
+async function subirArchivoAfuera(manifiesto, ruta) {
+  const resultado = {
+    nombre: path.basename(ruta),
+    bytes: (await fsp.stat(ruta)).size,
+    sha256: await sha256Archivo(ruta),
+    subido: false,
+    verificado: false,
+  };
+  try {
+    await ejecutarComandoBackup(COMANDO_SUBIDA, manifiesto, ruta);
+    resultado.subido = true;
+    await ejecutarComandoBackup(COMANDO_VERIFICAR, manifiesto, ruta);
+    resultado.verificado = true;
+    log.info("[BACKUP] subido y verificado afuera:", resultado.nombre);
+  } catch (e) {
+    resultado.error = String(e.stderr || e.message || e).trim().slice(0, 500);
+    log.error("[BACKUP] falló la copia externa de", resultado.nombre, "—", resultado.error);
+  }
+  return resultado;
+}
+
+async function subirAfuera(manifiesto, rutas) {
+  const configuracion = validarConfiguracionBackup({ estricto: false });
+  if (!configuracion.ok) {
+    if (EXIGIR_SEGURO) {
+      log.error("[BACKUP] copia externa bloqueada:", configuracion.errores.join(" · "));
+    }
+    return {
+      configurado: false,
+      estado: "no_configurado",
+      verificado: false,
+      fecha: new Date().toISOString(),
+      archivos: [],
+      error: configuracion.errores.join(" · "),
+    };
+  }
+  if (!manifiesto.cifrado) {
+    return {
+      configurado: true,
+      estado: "omitido_sin_cifrado",
+      verificado: false,
+      fecha: new Date().toISOString(),
+      archivos: [],
+      error: "El respaldo local no está cifrado",
+    };
+  }
+
+  const resultados = [];
+  for (const ruta of rutas) resultados.push(await subirArchivoAfuera(manifiesto, ruta));
+  const verificado = resultados.length > 0 && resultados.every(r => r.verificado);
+  return {
+    configurado: true,
+    estado: verificado ? "verificado" : "fallo",
+    verificado,
+    fecha: new Date().toISOString(),
+    archivos: resultados,
+  };
 }
 
 // ─── ESTADO ───────────────────────────────────────────────────────────────
@@ -361,11 +534,25 @@ async function estado() {
   const backups = (await listarBackups()).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   const ultimo = backups[0] || null;
   const horas = ultimo ? (Date.now() - new Date(ultimo.fecha).getTime()) / 3600000 : null;
+  const configuracion = validarConfiguracionBackup({ estricto: false });
+  const ultimaCopiaExterna = Boolean(
+    ultimo?.externo?.verificado === true && ultimo?.externo?.manifiestoSubido !== false
+  );
+
+  let problema = null;
+  if (EXIGIR_SEGURO && !configuracion.ok) problema = "configuracion_insegura";
+  else if (!ultimo) problema = "nunca_se_hizo";
+  else if (ultimo.verificado === false) problema = "ultimo_fallo";
+  else if (!ultimaCopiaExterna) problema = "ultimo_sin_copia_externa";
+  else if (horas > HORAS_ALERTA) problema = "desactualizado";
 
   return {
     configurado: true,
     cifrado: Boolean(CLAVE),
-    afuera: Boolean(process.env.BACKUP_COMANDO_SUBIDA),
+    afuera: ultimaCopiaExterna,
+    afueraConfigurado: configuracion.ok,
+    seguroExigido: EXIGIR_SEGURO,
+    configuracionSegura: configuracion.ok,
     cuantos: backups.length,
     ultimo: ultimo && {
       fecha: ultimo.fecha,
@@ -375,14 +562,14 @@ async function estado() {
       verificado: ultimo.verificado,
       segundos: ultimo.segundos,
       cifrado: ultimo.cifrado,
+      externo: ultimo.externo ? {
+        estado: ultimo.externo.estado,
+        verificado: ultimo.externo.verificado === true,
+        fecha: ultimo.externo.fecha || null,
+      } : { estado: "sin_registro", verificado: false, fecha: null },
     },
     horasDesdeUltimo: horas == null ? null : Math.round(horas * 10) / 10,
-    // Esto es lo que pinta la pantalla en rojo. Se decide acá y no en el
-    // navegador para que la respuesta sea la misma desde donde se mire.
-    problema: !ultimo ? "nunca_se_hizo"
-      : ultimo.verificado === false ? "ultimo_fallo"
-      : horas > HORAS_ALERTA ? "desactualizado"
-      : null,
+    problema,
     espacioLibre: null,
   };
 }
@@ -392,6 +579,7 @@ let temporizador = null;
 
 function programar() {
   if (temporizador) return;
+  validarConfiguracionBackup();
   const ms = HORAS_INTERVALO * 3600000;
 
   // El primero sale a los 2 minutos de arrancar y no en el acto: si el
@@ -408,10 +596,15 @@ function programar() {
   // apaga Symphomed a propósito.
   if (temporizador.unref) temporizador.unref();
 
-  log.info(`[BACKUP] programado cada ${HORAS_INTERVALO} h · destino ${DIR_BACKUPS} · ${CLAVE ? "cifrado" : "SIN CIFRAR (falta BACKUP_CLAVE)"}`);
+  log.info(
+    `[BACKUP] programado cada ${HORAS_INTERVALO} h · destino ${DIR_BACKUPS} · ` +
+    `${CLAVE ? "cifrado" : "SIN CIFRAR (falta BACKUP_CLAVE)"} · ` +
+    `${COMANDO_SUBIDA && COMANDO_VERIFICAR ? "externo verificado" : "SIN DESTINO EXTERNO VERIFICADO"}`
+  );
 }
 
 module.exports = {
   hacerBackup, verificarBackup, listarBackups, estado, programar,
+  validarConfiguracionBackup, erroresConfiguracionBackup,
   cifrar, descifrar, DIR_BACKUPS,
 };
