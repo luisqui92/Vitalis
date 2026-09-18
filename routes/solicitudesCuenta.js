@@ -29,7 +29,8 @@ const { esOperador } = require("../services/operadores");
 const { registrar } = require("../services/auditoria");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { log } = require("../config");
+const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("../services/metaWhatsapp");
+const { CONFIG, log } = require("../config");
 
 // Igual que el panel de pagos: acá entra también una cuenta administrativa,
 // porque quien administra Symphomed no tiene por qué ser médico.
@@ -71,6 +72,29 @@ async function traerSolicitud(phone) {
   const medico = await Medico.findOne({ phone: String(phone || "").trim() });
   if (!medico) throw new ErrorHttp(404, "Esa solicitud no existe");
   return medico;
+}
+
+async function avisarCuentaAprobada(medico) {
+  const esBrasil = medico.moneda === "BRL" || medico.idioma === "pt";
+  const destino = normalizarDestino(medico.phone, esBrasil ? "BR" : "BO");
+  if (!destino) throw new Error("la cuenta no tiene un teléfono válido");
+
+  const nombre = medico.nombre || "Profesional";
+  const ingreso = CONFIG.APP_URL || "https://app.symphomed.com";
+  const portugues = medico.idioma === "pt";
+  const texto = portugues
+    ? `Olá ${nombre}, sua conta da Symphomed foi aprovada.\n\nVocê já pode entrar em ${ingreso} com o telefone que cadastrou.\n\nPor segurança, não compartilhe sua senha.`
+    : `Hola ${nombre}, tu cuenta de Symphomed fue aprobada.\n\nYa podés ingresar en ${ingreso} con el teléfono que registraste.\n\nPor seguridad, no compartas tu contraseña.`;
+
+  // Meta rechazó la variante pt_BR de esta plantilla en esta cuenta.
+  // Dentro de las 24 h se mantiene el texto libre en portugués; fuera de la
+  // ventana se usa la plantilla española aprobada para no perder el aviso.
+  const resultado = await enviarTextoOPlantilla(destino, texto, {
+    plantilla: PLANTILLAS.cuentaAprobada,
+    parametros: [nombre, ingreso],
+    idioma: "es",
+  });
+  if (!resultado) throw new Error("WhatsApp Meta no está configurado");
 }
 
 module.exports = function (app) {
@@ -118,6 +142,17 @@ module.exports = function (app) {
     log.info(`[CUENTAS] ${quien} aprobó a ${medico.nombre} (${medico.phone})`);
 
     res.json({ ok: true, phone: medico.phone, nombre: medico.nombre });
+
+    // La aprobación ya quedó guardada: el aviso es importante, pero una
+    // caída de Meta no puede revertirla ni convertir la respuesta en 500.
+    avisarCuentaAprobada(medico)
+      .then(() => registrar({ req, medicoPhone: quien, accion: "cuenta_aprobada_whatsapp",
+        recurso: `Medico:${medico.phone}` }))
+      .catch((e) => {
+        registrar({ req, medicoPhone: quien, accion: "cuenta_aprobada_whatsapp",
+          recurso: `Medico:${medico.phone}`, detalle: e.message, exito: false });
+        log.error(`[CUENTAS] cuenta aprobada, pero no se pudo avisar por WhatsApp a ${medico.phone}: ${e.message}`);
+      });
   }));
 
   // ─── RECHAZAR ──────────────────────────────────────────────────────────
