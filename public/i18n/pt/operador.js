@@ -1,7 +1,7 @@
 // Symphomed — Português · tela de operador (creditar recargas).
 Object.assign(I18N.pt, {
-  "op.titulo": "Creditar recargas",
-  "op.ayuda": "Busque o médico, confirme o pagamento no banco e credite. A recarga mínima é R$ {minimo}.",
+  "op.titulo": "Contas e pagamentos",
+  "op.ayuda": "Revise primeiro as solicitações de conta. Para creditar saldo, confirme o pagamento no banco; a recarga mínima é R$ {minimo}.",
   "op.falta2fa": "Para creditar saldo você precisa da verificação em duas etapas ativa. Ative logo abaixo e entre de novo.",
   "op.faltaPermiso": "Esta conta ainda não tem permissão para aprovar pagamentos. É preciso adicionar o telefone dela a OPERADORES_SALDO no servidor e reiniciar o Symphomed. Avise quem administra o servidor.",
   "op.noPudimosVerificar": "Não conseguimos verificar a permissão desta conta com o servidor ({detalle}). Não é necessariamente falta de permissão: pode ser um problema momentâneo. Tente de novo em um minuto.",
@@ -37,7 +37,7 @@ Object.assign(I18N.pt, {
   "op.motivoRechazo": "Por que está recusando? O médico vai ver este texto.",
   "op.errRechazar": "Não foi possível recusar",
   "op.panelPendientes": "{n} médico(s) esperando você aprovar o pagamento",
-  "op.panelAyuda": "Toque aqui para revisar e creditar.",
+  "op.panelAyuda": "Toque aqui para revisar e resolver o que está pendente.",
   "op.res.hoy": "Entrou hoje",
   "op.res.mes": "Entrou este mês",
   "op.res.consumo": "Consumido este mês",
@@ -46,7 +46,7 @@ Object.assign(I18N.pt, {
   "op.res.deudaAyuda": "Atenderam com o saldo zerado. É descontado sozinho na próxima recarga.",
   "op.res.verCargas": "Ver últimas recargas",
   "op.res.por": "creditado por {quien}",
-  "op.nav.pagos": "Pagamentos",
+  "op.nav.pagos": "Contas e pagamentos",
   "op.irAConfig": "Ir para Configuração",
   "op.buscarAyuda": "Para creditar alguém que não avisou pelo app, ou para ver o histórico dele.",
   "op.dp.titulo": "Onde nos pagam",

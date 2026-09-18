@@ -47,16 +47,16 @@ async function traerEstadoOperador() {
     return OPERADOR_ESTADO;
   }
 
-  // La cola, solo si además hay 2FA: sin él esta ruta contesta 403 seguro, y
-  // pedirla es gastar un rebote para no enterarse de nada. Y aunque falle por
-  // cualquier otro motivo, no puede tocar lo que ya sabemos de la cuenta.
+  // Las dos colas, solo si además hay 2FA: ambas rutas están protegidas
+  // por el segundo factor. Se consultan por separado para que una caída en
+  // pagos no esconda que hay una cuenta esperando aprobación, ni al revés.
   if (OPERADOR_ESTADO.operador && OPERADOR_ESTADO.dosFAActivo) {
-    try {
-      const cola = await api("/medico/operador/solicitudes");
-      OPERADOR_ESTADO.pendientes = cola.pendientes || 0;
-    } catch {
-      OPERADOR_ESTADO.pendientes = 0;
-    }
+    const [pagos, cuentas] = await Promise.all([
+      api("/medico/operador/solicitudes").catch(() => null),
+      api("/medico/solicitudes-cuenta").catch(() => null),
+    ]);
+    OPERADOR_ESTADO.pendientes = pagos?.pendientes || 0;
+    OPERADOR_ESTADO.cuentasPendientes = cuentas?.pendientes?.length || 0;
   }
   return OPERADOR_ESTADO;
 }
@@ -71,12 +71,15 @@ async function traerEstadoOperador() {
 // "0 avisos" se deja de ver justo el día que dice 3.
 function avisoOperadorHtml() {
   const e = OPERADOR_ESTADO;
-  if (!e?.operador || !e.pendientes) return "";
+  const pagos = e?.pendientes || 0;
+  const cuentas = e?.cuentasPendientes || 0;
+  if (!e?.operador || (!pagos && !cuentas)) return "";
   return `
-    <div class="card no-imprimir saldo-aviso-panel" id="avisoOperador" style="cursor:pointer;border-color:var(--primary)">
-      <div style="font-weight:600">${t("op.panelPendientes", { n: e.pendientes })}</div>
-      <div class="hint" style="margin:2px 0 0">${t("op.panelAyuda")}</div>
-    </div>`;
+    <button type="button" class="card no-imprimir saldo-aviso-panel" id="avisoOperador" style="width:100%;text-align:left;border-color:var(--primary)">
+      ${cuentas ? `<span style="display:block;font-weight:600">${t("cuentas.panelPendientes", { n: cuentas })}</span>` : ""}
+      ${pagos ? `<span style="display:block;font-weight:600">${t("op.panelPendientes", { n: pagos })}</span>` : ""}
+      <span class="hint" style="display:block;margin:2px 0 0">${t("op.panelAyuda")}</span>
+    </button>`;
 }
 
 function engancharAvisoOperador() {

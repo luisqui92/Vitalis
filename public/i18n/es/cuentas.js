@@ -1,6 +1,7 @@
 // Symphomed — Español · solicitudes de cuenta (quién pidió entrar).
 Object.assign(I18N.es, {
   "cuentas.ninguna": "No hay solicitudes de cuenta esperando.",
+  "cuentas.panelPendientes": "{n} solicitud(es) de cuenta esperando aprobación",
   "cuentas.titulo": "Solicitudes de cuenta ({n})",
   "cuentas.ayuda": "Estas personas pidieron entrar y todavía no pueden. Aprobar le abre el acceso a un sistema de historias clínicas: mirá la matrícula antes.",
   "cuentas.matricula": "Matrícula",

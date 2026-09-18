@@ -1,7 +1,7 @@
 // Symphomed — Español · pantalla de operador (acreditar recargas).
 Object.assign(I18N.es, {
-  "op.titulo": "Acreditar recargas",
-  "op.ayuda": "Buscá al médico, verificá el pago en el banco y acreditá. La recarga mínima es Bs {minimo}.",
+  "op.titulo": "Cuentas y pagos",
+  "op.ayuda": "Revisá primero las solicitudes de cuenta. Para acreditar saldo, verificá el pago en el banco; la recarga mínima es Bs {minimo}.",
   "op.falta2fa": "Para acreditar saldo necesitás la verificación en dos pasos activa. Activala más abajo y volvé a entrar.",
   "op.faltaPermiso": "Esta cuenta todavía no tiene el permiso para aprobar pagos. Hay que agregar su teléfono a OPERADORES_SALDO en el servidor y reiniciar Symphomed. Avisale a quien administra el servidor.",
   "op.noPudimosVerificar": "No pudimos verificar el permiso de esta cuenta con el servidor ({detalle}). No es necesariamente que falte el permiso: puede ser un problema momentáneo. Probá de nuevo en un minuto.",
@@ -37,7 +37,7 @@ Object.assign(I18N.es, {
   "op.motivoRechazo": "¿Por qué se rechaza? El médico va a ver este texto.",
   "op.errRechazar": "No se pudo rechazar",
   "op.panelPendientes": "{n} médico(s) esperando que apruebes su pago",
-  "op.panelAyuda": "Tocá acá para revisarlos y acreditar.",
+  "op.panelAyuda": "Tocá acá para revisar y resolver lo pendiente.",
   "op.res.hoy": "Entró hoy",
   "op.res.mes": "Entró este mes",
   "op.res.consumo": "Consumido este mes",
@@ -46,7 +46,7 @@ Object.assign(I18N.es, {
   "op.res.deudaAyuda": "Atendieron con el saldo agotado. Se descuenta solo en su próxima recarga.",
   "op.res.verCargas": "Ver últimas recargas",
   "op.res.por": "acreditó {quien}",
-  "op.nav.pagos": "Pagos",
+  "op.nav.pagos": "Cuentas y pagos",
   "op.irAConfig": "Ir a Configuración",
   "op.buscarAyuda": "Para acreditar a alguien que no avisó por la app, o para revisar su historial.",
   "op.dp.titulo": "Dónde nos pagan",
