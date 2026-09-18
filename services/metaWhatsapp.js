@@ -65,6 +65,17 @@ async function enviarTexto(destino, texto) {
   return mandar({ to: destino, type: "text", text: { body: texto } });
 }
 
+// Meta exige formato internacional sin "+". Las cuentas bolivianas de los
+// primeros pilotos se registraron con ocho dígitos; Brasil suele venir con
+// DDD pero sin 55. Los números que ya traen código de país se conservan.
+function normalizarDestino(destino, pais = "BO") {
+  let numero = String(destino || "").replace(/\D/g, "");
+  if (numero.startsWith("00")) numero = numero.slice(2);
+  if (pais === "BR" && /^\d{10,11}$/.test(numero)) return `55${numero}`;
+  if (pais !== "BR" && /^\d{8}$/.test(numero)) return `591${numero}`;
+  return numero;
+}
+
 // ─── PLANTILLAS ────────────────────────────────────────────────────────────
 //
 // ═══ LA VENTANA DE 24 HORAS ════════════════════════════════════════════════
@@ -102,6 +113,10 @@ const PLANTILLAS = {
   // paciente escribió. Y es de las pocas donde que no llegue importa de
   // verdad — sin la llave el paciente no puede llevarse lo suyo a ningún lado.
   llavePaciente: "historia_propia",
+  // El registro ocurre en la web, por lo que casi nunca existe una ventana
+  // de conversación abierta. Sin plantilla, la aprobación quedaría dentro
+  // de Symphomed y el profesional no sabría que ya puede entrar.
+  cuentaAprobada: "cuenta_habilitada",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es
@@ -197,7 +212,7 @@ async function obtenerEstado() {
 
 module.exports = {
   enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado,
-  enviarPlantilla, enviarTextoOPlantilla, PLANTILLAS, bajarMedia,
+  enviarPlantilla, enviarTextoOPlantilla, normalizarDestino, PLANTILLAS, bajarMedia,
 };
 
 // ─── Bajar un archivo que mandó el paciente ────────────────────────────────

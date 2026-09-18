@@ -79,7 +79,7 @@ console.log("\n── 3. El código pasa tantos valores como variables tiene ─
 // que se lea el TEXTO y no se ejecute: ejecutarlas pediría una base, una
 // consulta y un paciente, y lo que importa acá es una sola cosa —cuántos
 // valores se pasan— que se ve leyendo.
-const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia"];
+const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia", "solicitudesCuenta"];
 const llamadas = [];
 for (const r of RUTAS) {
   const codigo = fs.readFileSync(path.join(RAIZ, "routes", `${r}.js`), "utf8");
@@ -97,7 +97,7 @@ for (const r of RUTAS) {
   }
 }
 
-verificar(`se encontraron las ${llamadas.length} llamadas con respaldo de plantilla`, llamadas.length === 6);
+verificar(`se encontraron las ${llamadas.length} llamadas con respaldo de plantilla`, llamadas.length === 7);
 for (const l of llamadas) {
   const doc = documentadas[l.nombre];
   const pide = doc ? [...new Set(doc.numeros)].length : -1;
@@ -138,6 +138,14 @@ verificar("y NO se traga los demás errores",
   /if \(!FUERA_DE_VENTANA\.has\(codigoDe\(e\)\)\) throw e;/.test(servicio));
 verificar("enviarPlantilla y enviarTextoOPlantilla se exportan",
   typeof enviarPlantilla === "function" && typeof enviarTextoOPlantilla === "function");
+
+const { normalizarDestino } = require(path.join(RAIZ, "services", "metaWhatsapp"));
+verificar("un celular boliviano local recibe el prefijo 591",
+  normalizarDestino("68548004", "BO") === "59168548004");
+verificar("un celular brasileño con DDD recibe el prefijo 55",
+  normalizarDestino("11987650001", "BR") === "5511987650001");
+verificar("un número internacional no se modifica",
+  normalizarDestino("59168548004", "BO") === "59168548004");
 
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

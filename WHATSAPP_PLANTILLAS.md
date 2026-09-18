@@ -6,9 +6,9 @@ Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
 mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
 de antemano.
 
-De los seis lugares donde Symphomed manda algo por WhatsApp, el único que
+De los siete lugares donde Symphomed manda algo por WhatsApp, el único que
 siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
-acaba de escribir. Los otros cinco los inicia la plataforma, y el paciente
+acaba de escribir. Los otros seis los inicia la plataforma, y la persona
 puede no haber escrito nunca:
 
 | Qué manda | Dónde | Cae fuera de la ventana |
@@ -19,8 +19,9 @@ puede no haber escrito nunca:
 | Aviso de reconsulta | `routes/consultaMedica.js` | casi siempre |
 | Informe al paciente | `routes/informes.js` | a menudo |
 | Informe de avance a la familia | `routes/informeFamilia.js` | **casi siempre** |
+| Cuenta profesional aprobada | `routes/solicitudesCuenta.js` | **casi siempre** |
 
-La última es la que más va a depender de la plantilla: la familia de un chico
+La de avance a la familia es la que más va a depender de la plantilla: la familia de un chico
 en seguimiento de neurodesarrollo no le escribe al consultorio entre sesión y
 sesión, así que la ventana de 24 h prácticamente nunca está abierta.
 
@@ -32,7 +33,7 @@ recibe el mensaje natural y completo, y la plantilla queda de red.
 
 `business.facebook.com` → WhatsApp Manager → **Message templates** → Create.
 
-Para las cuatro: categoría **Utility** (no Marketing — Marketing se cobra más
+Para todas: categoría **Utility** (no Marketing — Marketing se cobra más
 caro y se aprueba peor), idioma **Spanish** (`es`).
 
 > **El acoplamiento frágil de todo esto:** el orden de los `{{1}}, {{2}}…`
@@ -188,6 +189,29 @@ viva, siempre.
 
 ---
 
+### 6. `cuenta_habilitada`
+
+Cuerpo:
+
+```
+Hola {{1}}. Tu solicitud de cuenta en Symphomed fue aprobada. Ya puedes ingresar desde {{2}} con el teléfono que registraste.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | nombre del profesional | `Dra. María Pérez` |
+| `{{2}}` | dirección de ingreso | `https://app.symphomed.com` |
+
+No incluye contraseña ni matrícula. La contraseña solo la conoce la persona
+que se registró y nunca debe viajar por WhatsApp.
+
+La versión `pt_BR` fue rechazada por Meta para esta cuenta de WhatsApp.
+Cuando el profesional usa portugués se intenta primero texto libre en ese
+idioma; fuera de la ventana de 24 horas se usa esta plantilla española para
+que el aviso no se pierda.
+
+---
+
 ## Reglas de Meta que hacen que te la rechacen
 
 - El cuerpo **no puede empezar ni terminar con una variable**. Por eso las
@@ -203,7 +227,7 @@ viva, siempre.
 
 El código ya manda el idioma del médico (`Medico.idioma`, `es` o `pt`). Las
 plantillas se aprueban **por idioma**: el día que entre el primer consultorio
-brasileño hay que cargar las mismas tres en `pt`, con el mismo nombre. Hasta
+brasileño hay que cargar las mismas en `pt_BR`, con el mismo nombre. Hasta
 entonces, un médico en `pt` recibe `132001` y el log lo dice con esas
 palabras — no falla en silencio.
 
