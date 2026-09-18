@@ -163,7 +163,9 @@ async function iniciarActivacion2FA() {
 // de qué preocuparse — el resto del tiempo es una línea tranquila.
 const PROBLEMAS_BACKUP = {
   nunca_se_hizo: "Todavía no se hizo ninguna copia de seguridad.",
-  ultimo_fallo: "La última copia no pasó la verificación. Revisá los logs del servidor.",
+  ultimo_fallo: "La última copia no pasó la restauración de prueba. Revisá los logs del servidor.",
+  ultimo_sin_copia_externa: "La última copia no quedó verificada fuera del servidor.",
+  configuracion_insegura: "La protección de producción está activa, pero falta cifrado o almacenamiento externo verificable.",
   desactualizado: "Hace más de 48 horas que no se hace una copia.",
 };
 
@@ -208,29 +210,39 @@ async function pintarEstadoBackups() {
         <div class="hint" style="margin-top:2px">
           ${e.cuantos} ${e.cuantos === 1 ? "copia guardada" : "copias guardadas"} ·
           ${u.cifrado ? "cifradas" : '<span style="color:var(--warning)">sin cifrar</span>'} ·
-          ${e.afuera ? "se envían fuera del servidor" : '<span style="color:var(--warning)">solo en este servidor</span>'}
+          ${e.afuera
+            ? "copia externa verificada"
+            : e.afueraConfigurado
+              ? '<span style="color:var(--warning)">última copia externa pendiente o fallida</span>'
+              : '<span style="color:var(--warning)">destino externo sin configurar</span>'}
         </div>
       ` : `<div class="hint">Todavía no hay ninguna copia.</div>`}
 
       ${!e.afuera ? `
         <div class="hint" style="margin-top:10px;color:var(--warning)">
-          Ojo: una copia en el mismo disco protege de un borrado por error, no de que el
-          disco se muera. Falta configurar el envío a otro lado.
+          La protección no está completa hasta que la última copia cifrada también figure
+          como verificada fuera de este servidor.
         </div>` : ""}
 
       <div id="backupErr"></div>
-      <button class="secondary" id="btnBackupAhora" style="margin-top:10px">Hacer una copia ahora</button>
+      ${e.puedeEjecutar
+        ? '<button class="secondary" id="btnBackupAhora" style="margin-top:10px">Hacer una copia ahora</button>'
+        : '<div class="hint" style="margin-top:10px">Las copias automáticas se ejecutan sin intervención. Solo un operador con 2FA puede iniciar una manual.</div>'}
     </div>`;
 
-  document.getElementById("btnBackupAhora").onclick = async () => {
-    const btn = document.getElementById("btnBackupAhora");
+  const btnBackup = document.getElementById("btnBackupAhora");
+  if (!btnBackup) return;
+  btnBackup.onclick = async () => {
+    const btn = btnBackup;
     btn.disabled = true;
     btn.textContent = "Copiando y verificando...";
     try {
       const r = await api("/medico/backups", { method: "POST" });
-      alert(r.verificado === true
-        ? `Listo: ${r.documentos} registros y ${r.archivos} archivos.\n\nSe restauró en una base de prueba para comprobar que sirve, y salió bien.`
-        : `La copia se hizo pero NO pasó la verificación. Avisale a soporte antes de confiar en ella.`);
+      alert(r.verificado === true && r.externo === true
+        ? `Listo: ${r.documentos} registros y ${r.archivos} archivos.\n\nSe restauró en una base de prueba y la copia externa quedó verificada.`
+        : r.verificado === true
+          ? `La copia local pasó la restauración, pero la copia externa NO quedó verificada. Revisá el estado antes de confiar en ella.`
+          : `La copia se hizo pero NO pasó la restauración de prueba. Avisale a soporte antes de confiar en ella.`);
       pintarEstadoBackups();
     } catch (err) {
       btn.disabled = false;
