@@ -14,8 +14,9 @@ Qué se respalda:
 
 ## 1. Configurar la clave de cifrado
 
-Sin esto los respaldos se guardan **sin cifrar**. Funcionan igual, pero no se
-pueden mandar fuera del servidor.
+En producción esta clave es obligatoria. Symphomed usa AES-256-GCM: cifra el
+contenido y también detecta alteraciones o corrupción. La clave debe tener al
+menos 32 bytes.
 
 Generá una clave larga:
 
@@ -39,32 +40,50 @@ Reiniciá:
 pm2 restart vitalis --update-env
 ```
 
-## 2. Mandar los respaldos fuera del servidor
+## 2. Mandar y verificar los respaldos fuera del servidor
 
-**Un respaldo en el mismo disco que la base no es un respaldo.** Protege de un
-borrado por error, no de que el disco se muera, que es el caso que uno
-realmente teme.
+**Un respaldo en el mismo disco que la base no es un respaldo.** El destino
+recomendado para la VM de Google Cloud es un bucket de Cloud Storage dedicado,
+preferentemente en otro proyecto con facturación y administradores separados.
 
-Symphomed no se ata a ningún proveedor: ejecuta el comando que le pongas.
+El bucket debe tener:
 
-Con [rclone](https://rclone.org) (funciona con Backblaze B2, Cloudflare R2,
-Google Drive, S3, lo que sea):
+- acceso uniforme, sin objetos públicos;
+- cuenta de servicio con permiso únicamente para crear y leer objetos;
+- retención de 90 días;
+- eliminación automática después del plazo operativo acordado;
+- bloqueo de la política de retención después de probarla. El bloqueo es
+  irreversible, por eso no se activa hasta completar una subida y restauración.
 
-```
+Instalá [rclone](https://rclone.org) y configurá un remoto llamado
+`respaldos`. En una VM de Google Cloud se puede usar la identidad de su
+cuenta de servicio, sin guardar una llave JSON.
+
+```bash
 curl https://rclone.org/install.sh | sudo bash
-rclone config          # seguí el asistente, ponele de nombre "respaldos"
+rclone config
 ```
 
-Y en el `.env`:
+La subida usa un nombre exacto e inmutable. Después, `rclone check --download`
+lee el objeto remoto y compara su contenido con el archivo local:
 
+```dotenv
+BACKUP_COMANDO_SUBIDA=rclone copyto --immutable --checksum {archivo} respaldos:symphomed/{nombre}
+BACKUP_COMANDO_VERIFICAR=rclone check {archivo} respaldos:symphomed/{nombre} --one-way --download
 ```
-BACKUP_COMANDO_SUBIDA=rclone copy {archivo} respaldos:vitalis-respaldos/
+
+Los marcadores disponibles son `{archivo}`, `{nombre}` y `{marca}`.
+Symphomed ejecuta el binario directamente, sin un shell.
+
+Cuando la clave y ambos comandos estén probados, activar el modo cerrado:
+
+```dotenv
+BACKUP_EXIGIR_SEGURO=1
 ```
 
-`{archivo}` lo reemplaza Symphomed por la ruta de cada archivo.
-
-Si el respaldo **no está cifrado, Symphomed se niega a subirlo** aunque esto
-esté configurado. Son datos de pacientes.
+Con esa bandera Symphomed no arranca si falta cifrado, subida o verificación.
+Además, no sube nada que no esté cifrado o que no haya pasado primero la
+restauración local.
 
 ## 3. Comprobar que anda
 
@@ -72,7 +91,9 @@ En Symphomed: **Panel → Seguridad**. Ahí abajo está el estado: cuándo fue l
 última, si pasó la verificación, cuánto ocupa, y si se está mandando afuera.
 Se pone en rojo sola si pasan más de 48 horas o si una falla.
 
-También hay un botón para hacer una a mano y verlo funcionar.
+También hay un botón para hacer una a mano y verlo funcionar. Solo aparece
+para un operador autorizado en `OPERADORES_SALDO` con 2FA activo; las demás
+cuentas ven el estado, pero no pueden provocar un volcado completo.
 
 ---
 
@@ -148,8 +169,10 @@ Todos opcionales, en el `.env`:
 
 | Variable | Por defecto | Qué hace |
 |---|---|---|
-| `BACKUP_CLAVE` | *(vacío)* | Clave de cifrado. Sin ella no se cifra ni se sube afuera. |
-| `BACKUP_COMANDO_SUBIDA` | *(vacío)* | Comando para mandar la copia afuera. |
+| `BACKUP_CLAVE` | *(vacío)* | Clave de cifrado de al menos 32 bytes. |
+| `BACKUP_COMANDO_SUBIDA` | *(vacío)* | Comando para crear el objeto externo. Debe incluir `{archivo}`. |
+| `BACKUP_COMANDO_VERIFICAR` | *(vacío)* | Comando que comprueba el contenido remoto. Debe incluir `{archivo}`. |
+| `BACKUP_EXIGIR_SEGURO` | `0` | En `1`, impide arrancar si falta cualquiera de los tres controles. |
 | `BACKUP_HORAS` | `24` | Cada cuántas horas se hace una. Entre 1 y 168 (una semana). |
 | `BACKUP_DIAS` | `7` | Se conservan todas las de los últimos N días. |
 | `BACKUP_SEMANAS` | `8` | Y una por semana hacia atrás, N semanas. |
@@ -164,11 +187,12 @@ es la última red.
 
 Para que quede dicho y no se descubra el día equivocado:
 
-- **La copia afuera hay que configurarla.** Mientras no lo esté, todo vive en
-  el mismo disco.
-- **Nadie prueba una restauración completa periódicamente.** Symphomed verifica
-  cada respaldo, pero probar el procedimiento entero —incluidos los archivos y
-  el reinicio— conviene hacerlo a mano una vez cada tanto. Media hora, dos
-  veces al año.
+- **La restauración automática valida Mongo, pero no sustituye un simulacro
+  completo.** Una vez al mes se debe descargar una copia externa, restaurar
+  Mongo y `uploads/` en una VM aislada y documentar tiempo y resultado.
 - **Si se pierde `BACKUP_CLAVE`, los respaldos cifrados no se abren.** No hay
-  puerta trasera, a propósito.
+  puerta trasera, a propósito. La clave debe quedar en un gestor de secretos y
+  en una custodia de emergencia separada de la VM.
+- **Un bucket en el mismo proyecto protege de perder la VM, pero no de perder
+  toda la cuenta de Google Cloud.** Para cubrir ese caso, usar otro proyecto y
+  administradores separados o replicar a un segundo proveedor.
