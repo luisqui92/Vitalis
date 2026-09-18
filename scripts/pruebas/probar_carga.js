@@ -182,8 +182,10 @@ const pantallas = [
   ["panel de pagos", `pintarResumenPagos`],
   ["pantalla de pagos", `renderPagos`],
   ["datos de pago", `pintarDatosDePago`],
-  ["cartel de avisos pendientes", `OPERADOR_ESTADO = { operador: true, pendientes: 3 }; avisoOperadorHtml()`],
-  ["cartel sin avisos", `OPERADOR_ESTADO = { operador: true, pendientes: 0 }; avisoOperadorHtml()`],
+  ["cartel de pagos pendientes", `OPERADOR_ESTADO = { operador: true, pendientes: 3, cuentasPendientes: 0 }; avisoOperadorHtml()`],
+  ["cartel de cuentas pendientes", `OPERADOR_ESTADO = { operador: true, pendientes: 0, cuentasPendientes: 2 }; avisoOperadorHtml()`],
+  ["cartel de cuentas y pagos pendientes", `OPERADOR_ESTADO = { operador: true, pendientes: 3, cuentasPendientes: 2 }; avisoOperadorHtml()`],
+  ["cartel sin avisos", `OPERADOR_ESTADO = { operador: true, pendientes: 0, cuentasPendientes: 0 }; avisoOperadorHtml()`],
   ["cartel para quien no es operador", `OPERADOR_ESTADO = { operador: false }; avisoOperadorHtml()`],
   ["dónde pagar", `dondePagarHtml({ configurado: true, qr: "/pago-qr.png", banco: "BCP", cuenta: "201-5012345", titular: "Luis Quiroga", documento: "1234567 SC", whatsapp: "59162741818" })`],
   ["dónde pagar sin configurar", `dondePagarHtml({ configurado: false })`],
@@ -366,12 +368,17 @@ verificar('en portugués dice "Configuração"', tabsPt.includes("Configuração
 
 // La pestaña de Pagos es de quien acredita, no de quien administra una
 // clínica: son permisos distintos y no tienen por qué ir juntos.
-vm.runInContext(`MEDICO_ROL = "medico"; ES_OPERADOR = true;`, sandbox);
+vm.runInContext(`MEDICO_IDIOMA = "es"; MEDICO_ROL = "medico"; ES_OPERADOR = true;`, sandbox);
 const tabsOperador = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
-verificar("el operador tiene pestaña de Pagos", tabsOperador.includes('id="btnPagos"'));
+verificar("el operador tiene pestaña de Cuentas y pagos", tabsOperador.includes('id="btnPagos"'));
 verificar("  ...y son 6 pestañas con la grilla acorde",
   (tabsOperador.match(/<button class="tab"/g) || []).length === 6
   && /repeat\(6,1fr\)/.test(tabsOperador));
+vm.runInContext(`OPERADOR_ESTADO = { operador: true, pendientes: 3, cuentasPendientes: 2 };`, sandbox);
+const tabsOperadorConPendientes = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
+verificar("el globo suma pagos y solicitudes de cuenta", tabsOperadorConPendientes.includes('<b class="tab-globo">5</b>'));
+const avisoCuentas = vm.runInContext(`avisoOperadorHtml()`, sandbox);
+verificar("el aviso distingue cuentas de pagos", avisoCuentas.includes("2 solicitud") && avisoCuentas.includes("3 médico"));
 vm.runInContext(`ES_OPERADOR = false; MEDICO_ROL = "admin";`, sandbox);
 const tabsAdminNoOp = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
 verificar("un admin de clínica que no acredita NO tiene pestaña de Pagos",

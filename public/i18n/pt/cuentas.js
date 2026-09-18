@@ -1,6 +1,7 @@
 // Symphomed — Português · solicitações de conta (quem pediu para entrar).
 Object.assign(I18N.pt, {
   "cuentas.ninguna": "Não há solicitações de conta esperando.",
+  "cuentas.panelPendientes": "{n} solicitação(ões) de conta aguardando aprovação",
   "cuentas.titulo": "Solicitações de conta ({n})",
   "cuentas.ayuda": "Estas pessoas pediram para entrar e ainda não podem. Aprovar abre o acesso a um sistema de prontuários: veja o registro profissional antes.",
   "cuentas.matricula": "Registro",
