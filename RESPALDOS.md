@@ -55,22 +55,22 @@ El bucket debe tener:
 - bloqueo de la política de retención después de probarla. El bloqueo es
   irreversible, por eso no se activa hasta completar una subida y restauración.
 
-Instalá [rclone](https://rclone.org) y configurá un remoto llamado
-`respaldos`. En una VM de Google Cloud se puede usar la identidad de su
-cuenta de servicio, sin guardar una llave JSON.
-
-```bash
-curl https://rclone.org/install.sh | sudo bash
-rclone config
-```
-
-La subida usa un nombre exacto e inmutable. Después, `rclone check --download`
-lee el objeto remoto y compara su contenido con el archivo local:
+En una VM de Google Cloud se usa `gcloud storage` con la identidad de la
+cuenta de servicio adjunta a la instancia, sin guardar llaves JSON. El script
+`scripts/backup_gcs.sh` crea cada objeto con `--no-clobber`, vuelve a
+descargarlo y compara byte por byte la copia remota con el archivo local.
 
 ```dotenv
-BACKUP_COMANDO_SUBIDA=rclone copyto --immutable --checksum {archivo} respaldos:symphomed/{nombre}
-BACKUP_COMANDO_VERIFICAR=rclone check {archivo} respaldos:symphomed/{nombre} --one-way --download
+BACKUP_GCS_BUCKET=symphomed-backups-vitalis-505104
+BACKUP_GCS_PREFIJO=symphomed
+BACKUP_COMANDO_SUBIDA=bash /home/rastreoplus/vitalis-app/scripts/backup_gcs.sh subir {archivo} {nombre}
+BACKUP_COMANDO_VERIFICAR=bash /home/rastreoplus/vitalis-app/scripts/backup_gcs.sh verificar {archivo} {nombre}
 ```
+
+La cuenta de servicio necesita únicamente `Storage Object Creator` y
+`Storage Object Viewer` en ese bucket. La instancia necesita el alcance de
+Cloud Storage en lectura y escritura; no hace falta habilitar el alcance
+general de Cloud Platform.
 
 Los marcadores disponibles son `{archivo}`, `{nombre}` y `{marca}`.
 Symphomed ejecuta el binario directamente, sin un shell.
