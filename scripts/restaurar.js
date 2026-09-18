@@ -107,7 +107,7 @@ async function restaurar(ruta, { encima }) {
   if (!encima) {
     console.log(`
   La base real quedó intacta. Para mirar lo restaurado:
-    mongosh "${uri.replace(/[^/]*$/, destino)}"
+    mongosh "<URI de MongoDB con la base ${destino}>"
 
   Si está todo bien y querés que reemplace a la real, volvé a correr esto
   con --encima. Antes de eso, hacé un respaldo de lo que hay ahora.
@@ -145,7 +145,7 @@ async function confirmar(texto, palabra) {
       Todo lo que se haya cargado después de este respaldo se pierde.
 
       Respaldo:  ${ruta}
-      Base:      ${process.env.MONGODB_URI}
+      Base:      configurada en MONGODB_URI (valor oculto)
 `);
     const ok = await confirmar('  Escribí exactamente  RESTAURAR  para seguir: ', "RESTAURAR");
     if (!ok) { console.log("\n  Cancelado. No se tocó nada.\n"); process.exit(0); }
