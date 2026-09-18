@@ -345,6 +345,10 @@ const pacienteSchema = new mongoose.Schema({
   sexo: { type: String, default: "" },
   telefono: { type: String, default: "" },
   notas: { type: String, default: "" },
+  // Copia local de seguridad. Existe aunque el médico trabaje solo o la
+  // ficha todavía no esté vinculada a una PersonaClinica. Al vincularla se
+  // sincroniza con las alergias compartidas (routes/personas.js).
+  alergias: { type: [String], default: [] },
   // Solo Brasil: Memed identifica al paciente por CPF y sin él no se puede
   // recetar. Vacío en el resto — pedirle el CPF a un paciente boliviano
   // sería pedirle un documento que no tiene.
@@ -743,6 +747,9 @@ const recetaOpticaSchema = new mongoose.Schema({
   },
   distanciaPupilar: { type: Number, default: null },
   notas: { type: String, default: "" },
+  // YYYY-MM-DD conserva el día que eligió el médico sin convertirlo en una
+  // hora UTC. `fecha` queda para ordenar registros viejos y nuevos.
+  fechaCivil: { type: String, default: "" },
   fecha: { type: Date, required: true },
 }, { timestamps: true });
 const RecetaOptica = mongoose.model("RecetaOptica", recetaOpticaSchema);
@@ -1824,6 +1831,9 @@ const recetaSchema = new mongoose.Schema({
     duracion: { type: String, default: "" },
   }],
   indicaciones: { type: String, default: "" },
+  // Día civil elegido por el médico. Es texto a propósito: una receta del
+  // 16 no debe aparecer como del 15 por la zona horaria del navegador.
+  fechaCivil: { type: String, default: "" },
   fecha: { type: Date, required: true },
 
   // ─── De dónde salió esta receta ──────────────────────────────────────

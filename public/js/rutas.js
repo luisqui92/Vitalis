@@ -32,7 +32,13 @@
 // recarga dibujaría el formulario vacío como si fuera el que se estaba
 // llenando, que es peor que devolver al panel.
 const RUTAS = [
+  { ruta: "inicio",        fn: "renderInicioEscritorio" },
   { ruta: "agenda",        fn: "renderAgenda" },
+  { ruta: "voz",           fn: "renderVozEscritorio" },
+  { ruta: "indicaciones",  fn: "renderIndicacionesEscritorio" },
+  { ruta: "estudios",      fn: "renderEstudiosEscritorio" },
+  { ruta: "reportes",      fn: "renderReportesEscritorio" },
+  { ruta: "finanzas",      fn: "renderFinanzasEscritorio" },
   { ruta: "recordatorios", fn: "renderRecordatorios" },
   { ruta: "configuracion", fn: "renderSeguridad" },
   { ruta: "clinica",       fn: "renderClinica" },

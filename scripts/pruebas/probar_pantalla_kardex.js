@@ -81,8 +81,8 @@ verificar("y «Más acciones» es <details> nativo, no un div con onclick",
 // quedar pegados.
 verificar("la alerta y el formulario son dos cajas separadas",
   /personaAlertaBox/.test(personas) && /getElementById\("personaBox"\)/.test(personas));
-verificar("sin persona vinculada la alerta se limpia (no queda la del paciente anterior)",
-  /pintarSinPersona[\s\S]{0,400}?personaAlertaBox[\s\S]{0,120}?innerHTML = ""/.test(personas));
+verificar("sin persona vinculada también se muestran las alergias de la ficha",
+  /pintarSinPersona[\s\S]{0,300}?pintarAlertaAlergias\(alergias\)/.test(personas));
 verificar("la alerta de alergias se anuncia sola a un lector de pantalla",
   /persona-alergias" role="alert"/.test(personas));
 
@@ -90,6 +90,13 @@ verificar("la alerta de alergias se anuncia sola a un lector de pantalla",
 console.log("\n── 2. Se puede usar sin mouse ──");
 verificar("un paciente de la lista es un <button>, no un <div>",
   /<button type="button" class="item item-paciente"/.test(pacientes));
+verificar("las consultas del Kardex también son botones",
+  /<button type="button" class="item" data-id=/.test(pacientes));
+verificar("los candidatos a persona también son botones",
+  /<button type="button" class="item" data-persona=/.test(personas));
+verificar("y las tarjetas recientes del escritorio también",
+  /<button type="button" class="escr-lista-item escr-lista-item-click" data-paciente-id=/.test(escritorio) &&
+  /<button type="button" class="escr-lista-item escr-lista-item-click" data-consulta-id=/.test(escritorio));
 verificar("y lleva type=\"button\" (sin eso, adentro de un form recarga la página)",
   /<button type="button" class="item item-paciente"/.test(pacientes));
 verificar("las pestañas declaran semántica de pestañas",
@@ -118,6 +125,8 @@ verificar("con respaldo para navegadores viejos",
   /addListener\(alCambiarElAncho\)/.test(escritorio));
 verificar("al cambiar, se repinta la pantalla actual",
   /alCambiarElAncho[\s\S]{0,600}?volverA\(\)/.test(escritorio));
+verificar("y primero restaura la URL exacta (incluida ficha y pestaña)",
+  /alCambiarElAncho[\s\S]{0,700}?abrirDesdeLaDireccion\(\)/.test(escritorio));
 // La salvaguarda no puede depender del mismo código que salvaguarda.
 verificar("y hay una salvaguarda CSS que no depende del JavaScript",
   /@media\(max-width:1023px\)\{[\s\S]{0,200}?\.escr-shell\{display:none!important/.test(css));
@@ -130,6 +139,20 @@ verificar("hay un formateador compartido", /function fechaCorta\(/.test(i18n) &&
 verificar("y uno para la hora", /function horaCorta\(/.test(i18n));
 verificar("toleran fechas vacías sin escribir «Invalid Date» en una ficha",
   /if \(!f\) return "—"/.test(i18n) && /isNaN\(d\)/.test(i18n));
+verificar("un día civil se construye en hora local, no con Date de UTC",
+  /function fechaComoDate\(/.test(i18n) && /new Date\(Number\(partes\[1\]\), Number\(partes\[2\]\) - 1/.test(i18n));
+verificar("el valor por defecto de los calendarios usa el día local",
+  /function fechaCalendarioLocal\(/.test(i18n) &&
+  !/toISOString\(\)\.slice\(0, 10\)/.test(leer("public", "js", "recetas.js")));
+
+const modelos = sinComentarios(leer("db", "models.js"));
+const rutasRecetas = sinComentarios(leer("routes", "recetas.js"));
+const rutasPacientes = sinComentarios(leer("routes", "pacientes.js"));
+verificar("las recetas conservan YYYY-MM-DD además de la fecha de orden",
+  /fechaCivil: \{ type: String/.test(modelos) && /interpretarFechaCivil/.test(rutasRecetas));
+verificar("cada paciente tiene alergias estructuradas aunque no pertenezca a una clínica",
+  /const pacienteSchema[\s\S]{0,1600}?alergias: \{ type: \[String\]/.test(modelos) &&
+  /req\.body\?\.alergias/.test(rutasPacientes));
 
 // Ninguna pantalla puede tener el locale escrito a mano.
 const conLocaleAMano = [];
@@ -159,8 +182,8 @@ verificar("usa la zona del aparato de quien mira",
   /horaCorta\(/.test(agenda));
 // Esto sigue pendiente y la prueba lo deja anotado para que no se olvide:
 // el bot manda horas desde el servidor, donde no hay navegador.
-const reserva = fs.readFileSync(path.join(RAIZ, "services", "reservaCitas.js"), "utf8");
-if (/America\/La_Paz/.test(reserva)) {
+const reserva = sinComentarios(fs.readFileSync(path.join(RAIZ, "services", "reservaCitas.js"), "utf8"));
+if (/timeZone:\s*["']America\/La_Paz/.test(reserva)) {
   console.log("ℹ️  PENDIENTE: services/reservaCitas.js sigue mandando horas en zona de Bolivia.");
   console.log("   Necesita un campo de zona horaria en Medico — se rompe cuando haya un cliente en Brasil.");
 }

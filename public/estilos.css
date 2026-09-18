@@ -130,7 +130,7 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    lista cambia de aspecto solo por haberla hecho accesible. */
 button.item{width:100%;text-align:left;font-family:inherit;font-size:inherit;color:inherit;display:block;}
 button.item-paciente{display:flex;}
-button.item .nombre,button.item .paciente-info{display:block;}
+button.item .nombre,button.item .paciente-info,button.item .preview{display:block;}
 /* El anillo de foco es el punto de todo esto: si no se ve dónde está parado
    el teclado, poder llegar con Tab no sirve de nada. */
 button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
@@ -399,6 +399,8 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
 .escr-acciones{display:flex;flex-direction:column;}
 .escr-lista{display:flex;flex-direction:column;gap:2px;}
 .escr-lista-item{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:var(--radius-sm);}
+button.escr-lista-item{width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;}
+button.escr-lista-item:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
 .escr-lista-item-click{cursor:pointer;transition:background .15s ease;}
 .escr-lista-item-click:hover{background:rgba(var(--primary-rgb),.06);}
 .escr-lista-item-error{cursor:pointer;background:var(--danger-bg);}

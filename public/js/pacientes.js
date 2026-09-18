@@ -280,7 +280,9 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
     // pintado llega tarde y le taparía lo que está haciendo.
     if (!seriePantallaVigente(serie)) return;
     const tabPorDefecto = MEDICO_TIPO_ESPECIALIDAD === "odontologia" ? "odontograma" : MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? "ojos" : MEDICO_TIPO_ESPECIALIDAD === "ginecologia" ? "embarazo" : "consultas";
-    pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabInicial || tabPorDefecto);
+    const tabsDisponibles = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
+    const tabSegura = tabInicial && tabsDisponibles[tabInicial] ? tabInicial : tabPorDefecto;
+    pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabSegura);
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
@@ -337,7 +339,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : t("kardex.noRegistrado")}</div>
         <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : t("kardex.sinNotas")}</div>` : `
         <div class="dato-row">📞 ${p.telefono ? esc(p.telefono) : t("kardex.noRegistrado")}</div>
-        <div class="dato-row">🎂 ${p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString(localeActual()) : t("kardex.noRegistrada")}</div>
+        <div class="dato-row">🎂 ${p.fechaNacimiento ? fechaCorta(p.fechaNacimiento) : t("kardex.noRegistrada")}</div>
         ${MEDICO_MONEDA === "BRL" ? `<div class="dato-row" id="fichaCpf">🪪 ${p.cpf ? esc(p.cpf) : `<button class="link" id="btnCpf" style="width:auto;margin:0;padding:0">${t("memed.cpfFalta")}</button>`}</div>` : ""}
         <div class="dato-row" style="border-bottom:none">📝 ${p.notas ? esc(p.notas) : t("kardex.sinNotas")}</div>`}
       </div>
@@ -363,14 +365,14 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     <button class="secondary" id="btnNuevaConsulta">${t("kardex.nuevaConsulta")}</button>
     ${consultas.length === 0 ? `<div class="empty">${t("kardex.sinConsultas")}</div>` : ""}
     ${consultas.map(c => `
-      <div class="item" data-id="${c._id}">
-        <div class="top">
-          <div class="fecha">${new Date(c.createdAt).toLocaleString(localeActual())}</div>
+      <button type="button" class="item" data-id="${c._id}">
+        <span class="top">
+          <span class="fecha">${new Date(c.createdAt).toLocaleString(localeActual())}</span>
           <span class="badge badge-${c.estado}">${estadoTxt[c.estado] || c.estado}</span>
-        </div>
-        ${c.notaClinica && c.notaClinica.motivoConsulta ? `<div class="preview">${esc(c.notaClinica.motivoConsulta)}</div>` : ""}
-        ${c.notaClinica && c.notaClinica.diagnostico ? `<div class="preview"><b>${t("kardex.dx")}</b> ${esc(c.notaClinica.diagnostico)}</div>` : ""}
-      </div>`).join("")}`;
+        </span>
+        ${c.notaClinica && c.notaClinica.motivoConsulta ? `<span class="preview">${esc(c.notaClinica.motivoConsulta)}</span>` : ""}
+        ${c.notaClinica && c.notaClinica.diagnostico ? `<span class="preview"><b>${t("kardex.dx")}</b> ${esc(c.notaClinica.diagnostico)}</span>` : ""}
+      </button>`).join("")}`;
 
   const medActivos = medicamentos.filter(m => !m.fechaFin);
   const medPasados = medicamentos.filter(m => m.fechaFin);
@@ -442,7 +444,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
           <div class="nombre">${esc(v.nombre)}${v.dosis ? " — " + esc(v.dosis) : ""}</div>
           <button class="link" data-borrar-vac="${v._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(v.fecha).toLocaleDateString(localeActual())}</div>
+        <div class="fecha">${fechaCorta(v.fecha)}</div>
       </div>`).join("")}`;
 
   const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
@@ -602,7 +604,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   if (tabActiva === "consultas") {
     document.getElementById("btnNuevaConsulta").onclick = () => renderNuevaConsulta(p._id, p.nombre);
-    document.querySelectorAll(".item").forEach(el => {
+    document.querySelectorAll('#tabContent .item[data-id]').forEach(el => {
       el.onclick = () => renderDetalle(el.dataset.id);
     });
   }

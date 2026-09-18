@@ -78,6 +78,12 @@ const authJs = fs.readFileSync(path.join(RAIZ, "public", "js", "auth.js"), "utf8
     /enrutar\("renderPacienteDetalle", \(id, tab\)/.test(sinComentarios));
   verificar("el panel, la agenda y las demás también",
     /enrutar\("renderDashboard"/.test(sinComentarios) && /for \(const r of RUTAS\) enrutar/.test(sinComentarios));
+  for (const ruta of ["inicio", "voz", "indicaciones", "estudios", "reportes", "finanzas"]) {
+    verificar(`la pantalla de escritorio «${ruta}» también es restaurable`,
+      new RegExp(`ruta:\\s*"${ruta}"`).test(sinComentarios));
+  }
+  verificar("una pestaña inexistente vuelve a una pestaña válida",
+    /tabsDisponibles\[tabInicial\]/.test(fs.readFileSync(path.join(RAIZ, "public", "js", "pacientes.js"), "utf8")));
 
   // El cambio de pestaña PISA la dirección en vez de apilarla: si no, el
   // botón atrás obliga a caminar hacia atrás por las doce pestañas de una

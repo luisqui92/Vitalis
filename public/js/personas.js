@@ -47,9 +47,44 @@ function bloquePersonaAccionesHtml() {
   return `<div id="personaBox"></div>`;
 }
 
+function normalizarAlergiasPantalla(lista) {
+  const unicas = new Map();
+  for (const valor of Array.isArray(lista) ? lista : []) {
+    const alergia = String(valor || "").trim();
+    if (alergia) unicas.set(alergia.toLocaleLowerCase(), alergia);
+  }
+  return [...unicas.values()];
+}
+
+// Un solo componente de alerta para fichas locales y personas compartidas.
+// Así una corrección de seguridad no queda aplicada en un caso y olvidada
+// en el otro.
+function pintarAlertaAlergias(lista) {
+  const alerta = document.getElementById("personaAlertaBox");
+  if (!alerta) return;
+  const alergias = normalizarAlergiasPantalla(lista);
+  alerta.innerHTML = alergias.length ? `
+    <div class="persona-alergias" role="alert">
+      <div class="persona-alergias-titulo">⚠️ ${t("persona.alergias")}</div>
+      <div class="persona-alergias-lista">${alergias.map(a => `<span>${esc(a)}</span>`).join("")}</div>
+    </div>` : "";
+}
+
+function campoAlergiasHtml(alergias, ayuda) {
+  return `
+    <label for="personaAlergias">${t("persona.alergiasCampo")}</label>
+    <input id="personaAlergias" type="text" value="${esc(normalizarAlergiasPantalla(alergias).join(", "))}" placeholder="${t("persona.alergiasPlaceholder")}">
+    <div class="hint" style="margin:6px 0 0">${t(ayuda)}</div>
+    <div id="personaErr"></div>
+    <button class="secondary" id="btnGuardarAlergias">${t("persona.guardarAlergias")}</button>`;
+}
+
 async function cargarBloquePersona(paciente) {
   const caja = document.getElementById("personaBox");
   if (!caja) return;
+  // Se pinta primero la copia local: incluso si falla la red que consulta la
+  // persona compartida, una alergia ya conocida no desaparece de la ficha.
+  pintarAlertaAlergias(paciente.alergias || []);
   let datos;
   try {
     datos = await api(`/medico/pacientes/${paciente._id}/persona`);
@@ -65,19 +100,15 @@ async function cargarBloquePersona(paciente) {
 }
 
 function pintarConPersona(caja, paciente, persona, fichas) {
-  const alergias = persona.alergias || [];
+  const alergias = normalizarAlergiasPantalla([
+    ...(persona.alergias || []),
+    ...(paciente.alergias || []),
+  ]);
 
   // La alerta va a su propia caja, arriba de las pestañas. role="alert" para
   // que un lector de pantalla la anuncie al aparecer en vez de esperar a que
   // alguien navegue hasta ella.
-  const alerta = document.getElementById("personaAlertaBox");
-  if (alerta) {
-    alerta.innerHTML = alergias.length ? `
-      <div class="persona-alergias" role="alert">
-        <div class="persona-alergias-titulo">⚠️ ${t("persona.alergias")}</div>
-        <div class="persona-alergias-lista">${alergias.map(a => `<span>${esc(a)}</span>`).join("")}</div>
-      </div>` : "";
-  }
+  pintarAlertaAlergias(alergias);
 
   caja.innerHTML = `
     <div class="card card-secundaria">
@@ -85,9 +116,7 @@ function pintarConPersona(caja, paciente, persona, fichas) {
       <div class="hint" style="margin:0 0 10px">
         ${fichas > 1 ? t("persona.enVariosConsultorios", { n: fichas }) : t("persona.soloAca")}
       </div>
-      <label>${t("persona.alergiasCampo")}</label>
-      <input id="personaAlergias" type="text" value="${esc(alergias.join(", "))}" placeholder="${t("persona.alergiasPlaceholder")}">
-      <div class="hint" style="margin:6px 0 0">${t("persona.alergiasAyuda")}</div>
+      ${campoAlergiasHtml(alergias, "persona.alergiasAyuda")}
       ${persona.alergiasActualizadasEn ? `
         <div class="hint" style="margin:4px 0 0">${t(
           // De quién fueron se dice solo como "vos" o "otro consultorio": el
@@ -96,8 +125,6 @@ function pintarConPersona(caja, paciente, persona, fichas) {
           persona.alergiasActualizadasPorMi ? "persona.alergiasActualizadasVos" : "persona.alergiasActualizadasOtro",
           { fecha: new Date(persona.alergiasActualizadasEn).toLocaleDateString(localeActual()) }
         )}</div>` : ""}
-      <div id="personaErr"></div>
-      <button class="secondary" id="btnGuardarAlergias">${t("persona.guardarAlergias")}</button>
       <button class="link" id="btnDesvincularPersona" style="width:auto;color:var(--danger)">${t("persona.desvincular")}</button>
     </div>`;
 
@@ -113,6 +140,7 @@ function pintarConPersona(caja, paciente, persona, fichas) {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ alergias: lista }),
       });
+      paciente.alergias = lista;
       cargarBloquePersona(paciente);
     } catch (e) {
       btn.disabled = false;
@@ -131,19 +159,36 @@ function pintarConPersona(caja, paciente, persona, fichas) {
 // sistema proponga "¿será este?" apenas se abre una ficha invita a decir
 // que sí sin mirar.
 function pintarSinPersona(caja, paciente) {
-  // Sin persona vinculada no hay alergias que avisar. Se limpia la caja de
-  // arriba explícitamente: si quedara la alerta del paciente anterior, el
-  // médico estaría viendo la alergia de otro sobre esta ficha.
-  const alerta = document.getElementById("personaAlertaBox");
-  if (alerta) alerta.innerHTML = "";
+  const alergias = normalizarAlergiasPantalla(paciente.alergias || []);
+  pintarAlertaAlergias(alergias);
 
   caja.innerHTML = `
     <div class="card card-secundaria">
+      ${campoAlergiasHtml(alergias, "persona.alergiasFichaAyuda")}
       <div class="hint" style="margin:0 0 10px">${t("persona.sinVincular")}</div>
       <div id="personaCandidatos"></div>
-      <div id="personaErr"></div>
       <button class="link" id="btnBuscarPersona" style="width:auto">${t("persona.buscar")}</button>
     </div>`;
+
+  document.getElementById("btnGuardarAlergias").onclick = async () => {
+    const btn = document.getElementById("btnGuardarAlergias");
+    const errBox = document.getElementById("personaErr");
+    const lista = document.getElementById("personaAlergias").value
+      .split(",").map(x => x.trim()).filter(Boolean);
+    errBox.innerHTML = "";
+    btn.disabled = true;
+    try {
+      await api(`/medico/pacientes/${paciente._id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alergias: lista }),
+      });
+      paciente.alergias = lista;
+      pintarSinPersona(caja, paciente);
+    } catch (e) {
+      btn.disabled = false;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("persona.errGuardar"))}</div>`;
+    }
+  };
 
   document.getElementById("btnBuscarPersona").onclick = async () => {
     const destino = document.getElementById("personaCandidatos");
@@ -179,16 +224,16 @@ function candidatoHtml(p) {
   const edad = edadDesde(p.fechaNacimiento);
   const datos = [
     edad != null ? t("pacientes.anos", { n: edad }) : null,
-    p.fechaNacimiento ? new Date(p.fechaNacimiento).toLocaleDateString(localeActual()) : null,
+    p.fechaNacimiento ? fechaCorta(p.fechaNacimiento) : null,
     p.documento || null,
     p.telefono || null,
   ].filter(Boolean).join(" · ");
   return `
-    <div class="item" data-persona="${p._id}">
-      <div class="top"><div class="nombre">${esc(p.nombre)}</div></div>
-      ${datos ? `<div class="paciente-info">${esc(datos)}</div>` : ""}
-      ${(p.alergias || []).length ? `<div class="paciente-info">⚠️ ${esc(p.alergias.join(", "))}</div>` : ""}
-    </div>`;
+    <button type="button" class="item" data-persona="${p._id}">
+      <span class="top"><span class="nombre">${esc(p.nombre)}</span></span>
+      ${datos ? `<span class="paciente-info">${esc(datos)}</span>` : ""}
+      ${(p.alergias || []).length ? `<span class="paciente-info">⚠️ ${esc(p.alergias.join(", "))}</span>` : ""}
+    </button>`;
 }
 
 async function vincularPersona(paciente, personaId) {

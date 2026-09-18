@@ -23,7 +23,7 @@ function tabRecetasHtml(recetas) {
     <div class="card" id="recetaNuevaBox">
       <div class="seccion-titulo" style="margin-top:0">${t("receta.nueva")}</div>
       <label>${t("receta.fecha")}</label>
-      <input id="recFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
+      <input id="recFecha" type="date" value="${fechaCalendarioLocal()}">
       <div id="recRows">${filaMedicamentoHtml()}</div>
       <button type="button" class="link" id="btnAgregarFila">${t("receta.agregarFila")}</button>
       <label>${t("receta.indicaciones")}</label>
@@ -38,7 +38,7 @@ function tabRecetasHtml(recetas) {
           <div class="nombre">${r.origen === "memed" ? `<span class="badge badge-completado">${t("memed.firmada")}</span> ` : ""}${esc(r.medicamentos.map(m => m.nombre).join(", "))}</div>
           <button class="link" data-borrar-receta="${r._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(r.fecha).toLocaleDateString(localeActual())}</div>
+        <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>
       </div>`).join("")}
     ${MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? `<div id="recetaOpticaBox" style="margin-top:18px"></div>` : ""}
   `;
@@ -81,7 +81,7 @@ function pintarRecetaOpticaBox(pacienteId, recetas) {
       <label>${t("optica.dp")}</label>
       <input id="ro_dp" type="number" step="0.5" placeholder="${t("optica.dpPlaceholder")}">
       <label>${t("receta.fecha")}</label>
-      <input id="ro_fecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
+      <input id="ro_fecha" type="date" value="${fechaCalendarioLocal()}">
       <label>${t("optica.notas")}</label>
       <input id="ro_notas" type="text" placeholder="${t("optica.notasPlaceholder")}">
       <div id="ro_err"></div>
@@ -94,7 +94,7 @@ function pintarRecetaOpticaBox(pacienteId, recetas) {
           <div class="nombre">OD ${r.od.esfera ?? "—"} / OI ${r.oi.esfera ?? "—"}</div>
           <button class="link" data-borrar-receta-optica="${r._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
         </div>
-        <div class="fecha">${new Date(r.fecha).toLocaleDateString(localeActual())}</div>
+        <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>
       </div>`).join("")}
   `;
 
@@ -157,7 +157,7 @@ async function renderRecetaOptica(id) {
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px">
           <div><b>${esc(medico.nombre)}</b>${medico.especialidad ? `<div>${esc(medico.especialidad)}</div>` : ""}</div>
-          <div>${new Date(receta.fecha).toLocaleDateString(localeActual())}</div>
+          <div>${fechaCorta(receta.fechaCivil || receta.fecha)}</div>
         </div>
         <div style="font-size:13px;margin-bottom:20px"><b>${t("receta.paciente")}</b> ${esc(paciente.nombre)}${edad != null ? " · " + t("pacientes.anos", { n: edad }) : ""}</div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -261,7 +261,7 @@ async function renderReceta(id) {
             <div><b>${esc(medico.nombre)}</b></div>
             ${medico.especialidad ? `<div>${esc(medico.especialidad)}</div>` : ""}
           </div>
-          <div>${new Date(receta.fecha).toLocaleDateString(localeActual())}</div>
+          <div>${fechaCorta(receta.fechaCivil || receta.fecha)}</div>
         </div>
         <div style="font-size:13px;margin-bottom:20px">
           <b>${t("receta.paciente")}</b> ${esc(paciente.nombre)}${edad != null ? " · " + t("pacientes.anos", { n: edad }) : ""}${paciente.sexo ? " · " + esc(paciente.sexo) : ""}

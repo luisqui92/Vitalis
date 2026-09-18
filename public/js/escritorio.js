@@ -134,6 +134,11 @@ function alCambiarElAncho() {
   if (esEscritorio()) activarEscritorioSiCorresponde();
   else desactivarEscritorioForzado();
 
+  // La URL es la fuente de verdad de la pantalla abierta. Esto conserva una
+  // ficha, una consulta y su pestaña exacta al girar la tablet o redimensionar
+  // la ventana; escrActivo solo conoce las secciones del menú de escritorio.
+  if (typeof abrirDesdeLaDireccion === "function" && abrirDesdeLaDireccion()) return;
+
   // Se repinta la pantalla actual. Si por algo no se puede, se cae al panel
   // de siempre, que es preferible a quedarse con el layout roto.
   const item = ESCR_NAV_ITEMS.find(i => i.id === escrActivo);
@@ -250,12 +255,12 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
                 </div>
               </div>`).join("")}
             ${notasConError.map(c => `
-              <div class="escr-lista-item escr-lista-item-error" data-consulta-id="${c._id}">
+              <button type="button" class="escr-lista-item escr-lista-item-error" data-consulta-id="${c._id}">
                 <div>
                   <div class="escr-lista-titulo">${t("escr.notaError", { paciente: esc(c.pacienteNombre || "") })}</div>
                   <div class="escr-lista-sub">${t("escr.revisarReintentar")}</div>
                 </div>
-              </div>`).join("")}
+              </button>`).join("")}
           </div>`}
       </div>
 
@@ -264,10 +269,10 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
         ${pacientesRecientes.length === 0 ? `<div class="hint">${t("escr.sinPacientes")}</div>` : `
           <div class="escr-lista">
             ${pacientesRecientes.map(p => `
-              <div class="escr-lista-item escr-lista-item-click" data-paciente-id="${p._id}">
+              <button type="button" class="escr-lista-item escr-lista-item-click" data-paciente-id="${p._id}">
                 <div class="avatar avatar-xs">${esc(iniciales(p.nombre))}</div>
                 <div><div class="escr-lista-titulo">${esc(p.nombre)}</div></div>
-              </div>`).join("")}
+              </button>`).join("")}
           </div>`}
       </div>
     </div>
@@ -277,12 +282,12 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
       ${consultasRecientes.length === 0 ? `<div class="hint">${t("escr.sinConsultas")}</div>` : `
         <div class="escr-lista">
           ${consultasRecientes.map(c => `
-            <div class="escr-lista-item escr-lista-item-click" data-consulta-id="${c._id}">
+            <button type="button" class="escr-lista-item escr-lista-item-click" data-consulta-id="${c._id}">
               <div>
                 <div class="escr-lista-titulo">${esc(c.pacienteNombre || "")}</div>
                 <div class="escr-lista-sub">${esc(new Date(c.createdAt).toLocaleString(localeActual()))} · ${t(c.estado === "completado" ? "escr.consulta.completada" : c.estado === "error" ? "escr.consulta.error" : "escr.consulta.procesando")}</div>
               </div>
-            </div>`).join("")}
+            </button>`).join("")}
         </div>`}
     </div>
   `;

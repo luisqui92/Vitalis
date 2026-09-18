@@ -7,6 +7,7 @@ Object.assign(I18N.es, {
   "persona.alergiasCampo": "Alergias (separadas por coma)",
   "persona.alergiasPlaceholder": "Ej: penicilina, AINEs, látex",
   "persona.alergiasAyuda": "Esto lo ve cualquier médico de la clínica que la atienda. Es lo único clínico que se comparte, y es para que nadie le recete algo que le hace mal.",
+  "persona.alergiasFichaAyuda": "Se muestran siempre arriba del Kardex, aunque esta ficha todavía no esté asociada a una clínica.",
   "persona.alergiasActualizadasVos": "Las actualizaste vos el {fecha}.",
   "persona.alergiasActualizadasOtro": "Actualizadas el {fecha} desde otro consultorio de la clínica.",
   "persona.guardarAlergias": "Guardar alergias",

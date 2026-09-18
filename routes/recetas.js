@@ -10,6 +10,24 @@ const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
 
+// Un <input type="date"> manda YYYY-MM-DD: un día civil sin zona horaria.
+// Se guarda ese texto y, para mantener índices/orden de registros anteriores,
+// una fecha ancla al mediodía UTC. El texto es la fuente de verdad al mostrar.
+function interpretarFechaCivil(valor) {
+  if (valor === undefined || valor === null || valor === "") {
+    return { fechaCivil: "", fecha: new Date() };
+  }
+  const fechaCivil = String(valor).trim();
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaCivil);
+  if (!partes) throw new ErrorHttp(400, "fecha debe tener formato AAAA-MM-DD");
+  const [anio, mes, dia] = partes.slice(1).map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia, 12));
+  if (fecha.getUTCFullYear() !== anio || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {
+    throw new ErrorHttp(400, "fecha no es válida");
+  }
+  return { fechaCivil, fecha };
+}
+
 module.exports = function (app) {
   // ─── CREAR RECETA ────────────────────────────────────────────────────────
   // Crearla ya es el acto de aprobación del médico (viene de una consulta que
@@ -28,7 +46,7 @@ module.exports = function (app) {
       .filter(m => m.nombre);
     if (medicamentos.length === 0) throw new ErrorHttp(400, "Agregá al menos un medicamento");
 
-    const fecha = req.body?.fecha ? new Date(req.body.fecha) : new Date();
+    const { fechaCivil, fecha } = interpretarFechaCivil(req.body?.fecha);
 
     const receta = await Receta.create({
       pacienteId: paciente._id,
@@ -36,6 +54,7 @@ module.exports = function (app) {
       consultaId: req.body?.consultaId || null,
       medicamentos,
       indicaciones: String(req.body?.indicaciones || "").trim(),
+      fechaCivil,
       fecha,
     });
     registrar({ req, medicoPhone, accion: "crear_receta", recurso: `Receta:${receta._id}` });
@@ -83,12 +102,12 @@ module.exports = function (app) {
     const hayDatos = [od.esfera, od.cilindro, oi.esfera, oi.cilindro].some(v => v !== null);
     if (!hayDatos) throw new ErrorHttp(400, "Cargá al menos esfera o cilindro de algún ojo");
 
-    const fecha = req.body?.fecha ? new Date(req.body.fecha) : new Date();
+    const { fechaCivil, fecha } = interpretarFechaCivil(req.body?.fecha);
     const distanciaPupilar = req.body?.distanciaPupilar ? Number(req.body.distanciaPupilar) : null;
 
     const receta = await RecetaOptica.create({
       pacienteId: paciente._id, medicoPhone, consultaId: req.body?.consultaId || null,
-      od, oi, distanciaPupilar, notas: String(req.body?.notas || "").trim(), fecha,
+      od, oi, distanciaPupilar, notas: String(req.body?.notas || "").trim(), fechaCivil, fecha,
     });
     registrar({ req, medicoPhone, accion: "crear_receta_optica", recurso: `RecetaOptica:${receta._id}` });
     res.status(201).json({ ok: true, receta });

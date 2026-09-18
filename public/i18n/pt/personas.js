@@ -7,6 +7,7 @@ Object.assign(I18N.pt, {
   "persona.alergiasCampo": "Alergias (separadas por vírgula)",
   "persona.alergiasPlaceholder": "Ex: penicilina, AINEs, látex",
   "persona.alergiasAyuda": "Isto é visto por qualquer médico da clínica que a atenda. É a única informação clínica compartilhada, e existe para que ninguém receite algo que lhe faça mal.",
+  "persona.alergiasFichaAyuda": "Aparecem sempre no topo do prontuário, mesmo que esta ficha ainda não esteja associada a uma clínica.",
   "persona.alergiasActualizadasVos": "Você atualizou em {fecha}.",
   "persona.alergiasActualizadasOtro": "Atualizadas em {fecha} por outro consultório da clínica.",
   "persona.guardarAlergias": "Salvar alergias",

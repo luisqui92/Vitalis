@@ -82,6 +82,16 @@ function normalizar(texto) {
     .trim();
 }
 
+function normalizarAlergias(lista) {
+  const unicas = new Map();
+  for (const valor of Array.isArray(lista) ? lista : []) {
+    const alergia = String(valor || "").trim().slice(0, 120);
+    if (alergia) unicas.set(alergia.toLocaleLowerCase("es"), alergia);
+    if (unicas.size === 30) break;
+  }
+  return [...unicas.values()];
+}
+
 module.exports = function (app) {
   // ─── BUSCAR UNA PERSONA YA CONOCIDA EN LA CLÍNICA ───────────────────────
   // Se usa al dar de alta un paciente: antes de crear una ficha nueva, ver
@@ -143,10 +153,22 @@ module.exports = function (app) {
         sexo: paciente.sexo,
         telefono: paciente.telefono,
         documento: String(req.body?.documento || "").trim().slice(0, 40),
+        alergias: normalizarAlergias(paciente.alergias),
       });
     }
 
+    // Una alergia local nunca desaparece al reconocer a la misma persona.
+    // Se fusiona con las compartidas y la copia local queda sincronizada.
+    const alergiasAntes = normalizarAlergias(persona.alergias);
+    const alergiasFusionadas = normalizarAlergias([...alergiasAntes, ...(paciente.alergias || [])]);
+    if (alergiasFusionadas.length !== alergiasAntes.length) {
+      persona.alergias = alergiasFusionadas;
+      persona.alergiasActualizadasPor = medicoPhone;
+      persona.alergiasActualizadasEn = new Date();
+      await persona.save();
+    }
     paciente.personaId = persona._id;
+    paciente.alergias = alergiasFusionadas;
     await paciente.save();
     registrar({ req, medicoPhone, accion: "vincular_persona", recurso: `Paciente:${paciente._id}→Persona:${persona._id}` });
     res.json({ ok: true, persona: personaParaElMedico(persona, medicoPhone) });
@@ -183,13 +205,16 @@ module.exports = function (app) {
     if (!atiende) throw new ErrorHttp(403, "Solo podés editar las alergias de un paciente que atendés");
 
     if (!Array.isArray(req.body?.alergias)) throw new ErrorHttp(400, "alergias tiene que ser una lista");
-    persona.alergias = req.body.alergias
-      .map(a => String(a || "").trim().slice(0, 120))
-      .filter(Boolean)
-      .slice(0, 30);
+    persona.alergias = normalizarAlergias(req.body.alergias);
     persona.alergiasActualizadasPor = medicoPhone;
     persona.alergiasActualizadasEn = new Date();
     await persona.save();
+    // Mantener una copia local permite que la alerta siga protegiendo al
+    // paciente si luego se desvincula la ficha por error o por reorganización.
+    await Paciente.updateMany(
+      { personaId: persona._id },
+      { $set: { alergias: persona.alergias } }
+    );
 
     registrar({ req, medicoPhone, accion: "editar_alergias_persona", recurso: `Persona:${persona._id}` });
     res.json({ ok: true, persona: personaParaElMedico(persona, medicoPhone) });

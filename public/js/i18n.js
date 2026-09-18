@@ -72,15 +72,31 @@ function localeActual() {
 // Toleran null y texto vacío porque la mitad de las fechas del sistema son
 // opcionales, y un "Invalid Date" impreso en una ficha clínica es peor que
 // un guion.
+function fechaComoDate(f) {
+  // Una fecha sin hora es un día civil, no medianoche UTC. `new Date("2026-09-16")`
+  // la convertiría en el día anterior en Bolivia; construirla con componentes
+  // locales conserva exactamente el día que escribió el médico.
+  const partes = typeof f === "string" && /^(\d{4})-(\d{2})-(\d{2})(?:T00:00:00(?:\.000)?Z)?$/.exec(f);
+  if (partes) return new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3]));
+  return new Date(f);
+}
+
+function fechaCalendarioLocal(valor = new Date()) {
+  const d = valor instanceof Date ? valor : fechaComoDate(valor);
+  if (isNaN(d)) return "";
+  const dos = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
 function fechaCorta(f) {
   if (!f) return "—";
-  const d = new Date(f);
+  const d = fechaComoDate(f);
   return isNaN(d) ? "—" : d.toLocaleDateString(localeActual());
 }
 
 function fechaLarga(f, opciones) {
   if (!f) return "—";
-  const d = new Date(f);
+  const d = fechaComoDate(f);
   if (isNaN(d)) return "—";
   return d.toLocaleDateString(localeActual(), opciones || { day: "numeric", month: "long", year: "numeric" });
 }

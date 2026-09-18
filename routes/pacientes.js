@@ -10,6 +10,19 @@ const { siguienteCodigo } = require("../services/codigos");
 
 const requireMedico = requireAuth(["medico"]);
 
+function fechaCivilOpcional(valor, campo) {
+  if (valor === undefined || valor === null || valor === "") return null;
+  const texto = String(valor).trim();
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+  if (!partes) throw new ErrorHttp(400, `${campo} debe tener formato AAAA-MM-DD`);
+  const [anio, mes, dia] = partes.slice(1).map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia, 12));
+  if (fecha.getUTCFullYear() !== anio || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {
+    throw new ErrorHttp(400, `${campo} no es válida`);
+  }
+  return fecha;
+}
+
 module.exports = function (app) {
   // ─── CREAR PACIENTE ─────────────────────────────────────────────────────
   app.post("/medico/pacientes", limitMedico, requireMedico, asyncRoute(async (req, res) => {
@@ -17,10 +30,13 @@ module.exports = function (app) {
     const nombre = String(req.body?.nombre || "").trim();
     if (!nombre) throw new ErrorHttp(400, "nombre es requerido");
 
-    const fechaNacimiento = req.body?.fechaNacimiento ? new Date(req.body.fechaNacimiento) : null;
+    const fechaNacimiento = fechaCivilOpcional(req.body?.fechaNacimiento, "fechaNacimiento");
     const sexo = String(req.body?.sexo || "").trim();
     const telefono = String(req.body?.telefono || "").trim();
     const notas = String(req.body?.notas || "").trim();
+    const alergias = Array.isArray(req.body?.alergias)
+      ? req.body.alergias.map(a => String(a || "").trim().slice(0, 120)).filter(Boolean).slice(0, 30)
+      : [];
     const especie = String(req.body?.especie || "").trim();
     const raza = String(req.body?.raza || "").trim();
     const duenoNombre = String(req.body?.duenoNombre || "").trim();
@@ -36,7 +52,7 @@ module.exports = function (app) {
     // llegar (ver routes/cajaDicom.js), y lo que el paciente dicta por
     // teléfono. Un paciente sin código no puede usar ninguna de las dos.
     const codigo = await siguienteCodigo(Paciente, medicoPhone, "P");
-    const paciente = await Paciente.create({ medicoPhone, codigo, nombre, fechaNacimiento, sexo, telefono, notas, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer });
+    const paciente = await Paciente.create({ medicoPhone, codigo, nombre, fechaNacimiento, sexo, telefono, notas, alergias, especie, raza, duenoNombre, tutorNombre, tutorParentesco, semanasGestacionAlNacer });
     res.status(201).json({ ok: true, paciente });
   }));
 
@@ -83,10 +99,17 @@ module.exports = function (app) {
       if (req.body?.[campo] !== undefined) paciente[campo] = String(req.body[campo]).trim();
     }
     if (req.body?.fechaNacimiento !== undefined) {
-      paciente.fechaNacimiento = req.body.fechaNacimiento ? new Date(req.body.fechaNacimiento) : null;
+      paciente.fechaNacimiento = fechaCivilOpcional(req.body.fechaNacimiento, "fechaNacimiento");
     }
     if (Array.isArray(req.body?.antecedentesPersonales)) {
       paciente.antecedentesPersonales = req.body.antecedentesPersonales.map(s => String(s).trim()).filter(Boolean);
+    }
+    if (req.body?.alergias !== undefined) {
+      if (!Array.isArray(req.body.alergias)) throw new ErrorHttp(400, "alergias tiene que ser una lista");
+      paciente.alergias = req.body.alergias
+        .map(a => String(a || "").trim().slice(0, 120))
+        .filter(Boolean)
+        .slice(0, 30);
     }
     if (Array.isArray(req.body?.antecedentesFamiliares)) {
       paciente.antecedentesFamiliares = req.body.antecedentesFamiliares
