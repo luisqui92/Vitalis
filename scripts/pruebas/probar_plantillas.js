@@ -147,5 +147,38 @@ verificar("un celular brasileño con DDD recibe el prefijo 55",
 verificar("un número internacional no se modifica",
   normalizarDestino("59168548004", "BO") === "59168548004");
 
+// ═══ 6. EL IDIOMA NUESTRO NO ES EL CÓDIGO DE META ══════════════════════════
+//
+// Symphomed guarda "es" o "pt" (Medico.idioma). Meta NO tiene un idioma "pt":
+// tiene pt_BR y pt_PT. Mandar "pt" devuelve 132001 —"la plantilla no existe en
+// ese idioma"— aunque la plantilla esté aprobada y perfecta.
+//
+// Esto NO era una precaución para el futuro: cuatro rutas ya pasaban
+// `medico.idioma` directo, así que ninguna plantilla en portugués iba a
+// funcionar nunca. Y es de los errores que no se ven, porque el que no recibe
+// el mensaje está en Brasil y el que mira el log está en Bolivia.
+console.log("\n── 6. El idioma del médico se traduce al código de Meta ──");
+const { codigoDeIdioma } = require(path.join(RAIZ, "services", "metaWhatsapp"));
+verificar('"pt" se manda como "pt_BR", que es el código que Meta conoce',
+  codigoDeIdioma("pt") === "pt_BR");
+verificar('"es" queda igual, que sí está en la lista de Meta',
+  codigoDeIdioma("es") === "es");
+// Quien escribió un código con región sabía lo que pedía: no se le toca.
+verificar("un código con región ya puesto se respeta",
+  codigoDeIdioma("pt_PT") === "pt_PT" && codigoDeIdioma("es_MX") === "es_MX");
+// Vacío o nulo cae al español y no a "undefined", que sería un 132001 seguro.
+verificar("sin idioma cae al español, no a un código inválido",
+  codigoDeIdioma(undefined) === "es" && codigoDeIdioma("") === "es" && codigoDeIdioma(null) === "es");
+
+// El enum de la base es lo que de verdad puede llegar acá. Si mañana alguien
+// agrega un idioma y no lo mapea, esta prueba lo agarra antes que un médico.
+const MODELOS = fs.readFileSync(path.join(RAIZ, "db", "models.js"), "utf8");
+const enumIdioma = (MODELOS.match(/idioma: \{ type: String, enum: \[([^\]]+)\]/) || [])[1] || "";
+const idiomas = [...enumIdioma.matchAll(/"([a-z_]+)"/g)].map(m => m[1]);
+const sinMapear = idiomas.filter(i => codigoDeIdioma(i) === i && i !== "es");
+verificar(`los ${idiomas.length} idiomas de la base (${idiomas.join(", ")}) tienen código de Meta`,
+  idiomas.length > 0 && sinMapear.length === 0);
+if (sinMapear.length) console.log("   sin mapear:", sinMapear.join(", "));
+
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

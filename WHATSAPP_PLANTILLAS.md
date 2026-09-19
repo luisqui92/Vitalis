@@ -225,11 +225,42 @@ que el aviso no se pierda.
 
 ## Portugués
 
-El código ya manda el idioma del médico (`Medico.idioma`, `es` o `pt`). Las
-plantillas se aprueban **por idioma**: el día que entre el primer consultorio
-brasileño hay que cargar las mismas en `pt_BR`, con el mismo nombre. Hasta
-entonces, un médico en `pt` recibe `132001` y el log lo dice con esas
-palabras — no falla en silencio.
+**No son dos plantillas: es una plantilla con dos idiomas.** El nombre es el
+mismo (`cuenta_habilitada`, no `cuenta_habilitada_pt`) y en Meta se le agrega
+la versión en portugués. El código manda `name` y `language.code` por separado,
+así que con nombres distintos no hay forma de elegir.
+
+**El idioma nuestro no es el código de Meta.** Symphomed guarda `es` o `pt`
+(`Medico.idioma`). Meta no tiene un idioma `pt`: tiene `pt_BR` y `pt_PT`. Un
+código que no está en su lista devuelve `132001` —"la plantilla no existe en
+ese idioma"— **aunque la plantilla esté aprobada y perfecta**.
+
+Por eso `services/metaWhatsapp.js` traduce `pt → pt_BR` adentro de
+`enviarPlantilla()`, que es el único lugar por el que pasan todas las rutas: una
+ruta nueva queda cubierta sin que nadie se acuerde. Un código que ya viene con
+región (`pt_BR`, `es_MX`) se respeta tal cual.
+
+Entonces, al cargarlas en Meta: **idioma Portuguese (BR)**, que es lo que el
+código pide. Si se carga como `pt_PT` no se va a usar nunca.
+
+### Al crear cada plantilla en el panel
+
+**«Tipo de variable» va en «Número», no en «Nombre».** Con "Nombre", Meta exige
+`{{nome}}`, `{{link}}` —minúsculas y guiones bajos— y rechaza `{{1}}`. Y no es
+solo una preferencia de escritura: `enviarPlantilla()` manda los parámetros
+**por posición**, sin `parameter_name`. Una plantilla aprobada con variables
+con nombre queda aprobada y **falla al mandarse**, que es el peor de los dos
+errores — nadie se entera hasta que un médico no recibe el aviso.
+
+### Cuando se apruebe una versión en portugués
+
+Hay un lugar que la ignora a propósito y hay que tocarlo a mano:
+`routes/solicitudesCuenta.js` manda `idioma: "es"` **fijo**, porque Meta había
+rechazado la `pt_BR` de `cuenta_habilitada`. Si se aprueba, ese `"es"` tiene
+que pasar a ser el idioma del médico — si no, la plantilla portuguesa queda
+aprobada y sin usarse nunca, que no da ningún error y no lo nota nadie.
+
+El resto de las rutas ya pasan `medico.idioma` y no hay que tocarlas.
 
 ## Cómo saber si están andando
 

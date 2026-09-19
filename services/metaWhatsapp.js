@@ -128,16 +128,43 @@ function codigoDe(e) {
   return Number(err.code ?? err.error_subcode ?? 0);
 }
 
-// idioma: "es" o "pt". Una plantilla se aprueba POR IDIOMA, así que pedir
-// "pt" cuando solo se aprobó "es" no falla en silencio: Meta devuelve 132001
-// y el log ya lo traduce a algo que se entiende.
+// ═══ EL IDIOMA NUESTRO NO ES EL CÓDIGO DE META ═════════════════════════════
+//
+// Symphomed guarda el idioma como "es" o "pt" (Medico.idioma, enum en
+// db/models.js). Meta NO tiene un idioma "pt": tiene `pt_BR` y `pt_PT`, y un
+// código que no está en su lista devuelve 132001 —"la plantilla no existe en
+// ese idioma"— aunque la plantilla esté aprobada y perfecta.
+//
+// Cuatro rutas ya venían pasando `medico.idioma` directo acá (citas,
+// reconsulta ×2, reserva pública), así que esto no es una precaución para el
+// futuro: es el motivo por el que ninguna plantilla en portugués iba a
+// funcionar nunca, por más que Meta la aprobara.
+//
+// Y es de los errores que no se ven: el que no recibe el mensaje es un
+// paciente en Brasil, y el que se entera —si mira el log— está en Bolivia.
+//
+// La traducción va acá adentro y no en cada ruta a propósito: es el único
+// lugar por el que pasan todas, y una ruta nueva queda cubierta sin que nadie
+// se acuerde. Un código que ya viene con región ("pt_BR", "es_MX") se respeta
+// tal cual: quien lo escribió así sabía lo que pedía.
+const IDIOMA_META = { pt: "pt_BR", es: "es" };
+function codigoDeIdioma(idioma) {
+  const i = String(idioma || "").trim();
+  if (!i) return "es";
+  if (i.includes("_")) return i;
+  return IDIOMA_META[i.toLowerCase()] || i;
+}
+
+// Una plantilla se aprueba POR IDIOMA, así que pedir portugués cuando solo se
+// aprobó el español no falla en silencio: Meta devuelve 132001 y el log ya lo
+// traduce a algo que se entiende.
 async function enviarPlantilla(destino, nombre, parametros = [], idioma = "es") {
   return mandar({
     to: destino,
     type: "template",
     template: {
       name: nombre,
-      language: { code: idioma },
+      language: { code: codigoDeIdioma(idioma) },
       components: parametros.length
         ? [{ type: "body", parameters: parametros.map(p => ({ type: "text", text: String(p ?? "") })) }]
         : [],
@@ -213,6 +240,7 @@ async function obtenerEstado() {
 module.exports = {
   enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado,
   enviarPlantilla, enviarTextoOPlantilla, normalizarDestino, PLANTILLAS, bajarMedia,
+  codigoDeIdioma,
 };
 
 // ─── Bajar un archivo que mandó el paciente ────────────────────────────────
