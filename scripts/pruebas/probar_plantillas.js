@@ -180,5 +180,46 @@ verificar(`los ${idiomas.length} idiomas de la base (${idiomas.join(", ")}) tien
   idiomas.length > 0 && sinMapear.length === 0);
 if (sinMapear.length) console.log("   sin mapear:", sinMapear.join(", "));
 
+// ═══ 7. LAS DOS FORMAS DE VARIABLE QUE ACEPTA META ═════════════════════════
+//
+// Meta tiene dos estilos y la plantilla se aprueba con UNO:
+//
+//   posicional — {{1}}, {{2}}   → {type:"text", text:"…"}
+//   con nombre — {{nome}}       → {type:"text", parameter_name:"nome", text:"…"}
+//
+// Las cinco primeras se aprobaron posicionales, pero el editor de Meta ahora
+// abre en «Nombre» por defecto en las cuentas nuevas. Si una se aprueba así y
+// mandamos posicionales, falla con la plantilla aprobada y correcta — que es
+// la peor forma de fallar, porque no hay nada que revisar.
+console.log("\n── 7. Las dos formas de variable de Meta ──");
+const { componentesDelCuerpo } = require(path.join(RAIZ, "services", "metaWhatsapp"));
+
+const posicional = componentesDelCuerpo(["Ana", "https://x.y"]);
+verificar("un arreglo sale posicional, como las cinco ya aprobadas",
+  posicional[0].parameters.every(p => p.type === "text" && !("parameter_name" in p)) &&
+  posicional[0].parameters.map(p => p.text).join("|") === "Ana|https://x.y");
+
+const conNombre = componentesDelCuerpo({ nome: "Ana", link: "https://x.y" });
+verificar("un objeto sale con nombre, que es lo que pide el editor nuevo",
+  conNombre[0].parameters.length === 2 &&
+  conNombre[0].parameters[0].parameter_name === "nome" &&
+  conNombre[0].parameters[1].parameter_name === "link");
+// El nombre va aparte del texto: metido adentro del texto, Meta lo manda como
+// contenido y al paciente le llega el nombre de la variable.
+verificar("  ...con el nombre en su campo, no pegado al texto",
+  conNombre[0].parameters[0].text === "Ana");
+
+// Sin variables no se manda un `components` vacío con una lista vacía adentro:
+// Meta lo rechaza. Tiene que ser el arreglo vacío.
+verificar("sin variables no se manda ningún componente",
+  componentesDelCuerpo([]).length === 0 && componentesDelCuerpo({}).length === 0 &&
+  componentesDelCuerpo(undefined).length === 0);
+
+// Un valor nulo tiene que viajar como cadena vacía y no como "null" escrito,
+// que es lo que leería el paciente.
+verificar("un valor vacío no le llega al paciente como «null»",
+  componentesDelCuerpo([null])[0].parameters[0].text === "" &&
+  componentesDelCuerpo({ nome: undefined })[0].parameters[0].text === "");
+
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

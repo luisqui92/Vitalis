@@ -245,12 +245,32 @@ código pide. Si se carga como `pt_PT` no se va a usar nunca.
 
 ### Al crear cada plantilla en el panel
 
-**«Tipo de variable» va en «Número», no en «Nombre».** Con "Nombre", Meta exige
-`{{nome}}`, `{{link}}` —minúsculas y guiones bajos— y rechaza `{{1}}`. Y no es
-solo una preferencia de escritura: `enviarPlantilla()` manda los parámetros
-**por posición**, sin `parameter_name`. Una plantilla aprobada con variables
-con nombre queda aprobada y **falla al mandarse**, que es el peor de los dos
-errores — nadie se entera hasta que un médico no recibe el aviso.
+**«Tipo de variable» decide el estilo, y las dos plantillas del mismo nombre
+tienen que usar el mismo.** Meta tiene dos:
+
+| En el panel | En el cuerpo | Qué manda el código |
+|---|---|---|
+| «Número» | `{{1}}`, `{{2}}` | `parametros` como **arreglo**: `[nombre, enlace]` |
+| «Nombre» | `{{nome}}`, `{{link}}` | `parametros` como **objeto**: `{ nome, link }` |
+
+`enviarPlantilla()` soporta las dos y elige por la forma de `parametros`: un
+arreglo sale posicional, un objeto sale con `parameter_name`. No hay una
+bandera aparte que haya que acordarse de poner — el dato ya está en lo que la
+ruta escribe, así que una ruta no puede decir una cosa y mandar otra.
+
+Las seis que hay hoy están aprobadas **posicionales**, y ese es el estilo por
+defecto. Pero el editor de Meta abre en «Nombre» en las cuentas nuevas, así que
+si el desplegable no se deja cambiar, se puede aprobar con nombres y pasar el
+objeto en la ruta. Lo que **no** se puede es mezclar: aprobada con nombres y
+mandando un arreglo, falla con la plantilla aprobada y correcta, que es la peor
+forma de fallar porque no hay nada que revisar.
+
+Si el panel rechaza `{{1}}` con «Los parámetros variables deben ser caracteres
+en minúscula…», el desplegable está en «Nombre». Está arriba de «Muestra de
+contenido multimedia», lejos del cuadro de texto — es fácil no verlo. Y después
+de cambiarlo conviene borrar las variables del texto y volver a insertarlas con
+«+ Añadir variable»: el editor las lleva como objetos internos y no siempre
+revalida las escritas a mano.
 
 ### Cuando se apruebe una versión en portugués
 

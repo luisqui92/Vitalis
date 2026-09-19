@@ -155,6 +155,45 @@ function codigoDeIdioma(idioma) {
   return IDIOMA_META[i.toLowerCase()] || i;
 }
 
+// ═══ LAS DOS FORMAS DE VARIABLE QUE ACEPTA META ════════════════════════════
+//
+// Meta tiene dos estilos y la plantilla se aprueba con UNO de los dos:
+//
+//   posicional — {{1}}, {{2}}   → parameters: [{type:"text", text:"…"}]
+//   con nombre — {{nome}}       → parameters: [{type:"text", parameter_name:"nome", text:"…"}]
+//
+// Las cinco primeras plantillas se aprobaron posicionales. Pero el editor de
+// Meta ahora abre en «Nombre» por defecto en las cuentas nuevas, y si se
+// aprueba así, mandar posicionales falla — con la plantilla aprobada y
+// correcta, que es la peor forma de fallar.
+//
+// Entonces se soportan las dos y lo decide la forma de `parametros`: un
+// arreglo es posicional, un objeto es con nombre. No hay una bandera aparte
+// que haya que acordarse de poner, ni un campo nuevo en PLANTILLAS: el dato ya
+// está en lo que la ruta escribe, y así una ruta no puede decir una cosa y
+// mandar otra.
+//
+// El orden de las claves del objeto no importa —Meta las busca por nombre—
+// pero el de un arreglo sí, y ese sigue siendo el acoplamiento frágil de
+// siempre: ver WHATSAPP_PLANTILLAS.md.
+function componentesDelCuerpo(parametros) {
+  if (Array.isArray(parametros)) {
+    return parametros.length
+      ? [{ type: "body", parameters: parametros.map(p => ({ type: "text", text: String(p ?? "") })) }]
+      : [];
+  }
+  if (parametros && typeof parametros === "object") {
+    const claves = Object.keys(parametros);
+    return claves.length
+      ? [{
+          type: "body",
+          parameters: claves.map(k => ({ type: "text", parameter_name: k, text: String(parametros[k] ?? "") })),
+        }]
+      : [];
+  }
+  return [];
+}
+
 // Una plantilla se aprueba POR IDIOMA, así que pedir portugués cuando solo se
 // aprobó el español no falla en silencio: Meta devuelve 132001 y el log ya lo
 // traduce a algo que se entiende.
@@ -165,9 +204,7 @@ async function enviarPlantilla(destino, nombre, parametros = [], idioma = "es") 
     template: {
       name: nombre,
       language: { code: codigoDeIdioma(idioma) },
-      components: parametros.length
-        ? [{ type: "body", parameters: parametros.map(p => ({ type: "text", text: String(p ?? "") })) }]
-        : [],
+      components: componentesDelCuerpo(parametros),
     },
   });
 }
@@ -240,7 +277,7 @@ async function obtenerEstado() {
 module.exports = {
   enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado,
   enviarPlantilla, enviarTextoOPlantilla, normalizarDestino, PLANTILLAS, bajarMedia,
-  codigoDeIdioma,
+  codigoDeIdioma, componentesDelCuerpo,
 };
 
 // ─── Bajar un archivo que mandó el paciente ────────────────────────────────
