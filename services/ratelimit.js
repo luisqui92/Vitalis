@@ -16,6 +16,18 @@ function almacen(nombre) {
 }
 
 // Limpieza periódica para no acumular claves (IPs, cuentas, sesiones)
+//
+// .unref() al final: sin eso, este temporizador —pensado para el servidor
+// que corre para siempre— mantiene vivo a CUALQUIER proceso que cargue este
+// archivo, aunque sea un script de una sola vez que ya terminó su trabajo.
+// Pasó de verdad: scripts/crear_socio.js requiere services/auditoria, que
+// requiere esto, y el proceso quedaba colgado sin ningún error ni log — solo
+// el cursor esperando, hasta matarlo a mano.
+//
+// unref() no apaga el temporizador ni cambia nada para el servidor: le dice
+// al runtime "no me cuentes como motivo para seguir vivo". Si el proceso
+// sigue corriendo por cualquier otra razón —que en el servidor siempre la
+// hay—, esto sigue disparando cada 5 minutos exactamente igual.
 setInterval(() => {
   const now = Date.now();
   for (const store of Object.values(stores)) {
@@ -23,7 +35,7 @@ setInterval(() => {
       if (data.resetAt < now) store.delete(clave);
     }
   }
-}, 5 * 60 * 1000); // cada 5 min
+}, 5 * 60 * 1000).unref(); // cada 5 min
 
 function getIP(req) {
   return (req.headers["x-forwarded-for"]?.split(",")[0].trim()) ||

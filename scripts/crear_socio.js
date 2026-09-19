@@ -19,40 +19,70 @@
 // lo pone requireOperador con segundo factor.
 //
 // Uso:
-//   node scripts/crear_socio.js <telefono> "Nombre del socio" [cupos] [password]
+//   node scripts/crear_socio.js <telefono> "Nombre del socio" [cupos] [--brl]
+//   node scripts/crear_socio.js <telefono> --clave "NuevaContraseña"
 //
 // Ejemplos:
 //   node scripts/crear_socio.js 70200001 "Distribuidora Andina" 10
 //   node scripts/crear_socio.js 5511987650001 "Parceiro Brasil" 20 --brl
+//   node scripts/crear_socio.js 70200001 --clave "SuClaveNueva99"
 //
-// Es idempotente en lo que importa: si el socio ya existe NO le pisa la
-// contraseña ni le duplica lotes con la misma referencia.
+// ═══ POR QUÉ LA CONTRASEÑA SE CAMBIA CON UNA BANDERA Y NO SOLA ═════════════
+//
+// Correr esto de nuevo sobre un socio que existe NO le toca la contraseña.
+// Tiene que ser así: el uso normal de volver a correrlo es cargarle más
+// cupos, y si de paso le cambiara la clave, el socio quedaría afuera sin que
+// nadie lo hubiera decidido — y se enteraría un lunes, intentando entrar.
+//
+// Pero tampoco puede no haber forma de cambiarla. La contraseña se guarda
+// hasheada: si se pierde, no se recupera, se reemplaza. Sin esta bandera un
+// socio que olvida su clave queda afuera para siempre, y hoy no existe
+// ninguna otra puerta —la ruta PATCH del operador no toca la contraseña—.
+//
+// Entonces: nunca por accidente, siempre a pedido, y queda en auditoría.
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const { Socio, LoteCupos } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 const { cuposDe } = require("../services/socios");
+const { registrar } = require("../services/auditoria");
 
 const VERDE = (t) => `\x1b[32m${t}\x1b[0m`;
 const GRIS = (t) => `\x1b[90m${t}\x1b[0m`;
 
 async function main() {
-  const args = process.argv.slice(2).filter(a => a !== "--brl");
-  const esBrasil = process.argv.includes("--brl");
+  const argv = process.argv.slice(2);
+  const esBrasil = argv.includes("--brl");
+  // --clave viene con su valor pegado detrás; se sacan los dos del resto para
+  // que las posiciones de nombre y cupos no se corran según si está o no.
+  //
+  // Cuando --clave NO está, iClave da -1, y "i !== iClave + 1" se vuelve
+  // "i !== 0" — filtra el primer argumento (el teléfono) en el camino que
+  // más se usa. Por eso la comprobación de iClave > -1 va primero: sin ella,
+  // el bug pasa las pruebas manuales de "sí tiene --clave" y revienta
+  // silenciosamente en el caso normal.
+  const iClave = argv.indexOf("--clave");
+  const claveNueva = iClave > -1 ? String(argv[iClave + 1] || "").trim() : "";
+  const args = argv.filter((a, i) => a !== "--brl" && (iClave === -1 || (i !== iClave && i !== iClave + 1)));
+
   const phone = String(args[0] || "").trim();
   const nombre = String(args[1] || "").trim();
   const cupos = Number(args[2] || 0);
-  const passwordDada = String(args[3] || "").trim();
   // Diez caracteres es el mínimo que exige la ruta del operador. Se genera
   // una del mismo largo para que el camino cómodo no sea el más débil.
-  const password = passwordDada || crypto.randomBytes(9).toString("base64url");
+  const password = claveNueva || crypto.randomBytes(9).toString("base64url");
 
-  if (!phone || !nombre) {
-    console.error('Uso: node scripts/crear_socio.js <telefono> "Nombre del socio" [cupos] [password] [--brl]');
+  if (!phone || (!nombre && !claveNueva)) {
+    console.error('Uso: node scripts/crear_socio.js <telefono> "Nombre del socio" [cupos] [--brl]');
+    console.error('     node scripts/crear_socio.js <telefono> --clave "NuevaContraseña"');
     process.exit(1);
   }
-  if (passwordDada && passwordDada.length < 10) {
+  if (iClave > -1 && !claveNueva) {
+    console.error("❌ --clave necesita la contraseña nueva al lado.");
+    process.exit(1);
+  }
+  if (claveNueva && claveNueva.length < 10) {
     console.error("❌ La contraseña de un socio tiene que tener al menos 10 caracteres.");
     console.error("   Es la misma regla que la ruta del operador; no la aflojo acá.");
     process.exit(1);
@@ -69,6 +99,12 @@ async function main() {
 
   let socio = await Socio.findOne({ phone });
   if (!socio) {
+    if (!nombre) {
+      console.error(`❌ No existe ningún socio con +${phone}, así que no hay contraseña que cambiar.`);
+      console.error('   Para crearlo: node scripts/crear_socio.js ' + phone + ' "Nombre del socio" [cupos]');
+      await mongoose.disconnect();
+      process.exit(1);
+    }
     socio = await Socio.create({
       nombre, phone,
       passwordHash: await hashPassword(password),
@@ -76,10 +112,25 @@ async function main() {
       activo: true,
     });
     console.log(VERDE(`\n✅ Socio creado: ${nombre} — +${phone} (${moneda})`));
-    console.log(`   Contraseña${passwordDada ? "" : " generada"}: ${VERDE(password)}`);
-    console.log(GRIS("   Anotala ahora: no se puede volver a ver, solo cambiar."));
+    console.log(`   Contraseña${claveNueva ? "" : " generada"}: ${VERDE(password)}`);
+    console.log(GRIS("   Anotala ahora: se guarda hasheada y no se puede volver a ver."));
+    console.log(GRIS(`   Si se pierde: node scripts/crear_socio.js ${phone} --clave "OtraContraseña"`));
+  } else if (claveNueva) {
+    // Se pide explícitamente con --clave, así que se hace y queda anotado.
+    // Cambiarle la contraseña a alguien es sacarlo de su cuenta hasta que se
+    // entere de la nueva: tiene que poder reconstruirse quién y cuándo.
+    socio.passwordHash = await hashPassword(claveNueva);
+    await socio.save();
+    registrar({
+      medicoPhone: "script", accion: "cambiar_clave_socio",
+      recurso: `Socio:${socio._id}`, detalle: `${socio.nombre} (+${phone})`,
+    });
+    console.log(VERDE(`\n✅ Contraseña cambiada: ${socio.nombre} — +${phone}`));
+    console.log(`   Contraseña nueva: ${VERDE(claveNueva)}`);
+    console.log(GRIS("   La anterior dejó de servir en este momento. Avisale."));
   } else {
     console.log(`\nℹ️  El socio +${phone} ya existía (contraseña sin cambios).`);
+    console.log(GRIS(`   Para cambiársela: node scripts/crear_socio.js ${phone} --clave "OtraContraseña"`));
   }
 
   // ─── El primer lote ─────────────────────────────────────────────────────

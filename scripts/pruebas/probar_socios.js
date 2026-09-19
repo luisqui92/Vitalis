@@ -46,7 +46,7 @@ function verificar(descripcion, condicion) {
   app.use((err, _q, res, _n) => res.status(err.status || 500).json({ error: err.message }));
 
   const { Socio, Clinica, Medico, LoteCupos, Paciente, Insumo } = require(path.join(RAIZ, "db", "models"));
-  const { generarToken, hashPassword } = require(path.join(RAIZ, "services", "auth"));
+  const { generarToken, hashPassword, verificarPassword } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
 
   const clave = await hashPassword("Prueba1234!");
@@ -295,25 +295,105 @@ function verificar(descripcion, condicion) {
   verificar("no se le ofrece dar de baja a un cliente que ya está de baja",
     /\$\{cu\.activa \? `[\s\S]{0,320}?data-baja=/.test(panelSocio));
 
-  // ─── 9. El alta del primer socio ───────────────────────────────────────
+  // ─── 9. El alta del primer socio, corriendo el script de verdad ────────
   //
   // Todavía no hay pantalla de operador para socios: las rutas existen y nadie
   // las llama. Mientras tanto el alta se hace con un script, y ese script
   // tiene que respetar las MISMAS reglas que la ruta — si afloja la contraseña
   // o deja cargar un lote sin referencia, el camino cómodo pasa a ser el más
   // débil, que es exactamente como se cuelan los agujeros.
-  console.log("\n── 9. El alta del primer socio, mientras no haya pantalla ──");
+  //
+  // Se corre como PROCESO APARTE y no se llama a su función: la mitad de lo
+  // que hay que probar es el parseo de argv, y ahí vivía un bug de verdad —
+  // con `--clave` ausente, un filtro por índice descartaba el teléfono y el
+  // socio se creaba con el NOMBRE en el campo del teléfono. Ninguna lectura
+  // del código lo iba a encontrar; hacía falta correrlo.
+  //
+  // Y por lo mismo se corre con un TOPE DE TIEMPO propio, más corto que el de
+  // la prueba entera. Este script requiere services/auditoria, que requiere
+  // services/ratelimit, que arranca un setInterval de limpieza — y si a ese
+  // temporizador se le vuelve a caer el .unref(), el script no termina nunca
+  // solo. Sin este tope, la señal de esa regresión sería la prueba entera
+  // trabada, y nadie sabría por qué.
+  console.log("\n── 9. El alta del primer socio, corriendo el script de verdad ──");
   const fsSocio = require("fs");
+  const { spawn } = require("child_process");
   const rutaAlta = path.join(RAIZ, "scripts", "crear_socio.js");
   verificar("hay una forma de dar de alta al primer socio sin pantalla", fsSocio.existsSync(rutaAlta));
-  const alta = fsSocio.existsSync(rutaAlta) ? fsSocio.readFileSync(rutaAlta, "utf8") : "";
+
+  function correrAlta(args, tope = 8000) {
+    return new Promise((resolve) => {
+      const hijo = spawn(process.execPath, [rutaAlta, ...args], {
+        env: { ...process.env, MONGODB_URI: process.env.MONGODB_URI },
+      });
+      let salida = "";
+      let resuelto = false;
+      const reloj = setTimeout(() => {
+        if (resuelto) return;
+        resuelto = true;
+        hijo.kill("SIGKILL");
+        // codigo:null es la marca de "no terminó solo", distinta de
+        // cualquier código de salida real que el script pueda devolver.
+        resolve({ codigo: null, salida, colgado: true });
+      }, tope);
+      hijo.stdout.on("data", (c) => { salida += c; });
+      hijo.stderr.on("data", (c) => { salida += c; });
+      hijo.on("close", (codigo) => {
+        if (resuelto) return;
+        resuelto = true;
+        clearTimeout(reloj);
+        resolve({ codigo, salida, colgado: false });
+      });
+    });
+  }
+
+  const alta = fsSocio.readFileSync(rutaAlta, "utf8");
   const rutaOperador = fsSocio.readFileSync(path.join(RAIZ, "routes", "operadorSaldo.js"), "utf8");
   verificar("  ...que exige la misma contraseña mínima que la ruta del operador",
     /length < 10/.test(alta) && /length < 10/.test(rutaOperador));
   verificar("  ...y que no carga un lote sin referencia",
     /const referencia = /.test(alta) && /referencia,/.test(alta));
-  verificar("  ...ni le pisa la contraseña a un socio que ya existe",
-    /contraseña sin cambios/.test(alta));
+
+  // El bug real: sin --clave, el teléfono tiene que quedar en el TELÉFONO.
+  const r1 = await correrAlta(["70200099", "Cliente Con Nombre Largo", "6"]);
+  verificar("el script termina solo, sin quedar colgado", !r1.colgado);
+  verificar("  ...y con código de salida 0", r1.codigo === 0);
+  const s1 = await Socio.findOne({ phone: "70200099" }).lean();
+  verificar("  ...creó el socio con el TELÉFONO en el campo del teléfono",
+    Boolean(s1) && s1.phone === "70200099" && s1.nombre === "Cliente Con Nombre Largo");
+  verificar("  ...y no uno con el nombre puesto donde va el teléfono (el bug real)",
+    !(await Socio.findOne({ phone: "Cliente Con Nombre Largo" }).lean()));
+  verificar("  ...con el lote de cupos que se le pidió",
+    (await LoteCupos.countDocuments({ socioId: s1._id })) === 1);
+
+  // Volver a correrlo NO le toca la contraseña ni le duplica el lote.
+  const hashAntes = s1.passwordHash;
+  const r2 = await correrAlta(["70200099", "Cliente Con Nombre Largo", "6"]);
+  verificar("correrlo de nuevo no cuelga y sale con 0", !r2.colgado && r2.codigo === 0);
+  const s1b = await Socio.findOne({ phone: "70200099" }).lean();
+  verificar("  ...sin tocar la contraseña", s1b.passwordHash === hashAntes);
+  verificar("  ...ni duplicar el lote", (await LoteCupos.countDocuments({ socioId: s1._id })) === 1);
+
+  // ─── --clave: la única forma de recuperar el acceso ────────────────────
+  const r3 = await correrAlta(["70200099", "--clave", "ClaveDePrueba99"]);
+  verificar("--clave cambia la contraseña, sin colgarse", !r3.colgado && r3.codigo === 0);
+  const s1c = await Socio.findOne({ phone: "70200099" });
+  verificar("  ...y la nueva contraseña funciona de verdad",
+    (await verificarPassword("ClaveDePrueba99", s1c.passwordHash)).ok);
+  verificar("  ...y la vieja ya no", !(await verificarPassword("Prueba1234!", s1c.passwordHash)).ok);
+
+  const r4 = await correrAlta(["70200099", "--clave", "corta"]);
+  verificar("una contraseña corta se rechaza, sin colgarse", !r4.colgado && r4.codigo !== 0);
+  verificar("  ...y no tocó la que ya estaba puesta",
+    (await Socio.findOne({ phone: "70200099" }).lean()).passwordHash === s1c.passwordHash);
+
+  const r5 = await correrAlta(["70200099", "--clave"]);
+  verificar("--clave sin valor se rechaza, sin colgarse", !r5.colgado && r5.codigo !== 0);
+
+  const r6 = await correrAlta(["70200000", "--clave", "ClaveDePrueba99"]);
+  verificar("cambiarle la clave a un socio que no existe se rechaza, sin colgarse",
+    !r6.colgado && r6.codigo !== 0);
+  verificar("  ...y no lo crea de paso", !(await Socio.findOne({ phone: "70200000" }).lean()));
 
   servidor.close();
   await mongoose.disconnect();
