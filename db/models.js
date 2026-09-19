@@ -201,6 +201,45 @@ const medicoSchema = new mongoose.Schema({
     motivo: { type: String, default: "" },
   },
 
+  // ─── El enlace de cobro propio ─────────────────────────────────────────
+  //
+  // ═══ POR QUÉ ES POR MÉDICO Y NO UNA CUENTA POR PAÍS ═══════════════════
+  //
+  // ConfigPago (services/datosPago.js) tiene UNA cuenta por país, y alcanza
+  // mientras todos los de ese país paguen al mismo lugar: un QR, una clave
+  // Pix, la misma para todos.
+  //
+  // Esto es para cuando eso no existe. En Brasil hoy no hay cuenta —la clave
+  // Pix quedó de baja— y la forma de cobrar es generar un enlace por médico
+  // en el proveedor y pasárselo. Sin un lugar donde ponerlo, ese enlace vive
+  // en un chat de WhatsApp: el médico lo pierde, vuelve a preguntar, y cada
+  // renovación es un mensaje más.
+  //
+  // Es a propósito que sea un enlace opaco y no un proveedor con nombre. Hoy
+  // es uno, mañana puede ser otro, y lo que Symphomed necesita saber es una
+  // sola cosa: a dónde mandar a este médico a pagar. El día que haya un PSP
+  // con API esto se vacía y deja de usarse solo — la pantalla del médico ya
+  // prefiere la cuenta del país cuando no hay enlace.
+  //
+  // ═══ QUÉ SE GUARDA ADEMÁS DEL ENLACE, Y POR QUÉ ═══════════════════════
+  //
+  // Quién lo puso y cuándo. Un enlace de cobro es a dónde va la plata de
+  // alguien: si un día los pagos empiezan a caer en una cuenta que no es la
+  // nuestra, esto dice quién lo cambió. Es el mismo criterio que la auditoría
+  // de `cambiar_datos_pago`, y acá importa más porque es por persona y nadie
+  // más lo ve.
+  cobro: {
+    // Siempre https. Un `javascript:` acá se convertiría en código corriendo
+    // en la pantalla del médico; se valida en el servidor (routes/
+    // operadorSaldo.js) y se vuelve a comprobar antes de dibujarlo.
+    enlace: { type: String, default: "" },
+    // Para el médico: "vence el 30", "son R$ 4.400 del año". Va debajo del
+    // botón. Sin esto, un enlace suelto no dice cuánto ni hasta cuándo.
+    nota: { type: String, default: "" },
+    actualizadoPor: { type: String, default: "" },
+    actualizadoEn: { type: Date, default: null },
+  },
+
   // ─── Las consultas de cortesía ─────────────────────────────────────────
   //
   // Cada cuenta nueva tiene unas cuantas consultas gratis. No es un regalo:

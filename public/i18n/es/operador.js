@@ -24,6 +24,18 @@ Object.assign(I18N.es, {
   "op.errAcreditar": "No se pudo acreditar",
   "op.bajoMinimoAyuda": "Si el médico ya transfirió, esa plata está en la cuenta. No acreditársela no le enseña la regla.",
   "op.acreditarIgual": "Acreditar igual",
+  // ─── El enlace de cobro por médico ──────────────────────────────────────
+  // Para cuando el país no tiene una cuenta común y hay que generar un cobro
+  // por persona. Ver db/models.js.
+  "op.enlaceCobro": "Enlace de pago de este médico",
+  "op.enlaceCobroAyuda": "Si su país no tiene cuenta para cobrar, pegá acá el enlace que le generaste. Lo va a ver en su pantalla de recarga, en vez del QR.",
+  "op.enlaceCobroNota": "Nota para el médico (opcional): monto, vencimiento…",
+  "op.enlaceCobroGuardar": "Guardar enlace",
+  "op.enlaceCobroQuitar": "Quitar",
+  "op.enlaceCobroPuesto": "Lo puso {quien} el {cuando}",
+  "op.enlaceCobroConfirmar": "Vas a mandar a {nombre} a pagar acá:\n\n{enlace}\n\nComprobá que sea el enlace de ESTA persona. ¿Lo guardo?",
+  "op.enlaceCobroConfirmarQuitar": "Se le quita el enlace de pago a {nombre}. Va a volver a ver la cuenta de su país, o el aviso de escribirnos si no hay. ¿Lo quito?",
+  "op.enlaceCobroError": "No se pudo guardar el enlace",
   "op.ultimos": "Últimos movimientos",
   "op.colaTitulo": "{n} aviso(s) de pago esperando",
   "op.colaVacia": "No hay avisos de pago pendientes.",

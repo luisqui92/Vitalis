@@ -276,9 +276,14 @@ async function main() {
   const pathSaldo = require("path");
   const RAIZ_SALDO = pathSaldo.join(__dirname, "..", "..");
   const PANTALLA = fsSaldo.readFileSync(pathSaldo.join(RAIZ_SALDO, "public", "js", "recarga.js"), "utf8");
-  // El bloque del caso "no configurado", medido hasta donde arranca el normal.
-  const sinCuenta = PANTALLA.slice(PANTALLA.indexOf("if (!d.configurado)"),
-                                   PANTALLA.indexOf("const filas = ["));
+  // El bloque del caso "no configurado", medido desde el `if` que lo abre
+  // hasta el `const filas` que arranca el camino normal. Se buscan por
+  // prefijo y no por la línea entera: la condición del if y la del filas
+  // cambian cuando se agrega un caso —pasó al sumar el enlace propio— y una
+  // prueba que se rompe por eso no está probando lo que dice probar.
+  const desde = PANTALLA.indexOf("if (!d.configurado");
+  const hasta = PANTALLA.indexOf("const filas =");
+  const sinCuenta = desde > 0 && hasta > desde ? PANTALLA.slice(desde, hasta) : "";
   verificar("el aviso de «acá no se puede pagar solo» ofrece el WhatsApp",
     sinCuenta.length > 0 && /d\.whatsapp/.test(sinCuenta) && /wa\.me\//.test(sinCuenta));
   // Sin esto el arreglo no sirve: el dato tiene que llegar al navegador

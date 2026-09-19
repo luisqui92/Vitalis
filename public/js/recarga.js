@@ -98,7 +98,30 @@ function rechazadaHtml(s) {
     </div>`;
 }
 
+// ═══ EL ENLACE DE COBRO PROPIO ═════════════════════════════════════════════
+//
+// Cuando el país de este médico no tiene una cuenta común —hoy, Brasil— se le
+// genera un cobro por persona en el proveedor y alguien le pega el enlace en
+// su ficha (ver db/models.js y routes/operadorSaldo.js).
+//
+// Va ARRIBA de todo y gana sobre la cuenta del país: es más específico. Si
+// alguien se tomó el trabajo de generarle un enlace a ESTE médico, es porque
+// la cuenta general no le sirve — mostrarle las dos lo deja eligiendo entre
+// dos formas de pagar sin saber cuál es la buena, y una de las dos va a
+// estar mal.
+//
+// El https se comprueba otra vez al dibujarlo, aunque el servidor ya lo valide
+// dos veces. Es una línea, y es lo único que separa un dato de la base de un
+// `href` en la pantalla de un médico: `esc()` evita salirse del atributo, pero
+// un `javascript:` adentro del href se ejecuta igual al tocarlo.
 function dondePagarHtml(d) {
+  // Un enlace propio reemplaza el PASO 1 —dónde pagar— y nada más. Los pasos
+  // 2 y 3 siguen igual: después de pagar, el médico tiene que poder avisar el
+  // pago con su referencia, que es lo que después le permite al operador
+  // acreditarle. Sin eso el enlace cobra pero el saldo no sube nunca.
+  const propio = d.cobroPropio && String(d.cobroPropio.enlace || "").startsWith("https://")
+    ? d.cobroPropio : null;
+
   // ═══ SIN CUENTA CARGADA, LO QUE HACE FALTA ES EL CONTACTO ════════════════
   //
   // Acá había un cartel solo. El botón de escribir por WhatsApp vivía abajo,
@@ -110,7 +133,7 @@ function dondePagarHtml(d) {
   // hace a mano: alguien genera un enlace de pago por médico y se lo manda.
   // Para eso el médico tiene que poder escribir, y este es el único lugar de
   // la app donde va a buscar.
-  if (!d.configurado) {
+  if (!d.configurado && !propio) {
     return `
       <div class="saldo-aviso" style="margin-top:10px">
         <div>${t("recarga.sinDatosPago")}</div>
@@ -121,7 +144,7 @@ function dondePagarHtml(d) {
           </a>` : ""}
       </div>`;
   }
-  const filas = [
+  const filas = propio ? [] : [
     [t("recarga.banco"), d.banco],
     [t("recarga.cuenta"), d.cuenta],
     [t("recarga.titular"), d.titular],
@@ -131,10 +154,18 @@ function dondePagarHtml(d) {
   return `
     <div class="card card-secundaria" style="margin-top:10px">
       <div class="seccion-titulo" style="margin-top:0">${t("recarga.paso1")}</div>
+      ${propio ? `
+        <div class="hint" style="margin:0 0 10px">${t("recarga.tuEnlaceAyuda")}</div>
+        <a class="primary" id="recPagar" style="display:inline-block;text-decoration:none;text-align:center"
+           href="${esc(propio.enlace)}" target="_blank" rel="noopener noreferrer">
+          ${t("recarga.pagarAhora")}
+        </a>
+        ${propio.nota ? `<div class="hint" style="margin:10px 0 0">${esc(propio.nota)}</div>` : ""}
+      ` : `
       <!-- Brasil arma su código con el monto adentro (ver services/pix.js).
            El QR fijo servía solo para R$ 100 y obligaba a pedir uno nuevo por
            cada monto distinto. En Bolivia sigue el QR del banco de siempre. -->
-      ${d.pais === "br" ? `<div id="pixBox"></div>` : (d.qr ? `<img src="${esc(d.qr)}" alt="${t("recarga.qr")}" class="recarga-qr">` : "")}
+      ${d.pais === "br" ? `<div id="pixBox"></div>` : (d.qr ? `<img src="${esc(d.qr)}" alt="${t("recarga.qr")}" class="recarga-qr">` : "")}`}
       ${filas.length ? `
         <div class="recarga-datos">
           ${filas.map(([k, v]) => `
@@ -145,7 +176,11 @@ function dondePagarHtml(d) {
       <div class="hint" style="margin:0 0 10px">${t("recarga.paso2Ayuda")}</div>
       <label>${d.pais === "br" ? t("recarga.cuantoVasAPagar") : t("recarga.cuantoPagaste")}</label>
       <input id="recMonto" type="number" inputmode="decimal" min="1" step="1" placeholder="200">
-      ${d.pais === "br" ? `<button class="secondary" id="btnGenerarPix" style="margin-top:8px">${t("recarga.generarPix")}</button>` : ""}
+      <!-- Con enlace propio no va: el monto ya está adentro del enlace que le
+           generaron, y ofrecerle además "generar un Pix" —que saldría de la
+           clave del país, que es justamente la que no sirve— es ofrecerle una
+           segunda forma de pagar que no funciona. -->
+      ${d.pais === "br" && !propio ? `<button class="secondary" id="btnGenerarPix" style="margin-top:8px">${t("recarga.generarPix")}</button>` : ""}
       <label>${t("recarga.referencia")}</label>
       <input id="recReferencia" type="text" placeholder="${t("recarga.referenciaPlaceholder")}" autocomplete="off">
       <div class="hint" style="margin:6px 0 0">${t("recarga.referenciaAyuda")}</div>

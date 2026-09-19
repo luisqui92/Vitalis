@@ -40,6 +40,11 @@ Object.assign(I18N.pt, {
   // se haga a mano. Tiene que salir de acá sabiendo qué hacer.
   "recarga.sinDatosPago": "Aqui ainda não dá para pagar sozinho. Fale com a gente e enviamos o seu link de pagamento.",
   "recarga.escribinos": "Falar pelo WhatsApp",
+  // O link de cobrança próprio: quando o país não tem conta comum e se gera
+  // uma cobrança por pessoa. Ver db/models.js.
+  "recarga.tuEnlace": "Seu link de pagamento",
+  "recarga.tuEnlaceAyuda": "Preparamos um link de pagamento para você. Abre em outra aba e dá para pagar ali mesmo.",
+  "recarga.pagarAhora": "Pagar agora",
   "recarga.errMonto": "Informe quanto você pagou",
   "recarga.errReferencia": "Informe a referência do comprovante",
   "recarga.errAvisar": "Não foi possível enviar o aviso",

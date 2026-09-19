@@ -479,6 +479,71 @@ async function main() {
   verificar("  ...y su log de accesos es solo el suyo",
     auditPagos.estado === 200 && (auditPagos.cuerpo?.eventos || []).every(e => e.medicoPhone === "70000005"));
 
+  // ═══ 17. EL ENLACE DE COBRO POR MÉDICO ══════════════════════════════════
+  //
+  // Para cuando un país no tiene cuenta común —hoy Brasil, con la clave Pix de
+  // baja— y hay que generarle un cobro por persona.
+  //
+  // Es el dato más peligroso de este panel, y no porque mueva saldo: no mueve
+  // nada. Es que termina como el `href` de un botón en la pantalla de otra
+  // persona, y dice A DÓNDE MANDA SU PLATA. Dos cosas hay que garantizar: que
+  // solo un operador lo pueda tocar, y que no pueda ser cualquier cosa.
+  console.log("\n── 17. El enlace de cobro por médico ──");
+  const rutaEnlace = "/medico/operador/cuenta/79999998/enlace-cobro";
+
+  // Un `javascript:` acá es código corriendo en la sesión de un médico.
+  // Escapar el HTML no alcanza: evita salirse del atributo, pero el esquema
+  // adentro del href se ejecuta igual al tocarlo.
+  const cobroVenenos = [
+    "javascript:alert(1)",
+    "JaVaScRiPt:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "http://sin-tls.example.com/pagar",
+    "no es un enlace",
+  ];
+  let cobroRechazados = 0;
+  for (const v of cobroVenenos) {
+    const r = await PUT(rutaEnlace, tk.operador, { enlace: v });
+    if (r.estado === 400) cobroRechazados++;
+    else console.log(`   ⚠️  aceptó «${v}» con ${r.estado}`);
+  }
+  verificar(`se rechazan los ${cobroVenenos.length} enlaces que no son https`, cobroRechazados === cobroVenenos.length);
+  verificar("  ...y ninguno quedó guardado",
+    !(await Medico.findOne({ phone: "79999998" }).lean()).cobro?.enlace);
+
+  const cobroBueno = await PUT(rutaEnlace, tk.operador, {
+    enlace: "https://pagos.ejemplo.com/c/abc123", nota: "R$ 4.400 · vence el 30",
+  });
+  verificar("un https válido se guarda", cobroBueno.estado === 200);
+  const cobroGuardado = (await Medico.findOne({ phone: "79999998" }).lean()).cobro;
+  verificar("  ...con la nota para el médico", cobroGuardado.nota === "R$ 4.400 · vence el 30");
+  // A dónde va la plata de alguien: si un día cae donde no corresponde, esto
+  // dice quién lo cambió.
+  verificar("  ...y queda quién lo puso y cuándo",
+    cobroGuardado.actualizadoPor === "70000001" && Boolean(cobroGuardado.actualizadoEn));
+
+  // El médico lo ve en SU pantalla de recarga, y nadie más.
+  const cobroSuyo = await GET("/medico/recargas/datos-pago", tk.brasil);
+  verificar("el médico lo recibe en su pantalla de recarga",
+    cobroSuyo.cuerpo.cobroPropio?.enlace === "https://pagos.ejemplo.com/c/abc123");
+  const cobroAjeno = await GET("/medico/recargas/datos-pago", tk.destino);
+  verificar("  ...y el de al lado no ve nada", cobroAjeno.cuerpo.cobroPropio === null);
+
+  // El candado de siempre: esto es del operador, no de cualquiera con sesión.
+  for (const [quien, token] of [["un médico común", tk.comun], ["un admin de clínica", tk.adminClinica],
+                                ["un operador sin 2FA", tk.sin2fa]]) {
+    const r = await PUT(rutaEnlace, token, { enlace: "https://mio.example.com/cobrar" });
+    verificar(`${quien} no puede ponerle un enlace de cobro a nadie`, r.estado === 403 || r.estado === 404);
+  }
+  verificar("y el enlace bueno sigue intacto después de los intentos",
+    (await Medico.findOne({ phone: "79999998" }).lean()).cobro.enlace === "https://pagos.ejemplo.com/c/abc123");
+
+  // Vaciarlo es una operación normal: venció, o el país ya tiene cuenta común.
+  const cobroVaciado = await PUT(rutaEnlace, tk.operador, { enlace: "" });
+  verificar("se puede quitar", cobroVaciado.estado === 200);
+  verificar("  ...y el médico vuelve a la cuenta de su país",
+    (await GET("/medico/recargas/datos-pago", tk.brasil)).cuerpo.cobroPropio === null);
+
   await new Promise((r) => servidor.close(r));
   await new Promise((r) => setTimeout(r, 400));
   await mongoose.connection.dropDatabase();

@@ -69,9 +69,21 @@ module.exports = function (app) {
   // grave en sí (son públicos, se los damos a todos) pero sí lo es al revés:
   // un brasileño viendo la cuenta boliviana transfiere plata que no vuelve.
   app.get("/medico/recargas/datos-pago", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("idioma").lean();
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("idioma cobro").lean();
+    // El enlace propio, si alguien se lo puso. Es para cuando su país no tiene
+    // cuenta común (ver db/models.js) y se le genera un cobro por persona.
+    //
+    // Se vuelve a exigir https acá aunque la ruta que lo guarda ya lo valide:
+    // este es el dato que termina siendo un href en la pantalla de alguien, y
+    // un registro viejo —o cargado por un script, o migrado— no pasó por
+    // aquella validación. El candado va también del lado que entrega.
+    const enlace = String(medico?.cobro?.enlace || "");
+    const cobroPropio = enlace.startsWith("https://")
+      ? { enlace, nota: String(medico.cobro.nota || "") }
+      : null;
     res.json({
       ...(await datosDePago(paisDelMedico(medico))),
+      cobroPropio,
       recargaMinimaCentavos: saldos.RECARGA_MINIMA,
     });
   }));

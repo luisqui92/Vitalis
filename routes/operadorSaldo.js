@@ -153,13 +153,68 @@ module.exports = function (app) {
   // ─── VER UNA CUENTA ANTES DE ACREDITARLE ───────────────────────────────
   app.get("/medico/operador/cuenta/:phone", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
     const phone = String(req.params.phone).trim();
-    const medico = await Medico.findOne({ phone }).select("phone nombre tipoEspecialidad activo moneda").lean();
+    const medico = await Medico.findOne({ phone }).select("phone nombre tipoEspecialidad activo moneda cobro").lean();
     if (!medico) throw new ErrorHttp(404, "No hay ninguna cuenta con ese teléfono");
     const [estado, movimientos] = await Promise.all([
       saldos.estadoDe(phone),
       saldos.movimientosDe(phone, 20),
     ]);
     res.json({ medico, ...estado, movimientos });
+  }));
+
+  // ─── EL ENLACE DE COBRO DE ESTE MÉDICO ─────────────────────────────────
+  //
+  // Para cuando el país no tiene una cuenta común: alguien genera un enlace
+  // por médico en el proveedor y lo pega acá. El porqué está en db/models.js.
+  //
+  // ═══ LA VALIDACIÓN NO ES BUROCRACIA ══════════════════════════════════
+  //
+  // Esto termina como el href de un botón en la pantalla de otra persona. Un
+  // `javascript:...` ahí es código corriendo en la sesión de un médico, y el
+  // escapado de HTML no lo detiene: escapar comillas evita salirse del
+  // atributo, pero un esquema `javascript:` adentro del href se ejecuta
+  // igual al tocarlo.
+  //
+  // Por eso se exige https y se rechaza todo lo demás, acá y otra vez antes
+  // de dibujarlo. Dos veces a propósito: este es el único candado que hay
+  // entre una cuenta de operador y la pantalla de todos sus médicos.
+  app.put("/medico/operador/cuenta/:phone/enlace-cobro", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    const phone = String(req.params.phone).trim();
+    const medico = await Medico.findOne({ phone });
+    if (!medico) throw new ErrorHttp(404, "No hay ninguna cuenta con ese teléfono");
+
+    const crudo = String(req.body?.enlace || "").trim();
+    const nota = String(req.body?.nota || "").trim().slice(0, 140);
+
+    // Vaciarlo es una operación legítima y frecuente: el enlace venció, o el
+    // país ya tiene cuenta común y esto sobra.
+    if (crudo) {
+      let url;
+      try { url = new URL(crudo); } catch { throw new ErrorHttp(400, "Eso no es un enlace válido."); }
+      if (url.protocol !== "https:") {
+        throw new ErrorHttp(400, "El enlace tiene que empezar con https://. No se acepta ningún otro tipo.");
+      }
+      if (crudo.length > 500) throw new ErrorHttp(400, "Ese enlace es demasiado largo.");
+    }
+
+    const antes = medico.cobro?.enlace || "";
+    medico.cobro = {
+      enlace: crudo, nota,
+      actualizadoPor: crudo ? req.adminUser.usuario : "",
+      actualizadoEn: crudo ? new Date() : null,
+    };
+    await medico.save();
+
+    // Se audita el enlace ENTERO, viejo y nuevo. Es a dónde va la plata de
+    // alguien: si mañana los pagos caen donde no corresponde, esto dice quién
+    // lo cambió, cuándo, y desde qué. Mismo criterio que cambiar_datos_pago.
+    registrar({
+      req, medicoPhone: req.adminUser.usuario,
+      accion: crudo ? "poner_enlace_cobro" : "quitar_enlace_cobro",
+      recurso: `Medico:${phone}`,
+      detalle: crudo ? `${antes || "(vacío)"} → ${crudo}` : `quitado (era ${antes || "(vacío)"})`,
+    });
+    res.json({ ok: true, cobro: medico.cobro });
   }));
 
   // ─── DÓNDE NOS PAGAN ───────────────────────────────────────────────────

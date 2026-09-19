@@ -287,6 +287,34 @@ async function abrirFichaOperador(phone) {
         </button>
       </div>
 
+      <!-- ═══ EL ENLACE DE COBRO DE ESTE MÉDICO ═══════════════════════════
+           Para cuando su país no tiene una cuenta común: se le genera un
+           cobro por persona en el proveedor y el enlace se pega acá. El
+           médico lo ve en su pantalla de recarga, en lugar del QR.
+
+           Va al final y no arriba: no es de todos los días. Se toca cuando
+           se le genera un cobro nuevo, o cuando venció el anterior. -->
+      <div class="seccion-titulo">${t("op.enlaceCobro")}</div>
+      <div class="hint" style="margin:0 0 8px">${t("op.enlaceCobroAyuda")}</div>
+      <input id="opEnlaceCobro" type="url" inputmode="url" autocomplete="off"
+             placeholder="https://..." value="${esc((d.medico.cobro || {}).enlace || "")}">
+      <input id="opEnlaceNota" type="text" autocomplete="off"
+             placeholder="${t("op.enlaceCobroNota")}" value="${esc((d.medico.cobro || {}).nota || "")}">
+      ${(d.medico.cobro || {}).actualizadoEn ? `
+        <div class="hint" style="margin:6px 0 0">
+          ${t("op.enlaceCobroPuesto", {
+            quien: esc(d.medico.cobro.actualizadoPor || "—"),
+            cuando: esc(fechaCorta(d.medico.cobro.actualizadoEn)),
+          })}
+        </div>` : ""}
+      <div id="opEnlaceErr"></div>
+      <div class="sol-acciones">
+        <button class="secondary" id="btnGuardarEnlace" style="margin:0">${t("op.enlaceCobroGuardar")}</button>
+        ${(d.medico.cobro || {}).enlace
+          ? `<button class="secondary" id="btnQuitarEnlace" style="margin:0">${t("op.enlaceCobroQuitar")}</button>`
+          : ""}
+      </div>
+
       ${d.movimientos.length ? `
         <div class="seccion-titulo">${t("op.ultimos")}</div>
         ${movimientosHtml(d.movimientos)}` : ""}
@@ -296,6 +324,47 @@ async function abrirFichaOperador(phone) {
   caja.querySelectorAll("[data-plan]").forEach(b => {
     b.onclick = () => activarPlan(b.dataset.plan, d);
   });
+  document.getElementById("btnGuardarEnlace").onclick = () => guardarEnlaceCobro(d.medico.phone, false);
+  const btnQuitar = document.getElementById("btnQuitarEnlace");
+  if (btnQuitar) btnQuitar.onclick = () => guardarEnlaceCobro(d.medico.phone, true);
+}
+
+// ─── PONER O QUITAR EL ENLACE DE COBRO ────────────────────────────────────
+//
+// Se confirma antes de guardar, mostrando el enlace y el NOMBRE del médico.
+// No es exceso de ceremonia: esto define a dónde va la plata de esa persona.
+// Un enlace pegado en la ficha equivocada manda a un médico a pagarle la
+// cuenta de otro, y nadie se entera hasta que falta el dinero.
+//
+// El servidor exige https y lo audita entero, viejo y nuevo. Esto es el aviso
+// de este lado.
+async function guardarEnlaceCobro(phone, quitar) {
+  const err = document.getElementById("opEnlaceErr");
+  const enlace = quitar ? "" : document.getElementById("opEnlaceCobro").value.trim();
+  const nota = quitar ? "" : document.getElementById("opEnlaceNota").value.trim();
+  err.innerHTML = "";
+
+  const nombre = (OPERADOR_ELEGIDO && OPERADOR_ELEGIDO.nombre) || phone;
+  const aviso = quitar
+    ? t("op.enlaceCobroConfirmarQuitar", { nombre })
+    : t("op.enlaceCobroConfirmar", { nombre, enlace });
+  if (!confirm(aviso)) return;
+
+  const botones = [document.getElementById("btnGuardarEnlace"), document.getElementById("btnQuitarEnlace")].filter(Boolean);
+  botones.forEach(b => { b.disabled = true; });
+  try {
+    await api(`/medico/operador/cuenta/${encodeURIComponent(phone)}/enlace-cobro`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enlace, nota }),
+    });
+    // Se vuelve a abrir la ficha para que lo que se ve sea lo que quedó
+    // guardado, y no lo que se tipeó. Si el servidor normalizó o rechazó algo,
+    // acá se nota.
+    abrirFichaOperador(phone);
+  } catch (e) {
+    botones.forEach(b => { b.disabled = false; });
+    err.innerHTML = `<div class="error">${esc(e.error || t("op.enlaceCobroError"))}</div>`;
+  }
 }
 
 // ─── ACTIVAR UN PLAN ──────────────────────────────────────────────────────
