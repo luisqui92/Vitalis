@@ -2,24 +2,44 @@
 
 ## Dónde estamos
 
-Un pago de prueba de R$ 1,00 falló. Un banco dijo "erro ao processar o
-pagamento" y otro, más preciso, "conta de destino não foi encontrada".
+**Resuelto: la clave Pix de Takenos está de baja.** Se comprobó pegándola
+suelta en un banco — no devuelve titular, así que no existe en DICT. No es la
+clave mal copiada ni un problema del generador: no hay cuenta del otro lado.
 
-El segundo mensaje es de **DICT**, el directorio de claves Pix del Banco
-Central. El banco no pudo resolver la clave, y eso ocurre *antes* de mirar el
-monto, el txid o el formato del código. Descarta que el problema sea nuestro
-generador — `scripts/pruebas/probar_pix.js` reproduce carácter por carácter,
-CRC incluido, un QR que un banco brasileño ya aceptó.
-
-Quedan dos causas, y hay un script para cada una:
-
-| Causa | Cómo se confirma |
-|---|---|
-| La clave cargada no es la correcta | `node scripts/ver_pix_configurado.js` |
-| La clave ya no existe en el proveedor | Pegarla suelta en un banco: si no aparece el titular antes de pedir el monto, está de baja |
+Cómo se llegó acá: un pago de prueba de R$ 1,00 falló. Un banco dijo "erro ao
+processar o pagamento" y otro, más preciso, "conta de destino não foi
+encontrada". El segundo mensaje es de **DICT**, el directorio de claves Pix del
+Banco Central, y ocurre *antes* de mirar el monto, el txid o el formato del
+código. `scripts/pruebas/probar_pix.js` reproduce carácter por carácter, CRC
+incluido, un QR que un banco brasileño ya aceptó, así que el generador estaba
+descartado desde el principio.
 
 No se puede consultar DICT desde el servidor: hace falta ser participante del
-SPI.
+SPI. Por eso esta comprobación la hizo una persona con un banco en la mano, y
+por eso hay que repetirla con la clave que reemplace a esta **antes** de
+ponerla en producción. Que un QR se dibuje no dice absolutamente nada.
+
+### Lo urgente, antes de elegir reemplazo
+
+**Hay que vaciar la clave Pix cargada.** Mientras siga ahí, Symphomed le sigue
+armando el QR a cualquier médico brasileño que entre a pagar: el único guardia
+es `if (!datos?.cuenta)` en `routes/recargas.js`, que comprueba que el campo no
+esté vacío, no que la clave exista.
+
+Una clave muerta es peor que ninguna. Sin clave, la pantalla dice "todavía no
+está cargada la clave Pix, escribinos" y el médico escribe — y nos enteramos.
+Con la clave muerta, el médico ve un QR normal, lo escanea, y el error se lo da
+su banco: nosotros no nos enteramos nunca, y él se queda pensando que el
+producto no funciona.
+
+Se vacía desde la pantalla de Pagos, dejando en blanco el campo de la clave
+para Brasil. No hace falta tocar el servidor ni desplegar nada.
+
+Queda una pregunta abierta para cuando haya reemplazo: ese guardia no distingue
+"nunca se configuró" de "se configuró y se dio de baja", y son dos mensajes
+distintos para el médico. Hoy no hay forma automática de distinguirlos —nadie
+puede consultar DICT desde acá— así que si se quiere, tiene que ser una marca
+que ponga a mano quien comprobó la clave.
 
 ## Estático y dinámico no son dos caminos alternativos
 
