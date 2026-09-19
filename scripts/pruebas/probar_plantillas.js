@@ -79,7 +79,12 @@ console.log("\n── 3. El código pasa tantos valores como variables tiene ─
 // que se lea el TEXTO y no se ejecute: ejecutarlas pediría una base, una
 // consulta y un paciente, y lo que importa acá es una sola cosa —cuántos
 // valores se pasan— que se ve leyendo.
-const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia", "solicitudesCuenta"];
+// "resumenCompartido" y "reseteoClave" no estaban acá y son las dos rutas más
+// nuevas que mandan plantilla — sin esto, un desacople entre la lista de
+// parámetros y lo que Meta tiene aprobado en esas dos no lo hubiera agarrado
+// nada.
+const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia", "solicitudesCuenta",
+  "resumenCompartido", "reseteoClave"];
 const llamadas = [];
 for (const r of RUTAS) {
   const codigo = fs.readFileSync(path.join(RAIZ, "routes", `${r}.js`), "utf8");
@@ -97,7 +102,20 @@ for (const r of RUTAS) {
   }
 }
 
-verificar(`se encontraron las ${llamadas.length} llamadas con respaldo de plantilla`, llamadas.length === 7);
+// Acá había un `llamadas.length === 7` fijo — el mismo problema que ya se
+// corrigió más arriba con el conteo de PLANTILLAS: un número que hay que
+// subir a mano cada vez que una ruta nueva manda una plantilla, y que se
+// arregla cambiando un dígito sin mirar nada. Lo que de verdad importa no es
+// CUÁNTAS llamadas hay en total, sino que CADA archivo de la lista tenga la
+// suya: un archivo con cero matches es la señal real de que algo se rompió
+// —la ruta dejó de usar el patrón `plantilla: PLANTILLAS.…` que este regex
+// busca, o el regex ya no encaja con cómo quedó escrita la llamada.
+console.log(`   se encontraron ${llamadas.length} llamadas con respaldo de plantilla`);
+const sinLlamada = RUTAS.filter(r => !llamadas.some(l => l.ruta === r));
+verificar("cada ruta de la lista tiene al menos una llamada con plantilla de respaldo",
+  sinLlamada.length === 0);
+if (sinLlamada.length) console.log("   sin ninguna:", sinLlamada.join(", "));
+
 for (const l of llamadas) {
   const doc = documentadas[l.nombre];
   const pide = doc ? [...new Set(doc.numeros)].length : -1;

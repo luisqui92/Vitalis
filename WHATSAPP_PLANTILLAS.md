@@ -6,9 +6,9 @@ Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
 mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
 de antemano.
 
-De los siete lugares donde Symphomed manda algo por WhatsApp, el único que
+De los nueve lugares donde Symphomed manda algo por WhatsApp, el único que
 siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
-acaba de escribir. Los otros seis los inicia la plataforma, y la persona
+acaba de escribir. Los otros ocho los inicia la plataforma, y la persona
 puede no haber escrito nunca:
 
 | Qué manda | Dónde | Cae fuera de la ventana |
@@ -20,6 +20,8 @@ puede no haber escrito nunca:
 | Informe al paciente | `routes/informes.js` | a menudo |
 | Informe de avance a la familia | `routes/informeFamilia.js` | **casi siempre** |
 | Cuenta profesional aprobada | `routes/solicitudesCuenta.js` | **casi siempre** |
+| La llave a la historia propia | `routes/resumenCompartido.js` | **casi siempre** |
+| Enlace para resetear la contraseña | `routes/reseteoClave.js` | **casi siempre** |
 
 La de avance a la familia es la que más va a depender de la plantilla: la familia de un chico
 en seguimiento de neurodesarrollo no le escribe al consultorio entre sesión y
@@ -209,6 +211,64 @@ La versión `pt_BR` fue rechazada por Meta para esta cuenta de WhatsApp.
 Cuando el profesional usa portugués se intenta primero texto libre en ese
 idioma; fuera de la ventana de 24 horas se usa esta plantilla española para
 que el aviso no se pierda.
+
+---
+
+### 7. `reseteo_clave`
+
+Cuerpo:
+
+```
+Hola {{1}}. Pediste restablecer tu contraseña de Symphomed.
+
+Entrá acá para elegir una nueva. El enlace vale por 2 horas y sirve una sola vez:
+
+{{2}}
+
+Si no fuiste vos, ignorá este mensaje: tu contraseña actual sigue funcionando.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre de la persona | `Carla` |
+| `{{2}}` | enlace para elegir la contraseña nueva | `https://app.symphomed.com/restablecer/abc123` |
+
+Esta plantilla **no tiene el atajo `idioma: "es"` fijo** que tiene
+`cuenta_habilitada`: el código manda el idioma real de la cuenta
+(`routes/reseteoClave.js`), porque `services/metaWhatsapp.js` ya traduce `pt`
+al código de Meta (`pt_BR`) desde adentro de `enviarPlantilla()` — ver la
+sección «Portugués» más abajo. El atajo de `cuenta_habilitada` es una cicatriz
+de un rechazo puntual de ESA plantilla, no una regla general.
+
+Por eso, además de la versión española de arriba —la que hay que cargar
+primero, para que el reseteo funcione desde el día uno—, conviene cargar
+también esta en portugués (`pt_BR`), apenas haya tiempo:
+
+```
+Olá {{1}}. Você pediu para redefinir sua senha da Symphomed.
+
+Entre aqui para escolher uma nova. O link vale por 2 horas e serve uma única vez:
+
+{{2}}
+
+Se não foi você, ignore esta mensagem: sua senha atual continua funcionando.
+```
+
+Mismas dos variables, mismo orden. Sin ella cargada, un socio o médico en
+portugués que pida el reseteo fuera de la ventana de 24 h se queda sin
+enlace — el código intenta el texto libre en su idioma primero, así que
+dentro de la ventana funciona igual; el hueco es solo fuera de ella.
+
+Las dos horas de vencimiento van escritas en el cuerpo y **no** como variable,
+mismo criterio que `informe_listo`: es `HORAS_VALIDEZ` en
+`routes/reseteoClave.js` y no cambia por persona. Si el número cambia, hay que
+pedir aprobación de nuevo — por eso está anotado acá.
+
+**Es la plantilla más sensible de las siete.** El enlace da acceso completo a
+la cuenta, así que el cuerpo tiene dos frases que no son decorativas: que
+sirve *una sola vez* (para que quien la lea no la reenvíe pensando que puede
+volver a usarla) y que ignorarla no hace nada si el pedido no fue de la
+persona (para que un intento ajeno no la asuste ni la empuje a hacer algo).
 
 ---
 

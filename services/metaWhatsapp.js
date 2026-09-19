@@ -117,6 +117,11 @@ const PLANTILLAS = {
   // de conversación abierta. Sin plantilla, la aprobación quedaría dentro
   // de Symphomed y el profesional no sabría que ya puede entrar.
   cuentaAprobada: "cuenta_habilitada",
+  // El enlace para elegir una contraseña nueva, cuando un admin aprobó el
+  // pedido. Casi siempre fuera de la ventana: entre que alguien pide
+  // resetear su clave y un admin lo aprueba pasa rato, y la persona no le
+  // escribió al WhatsApp de Symphomed en el medio.
+  reseteoClave: "reseteo_clave",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es

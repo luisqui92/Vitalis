@@ -45,10 +45,12 @@ function renderLogin() {
       <div id="lErr"></div>
       <button class="primary" id="lBtn">${t("auth.ingresar")}</button>
       <button class="link" id="lGoReg">${t("auth.irRegistro")}</button>
+      <button class="link" id="lGoOlvide" style="font-size:13px">${t("auth.olvide")}</button>
       ${selectorIdiomaHtml()}
     </div>`;
   cablearSelectorIdioma(renderLogin);
   document.getElementById("lGoReg").onclick = renderRegistro;
+  document.getElementById("lGoOlvide").onclick = () => renderOlvideClave(document.getElementById("lPhone").value.trim());
   document.getElementById("lBtn").onclick = async () => {
     const phone = document.getElementById("lPhone").value.trim();
     const password = document.getElementById("lPass").value;
@@ -61,6 +63,58 @@ function renderLogin() {
       completarLogin(data);
     } catch (e) {
       errBox.innerHTML = `<div class="error">${esc(e.error || t("auth.errIngresar"))}</div>`;
+    }
+  };
+}
+
+// ═══ OLVIDÉ MI CONTRASEÑA ═══════════════════════════════════════════════════
+//
+// Un solo campo y un botón. La respuesta que llega es SIEMPRE la misma —"si
+// ese número está registrado…"— exista o no exista la cuenta, y por eso la
+// pantalla nunca puede decir "cuenta no encontrada": eso sería exactamente lo
+// que la ruta del servidor está diseñada para no revelar (ver el porqué junto
+// al modelo SolicitudReseteo en db/models.js).
+//
+// Se le pasa el teléfono ya tipeado en el login, para no hacerlo escribirlo
+// dos veces — es lo único que se lleva de una pantalla a la otra.
+function renderOlvideClave(telefonoDeArranque) {
+  app.innerHTML = `
+    <div class="card">
+      <div class="hint" style="margin-bottom:14px">${t("auth.olvide.ayuda")}</div>
+      <label>${t("auth.telefono")}</label>
+      <input id="ocPhone" type="tel" placeholder="${t("auth.telefonoPlaceholder")}" value="${esc(telefonoDeArranque || "")}">
+      <div id="ocErr"></div>
+      <button class="primary" id="ocBtn">${t("auth.olvide.enviar")}</button>
+      <button class="link" id="ocVolver">${t("auth.olvide.volver")}</button>
+    </div>`;
+  document.getElementById("ocVolver").onclick = renderLogin;
+  document.getElementById("ocBtn").onclick = async () => {
+    const phone = document.getElementById("ocPhone").value.trim();
+    const errBox = document.getElementById("ocErr");
+    errBox.innerHTML = "";
+    if (!phone) { errBox.innerHTML = `<div class="error">${t("auth.olvide.errFalta")}</div>`; return; }
+    const btn = document.getElementById("ocBtn");
+    btn.disabled = true;
+    try {
+      // No hay try/catch que distinga "existe" de "no existe": la ruta
+      // contesta 200 con el mismo mensaje en los dos casos. Un error acá es
+      // de red, no de la cuenta.
+      await api("/reseteo-clave/solicitar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefono: phone }),
+      });
+      app.innerHTML = `
+        <div class="card">
+          <div class="hint">${t("auth.olvide.enviado")}</div>
+          <button class="primary" id="ocVolver2" style="margin-top:14px">${t("auth.olvide.volver")}</button>
+        </div>`;
+      document.getElementById("ocVolver2").onclick = renderLogin;
+    } catch (e) {
+      // Esto SÍ puede ser un mensaje distinto del de éxito: no dice nada
+      // sobre si la cuenta existe, dice que el PEDIDO no llegó —demasiados
+      // intentos, o la red— y eso es seguro de mostrar tal cual.
+      btn.disabled = false;
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("auth.olvide.errEnviar"))}</div>`;
     }
   };
 }

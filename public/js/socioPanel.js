@@ -72,6 +72,7 @@ function pantallaLogin() {
       <input id="loginPass" type="password" autocomplete="current-password">
       <div id="loginErr"></div>
       <button class="primary" id="btnEntrar">Entrar</button>
+      <button class="link" id="btnOlvide" style="font-size:13px">¿Olvidaste tu contraseña?</button>
       <div class="hint">¿Sos profesional de la salud? Tu acceso es <a href="/app">app.symphomed.com</a>.</div>
     </div>`;
 
@@ -99,11 +100,59 @@ function pantallaLogin() {
     }
   };
   document.getElementById("btnEntrar").onclick = entrar;
+  document.getElementById("btnOlvide").onclick = () => pantallaOlvideClave(document.getElementById("loginPhone").value.trim());
   // Enter en cualquiera de los dos campos entra: es lo que hace todo el
   // mundo, y obligar a bajar al botón es fricción gratis.
   for (const id of ["loginPhone", "loginPass"]) {
     document.getElementById(id).onkeydown = (e) => { if (e.key === "Enter") entrar(); };
   }
+}
+
+// ═══ OLVIDÉ MI CONTRASEÑA ═══════════════════════════════════════════════════
+//
+// Misma ruta pública que usa el login de médico (/reseteo-clave/solicitar):
+// no declara si es socio o médico, prueba las dos colecciones del lado del
+// servidor. Acá tampoco se distingue "cuenta no encontrada" de "cuenta
+// encontrada" — la respuesta es siempre la misma, a propósito. Ver el
+// porqué junto al modelo SolicitudReseteo en db/models.js.
+function pantallaOlvideClave(telefonoDeArranque) {
+  app.innerHTML = `
+    <div class="card">
+      <div class="hint" style="margin-bottom:14px">
+        Poné tu teléfono. Si la cuenta existe, un administrador va a revisar el pedido y te va a escribir por WhatsApp.
+      </div>
+      <label for="ocPhone">Teléfono</label>
+      <input id="ocPhone" type="tel" inputmode="tel" autocomplete="username" placeholder="Ej: 70012345" value="${esc(telefonoDeArranque || "")}">
+      <div id="ocErr"></div>
+      <button class="primary" id="ocBtn">Pedir ayuda para entrar</button>
+      <button class="link" id="ocVolver">← Volver</button>
+    </div>`;
+  document.getElementById("ocVolver").onclick = pantallaLogin;
+  document.getElementById("ocBtn").onclick = async () => {
+    const phone = document.getElementById("ocPhone").value.trim();
+    const err = document.getElementById("ocErr");
+    err.innerHTML = "";
+    if (!phone) { err.innerHTML = `<div class="error">Poné tu teléfono</div>`; return; }
+    const btn = document.getElementById("ocBtn");
+    btn.disabled = true;
+    try {
+      await api("/reseteo-clave/solicitar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefono: phone }),
+      });
+      app.innerHTML = `
+        <div class="card">
+          <div class="hint">Listo. Si ese número está registrado, en un rato te escribimos por WhatsApp.</div>
+          <button class="primary" id="ocVolver2" style="margin-top:14px">← Volver</button>
+        </div>`;
+      document.getElementById("ocVolver2").onclick = pantallaLogin;
+    } catch (e) {
+      // Esto SÍ puede diferir del mensaje de éxito: no dice si la cuenta
+      // existe, dice que el pedido no llegó — demasiados intentos, o la red.
+      btn.disabled = false;
+      err.innerHTML = `<div class="error">${esc(e.error || "No se pudo enviar el pedido. Probá de nuevo en un momento.")}</div>`;
+    }
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

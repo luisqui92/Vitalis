@@ -2634,7 +2634,103 @@ const llavePacienteSchema = new mongoose.Schema({
 llavePacienteSchema.index({ pacienteId: 1 }, { unique: true, partialFilterExpression: { revocadaEn: null } });
 const LlavePaciente = mongoose.model("LlavePaciente", llavePacienteSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+
+// ═══ OLVIDÉ MI CONTRASEÑA, CON UN HUMANO EN EL MEDIO ═══════════════════════
+//
+// Hoy, si un médico o un socio pierde su contraseña, la única forma de
+// recuperarla es que alguien con acceso al servidor corra un script
+// (scripts/cuentas.js, scripts/crear_socio.js --clave). Eso funciona, pero
+// depende de una persona despierta con la terminal abierta: no escala más
+// allá de un puñado de cuentas, y de noche o un fin de semana esa persona no
+// está.
+//
+// Esto es lo mismo, con dos cambios: quien lo pide no necesita hablarle a
+// nadie por WhatsApp aparte —hay un botón en la pantalla de entrar— y quien
+// lo aprueba lo hace desde un panel, no por SSH.
+//
+// ═══ POR QUÉ NO ES AUTOMÁTICO ══════════════════════════════════════════════
+//
+// Podría serlo: mandar un enlace apenas alguien pide el reseteo, sin que
+// nadie lo mire. No se hace, a propósito. Esto es la puerta de entrada a un
+// sistema de historias clínicas (del lado médico) y a la capacidad de dar de
+// alta cuentas (del lado socio) — la misma razón por la que dar de alta una
+// cuenta nueva pasa por un humano (ver SolicitudCuenta en Medico) y no por
+// un formulario que se aprueba solo. Un enlace de reseteo automático es
+// exactamente lo que un atacante que solo sabe el número de teléfono de
+// alguien necesita.
+//
+// Por eso aprueba la MISMA gente que aprueba cuentas y acredita pagos —
+// OPERADORES_SALDO con el segundo factor activo (ver requireAprobador acá
+// abajo)—, no porque el reseteo mueva plata, sino porque es la misma clase
+// de decisión: quién entra al sistema.
+//
+// ═══ POR QUÉ NO SE MANDA LA CONTRASEÑA POR WHATSAPP ═══════════════════════
+//
+// Nunca, en ningún camino. Se manda un ENLACE, que vence en pocas horas y
+// sirve una sola vez, y quien lo abre elige su propia contraseña ahí. Es la
+// misma regla que ya rige para «cuenta_habilitada» y para la llave del
+// paciente: la vista previa de un WhatsApp se ve en la pantalla bloqueada de
+// un teléfono que puede ser compartido, y una contraseña ahí sería entregarle
+// la cuenta a quien mire por encima del hombro.
+//
+// ═══ POR QUÉ NO SE DICE SI EL TELÉFONO EXISTE ═════════════════════════════
+//
+// La ruta pública que recibe el pedido contesta EXACTAMENTE el mismo mensaje
+// exista o no exista una cuenta con ese teléfono. Si contestara distinto,
+// cualquiera podría usarla para averiguar qué números de teléfono son
+// médicos o socios de Symphomed, probando uno por uno. Ver routes/
+// reseteoClave.js.
+const solicitudReseteoSchema = new mongoose.Schema({
+  tipo: { type: String, enum: ["medico", "socio"], required: true },
+  telefono: { type: String, required: true, index: true },
+  // Copiado al pedir, para que el panel del admin no tenga que resolver un
+  // join solo para mostrar a quién le está por mandar un enlace de acceso.
+  nombre: { type: String, default: "" },
+  pedidaEn: { type: Date, default: Date.now },
+  ip: { type: String, default: "" },
+
+  // "vencida" es un estado terminal más que ADEMÁS de "aprobada": una
+  // solicitud aprobada cuyo token venció sin usarse sigue diciendo
+  // "aprobada" hasta que algo la toque —el vencimiento es una propiedad de
+  // `tokenExpira`, no un cambio de estado automático—. Sin este estado, el
+  // índice único de abajo la seguiría contando como "viva" para siempre, y
+  // la persona que dejó pasar las dos horas no podría volver a pedir un
+  // enlace nunca más. routes/reseteoClave.js la transiciona acá ANTES de
+  // dejar pasar un pedido nuevo — ver el comentario en esa ruta.
+  estado: {
+    type: String,
+    enum: ["pendiente", "aprobada", "rechazada", "usada", "vencida"],
+    default: "pendiente", index: true,
+  },
+
+  // Se llenan al aprobar. El enlace ES la credencial —mismo criterio que
+  // InformeFamilia y LlavePaciente— y por eso el candado real está en que
+  // `token` no exista hasta que un humano lo decida, no en su longitud.
+  token: { type: String, default: null, index: true },
+  tokenExpira: { type: Date, default: null },
+  aprobadaPor: { type: String, default: "" },
+  aprobadaEn: { type: Date, default: null },
+
+  rechazadaPor: { type: String, default: "" },
+  rechazadaEn: { type: Date, default: null },
+  // Nota interna de quien rechaza (ej. "no reconozco este pedido"). No se le
+  // manda a nadie: a diferencia de rechazar una cuenta —donde el médico
+  // sigue sin poder entrar y necesita saber por qué—, acá rechazar significa
+  // simplemente que no pasa nada, y la persona sigue con su contraseña de
+  // siempre.
+  nota: { type: String, default: "" },
+
+  usadaEn: { type: Date, default: null },
+}, { timestamps: true });
+// Como máximo un pedido VIVO (pendiente o aprobado-sin-usar) por cuenta. Es
+// lo que evita que pedir el botón seis veces seguidas le llene la cola al
+// admin de seis filas idénticas, y lo garantiza la base, no el código: si dos
+// pedidos llegan al mismo tiempo, el segundo falla acá.
+solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
+  { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
+const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
+
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

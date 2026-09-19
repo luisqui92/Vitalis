@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Elegir contraseña nueva</title>
+<!-- Que no lo levante un buscador ni quede en el historial de un navegador
+     compartido con el enlace legible: es una puerta a una cuenta. -->
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="/img/simbolo-192.png">
+<link rel="stylesheet" href="/resumen.css">
+</head>
+<!--
+  ═══ POR QUÉ ESTA PÁGINA ES APARTE, IGUAL QUE /r Y /mi ═════════════════════
+
+  Quien la abre todavía no puede entrar a nada de Symphomed —ni a la app ni
+  al panel del socio—, así que no tiene sentido bajarle el JavaScript de
+  ninguno de los dos para mostrarle un formulario de dos campos.
+
+  Reusa resumen.css y no una hoja propia: sus clases (.panel, .btn, .barra,
+  .error) ya son genéricas, no clínicas, y escribir una hoja nueva para dos
+  campos y un botón sería duplicar lo que ya existe.
+-->
+<body>
+
+<div class="barra no-imprimir">
+  <span class="marca"><i></i>SYMPHOMED</span>
+  <span class="barra-nota">Contraseña nueva</span>
+</div>
+
+<div class="envoltorio" id="app" style="max-width:440px">
+  <div class="cargando">Comprobando el enlace…</div>
+</div>
+
+<script src="/js/restablecerClave.js"></script>
+</body>
+</html>

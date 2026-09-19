@@ -10,6 +10,15 @@ Object.assign(I18N.es, {
   "auth.irRegistro": "¿No tenés cuenta? Registrate",
   "auth.errFaltanDatos": "Completá teléfono y contraseña",
   "auth.errIngresar": "No se pudo iniciar sesión",
+  // Olvidé mi contraseña. El mensaje de respuesta es SIEMPRE el mismo, exista
+  // o no exista la cuenta — ver el porqué en db/models.js, junto al modelo.
+  "auth.olvide": "¿Olvidaste tu contraseña?",
+  "auth.olvide.ayuda": "Poné tu teléfono. Si la cuenta existe, un administrador va a revisar el pedido y te va a escribir por WhatsApp.",
+  "auth.olvide.enviar": "Pedir ayuda para entrar",
+  "auth.olvide.volver": "← Volver",
+  "auth.olvide.enviado": "Listo. Si ese número está registrado, en un rato te escribimos por WhatsApp.",
+  "auth.olvide.errFalta": "Poné tu teléfono",
+  "auth.olvide.errEnviar": "No se pudo enviar el pedido. Probá de nuevo en un momento.",
   "auth.idioma": "Idioma",
   "auth.2fa.ayuda": "🔐 Ingresá el código de 6 dígitos de tu app autenticadora (Google Authenticator, Authy...).",
   "auth.2fa.confirmar": "Confirmar",

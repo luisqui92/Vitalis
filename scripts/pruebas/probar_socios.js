@@ -278,8 +278,14 @@ function verificar(descripcion, condicion) {
   const panelSinComentarios = panel.replace(/^\s*\/\/.*$/gm, "");
   verificar("el panel no llama a ninguna ruta clínica",
     !/\/medico\/pacientes|\/medico\/consultas|\/medico\/recetas/.test(panelSinComentarios));
-  verificar("solo pega a rutas /socio/",
-    [...panelSinComentarios.matchAll(/api\("(\/[^"`]*)/g)].every(m => m[1].startsWith("/socio/")));
+  // La única excepción admitida es /reseteo-clave/, y es a propósito: es una
+  // ruta pública, sin sesión, que no toca ni un dato clínico —"olvidé mi
+  // contraseña" (ver routes/reseteoClave.js)—. Es la MISMA ruta que usa el
+  // login de médico, así que compartirla no filtra nada que ya no compartan
+  // las dos puertas de entrada. Todo lo demás sigue teniendo que ser /socio/.
+  verificar("solo pega a rutas /socio/, salvo el reseteo de contraseña compartido",
+    [...panelSinComentarios.matchAll(/api\("(\/[^"`]*)/g)]
+      .every(m => m[1].startsWith("/socio/") || m[1].startsWith("/reseteo-clave/")));
   // Es una página aparte: un vendedor no carga el megabyte de código clínico,
   // y la separación física refuerza la de permisos.
   const html = require("fs").readFileSync(path.join(RAIZ, "public", "socio.html"), "utf8");

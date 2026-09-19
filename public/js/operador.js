@@ -51,12 +51,14 @@ async function traerEstadoOperador() {
   // por el segundo factor. Se consultan por separado para que una caída en
   // pagos no esconda que hay una cuenta esperando aprobación, ni al revés.
   if (OPERADOR_ESTADO.operador && OPERADOR_ESTADO.dosFAActivo) {
-    const [pagos, cuentas] = await Promise.all([
+    const [pagos, cuentas, reseteos] = await Promise.all([
       api("/medico/operador/solicitudes").catch(() => null),
       api("/medico/solicitudes-cuenta").catch(() => null),
+      api("/medico/operador/reseteos").catch(() => null),
     ]);
     OPERADOR_ESTADO.pendientes = pagos?.pendientes || 0;
     OPERADOR_ESTADO.cuentasPendientes = cuentas?.pendientes?.length || 0;
+    OPERADOR_ESTADO.reseteosPendientes = reseteos?.pedidos?.length || 0;
   }
   return OPERADOR_ESTADO;
 }
@@ -73,10 +75,12 @@ function avisoOperadorHtml() {
   const e = OPERADOR_ESTADO;
   const pagos = e?.pendientes || 0;
   const cuentas = e?.cuentasPendientes || 0;
-  if (!e?.operador || (!pagos && !cuentas)) return "";
+  const reseteos = e?.reseteosPendientes || 0;
+  if (!e?.operador || (!pagos && !cuentas && !reseteos)) return "";
   return `
     <button type="button" class="card no-imprimir saldo-aviso-panel" id="avisoOperador" style="width:100%;text-align:left;border-color:var(--primary)">
       ${cuentas ? `<span style="display:block;font-weight:600">${t("cuentas.panelPendientes", { n: cuentas })}</span>` : ""}
+      ${reseteos ? `<span style="display:block;font-weight:600">${t("op.reseteosPendientes", { n: reseteos })}</span>` : ""}
       ${pagos ? `<span style="display:block;font-weight:600">${t("op.panelPendientes", { n: pagos })}</span>` : ""}
       <span class="hint" style="display:block;margin:2px 0 0">${t("op.panelAyuda")}</span>
     </button>`;
@@ -172,6 +176,7 @@ async function renderPagos() {
     <div class="hint" style="margin:0 0 12px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
 
     <div id="opCuentas"></div>
+    <div id="opReseteos"></div>
     <div id="opResumen"></div>
     <div id="opCola"></div>
 
@@ -190,6 +195,7 @@ async function renderPagos() {
   // abran la cuenta es más urgente que un pago, pero si esta consulta tarda
   // no puede retrasar el resto del panel.
   pintarSolicitudesDeCuenta();
+  pintarReseteos();
   pintarResumenPagos();
   pintarColaSolicitudes();
   pintarDatosDePago();
@@ -826,6 +832,114 @@ function engancharSolicitudCuenta(s) {
     } catch (e) {
       bloquear(false);
       errBox.innerHTML = `<div class="error">${esc(e.error || t("cuentas.errRechazar"))}</div>`;
+    }
+  };
+}
+
+// ═══ RESTABLECER CONTRASEÑA ═════════════════════════════════════════════════
+//
+// Mismo patrón que las solicitudes de cuenta, justo arriba: una cola, dos
+// botones, una confirmación que muestra el NOMBRE antes de actuar. La
+// diferencia es lo que pasa DESPUÉS de aprobar — no alcanza con repintar la
+// lista, porque aprobar puede fallar en mandar el WhatsApp sin que el pedido
+// deje de ser válido (el enlace ya existe), y ahí el operador necesita poder
+// copiarlo y mandarlo él. Mismo criterio que emitir la llave del paciente en
+// public/js/compartirResumen.js.
+async function pintarReseteos() {
+  const caja = document.getElementById("opReseteos");
+  if (!caja) return;
+
+  let datos;
+  try {
+    datos = await api("/medico/operador/reseteos");
+  } catch {
+    caja.innerHTML = "";
+    return;
+  }
+  if (!caja.isConnected) return;
+
+  const pedidos = datos.pedidos || [];
+  if (!pedidos.length) { caja.innerHTML = ""; return; }
+
+  caja.innerHTML = `
+    <div class="card" style="border-color:var(--primary)">
+      <div class="seccion-titulo" style="margin-top:0">${t("op.reseteos.titulo", { n: pedidos.length })}</div>
+      ${pedidos.map(p => reseteoHtml(p)).join("")}
+    </div>`;
+
+  pedidos.forEach(p => engancharReseteo(p));
+}
+
+function reseteoHtml(p) {
+  return `
+    <div class="sol-item" id="rst-${esc(p._id)}">
+      <div class="sol-nombre">${esc(p.nombre || p.telefono)}</div>
+      <div class="sol-datos">
+        ${t("op.reseteos.item", {
+          tipo: t("op.reseteos.tipo." + p.tipo), telefono: esc(p.telefono),
+          cuando: esc(fechaCorta(p.pedidaEn)),
+        })}
+      </div>
+      <div class="sol-acciones">
+        <button class="primary" data-aprobar="${esc(p._id)}">${t("op.reseteos.aprobar")}</button>
+        <button class="secondary" data-rechazar="${esc(p._id)}">${t("op.reseteos.rechazar")}</button>
+      </div>
+      <div data-salida="${esc(p._id)}"></div>
+    </div>`;
+}
+
+function engancharReseteo(p) {
+  const fila = document.getElementById(`rst-${p._id}`);
+  if (!fila) return;
+  const salida = fila.querySelector(`[data-salida="${p._id}"]`);
+  const bloquear = (si) => fila.querySelectorAll("button").forEach(b => { b.disabled = si; });
+
+  fila.querySelector(`[data-aprobar="${p._id}"]`).onclick = async () => {
+    // Aprobar acá manda un enlace que da acceso completo a la cuenta. La
+    // misma clase de decisión que aprobar una cuenta nueva, mismo aviso.
+    if (!confirm(t("op.reseteos.confirmarAprobar", { nombre: p.nombre || p.telefono }))) return;
+    bloquear(true);
+    salida.innerHTML = "";
+    try {
+      const r = await api(`/medico/operador/reseteos/${encodeURIComponent(p._id)}/aprobar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      });
+      if (r.enviadoA) {
+        // Se saca la fila entera del panel en vez de dejarla con los botones
+        // deshabilitados: ya está resuelta, y dejarla ahí invita a un
+        // segundo clic que no hace nada.
+        fila.remove();
+        if (!document.querySelector("#opReseteos .sol-item")) pintarReseteos();
+      } else {
+        // El enlace existe igual, aunque WhatsApp haya fallado. Se le da al
+        // operador para que lo mande él — no se pierde el pedido.
+        salida.innerHTML = `
+          <div class="hint" style="margin-top:6px">${esc(r.aviso || "")}</div>
+          <code style="display:block;word-break:break-all;font-size:12px;margin:6px 0">${esc(r.enlace)}</code>
+          <button class="secondary" data-copiar="${esc(p._id)}">${t("op.reseteos.copiar")}</button>`;
+        fila.querySelector(`[data-copiar="${p._id}"]`).onclick = async (ev) => {
+          try { await navigator.clipboard.writeText(r.enlace); ev.target.textContent = t("op.reseteos.copiado"); }
+          catch { /* el enlace queda visible para copiarlo a mano */ }
+        };
+      }
+    } catch (e) {
+      bloquear(false);
+      salida.innerHTML = `<div class="error">${esc(e.error || t("op.reseteos.errAprobar"))}</div>`;
+    }
+  };
+
+  fila.querySelector(`[data-rechazar="${p._id}"]`).onclick = async () => {
+    bloquear(true);
+    salida.innerHTML = "";
+    try {
+      await api(`/medico/operador/reseteos/${encodeURIComponent(p._id)}/rechazar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      });
+      fila.remove();
+      if (!document.querySelector("#opReseteos .sol-item")) pintarReseteos();
+    } catch (e) {
+      bloquear(false);
+      salida.innerHTML = `<div class="error">${esc(e.error || t("op.reseteos.errRechazar"))}</div>`;
     }
   };
 }

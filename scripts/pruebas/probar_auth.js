@@ -56,6 +56,13 @@ function correr(codigoAuth, idioma) {
 // Se saca la línea entera —sangría incluida—, porque el espacio en blanco
 // que la rodea también es parte de lo que se agregó.
 const sinSelector = (html) => html.replace(/\n\s*<div style="text-align:center;margin-top:14px;font-size:13px">[\s\S]*?<\/div>/g, "");
+// Y el botón de «olvidé mi contraseña» en el login, que es lo otro nuevo a
+// propósito de esta sesión. No se saca la pantalla entera de la comparación
+// —como se hizo con "registro", que se rediseñó de punta a punta— porque acá
+// el resto del login no cambió: sigue valiendo la pena comprobar que un
+// cambio de i18n no le mueve una coma al resto de la pantalla, y esto es lo
+// único que hay que descontar para poder seguir haciendo esa comprobación.
+const sinOlvide = (html) => html.replace(/\n\s*<button class="link" id="lGoOlvide"[^>]*>[\s\S]*?<\/button>/g, "");
 
 const antes = execSync(`git -C ${RAIZ} show main:public/js/auth.js`, { encoding: "utf8" });
 const ahora = fs.readFileSync(`${RAIZ}/public/js/auth.js`, "utf8");
@@ -74,9 +81,11 @@ let fallos = 0;
 // lo que garantiza que el i18n no las movió ni un carácter.
 for (const pantalla of ["login", "dosfa"]) {
   const a = viejo[pantalla];
-  const b = sinSelector(nuevoEs[pantalla]);
+  // sinOlvide es un no-op sobre "dosfa" —ese botón no existe ahí—, así que
+  // encadenarla para las dos pantallas no le resta nada a la comprobación.
+  const b = sinOlvide(sinSelector(nuevoEs[pantalla]));
   if (a === b) {
-    console.log(`✅ ${pantalla} en español: idéntico salvo el selector (${a.length} car.)`);
+    console.log(`✅ ${pantalla} en español: idéntico salvo lo agregado a propósito (${a.length} car.)`);
   } else {
     fallos++;
     const i = [...a].findIndex((c, k) => c !== b[k]);

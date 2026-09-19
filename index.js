@@ -126,6 +126,9 @@ require("./routes/medicoAuth")(app);
 // La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en
 // Symphomed no da acceso — ver el encabezado de routes/solicitudesCuenta.js.
 require("./routes/solicitudesCuenta")(app);
+// Olvidé mi contraseña, con un admin en el medio — ver el encabezado de
+// routes/reseteoClave.js y el del modelo en db/models.js.
+require("./routes/reseteoClave")(app);
 // Receta digital de Brasil. En Brasil una receta necesita firma ICP-Brasil,
 // así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);
@@ -297,6 +300,12 @@ app.get("/teleconsulta/:token", (_req, res) => res.sendFile(path.join(__dirname,
 // veces alguien dicta por teléfono.
 app.get("/r/:token", (_req, res) => res.sendFile(path.join(__dirname, "public", "resumen.html")));
 app.get("/mi/:llave", (_req, res) => res.sendFile(path.join(__dirname, "public", "mi.html")));
+
+// ─── OLVIDÉ MI CONTRASEÑA ──────────────────────────────────────────────────
+// Misma razón que /r y /mi: página propia, no index.html. Quien la abre
+// todavía no puede entrar a nada — no tiene sentido bajarle el resto de la
+// app para mostrarle un formulario de dos campos.
+app.get("/restablecer/:token", (_req, res) => res.sendFile(path.join(__dirname, "public", "restablecer.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
 // http.createServer (en vez del app.listen de siempre) porque el

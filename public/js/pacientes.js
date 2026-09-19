@@ -39,7 +39,8 @@ function pestanasPacientes(pendientes) {
   // El globo con los pendientes es lo mismo que hace la campana de
   // recordatorios — el número que hay que atender, visible sin entrar.
   if (ES_OPERADOR) {
-    const esperando = (OPERADOR_ESTADO?.pendientes || 0) + (OPERADOR_ESTADO?.cuentasPendientes || 0);
+    const esperando = (OPERADOR_ESTADO?.pendientes || 0) + (OPERADOR_ESTADO?.cuentasPendientes || 0)
+      + (OPERADOR_ESTADO?.reseteosPendientes || 0);
     pestanas.push(`<button class="tab" id="btnPagos"><span class="tab-icono">${ICONOS.tendencia}${esperando ? `<b class="tab-globo">${esperando}</b>` : ""}</span>${t("op.nav.pagos")}</button>`);
   }
   return pestanas;
