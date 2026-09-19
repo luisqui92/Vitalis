@@ -288,6 +288,33 @@ function verificar(descripcion, condicion) {
   verificar("y el servidor la sirve en /socio",
     /app\.get\("\/socio"/.test(require("fs").readFileSync(path.join(RAIZ, "index.js"), "utf8")));
 
+  // A una cuenta ya dada de baja se le ofrecía igual «Pedir la baja». El socio
+  // la toca, el servidor la ignora, y queda sin saber si funcionó o si el
+  // panel está roto — y su cupo ya estaba devuelto de todos modos.
+  const panelSocio = require("fs").readFileSync(path.join(RAIZ, "public", "js", "socioPanel.js"), "utf8");
+  verificar("no se le ofrece dar de baja a un cliente que ya está de baja",
+    /\$\{cu\.activa \? `[\s\S]{0,320}?data-baja=/.test(panelSocio));
+
+  // ─── 9. El alta del primer socio ───────────────────────────────────────
+  //
+  // Todavía no hay pantalla de operador para socios: las rutas existen y nadie
+  // las llama. Mientras tanto el alta se hace con un script, y ese script
+  // tiene que respetar las MISMAS reglas que la ruta — si afloja la contraseña
+  // o deja cargar un lote sin referencia, el camino cómodo pasa a ser el más
+  // débil, que es exactamente como se cuelan los agujeros.
+  console.log("\n── 9. El alta del primer socio, mientras no haya pantalla ──");
+  const fsSocio = require("fs");
+  const rutaAlta = path.join(RAIZ, "scripts", "crear_socio.js");
+  verificar("hay una forma de dar de alta al primer socio sin pantalla", fsSocio.existsSync(rutaAlta));
+  const alta = fsSocio.existsSync(rutaAlta) ? fsSocio.readFileSync(rutaAlta, "utf8") : "";
+  const rutaOperador = fsSocio.readFileSync(path.join(RAIZ, "routes", "operadorSaldo.js"), "utf8");
+  verificar("  ...que exige la misma contraseña mínima que la ruta del operador",
+    /length < 10/.test(alta) && /length < 10/.test(rutaOperador));
+  verificar("  ...y que no carga un lote sin referencia",
+    /const referencia = /.test(alta) && /referencia,/.test(alta));
+  verificar("  ...ni le pisa la contraseña a un socio que ya existe",
+    /contraseña sin cambios/.test(alta));
+
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();

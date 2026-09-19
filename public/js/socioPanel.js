@@ -212,9 +212,14 @@ function pintarPanel(r, cuentas) {
                 Saldo: ${plata(cu.saldoCentavos, moneda)}
                 ${cu.saldoCentavos <= 0 ? " — conviene llamarlo para que recargue" : ""}
               </div>` : ""}
-            <button class="link" data-baja="${cu.tipo}:${cu.id}" style="width:auto;margin:6px 0 0;color:var(--danger)">
-              Pedir la baja
-            </button>
+            <!-- Solo si está activo. A una cuenta ya dada de baja se le
+                 ofrecía igual «Pedir la baja»: el socio la toca, no cambia
+                 nada —el servidor la ignora— y queda sin saber si funcionó o
+                 si el panel está roto. Su cupo, además, ya está devuelto. -->
+            ${cu.activa ? `
+              <button class="link" data-baja="${cu.tipo}:${cu.id}" style="width:auto;margin:6px 0 0;color:var(--danger)">
+                Pedir la baja
+              </button>` : ""}
           </div>`).join("")}
     </div>`;
 
