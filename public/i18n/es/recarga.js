@@ -36,7 +36,13 @@ Object.assign(I18N.es, {
   "recarga.estado.pendiente": "En revisión",
   "recarga.estado.acreditada": "Acreditada",
   "recarga.estado.rechazada": "Rechazada",
-  "recarga.sinDatosPago": "Todavía no configuramos la cuenta para recibir pagos. Escribinos y lo resolvemos.",
+  // No dice "todavía no configuramos" sino "escribinos y te lo pasamos".
+  // Mientras el cobro de un país se hace a mano —alguien genera un enlace por
+  // médico— esto no es una falla a punto de arreglarse: es cómo funciona hoy,
+  // y el médico tiene que salir de esta pantalla sabiendo qué hacer, no
+  // esperando a que arreglemos algo.
+  "recarga.sinDatosPago": "Acá todavía no se puede pagar solo. Escribinos y te pasamos tu enlace de pago.",
+  "recarga.escribinos": "Escribinos por WhatsApp",
   "recarga.errMonto": "Poné cuánto pagaste",
   "recarga.errReferencia": "Poné la referencia del comprobante",
   "recarga.errAvisar": "No se pudo enviar el aviso",

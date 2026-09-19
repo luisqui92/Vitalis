@@ -36,7 +36,10 @@ Object.assign(I18N.pt, {
   "recarga.estado.pendiente": "Em análise",
   "recarga.estado.acreditada": "Creditada",
   "recarga.estado.rechazada": "Recusada",
-  "recarga.sinDatosPago": "Ainda não configuramos a conta para receber pagamentos. Fale com a gente.",
+  // Esta es LA que va a leer un médico brasileño mientras el cobro en Brasil
+  // se haga a mano. Tiene que salir de acá sabiendo qué hacer.
+  "recarga.sinDatosPago": "Aqui ainda não dá para pagar sozinho. Fale com a gente e enviamos o seu link de pagamento.",
+  "recarga.escribinos": "Falar pelo WhatsApp",
   "recarga.errMonto": "Informe quanto você pagou",
   "recarga.errReferencia": "Informe a referência do comprovante",
   "recarga.errAvisar": "Não foi possível enviar o aviso",

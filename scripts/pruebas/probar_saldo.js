@@ -260,6 +260,42 @@ async function main() {
   verificar("  ...y con corregir se arregla desde los movimientos", arreglado.corregido);
   verificar("  ...y después cuadra", (await saldos.reconciliar(ana.phone)).cuadra);
 
+  // ═══ 12c. CUANDO UN PAÍS TODAVÍA NO PUEDE PAGAR SOLO ════════════════════
+  //
+  // No es un caso raro ni transitorio: es el estado normal mientras el cobro
+  // de un país se hace a mano —alguien genera un enlace de pago por médico y
+  // se lo manda—. Y es justo el estado en el que el médico NECESITA poder
+  // escribir.
+  //
+  // Acá la pantalla mostraba un cartel y nada más. El enlace de WhatsApp
+  // vivía adentro del camino en que SÍ hay cuenta cargada, así que se lo
+  // sacábamos exactamente cuando hacía falta. Un médico que no puede pagar y
+  // tampoco sabe a quién preguntarle, no paga.
+  console.log("\n── 12c. Sin cuenta cargada, el médico igual sabe a quién escribir ──");
+  const fsSaldo = require("fs");
+  const pathSaldo = require("path");
+  const RAIZ_SALDO = pathSaldo.join(__dirname, "..", "..");
+  const PANTALLA = fsSaldo.readFileSync(pathSaldo.join(RAIZ_SALDO, "public", "js", "recarga.js"), "utf8");
+  // El bloque del caso "no configurado", medido hasta donde arranca el normal.
+  const sinCuenta = PANTALLA.slice(PANTALLA.indexOf("if (!d.configurado)"),
+                                   PANTALLA.indexOf("const filas = ["));
+  verificar("el aviso de «acá no se puede pagar solo» ofrece el WhatsApp",
+    sinCuenta.length > 0 && /d\.whatsapp/.test(sinCuenta) && /wa\.me\//.test(sinCuenta));
+  // Sin esto el arreglo no sirve: el dato tiene que llegar al navegador
+  // aunque no haya cuenta cargada.
+  const SERVICIO = fsSaldo.readFileSync(pathSaldo.join(RAIZ_SALDO, "services", "datosPago.js"), "utf8");
+  verificar("  ...y el servidor lo manda aunque no haya cuenta cargada",
+    /qr, banco, cuenta, titular, documento, whatsapp, ciudad,/.test(SERVICIO) &&
+    /configurado: Boolean\(qr \|\| \(banco && cuenta\)\)/.test(SERVICIO));
+  // El texto tiene que decir qué hacer, no que algo está roto: mientras el
+  // cobro sea manual, esto es cómo funciona, no una falla por arreglarse.
+  for (const idioma of ["es", "pt"]) {
+    const textos = fsSaldo.readFileSync(pathSaldo.join(RAIZ_SALDO, "public", "i18n", idioma, "recarga.js"), "utf8");
+    verificar(`  ...y en ${idioma} dice qué hacer, con el botón para hacerlo`,
+      /"recarga\.escribinos":/.test(textos) &&
+      /"recarga\.sinDatosPago": "[^"]*(enlace de pago|link de pagamento)/.test(textos));
+  }
+
   console.log("\n── 13. El historial es legible para el médico ──");
   const movs = await saldos.movimientosDe(beto, 50);
   verificar("están todos los movimientos", movs.length >= 12);

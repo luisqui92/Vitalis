@@ -99,8 +99,27 @@ function rechazadaHtml(s) {
 }
 
 function dondePagarHtml(d) {
+  // ═══ SIN CUENTA CARGADA, LO QUE HACE FALTA ES EL CONTACTO ════════════════
+  //
+  // Acá había un cartel solo. El botón de escribir por WhatsApp vivía abajo,
+  // adentro del camino en que SÍ hay cuenta cargada — o sea que justo cuando
+  // el médico no puede pagar solo es cuando le sacábamos la forma de
+  // preguntar cómo.
+  //
+  // No es un caso raro. Es el estado normal mientras el cobro de un país se
+  // hace a mano: alguien genera un enlace de pago por médico y se lo manda.
+  // Para eso el médico tiene que poder escribir, y este es el único lugar de
+  // la app donde va a buscar.
   if (!d.configurado) {
-    return `<div class="saldo-aviso" style="margin-top:10px">${t("recarga.sinDatosPago")}</div>`;
+    return `
+      <div class="saldo-aviso" style="margin-top:10px">
+        <div>${t("recarga.sinDatosPago")}</div>
+        ${d.whatsapp ? `
+          <a class="link" id="recWhatsapp" style="display:inline-block;margin-top:8px"
+             href="https://wa.me/${esc(d.whatsapp)}" target="_blank" rel="noopener">
+            ${t("recarga.escribinos")}
+          </a>` : ""}
+      </div>`;
   }
   const filas = [
     [t("recarga.banco"), d.banco],
