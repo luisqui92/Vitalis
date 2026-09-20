@@ -29,6 +29,13 @@ async function renderSeguridad() {
     // Sin await, como los demás: si Memed no contesta, Configuración se abre
     // igual. Y en cuentas que no recetan por Memed no dibuja nada.
     if (typeof memedPintarConsejo === "function") memedPintarConsejo();
+    // Mismo corte que ya usa el servidor para esta puerta (requireAuth de
+    // /medico/baja/solicitar): un director es "medico" para el token igual
+    // que un médico de a pie — ver el comentario de tokenDeMedico en routes/
+    // medicoAuth.js. Solo el personal administrativo (rol "admin") no tiene
+    // este botón, porque esa cuenta no la creó por su cuenta: la dio de alta
+    // el director de la clínica, así que no es sobre ella que rige 5.1.1(v).
+    if (typeof MEDICO_ROL === "undefined" || MEDICO_ROL !== "admin") pintarCerrarCuenta();
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || "Error cargando seguridad")}</div>`;
@@ -84,7 +91,9 @@ function pintarSeguridad(dosFAActivo, eventos) {
           </div>
           <div class="fecha">${fechaHora(ev.createdAt)} · IP ${esc(ev.ip || "—")}</div>
         </div>`).join("")}
-    </div>`;
+    </div>
+
+    <div id="cerrarCuentaBox"></div>`;
 
   // No siempre "el panel" es el de pacientes: ver volverAlPanel(). Una cuenta
   // administrativa que llegó acá a activar su 2FA tiene que poder salir a su
@@ -249,6 +258,55 @@ async function pintarEstadoBackups() {
       btn.textContent = "Hacer una copia ahora";
       const caja2 = document.getElementById("backupErr");
       if (caja2) caja2.innerHTML = `<div class="error">${esc(err.error || "No se pudo hacer la copia")}</div>`;
+    }
+  };
+}
+
+// ─── CERRAR LA PROPIA CUENTA ──────────────────────────────────────────────
+// Existe por un requisito de las tiendas de apps (App Store 5.1.1(v) y la
+// política de borrado de cuenta de Google Play), no por un pedido de algún
+// médico — ver el comentario largo en db/models.js junto a SolicitudBaja
+// sobre qué hace y qué NO hace (no borra historias clínicas).
+async function pintarCerrarCuenta() {
+  const caja = document.getElementById("cerrarCuentaBox");
+  if (!caja) return;
+  let e;
+  try {
+    e = await api("/medico/baja/estado");
+  } catch { return; }
+
+  if (e.pendiente) {
+    caja.innerHTML = `
+      <div class="card">
+        <div class="seccion-titulo" style="margin-top:0">${t("config.baja.titulo")}</div>
+        <div class="hint">${t("config.baja.pendienteAyuda", { fecha: fechaHora(e.pedidaEn) })}</div>
+      </div>`;
+    return;
+  }
+
+  caja.innerHTML = `
+    <div class="card" style="border-color:var(--danger)">
+      <div class="seccion-titulo" style="margin-top:0;color:var(--danger)">${t("config.baja.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${t("config.baja.ayuda")}</div>
+      <label>${t("config.baja.motivoLabel")}</label>
+      <textarea id="bajaMotivo" rows="2" placeholder="${esc(t("config.baja.motivoPlaceholder"))}"></textarea>
+      <div id="bajaErr"></div>
+      <button class="secondary" id="btnPedirBaja" style="color:var(--danger)">${t("config.baja.boton")}</button>
+    </div>`;
+
+  document.getElementById("btnPedirBaja").onclick = async () => {
+    if (!confirm(t("config.baja.confirmar"))) return;
+    const errBox = document.getElementById("bajaErr");
+    errBox.innerHTML = "";
+    const motivo = document.getElementById("bajaMotivo").value.trim();
+    try {
+      await api("/medico/baja/solicitar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo }),
+      });
+      pintarCerrarCuenta();
+    } catch (err) {
+      errBox.innerHTML = `<div class="error">${esc(err.error || t("config.baja.errEnviar"))}</div>`;
     }
   };
 }

@@ -2680,6 +2680,54 @@ const LlavePaciente = mongoose.model("LlavePaciente", llavePacienteSchema);
 // cualquiera podría usarla para averiguar qué números de teléfono son
 // médicos o socios de Symphomed, probando uno por uno. Ver routes/
 // reseteoClave.js.
+// ═══ SOLICITUDBAJA: pedir el cierre de la propia cuenta ═══════════════════
+//
+// Existe por un requisito externo, no por un pedido de un médico: tanto
+// Apple (guideline 5.1.1(v)) como Google Play exigen que toda app que deja
+// crear una cuenta también deje cerrarla desde adentro. Apple acepta
+// explícitamente que ese cierre sea "una solicitud que revisa una persona",
+// en vez de un botón que borra todo al toque — y acá adentro hay historias
+// clínicas de pacientes reales, así que esa revisión humana es justo lo que
+// conviene de todos modos.
+//
+// "Cerrar la cuenta" NO borra las historias clínicas. Apaga el acceso
+// (`activo: false`, mismo interruptor que ya usa todo el sistema — ver el
+// login en routes/medicoAuth.js) e invalida la contraseña. Los registros
+// clínicos quedan — retenerlos es una obligación legal en la mayoría de las
+// jurisdicciones donde Symphomed opera, y borrarlos junto con la cuenta
+// sería perder historia clínica de pacientes que nunca pidieron nada. La
+// política de privacidad (public/privacidad.html) explica esto mismo.
+const solicitudBajaSchema = new mongoose.Schema({
+  tipo: { type: String, enum: ["medico"], default: "medico", required: true },
+  telefono: { type: String, required: true, index: true },
+  nombre: { type: String, default: "" },
+  // Por qué se va, si quiso contar — nunca obligatorio: pedirlo como
+  // requisito solo demora a alguien que ya decidió irse.
+  motivo: { type: String, default: "" },
+  pedidaEn: { type: Date, default: Date.now },
+  ip: { type: String, default: "" },
+
+  // A diferencia de SolicitudReseteo, "aprobada" acá ES el estado final: no
+  // hay un enlace que alguien más tenga que usar después — aprobar y
+  // ejecutar el cierre son el mismo acto (ver routes/solicitudBaja.js).
+  estado: {
+    type: String,
+    enum: ["pendiente", "aprobada", "rechazada"],
+    default: "pendiente", index: true,
+  },
+  aprobadaPor: { type: String, default: "" },
+  aprobadaEn: { type: Date, default: null },
+  rechazadaPor: { type: String, default: "" },
+  rechazadaEn: { type: Date, default: null },
+  nota: { type: String, default: "" },
+}, { timestamps: true });
+// Como máximo un pedido pendiente por cuenta — mismo motivo que
+// SolicitudReseteo: que tocar el botón varias veces no le llene la cola al
+// operador de filas idénticas.
+solicitudBajaSchema.index({ tipo: 1, telefono: 1 },
+  { unique: true, partialFilterExpression: { estado: "pendiente" } });
+const SolicitudBaja = mongoose.model("SolicitudBaja", solicitudBajaSchema);
+
 const solicitudReseteoSchema = new mongoose.Schema({
   tipo: { type: String, enum: ["medico", "socio"], required: true },
   telefono: { type: String, required: true, index: true },
@@ -2730,7 +2778,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

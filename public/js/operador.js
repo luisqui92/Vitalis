@@ -51,14 +51,16 @@ async function traerEstadoOperador() {
   // por el segundo factor. Se consultan por separado para que una caída en
   // pagos no esconda que hay una cuenta esperando aprobación, ni al revés.
   if (OPERADOR_ESTADO.operador && OPERADOR_ESTADO.dosFAActivo) {
-    const [pagos, cuentas, reseteos] = await Promise.all([
+    const [pagos, cuentas, reseteos, bajas] = await Promise.all([
       api("/medico/operador/solicitudes").catch(() => null),
       api("/medico/solicitudes-cuenta").catch(() => null),
       api("/medico/operador/reseteos").catch(() => null),
+      api("/medico/operador/bajas").catch(() => null),
     ]);
     OPERADOR_ESTADO.pendientes = pagos?.pendientes || 0;
     OPERADOR_ESTADO.cuentasPendientes = cuentas?.pendientes?.length || 0;
     OPERADOR_ESTADO.reseteosPendientes = reseteos?.pedidos?.length || 0;
+    OPERADOR_ESTADO.bajasPendientes = bajas?.pedidos?.length || 0;
   }
   return OPERADOR_ESTADO;
 }
@@ -76,11 +78,13 @@ function avisoOperadorHtml() {
   const pagos = e?.pendientes || 0;
   const cuentas = e?.cuentasPendientes || 0;
   const reseteos = e?.reseteosPendientes || 0;
-  if (!e?.operador || (!pagos && !cuentas && !reseteos)) return "";
+  const bajas = e?.bajasPendientes || 0;
+  if (!e?.operador || (!pagos && !cuentas && !reseteos && !bajas)) return "";
   return `
     <button type="button" class="card no-imprimir saldo-aviso-panel" id="avisoOperador" style="width:100%;text-align:left;border-color:var(--primary)">
       ${cuentas ? `<span style="display:block;font-weight:600">${t("cuentas.panelPendientes", { n: cuentas })}</span>` : ""}
       ${reseteos ? `<span style="display:block;font-weight:600">${t("op.reseteosPendientes", { n: reseteos })}</span>` : ""}
+      ${bajas ? `<span style="display:block;font-weight:600">${t("op.bajasPendientes", { n: bajas })}</span>` : ""}
       ${pagos ? `<span style="display:block;font-weight:600">${t("op.panelPendientes", { n: pagos })}</span>` : ""}
       <span class="hint" style="display:block;margin:2px 0 0">${t("op.panelAyuda")}</span>
     </button>`;
@@ -177,6 +181,7 @@ async function renderPagos() {
 
     <div id="opCuentas"></div>
     <div id="opReseteos"></div>
+    <div id="opBajas"></div>
     <div id="opResumen"></div>
     <div id="opCola"></div>
 
@@ -196,6 +201,7 @@ async function renderPagos() {
   // no puede retrasar el resto del panel.
   pintarSolicitudesDeCuenta();
   pintarReseteos();
+  pintarBajas();
   pintarResumenPagos();
   pintarColaSolicitudes();
   pintarDatosDePago();
@@ -940,6 +946,94 @@ function engancharReseteo(p) {
     } catch (e) {
       bloquear(false);
       salida.innerHTML = `<div class="error">${esc(e.error || t("op.reseteos.errRechazar"))}</div>`;
+    }
+  };
+}
+
+// ─── CIERRE DE CUENTA: la cola de pedidos ──────────────────────────────────
+// Existe por 5.1.1(v) de Apple y la política de borrado de cuenta de Google
+// Play — ver el comentario largo junto a SolicitudBaja en db/models.js.
+// Aprobar acá apaga el acceso del médico EN EL ACTO, a diferencia de un
+// reseteo: no queda un enlace pendiente que alguien más tenga que usar
+// después.
+async function pintarBajas() {
+  const caja = document.getElementById("opBajas");
+  if (!caja) return;
+
+  let datos;
+  try {
+    datos = await api("/medico/operador/bajas");
+  } catch {
+    caja.innerHTML = "";
+    return;
+  }
+  if (!caja.isConnected) return;
+
+  const pedidos = datos.pedidos || [];
+  if (!pedidos.length) { caja.innerHTML = ""; return; }
+
+  caja.innerHTML = `
+    <div class="card" style="border-color:var(--danger)">
+      <div class="seccion-titulo" style="margin-top:0">${t("op.bajas.titulo", { n: pedidos.length })}</div>
+      ${pedidos.map(p => bajaHtml(p)).join("")}
+    </div>`;
+
+  pedidos.forEach(p => engancharBaja(p));
+}
+
+function bajaHtml(p) {
+  return `
+    <div class="sol-item" id="baj-${esc(p._id)}">
+      <div class="sol-nombre">${esc(p.nombre || p.telefono)}</div>
+      <div class="sol-datos">
+        ${t("op.bajas.item", { telefono: esc(p.telefono), cuando: esc(fechaCorta(p.pedidaEn)) })}
+      </div>
+      ${p.motivo ? `<div class="hint" style="margin:4px 0">${esc(p.motivo)}</div>` : ""}
+      <div class="sol-acciones">
+        <button class="primary" style="background:var(--danger);border-color:var(--danger)" data-aprobar="${esc(p._id)}">${t("op.bajas.aprobar")}</button>
+        <button class="secondary" data-rechazar="${esc(p._id)}">${t("op.bajas.rechazar")}</button>
+      </div>
+      <div data-salida="${esc(p._id)}"></div>
+    </div>`;
+}
+
+function engancharBaja(p) {
+  const fila = document.getElementById(`baj-${p._id}`);
+  if (!fila) return;
+  const salida = fila.querySelector(`[data-salida="${p._id}"]`);
+  const bloquear = (si) => fila.querySelectorAll("button").forEach(b => { b.disabled = si; });
+
+  fila.querySelector(`[data-aprobar="${p._id}"]`).onclick = async () => {
+    // Acá "aprobar" apaga la cuenta ya mismo — no hay vuelta atrás fácil
+    // (habría que darla de alta de nuevo a mano), por eso el aviso es más
+    // fuerte que el de un reseteo.
+    if (!confirm(t("op.bajas.confirmarAprobar", { nombre: p.nombre || p.telefono }))) return;
+    bloquear(true);
+    salida.innerHTML = "";
+    try {
+      await api(`/medico/operador/bajas/${encodeURIComponent(p._id)}/aprobar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      });
+      fila.remove();
+      if (!document.querySelector("#opBajas .sol-item")) pintarBajas();
+    } catch (e) {
+      bloquear(false);
+      salida.innerHTML = `<div class="error">${esc(e.error || t("op.bajas.errAprobar"))}</div>`;
+    }
+  };
+
+  fila.querySelector(`[data-rechazar="${p._id}"]`).onclick = async () => {
+    bloquear(true);
+    salida.innerHTML = "";
+    try {
+      await api(`/medico/operador/bajas/${encodeURIComponent(p._id)}/rechazar`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      });
+      fila.remove();
+      if (!document.querySelector("#opBajas .sol-item")) pintarBajas();
+    } catch (e) {
+      bloquear(false);
+      salida.innerHTML = `<div class="error">${esc(e.error || t("op.bajas.errRechazar"))}</div>`;
     }
   };
 }

@@ -129,6 +129,7 @@ require("./routes/solicitudesCuenta")(app);
 // Olvidé mi contraseña, con un admin en el medio — ver el encabezado de
 // routes/reseteoClave.js y el del modelo en db/models.js.
 require("./routes/reseteoClave")(app);
+require("./routes/solicitudBaja")(app);
 // Receta digital de Brasil. En Brasil una receta necesita firma ICP-Brasil,
 // así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);
@@ -306,6 +307,15 @@ app.get("/mi/:llave", (_req, res) => res.sendFile(path.join(__dirname, "public",
 // todavía no puede entrar a nada — no tiene sentido bajarle el resto de la
 // app para mostrarle un formulario de dos campos.
 app.get("/restablecer/:token", (_req, res) => res.sendFile(path.join(__dirname, "public", "restablecer.html")));
+
+// ─── POLÍTICA DE PRIVACIDAD ─────────────────────────────────────────────────
+// Página propia y pública, sin sesión: es la URL que se declara en App Store
+// Connect y en Google Play Console, y las revisiones automáticas de ambas
+// tiendas la abren sin ningún token ni cookie. Ruta sin parámetro a
+// propósito —no es un enlace de un solo uso como /r o /restablecer— para que
+// se pueda pegar tal cual en los dos formularios.
+app.get("/privacidad", (_req, res) => res.sendFile(path.join(__dirname, "public", "privacidad.html")));
+app.get("/privacidad/pt", (_req, res) => res.sendFile(path.join(__dirname, "public", "privacidad.pt.html")));
 
 // ─── SERVER ───────────────────────────────────────────────────────────────
 // http.createServer (en vez del app.listen de siempre) porque el
