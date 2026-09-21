@@ -99,8 +99,12 @@ async function main() {
     if (medico.activo !== false) {
       console.log("\nEsta cuenta ya estaba activa — no había nada que hacer.\n");
     } else {
-      medico.activo = true;
-      await medico.save();
+      // updateOne y no medico.save(): guardar el documento entero lo
+      // revalida entero, y una cuenta vieja puede tener un dato que ya no
+      // entra en el esquema de hoy (p. ej. "Aprobada" con mayúscula, de
+      // antes de que el enum se pusiera estricto) — eso no tiene nada que
+      // ver con activarla, y no debería impedirlo.
+      await Medico.updateOne({ phone }, { $set: { activo: true } });
       console.log(`\n✅ Cuenta de +${phone} reactivada. Ya puede entrar con su contraseña de siempre.\n`);
     }
     if (!ponerClave) {
@@ -133,8 +137,9 @@ async function main() {
     process.exit(1);
   }
 
-  medico.passwordHash = await hashPassword(clave);
-  await medico.save();
+  // Mismo motivo que en --activar: updateOne toca solo este campo, en vez
+  // de revalidar el documento entero contra el esquema de hoy.
+  await Medico.updateOne({ phone }, { $set: { passwordHash: await hashPassword(clave) } });
   console.log(`\n✅ Contraseña nueva para +${phone}:\n`);
   console.log(`      ${clave}\n`);
   console.log("Se muestra UNA sola vez. Anotala ahora.");

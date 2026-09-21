@@ -59,6 +59,31 @@ function correr(args, env) {
   const r3 = await correr(["68548004"], env);
   verificar("sin --activar ni --clave, solo informa (no cambia nada)", r3.code === 0 && !/reactivada/.test(r3.salida));
 
+  // ═══ EL BUG REAL: una cuenta vieja con un dato que ya no entra en el
+  // esquema de hoy ═══════════════════════════════════════════════════════
+  //
+  // Pasó en producción: una cuenta con estadoCuenta: "Aprobada" (con
+  // mayúscula, de antes de que el enum existiera o se hiciera estricto).
+  // medico.save() revalida el documento ENTERO, así que activarla tiraba
+  // "Medico validation failed: estadoCuenta: `Aprobada` is not a valid
+  // enum value" — un error que no tiene nada que ver con lo que se estaba
+  // pidiendo. Se inserta con el driver crudo, no con Medico.create(), porque
+  // justamente Mongoose no dejaría crear un documento así — es el mismo
+  // camino por el que debió haber entrado el dato real, hace tiempo.
+  console.log("\n── Una cuenta con un dato legado inválido igual se puede activar ──");
+  await mongoose.connection.collection("medicos").insertOne({
+    phone: "68548005", nombre: "Dra. Con Dato Viejo",
+    passwordHash: await hashPassword("ClaveVieja1234!"),
+    activo: false, estadoCuenta: "Aprobada", tipoEspecialidad: "medicina_general",
+  });
+  const r4 = await correr(["68548005", "--activar"], env);
+  verificar("el script termina sin error, pese al dato inválido", r4.code === 0);
+  verificar("dice que la reactivó", /reactivada/.test(r4.salida));
+  const m4 = await mongoose.connection.collection("medicos").findOne({ phone: "68548005" });
+  verificar("  ...y activo quedó en true en la base", m4.activo === true);
+  verificar("  ...sin tocar (ni «corregir») el dato viejo que no pidieron tocar",
+    m4.estadoCuenta === "Aprobada");
+
   await mongoose.disconnect();
   await mongod.stop();
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
