@@ -18,6 +18,7 @@
 //   node scripts/cuentas.js <telefono>               (mira una)
 //   node scripts/cuentas.js <telefono> --clave       (le pone una nueva)
 //   node scripts/cuentas.js <telefono> --clave "la-que-quieras"
+//   node scripts/cuentas.js <telefono> --activar     (reactiva una cuenta apagada)
 //
 // Sin la contraseña escrita, genera una y la muestra UNA sola vez.
 //
@@ -45,6 +46,7 @@ const DEMOS_CONOCIDAS = {
 
 async function main() {
   const phone = String(process.argv[2] || "").trim();
+  const activar = process.argv.includes("--activar");
   const ponerClave = process.argv.includes("--clave");
   const claveDada = process.argv[process.argv.indexOf("--clave") + 1];
   const clave = ponerClave
@@ -87,6 +89,25 @@ async function main() {
   const consultas = await ConsultaMedica.countDocuments({ medicoPhone: phone });
   console.log(`\n+${medico.phone}  ${medico.nombre}`);
   console.log(`${medico.tipoEspecialidad} · ${pacientes} paciente(s), ${consultas} consulta(s)`);
+  if (medico.activo === false) console.log("Estado: INACTIVA");
+
+  // Reactivar es de bajo riesgo — al revés que cambiar la contraseña, no deja
+  // a nadie afuera de su consultorio: en el peor caso, alguien que no debía
+  // entrar puede entrar de nuevo. Por eso no lleva el mismo freno de
+  // --clave/--igual, solo confirma qué estaba pasando antes de tocarlo.
+  if (activar) {
+    if (medico.activo !== false) {
+      console.log("\nEsta cuenta ya estaba activa — no había nada que hacer.\n");
+    } else {
+      medico.activo = true;
+      await medico.save();
+      console.log(`\n✅ Cuenta de +${phone} reactivada. Ya puede entrar con su contraseña de siempre.\n`);
+    }
+    if (!ponerClave) {
+      await mongoose.disconnect();
+      return;
+    }
+  }
 
   if (!ponerClave) {
     console.log("\nLa contraseña no se puede leer: bcrypt es de una sola vía.");
