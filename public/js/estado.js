@@ -98,6 +98,28 @@ function iniciales(nombre) {
   return ((partes[0]?.[0] || "") + (partes[1]?.[0] || "")).toUpperCase();
 }
 
+// ─── FOTO DE PERFIL ────────────────────────────────────────────────────────
+// Se pide una sola vez por sesión y se guarda en memoria: tanto el panel
+// (avatar del saludo) como Configuración (dónde se sube/cambia) la usan, y
+// sin este caché cada repintado del panel volvería a pedirla al servidor.
+// undefined = todavía no se pidió · null = el médico no tiene foto · Blob = la tiene.
+let _fotoPerfilCache = undefined;
+async function traerBlobFotoPerfil(forzar) {
+  if (!forzar && _fotoPerfilCache !== undefined) return _fotoPerfilCache;
+  try {
+    const headers = {};
+    if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+    const res = await fetch(API + "/medico/perfil/foto", { headers });
+    _fotoPerfilCache = res.ok ? await res.blob() : null;
+  } catch {
+    _fotoPerfilCache = null;
+  }
+  return _fotoPerfilCache;
+}
+// Después de subir o quitar una foto, o al salir de la cuenta — para que la
+// próxima que se pida no sea la de quien ya cerró sesión.
+function invalidarFotoPerfilCache() { _fotoPerfilCache = undefined; }
+
 function fmt(s){ const m=String(Math.floor(s/60)).padStart(2,"0"); const r=String(s%60).padStart(2,"0"); return m+":"+r; }
 
 // Set propio de íconos de línea (SVG inline, trazo = currentColor) para las
@@ -319,6 +341,7 @@ async function api(path, opts = {}) {
 
 function logout() {
   TOKEN = null; MEDICO_NOMBRE = ""; MEDICO_TIPO_ESPECIALIDAD = "medicina_general";
+  invalidarFotoPerfilCache();
   localStorage.removeItem("salud_token");
   localStorage.removeItem("salud_nombre");
   localStorage.removeItem("salud_tipo_especialidad");

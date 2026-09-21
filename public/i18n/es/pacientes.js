@@ -2,6 +2,7 @@
 Object.assign(I18N.es, {
   // ─── Panel (lista de pacientes) ───────────────────────────────────────
   "pacientes.saludo": "Hola, {nombre}",
+  "pacientes.verConfiguracion": "Ver perfil y configuración",
   "pacientes.cargando": "Cargando tus pacientes...",
   "pacientes.error": "Error cargando pacientes",
   "pacientes.bandeja.uno": "📥 {n} estudio sin asignar",

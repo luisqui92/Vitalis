@@ -14,4 +14,14 @@ Object.assign(I18N.es, {
   "config.baja.confirmar": "¿Segura/o? Vas a perder el acceso a Symphomed apenas se apruebe el pedido. Tus historias clínicas se conservan, pero vos ya no vas a poder entrar a verlas.",
   "config.baja.errEnviar": "No se pudo enviar el pedido",
   "config.baja.pendienteAyuda": "Pediste cerrar tu cuenta el {fecha}. Un administrador lo está revisando — te vas a quedar sin acceso apenas lo apruebe.",
+
+  "config.foto.titulo": "🖼️ Foto de perfil",
+  "config.foto.ayuda": "Solo la ves vos, en tu panel — no aparece en ninguna historia clínica ni la ve ningún paciente.",
+  "config.foto.subir": "Subir foto",
+  "config.foto.cambiar": "Cambiar foto",
+  "config.foto.quitar": "Quitar foto",
+  "config.foto.confirmarQuitar": "¿Quitar tu foto de perfil?",
+  "config.foto.errPeso": "La foto pesa más de 5 MB — probá con una más chica.",
+  "config.foto.errSubir": "No se pudo subir la foto",
+  "config.foto.errQuitar": "No se pudo quitar la foto",
 });

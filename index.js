@@ -130,6 +130,7 @@ require("./routes/solicitudesCuenta")(app);
 // routes/reseteoClave.js y el del modelo en db/models.js.
 require("./routes/reseteoClave")(app);
 require("./routes/solicitudBaja")(app);
+require("./routes/perfilFoto")(app);
 // Receta digital de Brasil. En Brasil una receta necesita firma ICP-Brasil,
 // así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);

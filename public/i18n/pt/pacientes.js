@@ -7,6 +7,7 @@
 Object.assign(I18N.pt, {
   // ─── Painel (lista de pacientes) ──────────────────────────────────────
   "pacientes.saludo": "Olá, {nombre}",
+  "pacientes.verConfiguracion": "Ver perfil e configurações",
   "pacientes.cargando": "Carregando seus pacientes...",
   "pacientes.error": "Erro ao carregar pacientes",
   "pacientes.bandeja.uno": "📥 {n} exame sem atribuição",

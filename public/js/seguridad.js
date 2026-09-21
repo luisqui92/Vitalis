@@ -25,6 +25,7 @@ async function renderSeguridad() {
     // Aparte y sin await: si los respaldos tardan o fallan, la pantalla de
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
+    pintarFotoPerfil();
     pintarSaldo();
     // Sin await, como los demás: si Memed no contesta, Configuración se abre
     // igual. Y en cuentas que no recetan por Memed no dibuja nada.
@@ -45,6 +46,8 @@ async function renderSeguridad() {
 function pintarSeguridad(dosFAActivo, eventos) {
   app.innerHTML = `
     <button class="back" id="btnBack">← Panel</button>
+
+    <div id="fotoPerfilBox"></div>
 
     <div id="saldoBox"></div>
     <!-- Solo en cuentas brasileñas: el consejo profesional con el que se
@@ -258,6 +261,73 @@ async function pintarEstadoBackups() {
       btn.textContent = "Hacer una copia ahora";
       const caja2 = document.getElementById("backupErr");
       if (caja2) caja2.innerHTML = `<div class="error">${esc(err.error || "No se pudo hacer la copia")}</div>`;
+    }
+  };
+}
+
+// ─── FOTO DE PERFIL ───────────────────────────────────────────────────────
+// Solo la ve el propio médico en su panel — nunca un paciente, nunca un
+// documento clínico. El archivo se sube como cuerpo crudo, mismo patrón que
+// estudios.js, y se cachea en memoria vía traerBlobFotoPerfil (estado.js)
+// para que el panel no la vuelva a pedir cada vez que se repinta.
+async function pintarFotoPerfil() {
+  const caja = document.getElementById("fotoPerfilBox");
+  if (!caja) return;
+  const blob = await traerBlobFotoPerfil();
+  const url = blob ? URL.createObjectURL(blob) : null;
+
+  caja.innerHTML = `
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${t("config.foto.titulo")}</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+        <span class="avatar avatar-sm" id="fotoPerfilAvatar"
+          style="${url ? `background-image:url('${url}');background-size:cover;background-position:center;color:transparent` : ""}"
+          aria-hidden="true">${url ? "" : esc(iniciales(MEDICO_NOMBRE))}</span>
+        <div class="hint" style="margin:0">${t("config.foto.ayuda")}</div>
+      </div>
+      <input type="file" id="fotoPerfilInput" accept="image/jpeg,image/png,image/webp" style="display:none">
+      <div id="fotoPerfilErr"></div>
+      <button class="secondary" id="btnSubirFoto">${url ? t("config.foto.cambiar") : t("config.foto.subir")}</button>
+      ${url ? `<button class="secondary" id="btnQuitarFoto" style="color:var(--danger)">${t("config.foto.quitar")}</button>` : ""}
+    </div>`;
+
+  const input = document.getElementById("fotoPerfilInput");
+  const errBox = document.getElementById("fotoPerfilErr");
+  document.getElementById("btnSubirFoto").onclick = () => input.click();
+
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    errBox.innerHTML = "";
+    // 5 MB del lado del cliente, para avisar antes de subir en vez de que
+    // el rechazo llegue recién después de esperar la subida entera.
+    if (file.size > 5 * 1024 * 1024) {
+      errBox.innerHTML = `<div class="error">${t("config.foto.errPeso")}</div>`;
+      return;
+    }
+    try {
+      await api("/medico/perfil/foto", {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      invalidarFotoPerfilCache();
+      pintarFotoPerfil();
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("config.foto.errSubir"))}</div>`;
+    }
+  };
+
+  const btnQuitar = document.getElementById("btnQuitarFoto");
+  if (btnQuitar) btnQuitar.onclick = async () => {
+    if (!confirm(t("config.foto.confirmarQuitar"))) return;
+    try {
+      await api("/medico/perfil/foto", { method: "DELETE" });
+      invalidarFotoPerfilCache();
+      pintarFotoPerfil();
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("config.foto.errQuitar"))}</div>`;
     }
   };
 }

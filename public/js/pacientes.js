@@ -122,6 +122,14 @@ async function renderDashboard() {
     const sinAsignar = (dataBandeja.entrantes || []).length;
 
     app.innerHTML = `
+      <button type="button" class="card no-imprimir" id="avatarHomeBox"
+        style="display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer">
+        <span class="avatar avatar-sm" id="avatarHomeImg" aria-hidden="true">${esc(iniciales(MEDICO_NOMBRE))}</span>
+        <span>
+          <span style="display:block;font-weight:600">${esc(t("pacientes.saludo", { nombre: MEDICO_NOMBRE || "" }))}</span>
+          <span class="hint" style="display:block;margin-top:2px">${t("pacientes.verConfiguracion")} →</span>
+        </span>
+      </button>
       ${avisoOperadorHtml()}
       ${avisoSaldoHtml()}
       <div id="vencidosBox"></div>
@@ -144,6 +152,10 @@ async function renderDashboard() {
         <div class="empty" id="buscarVacio" style="display:none">${t("pacientes.buscarVacio")}</div>
       `}
     `;
+    document.getElementById("avatarHomeBox").onclick = renderSeguridad;
+    // Sin await, como los demás avisos del panel: si la foto tarda o no hay
+    // ninguna subida, el panel se abre igual con las iniciales de siempre.
+    pintarAvatarHome();
     engancharAvisoSaldo();
     engancharAvisoOperador();
     // Sin await: recorre las fichas para calcular qué se pasó, así que si
@@ -183,6 +195,22 @@ async function renderDashboard() {
     if (!seriePantallaVigente(serie)) return;
     app.innerHTML = `<div class="error">${esc(e.error || t("pacientes.error"))}</div>`;
   }
+}
+
+// Reemplaza las iniciales del saludo por la foto de perfil, si el médico
+// subió una — ver traerBlobFotoPerfil en estado.js. Separada de
+// renderDashboard() (y sin await ahí) para que el panel no espere a la foto
+// para mostrar la lista de pacientes, que es lo que de verdad importa.
+async function pintarAvatarHome() {
+  const blob = await traerBlobFotoPerfil();
+  if (!blob) return;
+  const avatar = document.getElementById("avatarHomeImg");
+  if (!avatar) return; // el médico ya navegó a otra pantalla
+  avatar.style.backgroundImage = `url('${URL.createObjectURL(blob)}')`;
+  avatar.style.backgroundSize = "cover";
+  avatar.style.backgroundPosition = "center";
+  avatar.style.color = "transparent";
+  avatar.textContent = "";
 }
 
 // ─── NUEVO PACIENTE ──────────────────────────────────────────────────────

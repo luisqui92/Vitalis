@@ -83,6 +83,17 @@ const medicoSchema = new mongoose.Schema({
   phone: { type: String, unique: true, index: true, required: true },
   nombre: { type: String, required: true },
   especialidad: { type: String, default: "" },
+  // La foto de perfil que ve el propio médico en su panel — nunca la ve un
+  // paciente ni aparece en ningún documento clínico, es solo para que la
+  // cuenta se sienta suya al entrar. El archivo vive en disco (ver
+  // services/archivosPerfil.js), acá solo queda la referencia — mismo
+  // patrón que Estudio.archivoNombre, por la misma razón: no hay motivo
+  // para duplicar bytes de imagen adentro de Mongo.
+  fotoPerfil: {
+    archivoNombre: { type: String, default: "" },
+    archivoMime: { type: String, default: "" },
+    actualizadaEn: { type: Date, default: null },
+  },
   // Determina qué pestañas ve el médico en el Kardex de cada paciente
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
