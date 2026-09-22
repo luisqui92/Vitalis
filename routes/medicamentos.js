@@ -5,6 +5,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { recalcularRecordatorio } = require("../services/recordatorioMedicamento");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -16,17 +17,24 @@ module.exports = function (app) {
 
     const nombre = String(req.body?.nombre || "").trim();
     if (!nombre) throw new ErrorHttp(400, "nombre es requerido");
+    const frecuencia = String(req.body?.frecuencia || "").trim();
 
-    const medicamento = await Medicamento.create({
+    const medicamento = new Medicamento({
       pacienteId: paciente._id,
       medicoPhone,
       nombre,
       dosis: String(req.body?.dosis || "").trim(),
-      frecuencia: String(req.body?.frecuencia || "").trim(),
+      frecuencia,
       fechaInicio: req.body?.fechaInicio ? new Date(req.body.fechaInicio) : null,
       fechaFin: req.body?.fechaFin ? new Date(req.body.fechaFin) : null,
       notas: String(req.body?.notas || "").trim(),
     });
+    // Ver services/recordatorioMedicamento.js: si "cada 3 días" (o
+    // equivalente) se entiende con confianza Y el paciente tiene teléfono,
+    // el recordatorio automático al paciente arranca solo, sin que el
+    // médico tenga que tocar nada aparte.
+    recalcularRecordatorio(medicamento, frecuencia, Boolean(paciente.telefono));
+    await medicamento.save();
     registrar({ req, medicoPhone, accion: "crear_medicamento", recurso: `Medicamento:${medicamento._id}` });
     res.status(201).json({ ok: true, medicamento });
   }));
@@ -42,6 +50,19 @@ module.exports = function (app) {
     }
     if (req.body?.fechaInicio !== undefined) medicamento.fechaInicio = req.body.fechaInicio ? new Date(req.body.fechaInicio) : null;
     if (req.body?.fechaFin !== undefined) medicamento.fechaFin = req.body.fechaFin ? new Date(req.body.fechaFin) : null;
+
+    // Solo se recalcula si tocaron la frecuencia — así una edición de otro
+    // campo (una nota, la dosis) no reinicia el conteo de veces enviadas.
+    // "recordatorioActivo" es la única forma de apagarlo a mano: si el
+    // médico ve que la detección se equivocó, no depende de reescribir la
+    // frecuencia para que se corrija sola.
+    if (req.body?.frecuencia !== undefined) {
+      const paciente = await Paciente.findById(medicamento.pacienteId).select("telefono").lean();
+      recalcularRecordatorio(medicamento, medicamento.frecuencia, Boolean(paciente?.telefono));
+    }
+    if (req.body?.recordatorioActivo !== undefined && medicamento.recordatorio?.intervaloDias) {
+      medicamento.recordatorio.activo = Boolean(req.body.recordatorioActivo);
+    }
 
     await medicamento.save();
     registrar({ req, medicoPhone, accion: "editar_medicamento", recurso: `Medicamento:${medicamento._id}` });

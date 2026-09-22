@@ -85,9 +85,16 @@ console.log("\n── 3. El código pasa tantos valores como variables tiene ─
 // nada.
 const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia", "solicitudesCuenta",
   "resumenCompartido", "reseteoClave"];
+// No todo lo que manda una plantilla vive en routes/: recordatorioMedicamento
+// la dispara un trabajo en segundo plano, no un pedido HTTP — ver
+// services/recordatorioMedicamento.js. Se lee aparte, de su propia carpeta,
+// pero entra al mismo chequeo de abajo: el acoplamiento frágil entre
+// `parametros` y lo que Meta tiene aprobado no distingue de dónde sale la
+// llamada.
+const SERVICIOS = ["recordatorioMedicamento"];
 const llamadas = [];
-for (const r of RUTAS) {
-  const codigo = fs.readFileSync(path.join(RAIZ, "routes", `${r}.js`), "utf8");
+for (const r of [...RUTAS.map(r => ({ nombre: r, dir: "routes" })), ...SERVICIOS.map(r => ({ nombre: r, dir: "services" }))]) {
+  const codigo = fs.readFileSync(path.join(RAIZ, r.dir, `${r.nombre}.js`), "utf8");
   for (const m of codigo.matchAll(/plantilla:\s*PLANTILLAS\.(\w+),\s*parametros:\s*\[([^\]]*)\]/g)) {
     const [, clave, lista] = m;
     // Se cuentan las comas de primer nivel: los valores son expresiones que
@@ -98,7 +105,7 @@ for (const r of RUTAS) {
       else if (")]}".includes(c)) nivel--;
       else if (c === "," && nivel === 0) valores++;
     }
-    llamadas.push({ ruta: r, clave, nombre: PLANTILLAS[clave], valores });
+    llamadas.push({ ruta: r.nombre, clave, nombre: PLANTILLAS[clave], valores });
   }
 }
 
@@ -111,8 +118,8 @@ for (const r of RUTAS) {
 // —la ruta dejó de usar el patrón `plantilla: PLANTILLAS.…` que este regex
 // busca, o el regex ya no encaja con cómo quedó escrita la llamada.
 console.log(`   se encontraron ${llamadas.length} llamadas con respaldo de plantilla`);
-const sinLlamada = RUTAS.filter(r => !llamadas.some(l => l.ruta === r));
-verificar("cada ruta de la lista tiene al menos una llamada con plantilla de respaldo",
+const sinLlamada = [...RUTAS, ...SERVICIOS].filter(r => !llamadas.some(l => l.ruta === r));
+verificar("cada ruta/servicio de la lista tiene al menos una llamada con plantilla de respaldo",
   sinLlamada.length === 0);
 if (sinLlamada.length) console.log("   sin ninguna:", sinLlamada.join(", "));
 
@@ -132,17 +139,19 @@ console.log("\n── 4. Ningún envío que inicia la plataforma quedó sin resp
 // whatsappSalud.js es la ÚNICA excepción legítima: ahí siempre se está
 // respondiendo a un mensaje que acaba de llegar.
 const sueltos = [];
-for (const r of [...RUTAS, "whatsappSalud", "vapi", "recordatorios"]) {
-  const archivo = path.join(RAIZ, "routes", `${r}.js`);
-  if (!fs.existsSync(archivo) || r === "whatsappSalud") continue;
+for (const r of [...RUTAS.map(r => ({ nombre: r, dir: "routes" })), { nombre: "whatsappSalud", dir: "routes" },
+  { nombre: "vapi", dir: "routes" }, { nombre: "recordatorios", dir: "routes" },
+  ...SERVICIOS.map(r => ({ nombre: r, dir: "services" }))]) {
+  const archivo = path.join(RAIZ, r.dir, `${r.nombre}.js`);
+  if (!fs.existsSync(archivo) || r.nombre === "whatsappSalud") continue;
   const codigo = fs.readFileSync(archivo, "utf8");
   // enviarTexto( a secas — no enviarTextoOPlantilla(
   for (const m of codigo.matchAll(/\benviarTexto\(/g)) {
     const antes = codigo.slice(0, m.index);
-    sueltos.push(`${r}.js:${antes.split("\n").length}`);
+    sueltos.push(`${r.nombre}.js:${antes.split("\n").length}`);
   }
 }
-verificar("ninguna ruta manda texto libre sin plantilla de respaldo", sueltos.length === 0);
+verificar("ningún archivo manda texto libre sin plantilla de respaldo", sueltos.length === 0);
 sueltos.forEach(s => console.log("   ", s, "— usa enviarTextoOPlantilla()"));
 
 console.log("\n── 5. El respaldo se dispara con el código correcto ──");

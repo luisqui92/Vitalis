@@ -6,9 +6,9 @@ Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
 mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
 de antemano.
 
-De los nueve lugares donde Symphomed manda algo por WhatsApp, el único que
+De los diez lugares donde Symphomed manda algo por WhatsApp, el único que
 siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
-acaba de escribir. Los otros ocho los inicia la plataforma, y la persona
+acaba de escribir. Los otros nueve los inicia la plataforma, y la persona
 puede no haber escrito nunca:
 
 | Qué manda | Dónde | Cae fuera de la ventana |
@@ -22,6 +22,7 @@ puede no haber escrito nunca:
 | Cuenta profesional aprobada | `routes/solicitudesCuenta.js` | **casi siempre** |
 | La llave a la historia propia | `routes/resumenCompartido.js` | **casi siempre** |
 | Enlace para resetear la contraseña | `routes/reseteoClave.js` | **casi siempre** |
+| Recordatorio de medicación al paciente | `services/recordatorioMedicamento.js` | **siempre** — lo dispara un trabajo en segundo plano, nunca un mensaje reciente del paciente |
 
 La de avance a la familia es la que más va a depender de la plantilla: la familia de un chico
 en seguimiento de neurodesarrollo no le escribe al consultorio entre sesión y
@@ -269,6 +270,36 @@ la cuenta, así que el cuerpo tiene dos frases que no son decorativas: que
 sirve *una sola vez* (para que quien la lea no la reenvíe pensando que puede
 volver a usarla) y que ignorarla no hace nada si el pedido no fue de la
 persona (para que un intento ajeno no la asuste ni la empuje a hacer algo).
+
+---
+
+### 8. `recordatorio_medicamento`
+
+Cuerpo:
+
+```
+Hola {{1}}, te recordamos tomar {{2}}, según indicó {{3}}.
+
+Si ya dejaste de tomarlo, avisale a tu médico para actualizar el tratamiento.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del paciente | `María` |
+| `{{2}}` | medicamento y dosis | `Amoxicilina (500 mg)` |
+| `{{3}}` | nombre del médico | `Dra. Camacho` |
+
+No la dispara ninguna ruta HTTP: la manda `services/recordatorioMedicamento.js`,
+un trabajo que corre cada hora y revisa qué medicamentos tienen un recordatorio
+activo y vencido — ver el comentario largo en ese archivo sobre cómo se decide
+"cada 3 días" a partir del texto que ya escribe el médico en "frecuencia", sin
+un campo nuevo que llenar.
+
+Siempre cae fuera de la ventana de 24 h por diseño: nadie le escribe al
+WhatsApp de Symphomed para pedir que le recuerden tomar un medicamento, el
+aviso sale solo. Por eso ésta es la única de las diez donde no tiene sentido
+"intentar primero texto libre" — igual pasa por `enviarTextoOPlantilla()`,
+que simplemente va a caer a la plantilla siempre.
 
 ---
 

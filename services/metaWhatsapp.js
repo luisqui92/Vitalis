@@ -122,6 +122,11 @@ const PLANTILLAS = {
   // resetear su clave y un admin lo aprueba pasa rato, y la persona no le
   // escribió al WhatsApp de Symphomed en el medio.
   reseteoClave: "reseteo_clave",
+  // El recordatorio de medicación al paciente (services/recordatorioMedicamento.js).
+  // Casi siempre fuera de la ventana: lo dispara un trabajo en segundo plano
+  // días después de la consulta, no un mensaje que el paciente acaba de
+  // mandar.
+  recordatorioMedicamento: "recordatorio_medicamento",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es

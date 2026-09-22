@@ -592,8 +592,35 @@ const medicamentoSchema = new mongoose.Schema({
   fechaInicio: { type: Date, default: null },
   fechaFin: { type: Date, default: null }, // null = activo/en curso
   notas: { type: String, default: "" }, // efectos secundarios, alergias relacionadas, etc.
+
+  // ─── Recordatorio automático al PACIENTE por WhatsApp ───────────────────
+  // No confundir con el modelo Recordatorio (routes/recordatorios.js): aquel
+  // es una lista para que el MÉDICO no se olvide de algo propio. Esto es al
+  // revés — un mensaje que sale solo del sistema hacia el paciente, sin que
+  // el médico tenga que acordarse de nada.
+  //
+  // Se activa solo si Symphomed pudo entender "frecuencia" como "cada N
+  // días" (ver detectarIntervaloDias en services/recordatorioMedicamento.js)
+  // Y el paciente tiene un teléfono cargado. No hay ningún campo aparte
+  // donde el médico tipee el intervalo a mano: sale de lo que ya escribe —
+  // por eso "activo" es apagable: si el texto era ambiguo y la detección se
+  // equivocó, no hay forma de que Symphomed lo sepa salvo que alguien lo
+  // apague desde el Kardex.
+  recordatorio: {
+    activo: { type: Boolean, default: false },
+    intervaloDias: { type: Number, default: null },
+    // La frase de "frecuencia" que disparó la detección — para que el
+    // médico entienda POR QUÉ se activó solo, sin tener que adivinar.
+    detectadoDe: { type: String, default: "" },
+    ultimoEnviado: { type: Date, default: null },
+    vecesEnviado: { type: Number, default: 0 },
+  },
 }, { timestamps: true });
 medicamentoSchema.index({ pacienteId: 1, fechaFin: 1 });
+// Lo que recorre el trabajo en segundo plano cada vez que corre — sin este
+// índice, cada pasada haría un table scan de TODOS los medicamentos de
+// TODOS los médicos para encontrar los pocos con un recordatorio activo.
+medicamentoSchema.index({ "recordatorio.activo": 1, fechaFin: 1 });
 const Medicamento = mongoose.model("Medicamento", medicamentoSchema);
 
 // Vacunación: vacunas aplicadas (y se puede usar para anotar dosis pendientes
