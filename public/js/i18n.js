@@ -17,8 +17,30 @@
 // idioma en los dos lados.
 const IDIOMAS = ["es", "pt"];
 
+// ─── EN QUÉ IDIOMA VIENE EL APARATO ─────────────────────────────────────
+// Solo importa ANTES de que haya una preferencia guardada: un médico
+// brasileño que abre Symphomed por primera vez —para registrarse, incluso
+// antes de tener cuenta— tiene el celular en portugués, y esa señal es
+// mejor que asumir español porque sí. Apenas elige un idioma a mano, o
+// entra con una cuenta que ya tiene el suyo, esta función deja de usarse:
+// fijarIdioma() lo persiste y esa preferencia manda de ahí en adelante.
+function idiomaDelDispositivo() {
+  // typeof primero: en el sandbox con el que se prueba este archivo
+  // (scripts/pruebas/probar_auth.js) no hay navegador de verdad, y esta
+  // función tiene que poder correr igual sin romper la prueba.
+  if (typeof navigator === "undefined") return "es";
+  const candidatos = (navigator.languages && navigator.languages.length)
+    ? navigator.languages
+    : [navigator.language || ""];
+  for (const c of candidatos) {
+    const base = String(c || "").toLowerCase().slice(0, 2);
+    if (IDIOMAS.includes(base)) return base;
+  }
+  return "es";
+}
+
 const guardado = localStorage.getItem("salud_idioma");
-let MEDICO_IDIOMA = IDIOMAS.includes(guardado) ? guardado : "es";
+let MEDICO_IDIOMA = IDIOMAS.includes(guardado) ? guardado : idiomaDelDispositivo();
 
 // Los dos diccionarios se cargan siempre. Juntos pesan poco (el servidor los
 // manda comprimidos con brotli, ver services/estaticosComprimidos.js) y

@@ -350,9 +350,12 @@ function logout() {
   localStorage.removeItem("salud_clinica");
   if (typeof MEDICO_ROL !== "undefined") MEDICO_ROL = "medico";
   if (typeof MEDICO_CLINICA !== "undefined") MEDICO_CLINICA = "";
-  // Al salir, la pantalla de login vuelve al español: el idioma era de la
-  // cuenta que se acaba de cerrar, no de este navegador.
-  fijarIdioma("es");
+  // Al salir, la pantalla de login vuelve al idioma del aparato, no al de
+  // la cuenta que se acaba de cerrar — esa preferencia era de la cuenta, no
+  // de este navegador. Antes volvía siempre a español a secas, que en un
+  // celular configurado en portugués es el mismo problema que se quiere
+  // evitar en el primer ingreso: ver idiomaDelDispositivo() en i18n.js.
+  fijarIdioma(idiomaDelDispositivo());
   aplicarTemaSegunEspecialidad();
   if (typeof desactivarEscritorio === "function") desactivarEscritorio();
   if (typeof desconectarTiempoReal === "function") desconectarTiempoReal();
