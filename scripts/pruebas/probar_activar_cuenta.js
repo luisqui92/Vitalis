@@ -84,6 +84,43 @@ function correr(args, env) {
   verificar("  ...sin tocar (ni «corregir») el dato viejo que no pidieron tocar",
     m4.estadoCuenta === "Aprobada");
 
+  // ═══ --moneda: el caso real que lo motivó — un médico brasileño que
+  // quedó con la moneda por defecto (BOB) porque el registro nunca pregunta
+  // de qué país es ══════════════════════════════════════════════════════
+  console.log("\n── --moneda corrige en qué moneda cobra la cuenta ──");
+  const { MovimientoSaldo } = require(path.join(RAIZ, "db", "models"));
+  await Medico.create({
+    phone: "11943701404", nombre: "Jose Salomon Perez Antelo",
+    passwordHash: await hashPassword("ClaveVieja1234!"), activo: true, estadoCuenta: "aprobada",
+    // Sin moneda explícita — así se registra cualquier médico hoy, sea de
+    // donde sea (ver el default en db/models.js).
+  });
+  const r5 = await correr(["11943701404", "--moneda", "BRL"], env);
+  verificar("el script termina sin error", r5.code === 0);
+  verificar("dice que la cambió de BOB a BRL", /cambiada de BOB a BRL/.test(r5.salida));
+  const m5 = await Medico.findOne({ phone: "11943701404" }).lean();
+  verificar("  ...y moneda quedó en BRL en la base", m5.moneda === "BRL");
+
+  console.log("\n── Pedir la misma moneda que ya tiene no rompe nada ──");
+  const r6 = await correr(["11943701404", "--moneda", "BRL"], env);
+  verificar("el script termina sin error", r6.code === 0);
+  verificar("dice que ya estaba en esa moneda", /Ya estaba en BRL/.test(r6.salida));
+
+  console.log("\n── Una moneda que no existe se rechaza ──");
+  const r7 = await correr(["11943701404", "--moneda", "USD"], env);
+  verificar("el script falla (exit != 0)", r7.code !== 0);
+  verificar("  ...y no tocó nada", (await Medico.findOne({ phone: "11943701404" }).lean()).moneda === "BRL");
+
+  console.log("\n── Si ya hay movimientos de saldo, avisa que no se convierten ──");
+  await Medico.create({
+    phone: "11943701405", nombre: "Con Movimientos Previos",
+    passwordHash: await hashPassword("ClaveVieja1234!"), activo: true, estadoCuenta: "aprobada", moneda: "BOB",
+  });
+  await MovimientoSaldo.create({ medicoPhone: "11943701405", tipo: "carga", montoCentavos: 20000, saldoDespuesCentavos: 20000 });
+  const r8 = await correr(["11943701405", "--moneda", "BRL"], env);
+  verificar("igual la cambia", r8.code === 0 && /cambiada de BOB a BRL/.test(r8.salida));
+  verificar("  ...pero avisa que los movimientos viejos no se convierten", /1 movimiento\(s\)/.test(r8.salida));
+
   await mongoose.disconnect();
   await mongod.stop();
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);

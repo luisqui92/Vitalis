@@ -19,6 +19,7 @@
 //   node scripts/cuentas.js <telefono> --clave       (le pone una nueva)
 //   node scripts/cuentas.js <telefono> --clave "la-que-quieras"
 //   node scripts/cuentas.js <telefono> --activar     (reactiva una cuenta apagada)
+//   node scripts/cuentas.js <telefono> --moneda BRL  (corrige en qué moneda cobra)
 //
 // Sin la contraseña escrita, genera una y la muestra UNA sola vez.
 //
@@ -28,7 +29,7 @@
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
-const { Medico, Paciente, ConsultaMedica } = require("../db/models");
+const { Medico, Paciente, ConsultaMedica, MovimientoSaldo } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 
 // Los teléfonos con los que se crearon las demos, según los ejemplos de cada
@@ -47,6 +48,7 @@ const DEMOS_CONOCIDAS = {
 async function main() {
   const phone = String(process.argv[2] || "").trim();
   const activar = process.argv.includes("--activar");
+  const monedaNueva = process.argv.includes("--moneda") ? process.argv[process.argv.indexOf("--moneda") + 1] : null;
   const ponerClave = process.argv.includes("--clave");
   const claveDada = process.argv[process.argv.indexOf("--clave") + 1];
   const clave = ponerClave
@@ -89,7 +91,39 @@ async function main() {
   const consultas = await ConsultaMedica.countDocuments({ medicoPhone: phone });
   console.log(`\n+${medico.phone}  ${medico.nombre}`);
   console.log(`${medico.tipoEspecialidad} · ${pacientes} paciente(s), ${consultas} consulta(s)`);
+  console.log(`Moneda: ${medico.moneda || "BOB"}`);
   if (medico.activo === false) console.log("Estado: INACTIVA");
+
+  // Corrige en qué moneda cobra la cuenta — se puso mal al registrarse (por
+  // defecto arranca en BOB, y nada la corrige sola para un médico
+  // brasileño: ver el comentario largo junto a "moneda" en db/models.js).
+  // No lleva el freno de --clave/--igual: no deja a nadie afuera de su
+  // consultorio. Sí avisa si ya hay movimientos de saldo, porque esos NO se
+  // convierten — quedan contados en la moneda con la que se cargaron.
+  if (monedaNueva) {
+    const codigo = monedaNueva.toUpperCase();
+    if (!["BOB", "BRL"].includes(codigo)) {
+      console.error(`\n❌ "${monedaNueva}" no es una moneda válida. Usá BOB o BRL.`);
+      await mongoose.disconnect();
+      process.exit(1);
+    }
+    if ((medico.moneda || "BOB") === codigo) {
+      console.log(`\nYa estaba en ${codigo} — no había nada que cambiar.\n`);
+    } else {
+      const movimientos = await MovimientoSaldo.countDocuments({ medicoPhone: phone });
+      await Medico.updateOne({ phone }, { $set: { moneda: codigo } });
+      console.log(`\n✅ Moneda de +${phone} cambiada de ${medico.moneda || "BOB"} a ${codigo}.`);
+      if (movimientos > 0) {
+        console.log(`⚠️  Esta cuenta ya tiene ${movimientos} movimiento(s) de saldo registrados`);
+        console.log(`   en la moneda vieja — esos NO se convierten, quedan como estaban.`);
+      }
+      console.log("");
+    }
+    if (!activar && !ponerClave) {
+      await mongoose.disconnect();
+      return;
+    }
+  }
 
   // Reactivar es de bajo riesgo — al revés que cambiar la contraseña, no deja
   // a nadie afuera de su consultorio: en el peor caso, alguien que no debía
