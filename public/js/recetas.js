@@ -15,10 +15,6 @@ function filaMedicamentoHtml() {
 
 function tabRecetasHtml(recetas) {
   return `
-    <!-- En Brasil se receta por Memed y esta caja reemplaza a la de abajo:
-         una receta sin firma digital no vale, y dos botones de recetar —uno
-         con validez legal y otro sin ella— son una trampa esperando a que
-         alguien apurado use el equivocado. Se llena en wireTabRecetas. -->
     <div id="memedBox"></div>
     <div class="card" id="recetaNuevaBox">
       <div class="seccion-titulo" style="margin-top:0">${t("receta.nueva")}</div>

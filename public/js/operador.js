@@ -280,10 +280,6 @@ async function abrirFichaOperador(phone) {
       <div id="opErr"></div>
       <button class="secondary" id="btnAcreditar">${t("op.acreditar")}</button>
 
-      <!-- La otra forma de cobrar. Va DEBAJO de acreditar y no arriba: la
-           mayoría de las veces lo que llega es una recarga, y poner el plan
-           primero haría que se toque por error. Usa la MISMA referencia de
-           pago: es el mismo comprobante. -->
       <div class="seccion-titulo">${t("op.planTitulo")}</div>
       <div class="hint" style="margin:0 0 8px">
         ${d.suscripcion && d.suscripcion.activa
@@ -299,13 +295,6 @@ async function abrirFichaOperador(phone) {
         </button>
       </div>
 
-      <!-- ═══ EL ENLACE DE COBRO DE ESTE MÉDICO ═══════════════════════════
-           Para cuando su país no tiene una cuenta común: se le genera un
-           cobro por persona en el proveedor y el enlace se pega acá. El
-           médico lo ve en su pantalla de recarga, en lugar del QR.
-
-           Va al final y no arriba: no es de todos los días. Se toca cuando
-           se le genera un cobro nuevo, o cuando venció el anterior. -->
       <div class="seccion-titulo">${t("op.enlaceCobro")}</div>
       <div class="hint" style="margin:0 0 8px">${t("op.enlaceCobroAyuda")}</div>
       <input id="opEnlaceCobro" type="url" inputmode="url" autocomplete="off"
@@ -506,11 +495,6 @@ async function pintarColaSolicitudes() {
         <div class="saldo-monto" style="font-size:22px">${esc(s.simbolo || "Bs")} ${esc(s.montoBs)}</div>
         <div class="hint" style="margin:0">${t("recarga.referencia")}: <b>${esc(s.referencia)}</b></div>
         ${s.txid ? `
-        <!-- El identificador que viaja DENTRO del código Pix y que aparece
-             en el extracto del banco, al lado del monto. Va en monoespaciada
-             y seleccionable porque el operador lo va a copiar y pegar en el
-             buscador de su banco: es la diferencia entre encontrar el pago y
-             adivinar cuál de los dos de R$ 400 es el de este médico. -->
         <div class="hint" style="margin:4px 0 0">Pix: <b style="font-family:monospace;user-select:all">${esc(s.txid)}</b></div>` : ""}
         <div class="hint" style="margin:4px 0 0;${s.saldo.enNegativo ? "color:var(--danger);font-weight:600" : ""}">
           ${t("op.saldoActual", { monto: `${esc(s.saldo.simbolo || "Bs")} ${esc(s.saldo.saldoBs)}` })}${s.saldo.enNegativo ? ` — ${t("op.enNegativo")}` : ""}
@@ -668,10 +652,6 @@ async function pintarDatosDePago() {
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${t("op.dp.titulo")}</div>
 
-      <!-- Son dos cuentas distintas, en dos monedas distintas. El selector va
-           arriba de todo y no escondido adentro del formulario: editar la
-           cuenta de Brasil creyendo que se edita la de Bolivia es el error
-           que manda todos los pagos de un país a la cuenta del otro. -->
       <div class="tabs" style="grid-template-columns:repeat(2,1fr);margin:10px 0">
         <button class="tab${OPERADOR_PAIS_PAGO === "bo" ? " activo" : ""}" data-pais="bo">${t("op.dp.bolivia")}</button>
         <button class="tab${OPERADOR_PAIS_PAGO === "br" ? " activo" : ""}" data-pais="br">${t("op.dp.brasil")}</button>

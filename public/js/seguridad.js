@@ -50,8 +50,6 @@ function pintarSeguridad(dosFAActivo, eventos) {
     <div id="fotoPerfilBox"></div>
 
     <div id="saldoBox"></div>
-    <!-- Solo en cuentas brasileñas: el consejo profesional con el que se
-         firman las recetas. Se llena en renderSeguridad. -->
     <div id="memedConsejoBox"></div>
 
     ${notificacionesHtml()}

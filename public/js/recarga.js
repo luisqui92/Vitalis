@@ -162,9 +162,6 @@ function dondePagarHtml(d) {
         </a>
         ${propio.nota ? `<div class="hint" style="margin:10px 0 0">${esc(propio.nota)}</div>` : ""}
       ` : `
-      <!-- Brasil arma su código con el monto adentro (ver services/pix.js).
-           El QR fijo servía solo para R$ 100 y obligaba a pedir uno nuevo por
-           cada monto distinto. En Bolivia sigue el QR del banco de siempre. -->
       ${d.pais === "br" ? `<div id="pixBox"></div>` : (d.qr ? `<img src="${esc(d.qr)}" alt="${t("recarga.qr")}" class="recarga-qr">` : "")}`}
       ${filas.length ? `
         <div class="recarga-datos">
@@ -176,10 +173,6 @@ function dondePagarHtml(d) {
       <div class="hint" style="margin:0 0 10px">${t("recarga.paso2Ayuda")}</div>
       <label>${d.pais === "br" ? t("recarga.cuantoVasAPagar") : t("recarga.cuantoPagaste")}</label>
       <input id="recMonto" type="number" inputmode="decimal" min="1" step="1" placeholder="200">
-      <!-- Con enlace propio no va: el monto ya está adentro del enlace que le
-           generaron, y ofrecerle además "generar un Pix" —que saldría de la
-           clave del país, que es justamente la que no sirve— es ofrecerle una
-           segunda forma de pagar que no funciona. -->
       ${d.pais === "br" && !propio ? `<button class="secondary" id="btnGenerarPix" style="margin-top:8px">${t("recarga.generarPix")}</button>` : ""}
       <label>${t("recarga.referencia")}</label>
       <input id="recReferencia" type="text" placeholder="${t("recarga.referenciaPlaceholder")}" autocomplete="off">

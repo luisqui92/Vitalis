@@ -212,11 +212,6 @@ function pintarFisioEvaluacion(pacienteId) {
       ${puntosVista.length === 0 ? `<div class="hint">${t("fisio.mapa.vacio")}</div>` : ""}
     </div>
 
-    <!-- El formulario de marcar dolor se dibuja ACÁ, pegado abajo de la
-         silueta. Antes se insertaba al principio de la pestaña y en una
-         pantalla de computadora aparecía tres tarjetas más arriba: se tocaba
-         el hombro y no pasaba nada visible. Mismo patrón que el mapa
-         corporal de veterinaria, que usa su propio contenedor. -->
     <div id="fisioFormDolorBox"></div>
 
     ${(ev.puntosDolor || []).length ? `

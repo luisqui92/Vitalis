@@ -218,9 +218,6 @@ function pintarPanel(r, cuentas) {
         <span>Invertido en cupos</span>
         <span>${plata(r.invertidoCentavos, moneda)}</span>
       </div>
-      <!-- Lo que el socio le cobra a SU cliente no está acá porque Symphomed
-           no lo sabe: es su precio, su margen y su decisión. Mostrar una
-           "ganancia estimada" sería inventarle un número. -->
       <div class="hint" style="margin-bottom:0">
         Lo que vos le cobrás a cada cliente es tu precio y no lo administramos:
         acá solo está lo que le pagás a Symphomed.
@@ -261,10 +258,6 @@ function pintarPanel(r, cuentas) {
                 Saldo: ${plata(cu.saldoCentavos, moneda)}
                 ${cu.saldoCentavos <= 0 ? " — conviene llamarlo para que recargue" : ""}
               </div>` : ""}
-            <!-- Solo si está activo. A una cuenta ya dada de baja se le
-                 ofrecía igual «Pedir la baja»: el socio la toca, no cambia
-                 nada —el servidor la ignora— y queda sin saber si funcionó o
-                 si el panel está roto. Su cupo, además, ya está devuelto. -->
             ${cu.activa ? `
               <button class="link" data-baja="${cu.tipo}:${cu.id}" style="width:auto;margin:6px 0 0;color:var(--danger)">
                 Pedir la baja

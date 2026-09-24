@@ -493,16 +493,6 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     </div>
     <div id="tabContent" role="tabpanel" aria-labelledby="tab-${tabActiva}" tabindex="0">${tabs[tabActiva] || tabConsultas}</div>
 
-    <!-- ═══ LO ADMINISTRATIVO, ABAJO Y PLEGADO ═══════════════════════════
-         Vincular la persona de la clínica y armar una videoconsulta estaban
-         ARRIBA de las pestañas, empujando la ficha clínica cientos de
-         píxeles hacia abajo en celular. Pasan una vez por paciente; la
-         ficha se abre veinte veces.
-
-         <details> nativo a propósito: se abre con teclado, lo anuncia
-         cualquier lector de pantalla y no necesita una línea de JavaScript.
-         Escribirlo a mano con un div y un onclick sería más código y menos
-         accesible. -->
     <details class="kardex-mas">
       <summary>${esc(t("kardex.masAcciones"))}</summary>
       <div class="kardex-mas-cuerpo">

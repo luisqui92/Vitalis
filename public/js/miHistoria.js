@@ -138,9 +138,6 @@ function pintar() {
     ${cajonCompartirHtml()}
     <div id="resultado"></div>
     ${compartidosHtml()}
-    <!-- ARRIBA de la historia y no al final. Es lo único de esta página que
-         puede salir caro si no se entiende, y una historia clínica mide dos
-         metros de pantalla: puesto abajo, no lo lee nadie. -->
     <section class="panel no-imprimir">
       <h2>Ojo con este enlace</h2>
       <p class="ayuda" style="margin:0">

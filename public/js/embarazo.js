@@ -52,24 +52,19 @@ function siluetaEmbarazoSvg(semanas) {
   return `
     <svg viewBox="0 0 190 220" style="width:100%;max-width:170px;height:auto;margin:8px auto 0;display:block" aria-label="Silueta del embarazo a las ${semanas} semanas">
       <g fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-opacity="0.5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-        <!-- cabeza y cuello, pegados al torso -->
         <circle cx="86" cy="26" r="15"/>
         <path d="M 80 40 L 80 50 L 92 50 L 92 40 Z" stroke="none" fill-opacity="0.18"/>
-        <!-- torso de perfil, mirando a la derecha -->
         <path d="M 86 46
                  C 72 50, 66 64, 68 82
                  C 70 108, 66 150, 64 196
                  L 86 196
                  C 88 158, 90 130, 92 108
                  C 96 88, 98 62, 92 46 Z"/>
-        <!-- brazo, apoyado sobre la panza -->
         <path d="M 92 62 C 108 70, ${cxPanza + rPanza * 0.6} ${cyPanza - rPanza * 0.7}, ${cxPanza + rPanza * 0.2} ${cyPanza + rPanza * 0.55}"
               fill="none" stroke-opacity="0.4"/>
       </g>
-      <!-- la panza: crece con las semanas -->
       <circle cx="${cxPanza}" cy="${cyPanza}" r="${rPanza}"
               fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-opacity="0.55" stroke-width="2"/>
-      <!-- el bebé adentro -->
       <circle cx="${cxPanza + 2}" cy="${cyPanza}" r="${rBebe}" fill="var(--primary)" fill-opacity="0.9"/>
     </svg>`;
 }

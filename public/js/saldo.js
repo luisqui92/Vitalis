@@ -209,9 +209,6 @@ function pintarPlanes(s) {
           </div>
         </div>`).join("")}
 
-      <!-- El prepago no se esconde: para un médico que atiende poco es la
-           opción correcta, y ofrecer solo el plan sería empujarlo a pagar de
-           más. Va abajo porque el plan es lo que conviene a la mayoría. -->
       ${plan.activa ? "" : `
         <div class="hint" style="margin:14px 0 0">${t("plan.oPrepago", { monto: (s.precioConsultaCentavos / 100).toFixed(2) })}</div>`}
       <div id="planPago"></div>
@@ -260,9 +257,6 @@ async function elegirPlan(plan, s) {
         <textarea id="planCodigo" readonly rows="3"
           style="width:100%;box-sizing:border-box;font-family:monospace;font-size:11px">${esc(r.codigo)}</textarea>
         <button class="secondary" id="btnCopiarPlan" style="margin-top:6px">${t("recarga.pixCopiar")}</button>
-        <!-- Después de pagar tiene que avisarnos igual que en una recarga: el
-             saldo y el plan todavía los activa una persona. Cuando el banco
-             avise solo, este texto se cae. -->
         <div class="hint" style="margin:10px 0 0">${t("plan.despuesDePagar")}</div>
       </div>`;
 

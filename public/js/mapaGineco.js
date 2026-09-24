@@ -63,7 +63,6 @@ function aparatoSvgHtml(porOrgano) {
 
   return `
     <svg viewBox="0 0 340 300" style="width:100%;max-width:360px;height:auto">
-      <!-- trompas: curvan desde los cuernos del útero hacia cada ovario -->
       ${g("trompa_izquierda", `
         <path d="M 132 96 C 100 74, 74 74, 62 96" fill="none" stroke="${color("trompa_izquierda")}" stroke-width="9" stroke-linecap="round"/>
         ${halo("trompa_izquierda", 97, 82, 26)}`)}
@@ -71,7 +70,6 @@ function aparatoSvgHtml(porOrgano) {
         <path d="M 208 96 C 240 74, 266 74, 278 96" fill="none" stroke="${color("trompa_derecha")}" stroke-width="9" stroke-linecap="round"/>
         ${halo("trompa_derecha", 243, 82, 26)}`)}
 
-      <!-- ovarios -->
       ${g("ovario_izquierdo", `
         <ellipse cx="56" cy="112" rx="23" ry="17" fill="${color("ovario_izquierdo")}" fill-opacity="0.55" stroke="${color("ovario_izquierdo")}" stroke-width="2.5"/>
         ${halo("ovario_izquierdo", 56, 112, 28)}`)}
@@ -79,22 +77,18 @@ function aparatoSvgHtml(porOrgano) {
         <ellipse cx="284" cy="112" rx="23" ry="17" fill="${color("ovario_derecho")}" fill-opacity="0.55" stroke="${color("ovario_derecho")}" stroke-width="2.5"/>
         ${halo("ovario_derecho", 284, 112, 28)}`)}
 
-      <!-- cuerpo del útero -->
       ${g("utero", `
         <path d="M 132 92 C 118 130, 128 186, 170 200 C 212 186, 222 130, 208 92 C 190 104, 150 104, 132 92 Z"
               fill="${color("utero")}" fill-opacity="0.35" stroke="${color("utero")}" stroke-width="3" stroke-linejoin="round"/>`)}
 
-      <!-- cavidad endometrial, adentro del útero -->
       ${g("endometrio", `
         <path d="M 146 106 C 140 136, 150 172, 170 182 C 190 172, 200 136, 194 106 C 180 114, 160 114, 146 106 Z"
               fill="${color("endometrio")}" fill-opacity="0.75" stroke="${color("endometrio")}" stroke-width="1.5"/>`)}
 
-      <!-- cuello uterino -->
       ${g("cuello_uterino", `
         <path d="M 156 200 L 184 200 L 180 236 L 160 236 Z" fill="${color("cuello_uterino")}" fill-opacity="0.6" stroke="${color("cuello_uterino")}" stroke-width="2.5"/>
         ${halo("cuello_uterino", 170, 218, 26)}`)}
 
-      <!-- etiquetas -->
       <text x="56" y="146" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.ovarioIzq")}</text>
       <text x="284" y="146" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.ovarioDer")}</text>
       <text x="170" y="152" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.75">${t("gin.utero")}</text>
