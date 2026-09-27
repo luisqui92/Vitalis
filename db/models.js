@@ -636,6 +636,72 @@ const vacunaSchema = new mongoose.Schema({
 vacunaSchema.index({ pacienteId: 1, fecha: -1 });
 const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 
+// ─── SYMPHOMED GANADERÍA (bovino, porcino, avícola) ────────────────────────
+//
+// Acá la unidad que importa es el GRUPO, no el animal: nadie lleva ficha
+// individual de 8.000 pollos de un galpón. Un animal de alto valor
+// individual (vaca lechera, reproductor) sigue usando Paciente — mismo
+// mecanismo que ya usan perros y gatos (especie/raza en pacienteSchema) —
+// porque a ese sí le conviene una ficha propia. LoteGanado es solo para lo
+// que de verdad se maneja y se trata en conjunto.
+const loteGanadoSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  especie: { type: String, enum: ["bovino", "porcino", "avicola"], required: true },
+  nombre: { type: String, required: true }, // ej. "Galpón 3", "Corral de engorde norte"
+  proposito: { type: String, default: "" }, // leche, carne, huevo, cría, engorde — texto libre, cada especie usa lo suyo
+  ubicacion: { type: String, default: "" }, // finca/potrero/galpón, como el veterinario lo identifica en campo
+  cantidadInicial: { type: Number, required: true, min: 1 },
+  // Se resta con cada evento de mortalidad. cantidadInicial queda fija como
+  // referencia histórica para calcular el % de mortalidad acumulada del
+  // lote completo (services/lotesGanado.js).
+  cantidadActual: { type: Number, required: true, min: 0 },
+  fechaIngreso: { type: Date, required: true },
+  estado: { type: String, enum: ["activo", "cerrado"], default: "activo", index: true },
+  fechaCierre: { type: Date, default: null },
+  motivoCierre: { type: String, default: "" }, // ej. "vendido", "faenado", "trasladado"
+  codigo: { type: String, default: "", index: true },
+  notas: { type: String, default: "" },
+}, { timestamps: true });
+loteGanadoSchema.index({ medicoPhone: 1, estado: 1 });
+const LoteGanado = mongoose.model("LoteGanado", loteGanadoSchema);
+
+// Un evento aplicado al LOTE COMPLETO: mortalidad, vacunación/tratamiento
+// masivo o pesaje de control. No hay "un evento por animal" — se carga una
+// vez para todo el lote, que es como de verdad se trabaja en campo.
+const eventoLoteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  tipo: { type: String, enum: ["mortalidad", "vacunacion", "tratamiento", "pesaje"], required: true, index: true },
+  fecha: { type: Date, required: true },
+
+  // mortalidad
+  cantidadMuertes: { type: Number, default: null, min: 0 },
+  causaPresunta: { type: String, default: "" },
+
+  // vacunación / tratamiento
+  producto: { type: String, default: "" },
+  dosis: { type: String, default: "" },
+  viaAplicacion: { type: String, default: "" }, // ej. "agua de bebida", "intramuscular"
+  cantidadAplicada: { type: Number, default: null, min: 0 },
+  // Días desde ESTA fecha hasta que se puede faenar o vender leche sin
+  // riesgo. Es el dato que dispara la alerta de retiro — sin este campo, un
+  // antibiótico cargado como "tratamiento" es indistinguible de una
+  // vitamina para el resto del sistema.
+  diasRetiroCarne: { type: Number, default: null, min: 0 },
+  diasRetiroLeche: { type: Number, default: null, min: 0 },
+
+  // pesaje — de una MUESTRA, no del lote entero (pesar 8.000 pollos uno por
+  // uno no pasa nunca). El promedio de la muestra es la mejor estimación
+  // que hay de la curva de crecimiento del lote.
+  tamanoMuestra: { type: Number, default: null, min: 1 },
+  pesoPromedioKg: { type: Number, default: null, min: 0 },
+
+  notas: { type: String, default: "" },
+  registradoPor: { type: String, default: "" }, // nombre de quien cargó, cuando no es el médico mismo (ej. encargado del galpón)
+}, { timestamps: true });
+eventoLoteSchema.index({ medicoPhone: 1, loteId: 1, fecha: -1 });
+const EventoLote = mongoose.model("EventoLote", eventoLoteSchema);
+
 // ─── ODONTOGRAMA (Symphomed Odonto) ────────────────────────────────────────
 // Numeración FDI/ISO-3950 (dos dígitos por cuadrante), la que se usa en
 // Bolivia y el resto de Latinoamérica — no la "Universal" de EE.UU.
@@ -2816,7 +2882,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, LoteGanado, EventoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

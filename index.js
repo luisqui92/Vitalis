@@ -156,6 +156,7 @@ require("./routes/informeFamilia")(app);
 // son rutas exactas, no comodines, así que no compiten con nada de abajo.
 require("./routes/resumenCompartido")(app);
 require("./routes/vacunasPet")(app);
+require("./routes/lotesGanado")(app);
 require("./routes/fisioterapia")(app);
 require("./routes/socio")(app);
 require("./routes/insumos")(app);
