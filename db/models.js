@@ -707,6 +707,22 @@ const eventoLoteSchema = new mongoose.Schema({
 eventoLoteSchema.index({ medicoPhone: 1, loteId: 1, fecha: -1 });
 const EventoLote = mongoose.model("EventoLote", eventoLoteSchema);
 
+// Una nota de voz dictada durante la visita a un lote: el veterinario graba,
+// se transcribe y se le pide a la IA que separe lo dicho en eventos reales
+// (mortalidad, vacunación, tratamiento, pesaje) — mismo mecanismo que
+// ConsultaMedica.notaClinica, pero acá el resultado no es un texto para leer:
+// son EventoLote reales, ya creados (ver services/notaVozLote.js).
+const notaVozLoteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  estado: { type: String, enum: ["procesando", "completado", "error"], default: "procesando", index: true },
+  transcripcionCompleta: { type: String, default: "" },
+  duracionSegundos: Number,
+  eventosCreados: [{ type: mongoose.Schema.Types.ObjectId, ref: "EventoLote" }],
+  errorMensaje: { type: String, default: "" },
+}, { timestamps: true });
+const NotaVozLote = mongoose.model("NotaVozLote", notaVozLoteSchema);
+
 // ─── ODONTOGRAMA (Symphomed Odonto) ────────────────────────────────────────
 // Numeración FDI/ISO-3950 (dos dígitos por cuadrante), la que se usa en
 // Bolivia y el resto de Latinoamérica — no la "Universal" de EE.UU.
@@ -2887,7 +2903,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, LoteGanado, EventoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, LoteGanado, EventoLote, NotaVozLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

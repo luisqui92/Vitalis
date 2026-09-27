@@ -168,6 +168,17 @@ function pintarLoteDetalle(data) {
       </div>` : ""}
 
     ${lote.estado !== "cerrado" ? `
+      <button class="secondary" id="btnDictarNota" style="margin-top:12px">🎙 ${t("ganaderia.dictado.boton")}</button>
+      <div id="dictadoBox" style="display:none;margin-top:12px" class="card">
+        <div class="seccion-titulo" style="margin-top:0">🎙 ${t("ganaderia.dictado.boton")}</div>
+        <div class="hint" style="margin-bottom:10px">${t("ganaderia.dictado.ayuda")}</div>
+        <div id="dictadoEstado" class="hint"></div>
+        <button class="secondary" id="btnGrabar">${t("ganaderia.dictado.grabar")}</button>
+        <button class="secondary" id="btnSubirDictado" style="display:none">${t("ganaderia.dictado.subir")}</button>
+        <div id="dictadoResultado"></div>
+        <div id="dictadoErr"></div>
+      </div>
+
       <button class="secondary" id="btnNuevoEvento" style="margin-top:12px">➕ ${t("ganaderia.detalle.nuevoEvento")}</button>
       <div id="eventoFormBox" style="display:none;margin-top:12px" class="card">
         <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.detalle.nuevoEvento")}</div>
@@ -243,6 +254,107 @@ function pintarLoteDetalle(data) {
         alert(e.error || t("ganaderia.detalle.errCerrar"));
       }
     };
+  }
+
+  const btnDictarNota = document.getElementById("btnDictarNota");
+  if (btnDictarNota) {
+    btnDictarNota.onclick = () => {
+      const box = document.getElementById("dictadoBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    };
+
+    let mediaRecorder = null, chunks = [], blob = null, mimeType = "audio/webm";
+    const dictadoEstado = document.getElementById("dictadoEstado");
+    const btnGrabar = document.getElementById("btnGrabar");
+    const btnSubirDictado = document.getElementById("btnSubirDictado");
+    const dictadoErr = document.getElementById("dictadoErr");
+    const dictadoResultado = document.getElementById("dictadoResultado");
+
+    btnGrabar.onclick = async () => {
+      if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+          mimeType = tipos.find(tp => MediaRecorder.isTypeSupported(tp)) || "";
+          mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+          chunks = [];
+          mediaRecorder.ondataavailable = e => chunks.push(e.data);
+          mediaRecorder.onstop = () => {
+            blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+            stream.getTracks().forEach(tr => tr.stop());
+            dictadoEstado.textContent = t("ganaderia.dictado.listo");
+            btnSubirDictado.style.display = "inline-block";
+          };
+          mediaRecorder.start();
+          dictadoEstado.textContent = t("ganaderia.dictado.grabando");
+          dictadoErr.innerHTML = ""; dictadoResultado.innerHTML = "";
+          btnSubirDictado.style.display = "none";
+          btnGrabar.textContent = t("ganaderia.dictado.detener");
+        } catch (e) {
+          dictadoErr.innerHTML = `<div class="error">${t("ganaderia.dictado.errMicrofono", { mensaje: esc(e.message) })}</div>`;
+        }
+      } else {
+        mediaRecorder.stop();
+        btnGrabar.textContent = t("ganaderia.dictado.grabar");
+      }
+    };
+
+    // Subir el audio y esperar el resultado ES un POST del propio médico —
+    // crea la nota de voz—, y sin esto el aviso de "algo cambió" de siempre
+    // repintaba el detalle del lote ENCIMA de la caja de dictado, en plena
+    // subida. Se marca a mano (no hay un renderX propio que envolver: el
+    // dictado vive adentro de esta misma pantalla) y se desmarca apenas
+    // termina, para que un cambio real de otro dispositivo vuelva a
+    // refrescar el lote una vez que el dictado ya no está en el medio. Ver
+    // el comentario de "dictadoLote" en PANTALLAS_SIN_REFRESCO (realtime.js).
+    function marcarDictadoEnCurso() { PANTALLA_ACTUAL = { tipo: "dictadoLote", params: {} }; }
+    function volverAMarcarLoteDetalle() { PANTALLA_ACTUAL = { tipo: "loteDetalle", params: { loteId: lote._id } }; }
+
+    btnSubirDictado.onclick = async () => {
+      if (!blob) return;
+      dictadoErr.innerHTML = "";
+      btnSubirDictado.disabled = true;
+      dictadoEstado.textContent = t("ganaderia.dictado.subiendo");
+      marcarDictadoEnCurso();
+      try {
+        const data = await api(`/medico/lotes/${lote._id}/notas-voz`, {
+          method: "POST", headers: { "Content-Type": mimeType || "audio/webm" }, body: blob,
+        });
+        dictadoEstado.textContent = t("ganaderia.dictado.procesando");
+        sondearNotaVoz(data.nota._id);
+      } catch (e) {
+        btnSubirDictado.disabled = false;
+        dictadoErr.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.dictado.errSubir"))}</div>`;
+        volverAMarcarLoteDetalle();
+      }
+    };
+
+    function sondearNotaVoz(notaId) {
+      pollTimeout = setTimeout(async () => {
+        try {
+          const data = await api(`/medico/notas-voz/${notaId}`);
+          if (data.nota.estado === "procesando") return sondearNotaVoz(notaId);
+          if (data.nota.estado === "error") {
+            dictadoEstado.textContent = "";
+            dictadoErr.innerHTML = `<div class="error">${t("ganaderia.dictado.errProcesar")}</div>`;
+            btnSubirDictado.style.display = "none";
+            volverAMarcarLoteDetalle();
+            return;
+          }
+          dictadoEstado.textContent = "";
+          const n = data.eventosCreados.length;
+          dictadoResultado.innerHTML = `
+            <div class="hint" style="margin-top:8px">"${esc(data.nota.transcripcionCompleta)}"</div>
+            <div style="font-weight:600;margin-top:6px">${t(n === 1 ? "ganaderia.dictado.resultadoUno" : "ganaderia.dictado.resultadoVarios", { n })}</div>
+            <button class="link" id="btnVerActualizado" style="margin-top:6px">${t("ganaderia.dictado.verActualizado")}</button>`;
+          document.getElementById("btnVerActualizado").onclick = () => renderLoteDetalle(lote._id);
+          btnSubirDictado.style.display = "none";
+          volverAMarcarLoteDetalle();
+        } catch (e) {
+          if (e.status === 401) return logout();
+        }
+      }, 1200);
+    }
   }
 
   const btnNuevoEvento = document.getElementById("btnNuevoEvento");

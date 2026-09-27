@@ -3,16 +3,20 @@
 // el comentario sobre LoteGanado en db/models.js para por qué esto es un
 // modelo aparte de Paciente, y no una extensión de la veterinaria de
 // mascotas que ya existía.
-const { LoteGanado, EventoLote, Medico } = require("../db/models");
+const express = require("express");
+const { LoteGanado, EventoLote, NotaVozLote, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { siguienteCodigo } = require("../services/codigos");
 const { mortalidadAcumulada, retirosVigentes, curvaPeso } = require("../services/lotesGanado");
 const { notificarRetiroRegistrado } = require("../services/alertaRetiroGanado");
+const { transcribirNotaDeVoz } = require("../services/assemblyai");
+const { generarEventosLote, crearEventosDesdeSugerencias } = require("../services/notaVozLote");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
+const audioRaw = express.raw({ type: "audio/*", limit: "80mb" });
 const ESPECIES = ["bovino", "porcino", "avicola"];
 const TIPOS_EVENTO = ["mortalidad", "vacunacion", "tratamiento", "pesaje"];
 
@@ -165,5 +169,67 @@ module.exports = function (app) {
     }
 
     res.status(201).json({ ok: true, evento, lote });
+  }));
+
+  // ─── DICTADO DE CAMPO: audio → transcripción → eventos reales ──────────
+  // Mismo patrón que POST /medico/consultas (routes/consultaMedica.js): se
+  // responde al toque con la nota en "procesando" y todo lo que tarda —
+  // transcribir, pedirle a la IA que separe los eventos, crearlos— sigue
+  // en segundo plano. El médico ya guardó el celular para cuando esto
+  // termina; por eso el resultado se consulta con el GET de abajo, no en
+  // esta misma respuesta.
+  app.post("/medico/lotes/:id/notas-voz", limitMedico, requireMedico, audioRaw, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const audioBuffer = req.body;
+    if (!Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) {
+      throw new ErrorHttp(400, "Falta el audio (Content-Type debe ser audio/*)");
+    }
+    const lote = await obtenerOFallar(LoteGanado, { _id: req.params.id, medicoPhone }, "Lote no encontrado");
+    if (lote.estado === "cerrado") throw new ErrorHttp(400, "No se pueden cargar eventos en un lote cerrado");
+
+    const nota = await NotaVozLote.create({ medicoPhone, loteId: lote._id, estado: "procesando" });
+    res.status(202).json({ ok: true, nota });
+
+    const medico = await Medico.findOne({ phone: medicoPhone }).select("phone nombre idioma tipoEspecialidad moneda").lean();
+
+    transcribirNotaDeVoz(audioBuffer, medico?.tipoEspecialidad, medico?.idioma)
+      .then(async ({ texto, duracionSegundos }) => {
+        nota.transcripcionCompleta = texto;
+        nota.duracionSegundos = duracionSegundos;
+
+        const { eventos } = await generarEventosLote(texto, medico?.idioma);
+        // El propio lote pudo cerrarse mientras esto corría en segundo
+        // plano (el médico lo cerró desde otra pestaña) — no se le agregan
+        // eventos a algo que ya se dio por terminado.
+        const loteFresco = await LoteGanado.findById(lote._id);
+        const creados = (loteFresco && loteFresco.estado !== "cerrado")
+          ? await crearEventosDesdeSugerencias(loteFresco, eventos, { registradoPor: medico?.nombre || "" })
+          : [];
+
+        nota.eventosCreados = creados.map(e => e._id);
+        nota.estado = "completado";
+        await nota.save();
+
+        for (const evento of creados) {
+          if ((evento.diasRetiroCarne != null || evento.diasRetiroLeche != null) && medico) {
+            notificarRetiroRegistrado(evento, loteFresco, medico)
+              .catch(e => log.error(`[NOTA_VOZ_LOTE] no se pudo avisar el retiro registrado (evento ${evento._id}):`, e.message));
+          }
+        }
+      })
+      .catch(async (e) => {
+        log.error(`[NOTA_VOZ_LOTE] no se pudo procesar la nota ${nota._id}:`, e.message);
+        await NotaVozLote.updateOne({ _id: nota._id }, { $set: { estado: "error", errorMensaje: e.message } });
+      });
+  }));
+
+  // ─── CONSULTAR EL ESTADO DE UNA NOTA DE VOZ (polling) ──────────────────
+  app.get("/medico/notas-voz/:id", requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const nota = await obtenerOFallar(NotaVozLote, { _id: req.params.id, medicoPhone }, "Nota no encontrada");
+    const eventosCreados = nota.eventosCreados.length
+      ? await EventoLote.find({ _id: { $in: nota.eventosCreados } }).lean()
+      : [];
+    res.json({ nota, eventosCreados });
   }));
 };

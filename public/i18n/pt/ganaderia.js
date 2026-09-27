@@ -75,6 +75,22 @@ Object.assign(I18N.pt, {
   "ganaderia.curva.titulo": "Curva de peso",
   "ganaderia.curva.muestra": "amostra de {n}",
 
+  "ganaderia.dictado.boton": "Ditar nota de voz",
+  "ganaderia.dictado.ayuda": "Grave o que você encontrou na visita — a IA separa sozinha a mortalidade, vacinação, tratamento ou pesagem que você mencionou.",
+  "ganaderia.dictado.grabar": "Gravar",
+  "ganaderia.dictado.detener": "Parar",
+  "ganaderia.dictado.grabando": "🔴 Gravando...",
+  "ganaderia.dictado.listo": "Gravação pronta.",
+  "ganaderia.dictado.subir": "Processar",
+  "ganaderia.dictado.subiendo": "Enviando...",
+  "ganaderia.dictado.procesando": "Ouvindo e separando os eventos...",
+  "ganaderia.dictado.errMicrofono": "Não foi possível acessar o microfone: {mensaje}",
+  "ganaderia.dictado.errSubir": "Não foi possível enviar a gravação.",
+  "ganaderia.dictado.errProcesar": "Não foi possível processar a nota de voz. Você pode registrar os eventos manualmente.",
+  "ganaderia.dictado.resultadoUno": "1 evento foi registrado.",
+  "ganaderia.dictado.resultadoVarios": "{n} eventos foram registrados.",
+  "ganaderia.dictado.verActualizado": "Ver ficha atualizada →",
+
   "escr.nav.ganaderia": "Pecuária",
   "pacientes.tab.ganaderia": "Pecuária",
 });

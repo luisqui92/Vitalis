@@ -53,7 +53,16 @@ function desconectarTiempoReal() {
 // perdería lo escrito: repintar arranca los <video> del DOM y con ellos la
 // conexión WebRTC. La llamada se corta en la mitad, con el paciente del
 // otro lado.
-const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele"]);
+//
+// "dictadoLote" es la misma idea aplicada al dictado de campo de Ganadería
+// (public/js/ganaderia.js): subir el audio ES un POST del propio médico —
+// crea la nota de voz—, y sin este freno el aviso de cambio repintaba el
+// detalle del lote EN MEDIO de la grabación/subida, tirando la caja de
+// dictado abajo del médico. No hay ningún "renderX" que envolver acá —el
+// dictado vive adentro de la misma pantalla de siempre—, así que
+// ganaderia.js marca y desmarca PANTALLA_ACTUAL a mano, en vez de con
+// envolverParaTiempoReal().
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote"]);
 
 // ═══ UN REPINTADO QUE NO PIDIÓ EL MÉDICO NO PUEDE MOVERLE LA PÁGINA ═══════
 //

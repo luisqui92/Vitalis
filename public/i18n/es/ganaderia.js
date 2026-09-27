@@ -75,6 +75,22 @@ Object.assign(I18N.es, {
   "ganaderia.curva.titulo": "Curva de peso",
   "ganaderia.curva.muestra": "muestra de {n}",
 
+  "ganaderia.dictado.boton": "Dictar nota de voz",
+  "ganaderia.dictado.ayuda": "Grabá lo que encontraste en la visita — la IA separa sola la mortalidad, vacunación, tratamiento o pesaje que hayas mencionado.",
+  "ganaderia.dictado.grabar": "Grabar",
+  "ganaderia.dictado.detener": "Detener",
+  "ganaderia.dictado.grabando": "🔴 Grabando...",
+  "ganaderia.dictado.listo": "Grabación lista.",
+  "ganaderia.dictado.subir": "Procesar",
+  "ganaderia.dictado.subiendo": "Subiendo...",
+  "ganaderia.dictado.procesando": "Escuchando y separando los eventos...",
+  "ganaderia.dictado.errMicrofono": "No se pudo acceder al micrófono: {mensaje}",
+  "ganaderia.dictado.errSubir": "No se pudo subir la grabación.",
+  "ganaderia.dictado.errProcesar": "No se pudo procesar la nota de voz. Podés cargar los eventos a mano.",
+  "ganaderia.dictado.resultadoUno": "Se registró 1 evento.",
+  "ganaderia.dictado.resultadoVarios": "Se registraron {n} eventos.",
+  "ganaderia.dictado.verActualizado": "Ver ficha actualizada →",
+
   // Se usan desde escritorio.js y pacientes.js, no desde ganaderia.js —
   // viven en este módulo porque son las mismas tres letras del nombre del
   // producto, y es donde alguien que traduzca esto va a buscarlas primero.
