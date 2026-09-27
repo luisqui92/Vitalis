@@ -795,6 +795,44 @@ const eventoReproductivoSchema = new mongoose.Schema({
 eventoReproductivoSchema.index({ medicoPhone: 1, animalId: 1, fecha: 1 });
 const EventoReproductivo = mongoose.model("EventoReproductivo", eventoReproductivoSchema);
 
+// ─── PRODUCCIÓN (Symphomed Ganadería) ──────────────────────────────────────
+//
+// Un registro por lote y por DÍA: los litros que fueron al tanque, o los
+// huevos juntados. "dia" es "YYYY-MM-DD" y es la clave: cargar dos veces el
+// mismo día corrige el número, no lo duplica (ver el índice único). Si se
+// sumaran, un encargado que carga, se equivoca y vuelve a cargar le
+// duplicaría la producción del día al dueño.
+//
+// Qué leche está en retiro NO se guarda acá: se calcula al leer, cruzando
+// con los tratamientos del lote (services/produccion.js). Así, corregir la
+// fecha de un tratamiento corrige también qué leche no se podía vender.
+const registroProduccionSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  tipo: { type: String, enum: ["leche", "huevos"], required: true },
+  dia: { type: String, required: true }, // "YYYY-MM-DD"
+  cantidad: { type: Number, required: true, min: 0 }, // litros o huevos
+  // Vacas en ordeñe o gallinas en postura ese día. Opcional para la leche;
+  // para los huevos es lo que da el % de postura.
+  animales: { type: Number, default: null, min: 0 },
+  notas: { type: String, default: "" },
+  registradoPor: { type: String, default: "" },
+}, { timestamps: true });
+registroProduccionSchema.index({ medicoPhone: 1, loteId: 1, tipo: 1, dia: 1 }, { unique: true });
+const RegistroProduccion = mongoose.model("RegistroProduccion", registroProduccionSchema);
+
+// El control lechero individual: cuántos litros dio una vaca un día. Mismo
+// criterio de un registro por vaca y por día.
+const controlLecheroSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  animalId: { type: mongoose.Schema.Types.ObjectId, ref: "AnimalGanado", required: true, index: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  dia: { type: String, required: true },
+  litros: { type: Number, required: true, min: 0 },
+}, { timestamps: true });
+controlLecheroSchema.index({ medicoPhone: 1, animalId: 1, dia: 1 }, { unique: true });
+const ControlLechero = mongoose.model("ControlLechero", controlLecheroSchema);
+
 // Una nota de voz dictada durante la visita a un lote: el veterinario graba,
 // se transcribe y se le pide a la IA que separe lo dicho en eventos reales
 // (mortalidad, vacunación, tratamiento, pesaje) — mismo mecanismo que
@@ -2996,7 +3034,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

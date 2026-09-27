@@ -220,12 +220,16 @@ async function renderLoteDetalle(id) {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
   try {
-    const [data, dataFincas, dataAnimales] = await Promise.all([
+    const [data, dataFincas, dataAnimales, dataProduccion] = await Promise.all([
       api(`/medico/lotes/${id}`),
       api("/medico/fincas"),
       api(`/medico/lotes/${id}/animales`),
+      api(`/medico/lotes/${id}/produccion`),
     ]);
-    pintarLoteDetalle({ ...data, fincas: dataFincas.fincas || [], animales: dataAnimales.animales || [], resumenRepro: dataAnimales.resumen });
+    pintarLoteDetalle({
+      ...data, fincas: dataFincas.fincas || [], animales: dataAnimales.animales || [],
+      resumenRepro: dataAnimales.resumen, produccion: dataProduccion,
+    });
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
@@ -234,13 +238,13 @@ async function renderLoteDetalle(id) {
 
 function retiroVigenteHtml(r) {
   const partes = [];
-  if (r.fechaLibreCarne) partes.push(t("ganaderia.detalle.libreCarne", { fecha: new Date(r.fechaLibreCarne).toLocaleDateString(localeActual()) }));
-  if (r.fechaLibreLeche) partes.push(t("ganaderia.detalle.libreLeche", { fecha: new Date(r.fechaLibreLeche).toLocaleDateString(localeActual()) }));
+  if (r.fechaLibreCarne) partes.push(t("ganaderia.detalle.libreCarne", { fecha: fechaCorta(r.fechaLibreCarne) }));
+  if (r.fechaLibreLeche) partes.push(t("ganaderia.detalle.libreLeche", { fecha: fechaCorta(r.fechaLibreLeche) }));
   return `<div class="hint">🔒 ${esc(r.producto)}: ${partes.join(" · ")}</div>`;
 }
 
 function eventoItemHtml(e) {
-  const fecha = new Date(e.fecha).toLocaleDateString(localeActual());
+  const fecha = fechaCorta(e.fecha);
   let linea = "";
   if (e.tipo === "mortalidad") {
     linea = `💀 ${t("ganaderia.eventos.mortalidad", { n: e.cantidadMuertes })}${e.causaPresunta ? ` — ${esc(e.causaPresunta)}` : ""}`;
@@ -260,7 +264,7 @@ function eventoItemHtml(e) {
 }
 
 function pintarLoteDetalle(data) {
-  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso, animales, resumenRepro } = data;
+  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso, animales, resumenRepro, produccion } = data;
   const conReproduccion = lote.especie === "bovino" || lote.especie === "porcino";
   const duenoTexto = finca ? [finca.duenoNombre, finca.duenoTelefono].filter(Boolean).map(esc).join(" · ") : "";
 
@@ -292,6 +296,8 @@ function pintarLoteDetalle(data) {
         <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.detalle.retiroTitulo")}</div>
         ${retirosVigentes.map(retiroVigenteHtml).join("")}
       </div>` : ""}
+
+    ${produccion?.tipo ? produccionLoteHtml(lote, produccion, retirosVigentes) : ""}
 
     ${conReproduccion ? reproduccionLoteHtml(lote, animales, resumenRepro) : ""}
 
@@ -356,7 +362,7 @@ function pintarLoteDetalle(data) {
       <div class="card" style="margin-top:12px">
         <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.curva.titulo")}</div>
         ${curvaPeso.map(p => `
-          <div class="paciente-info">${new Date(p.fecha).toLocaleDateString(localeActual())} — ${p.pesoPromedioKg} kg (${t("ganaderia.curva.muestra", { n: p.tamanoMuestra })})</div>
+          <div class="paciente-info">${fechaCorta(p.fecha)} — ${p.pesoPromedioKg} kg (${t("ganaderia.curva.muestra", { n: p.tamanoMuestra })})</div>
         `).join("")}
       </div>` : ""}
 
@@ -368,6 +374,7 @@ function pintarLoteDetalle(data) {
 
   document.getElementById("btnBack").onclick = renderGanaderia;
   if (conReproduccion) engancharReproduccionLote(lote);
+  if (produccion?.tipo) engancharProduccionLote(lote, produccion.tipo);
 
   const selectFinca = document.getElementById("loteCambiarFinca");
   if (selectFinca) {
@@ -580,9 +587,9 @@ function fechaStrLocalGanado(d) {
 
 const TIPOS_EVENTO_REPRO = ["servicio", "diagnostico", "parto", "aborto", "destete", "secado"];
 
-function fechaCorta(f) {
-  return f ? new Date(f).toLocaleDateString(localeActual()) : "";
-}
+// fechaCorta() es la de public/js/i18n.js: trata una fecha guardada a
+// medianoche UTC como el día civil que escribió el médico. Una copia propia
+// acá la pisaba para toda la app y corría un día las fechas en Bolivia.
 
 function estadoReproHtml(repro, activa) {
   if (activa === false) return `<span class="hint">${t("ganaderia.repro.baja")}</span>`;
@@ -673,7 +680,11 @@ async function renderAnimalDetalle(id) {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
   try {
-    pintarAnimalDetalle(await api(`/medico/animales/${id}`));
+    const [data, controles] = await Promise.all([
+      api(`/medico/animales/${id}`),
+      api(`/medico/animales/${id}/controles-lecheros`),
+    ]);
+    pintarAnimalDetalle({ ...data, controles });
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
@@ -734,6 +745,8 @@ function pintarAnimalDetalle(data) {
       ${ind.criasDestetadasPromedio != null ? `<div class="paciente-info">${t("ganaderia.repro.destetadasPromedio", { n: ind.criasDestetadasPromedio.toFixed(1) })}</div>` : ""}
     </div>
 
+    ${data.controles?.aplica ? controlLecheroHtml(data.controles, puedeCargar) : ""}
+
     ${puedeCargar ? `
       <button class="secondary" id="btnNuevoEventoRepro" style="margin-top:12px">➕ ${t("ganaderia.repro.registrar")}</button>
       <div id="eventoReproBox" style="display:none;margin-top:12px" class="card">
@@ -781,6 +794,7 @@ function pintarAnimalDetalle(data) {
   `;
 
   document.getElementById("btnBack").onclick = () => renderLoteDetalle(animal.loteId);
+  if (data.controles?.aplica && puedeCargar) engancharControlLechero(animal);
 
   const btnBaja = document.getElementById("btnBajaAnimal");
   if (btnBaja) {
@@ -834,6 +848,149 @@ function pintarAnimalDetalle(data) {
     try {
       await api(`/medico/animales/${animal._id}/eventos`, {
         method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(cuerpo),
+      });
+      renderAnimalDetalle(animal._id);
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
+    }
+  };
+}
+
+// ─── PRODUCCIÓN (leche y huevos) ────────────────────────────────────────────
+//
+// Los números (promedios, caída, qué leche está en retiro) los calcula el
+// servidor en services/produccion.js; acá solo se pintan.
+
+function numeroCorto(n, decimales = 1) {
+  return n == null ? "—" : Number(n).toLocaleString(localeActual(), { maximumFractionDigits: decimales });
+}
+
+function diaCortoProd(dia) {
+  return new Date(`${dia}T12:00:00Z`).toLocaleDateString(localeActual(), { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+}
+
+// Una barra por día, del más nuevo al más viejo. Barras hechas con un div y
+// no con un gráfico: se leen igual en un celular chico, no necesitan
+// ninguna librería y el número va al lado, que es lo que de verdad se mira.
+function barrasProduccionHtml(tipo, serie) {
+  const dias = serie.slice(-14).reverse();
+  if (!dias.length) return "";
+  const max = Math.max(...dias.map(r => r.cantidad), 1);
+  return `<div style="display:grid;gap:4px;margin-top:10px">${dias.map(r => `
+    <div style="display:grid;grid-template-columns:42px 1fr auto;gap:8px;align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+      <span class="hint" style="margin:0">${diaCortoProd(r.dia)}</span>
+      <span style="display:block;height:10px;border-radius:5px;background:var(--border)">
+        <span style="display:block;height:10px;border-radius:5px;width:${Math.max(2, (r.cantidad / max) * 100)}%;background:${r.enRetiro ? "var(--warning)" : "var(--primary)"}"></span>
+      </span>
+      <span>${numeroCorto(r.cantidad)}${tipo === "huevos" && r.porAnimal != null ? ` · ${numeroCorto(r.porAnimal)}%` : ""}${r.enRetiro ? " 🔒" : ""}</span>
+    </div>`).join("")}</div>`;
+}
+
+function produccionLoteHtml(lote, produccion, retirosVigentes) {
+  const { tipo, resumen: r, controlLote } = produccion;
+  const unidad = t("ganaderia.prod.unidad." + tipo);
+  const retiroLecheHoy = tipo === "leche"
+    ? (retirosVigentes || []).find(x => x.fechaLibreLeche && new Date(x.fechaLibreLeche) > new Date())
+    : null;
+  const variacion = r.variacionPct == null ? "" :
+    ` <span style="color:${r.variacionPct < 0 ? "var(--danger)" : "var(--success)"}">${r.variacionPct > 0 ? "+" : ""}${Math.round(r.variacionPct)}%</span> ${t("ganaderia.prod.vsSemanaAnterior")}`;
+
+  return `
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.prod.titulo." + tipo)}</div>
+      ${r.alertas.map(a => `<div class="paciente-info" style="color:var(--warning)">⚠️ ${t("ganaderia.prod.alerta." + a.tipo, { pct: a.pct, litros: numeroCorto(a.litros) })}</div>`).join("")}
+      ${r.ultimo ? `
+        <div class="paciente-info">${t("ganaderia.prod.ultimo", { dia: diaCortoProd(r.ultimo.dia), cantidad: numeroCorto(r.ultimo.cantidad), unidad })}${
+          r.ultimo.porAnimal != null ? ` · ${t("ganaderia.prod.porAnimal." + tipo, { n: numeroCorto(r.ultimo.porAnimal) })}` : ""}</div>
+        ${r.promedio7 != null ? `<div class="paciente-info">${t("ganaderia.prod.promedio7." + tipo, { n: numeroCorto(r.promedio7) })}${variacion}</div>` : ""}
+        ${tipo === "leche" && r.vendible7 != null ? `<div class="paciente-info">${t("ganaderia.prod.vendible7", { n: numeroCorto(r.vendible7) })}</div>` : ""}
+        ${barrasProduccionHtml(tipo, r.serie)}
+      ` : `<div class="hint">${t("ganaderia.prod.vacio." + tipo)}</div>`}
+
+      ${controlLote ? `
+        <div class="hint" style="margin-top:10px">${t("ganaderia.prod.controlLote", { dia: diaCortoProd(controlLote.dia), n: controlLote.vacas, promedio: numeroCorto(controlLote.promedio) })}</div>
+        ${controlLote.vacasDelDia.slice(0, 3).map(c => `<div class="paciente-info">${esc(c.identificador)} — ${numeroCorto(c.litros)} L</div>`).join("")}` : ""}
+
+      ${lote.estado !== "cerrado" ? `
+        <button class="link" id="btnCargarProduccion" style="margin-top:8px">➕ ${t("ganaderia.prod.cargar." + tipo)}</button>
+        <div id="produccionFormBox" style="display:none;margin-top:8px">
+          ${retiroLecheHoy ? `<div class="paciente-info" style="color:var(--warning)">🔒 ${t("ganaderia.prod.avisoRetiro", { producto: esc(retiroLecheHoy.producto), fecha: fechaCorta(retiroLecheHoy.fechaLibreLeche) })}</div>` : ""}
+          <label>${t("ganaderia.evento.fecha")}</label>
+          <input id="prodDia" type="date" value="${fechaStrLocalGanado(new Date())}">
+          <label>${t("ganaderia.prod.cantidad." + tipo)}</label>
+          <input id="prodCantidad" type="number" min="0" step="${tipo === "leche" ? "0.1" : "1"}">
+          <label>${t("ganaderia.prod.animales." + tipo)}</label>
+          <input id="prodAnimales" type="number" min="0" step="1" placeholder="${tipo === "huevos" ? t("ganaderia.prod.animalesPlaceholder", { n: produccion.cantidadActual }) : ""}">
+          <div class="hint">${t("ganaderia.prod.corregir")}</div>
+          <div id="prodErr"></div>
+          <button class="secondary" id="btnGuardarProduccion">${t("ganaderia.evento.guardar")}</button>
+        </div>` : ""}
+    </div>`;
+}
+
+function engancharProduccionLote(lote, tipo) {
+  const btn = document.getElementById("btnCargarProduccion");
+  if (!btn) return;
+  btn.onclick = () => {
+    const box = document.getElementById("produccionFormBox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  };
+  document.getElementById("btnGuardarProduccion").onclick = async () => {
+    const errBox = document.getElementById("prodErr");
+    errBox.innerHTML = "";
+    const dia = document.getElementById("prodDia").value;
+    const cantidad = document.getElementById("prodCantidad").value;
+    if (!dia || cantidad === "") { errBox.innerHTML = `<div class="error">${t("ganaderia.evento.errFaltanDatos")}</div>`; return; }
+    try {
+      const data = await api(`/medico/lotes/${lote._id}/produccion`, {
+        method: "PUT", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ dia, cantidad, animales: document.getElementById("prodAnimales").value }),
+      });
+      // Es el momento justo para frenar que esa leche vaya al tanque:
+      // se dice ahora, no solo con el candadito en la lista.
+      if (data.enRetiro) alert(t("ganaderia.prod.guardadoEnRetiro", { producto: data.productoRetiro || "" }));
+      renderLoteDetalle(lote._id);
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
+    }
+  };
+}
+
+// ─── CONTROL LECHERO DE UNA VACA ────────────────────────────────────────────
+function controlLecheroHtml(c, puedeCargar) {
+  const ultimos = c.serie.slice(-10).reverse();
+  return `
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.prod.controlTitulo")}</div>
+      ${c.ultimo ? `
+        <div class="paciente-info">${t("ganaderia.prod.controlUltimo", { litros: numeroCorto(c.ultimo.litros), dia: diaCortoProd(c.ultimo.dia) })}${
+          c.ultimo.del != null ? ` · ${t("ganaderia.prod.del", { n: c.ultimo.del })}` : ""}</div>
+        ${c.promedioLactancia != null ? `<div class="paciente-info">${t("ganaderia.prod.promedioLactancia", { n: numeroCorto(c.promedioLactancia) })}</div>` : ""}
+        ${c.pico ? `<div class="paciente-info">${t("ganaderia.prod.pico", { n: numeroCorto(c.pico.litros), dia: diaCortoProd(c.pico.dia) })}</div>` : ""}
+        ${ultimos.map(x => `<div class="paciente-info" style="font-variant-numeric:tabular-nums">${diaCortoProd(x.dia)} — ${numeroCorto(x.litros)} L${x.del != null ? ` <span class="hint">(${t("ganaderia.prod.del", { n: x.del })})</span>` : ""}</div>`).join("")}
+      ` : `<div class="hint">${t("ganaderia.prod.controlVacio")}</div>`}
+      ${puedeCargar ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div><label>${t("ganaderia.evento.fecha")}</label><input id="controlDia" type="date" value="${fechaStrLocalGanado(new Date())}"></div>
+          <div><label>${t("ganaderia.prod.litros")}</label><input id="controlLitros" type="number" min="0" step="0.1"></div>
+        </div>
+        <div id="controlErr"></div>
+        <button class="secondary" id="btnGuardarControl">${t("ganaderia.prod.guardarControl")}</button>` : ""}
+    </div>`;
+}
+
+function engancharControlLechero(animal) {
+  const btn = document.getElementById("btnGuardarControl");
+  if (!btn) return;
+  btn.onclick = async () => {
+    const errBox = document.getElementById("controlErr");
+    errBox.innerHTML = "";
+    const dia = document.getElementById("controlDia").value;
+    const litros = document.getElementById("controlLitros").value;
+    if (!dia || litros === "") { errBox.innerHTML = `<div class="error">${t("ganaderia.evento.errFaltanDatos")}</div>`; return; }
+    try {
+      await api(`/medico/animales/${animal._id}/controles-lecheros`, {
+        method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ dia, litros }),
       });
       renderAnimalDetalle(animal._id);
     } catch (e) {
