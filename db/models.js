@@ -644,8 +644,35 @@ const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 // mecanismo que ya usan perros y gatos (especie/raza en pacienteSchema) —
 // porque a ese sí le conviene una ficha propia. LoteGanado es solo para lo
 // que de verdad se maneja y se trata en conjunto.
+// La finca (o granja, o establecimiento) es el CLIENTE del veterinario de
+// campo: un veterinario atiende quince o veinte, cada una con sus lotes. Y
+// quien decide cuándo se faena o se vende la leche es el dueño, no el
+// veterinario — por eso el dueño vive acá, con su teléfono, y recibe él
+// también las alertas de retiro (services/alertaRetiroGanado.js).
+//
+// El dueño NO tiene cuenta en Symphomed: es un contacto, igual que el
+// "telefono" de un paciente. Darle acceso propio es otro paso.
+const fincaSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  codigo: { type: String, default: "", index: true },
+  nombre: { type: String, required: true },
+  ubicacion: { type: String, default: "" },
+  duenoNombre: { type: String, default: "" },
+  // Tal cual lo escribió el veterinario. Se normaliza recién al mandar
+  // (normalizarDestino en services/metaWhatsapp.js), con el país de la
+  // cuenta — mismo criterio que con el teléfono de un paciente.
+  duenoTelefono: { type: String, default: "" },
+  notas: { type: String, default: "" },
+}, { timestamps: true });
+fincaSchema.index({ medicoPhone: 1, nombre: 1 });
+const Finca = mongoose.model("Finca", fincaSchema);
+
 const loteGanadoSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
+  // Opcional: los lotes que se cargaron antes de que existieran las fincas
+  // quedan sueltos, y un veterinario que maneja un solo establecimiento no
+  // tiene por qué cargar uno.
+  fincaId: { type: mongoose.Schema.Types.ObjectId, ref: "Finca", default: null, index: true },
   especie: { type: String, enum: ["bovino", "porcino", "avicola"], required: true },
   nombre: { type: String, required: true }, // ej. "Galpón 3", "Corral de engorde norte"
   proposito: { type: String, default: "" }, // leche, carne, huevo, cría, engorde — texto libre, cada especie usa lo suyo
@@ -2908,7 +2935,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, LoteGanado, EventoLote, NotaVozLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

@@ -19,8 +19,45 @@
 // Ningún competidor relevado (services/ganaderia — ver el estudio de
 // mercado) ofrece esto como alerta proactiva.
 const { log } = require("../config");
-const { LoteGanado, EventoLote, Medico } = require("../db/models");
-const { enviarTextoOPlantilla, PLANTILLAS } = require("./metaWhatsapp");
+const { LoteGanado, EventoLote, Medico, Finca } = require("../db/models");
+const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("./metaWhatsapp");
+
+// ─── A QUIÉN SE LE AVISA ────────────────────────────────────────────────────
+//
+// Al veterinario siempre. Y al dueño de la finca, si el lote tiene una y el
+// dueño tiene teléfono cargado: es él quien decide cuándo se faena o se
+// vende la leche, así que una alerta de retiro que solo le llega al
+// veterinario depende de que el veterinario se acuerde de reenviarla.
+//
+// El envío al dueño NO puede tumbar el del veterinario: si el número del
+// dueño está mal escrito, el veterinario igual tiene que enterarse, y el
+// evento igual tiene que quedar marcado como avisado (si no, el trabajo de
+// cada hora le volvería a escribir al veterinario para siempre por culpa de
+// un número ajeno). Por eso el del veterinario tira el error y el del dueño
+// solo lo anota.
+async function telefonoDelDueno(lote, medico) {
+  if (!lote?.fincaId) return null;
+  const finca = await Finca.findOne({ _id: lote.fincaId, medicoPhone: medico.phone }).select("duenoTelefono").lean();
+  const tel = String(finca?.duenoTelefono || "").trim();
+  if (!tel) return null;
+  const destino = normalizarDestino(tel, medico?.moneda === "BRL" ? "BR" : "BO");
+  // El dueño y el veterinario pueden ser la misma persona (un veterinario
+  // que además tiene su propio campo): no se le manda el mismo aviso dos veces.
+  return destino && destino !== normalizarDestino(medico.phone, medico?.moneda === "BRL" ? "BR" : "BO") ? destino : null;
+}
+
+async function avisar(lote, medico, texto, respaldo) {
+  const resultado = await enviarTextoOPlantilla(medico.phone, texto, respaldo);
+  const dueno = await telefonoDelDueno(lote, medico);
+  if (dueno) {
+    try {
+      await enviarTextoOPlantilla(dueno, texto, respaldo);
+    } catch (e) {
+      log.error(`[ALERTA_RETIRO_GANADO] no se pudo avisar al dueño (${dueno}) del lote ${lote.codigo}: ${e.message}`);
+    }
+  }
+  return resultado;
+}
 
 // ─── EL AVISO INMEDIATO, AL CARGAR EL EVENTO ────────────────────────────────
 async function notificarRetiroRegistrado(evento, lote, medico) {
@@ -45,7 +82,7 @@ async function notificarRetiroRegistrado(evento, lote, medico) {
     ? `Registrado: ${evento.producto} no lote ${lote.codigo} (${lote.nombre}). Período de carência: ${partes.join(", ")}.`
     : `Se registró ${evento.producto} en el lote ${lote.codigo} (${lote.nombre}). Período de retiro: ${partes.join(", ")}.`;
 
-  return enviarTextoOPlantilla(medico.phone, texto, {
+  return avisar(lote, medico, texto, {
     plantilla: PLANTILLAS.retiroGanadoRegistrado,
     parametros: [lote.codigo, evento.producto, partes.join(", ")],
     idioma: medico?.idioma,
@@ -78,7 +115,7 @@ async function procesarRetirosLiberados() {
 
     try {
       const [lote, medico] = await Promise.all([
-        LoteGanado.findById(evento.loteId).select("codigo nombre medicoPhone").lean(),
+        LoteGanado.findById(evento.loteId).select("codigo nombre medicoPhone fincaId").lean(),
         Medico.findOne({ phone: evento.medicoPhone }).select("phone nombre idioma moneda").lean(),
       ]);
       // El lote pudo cerrarse o borrarse entre que se cargó el evento y que
@@ -111,7 +148,7 @@ async function notificarRetiroLibre(evento, lote, medico) {
     ? `O lote ${lote.codigo} (${lote.nombre}) já está livre: o período de carência de ${evento.producto} venceu. Já pode ${acciones.join(" e ")}.`
     : `El lote ${lote.codigo} (${lote.nombre}) ya está libre: venció el período de retiro de ${evento.producto}. Ya podés ${acciones.join(" y ")}.`;
 
-  return enviarTextoOPlantilla(medico.phone, texto, {
+  return avisar(lote, medico, texto, {
     plantilla: PLANTILLAS.retiroGanadoLibre,
     parametros: [lote.codigo, evento.producto],
     idioma: medico?.idioma,

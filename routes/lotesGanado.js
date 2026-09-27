@@ -4,7 +4,8 @@
 // modelo aparte de Paciente, y no una extensión de la veterinaria de
 // mascotas que ya existía.
 const express = require("express");
-const { LoteGanado, EventoLote, NotaVozLote, Medico } = require("../db/models");
+const mongoose = require("mongoose");
+const { Finca, LoteGanado, EventoLote, NotaVozLote, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
@@ -36,10 +37,70 @@ function enteroOpcional(valor) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+// La finca que viene en el pedido, verificada contra el dueño de la cuenta.
+// Vacío = sin finca (null), que es un valor válido. Un id de otro médico da
+// 404 igual que uno que no existe: no se delata que existe.
+async function fincaDelMedico(fincaId, medicoPhone) {
+  if (fincaId === undefined || fincaId === null || fincaId === "") return null;
+  if (!mongoose.isValidObjectId(fincaId)) throw new ErrorHttp(400, "fincaId no es válido");
+  return obtenerOFallar(Finca, { _id: fincaId, medicoPhone }, "Finca no encontrada");
+}
+
+function datosDeFinca(body) {
+  return {
+    ubicacion: String(body?.ubicacion || "").trim(),
+    duenoNombre: String(body?.duenoNombre || "").trim(),
+    duenoTelefono: String(body?.duenoTelefono || "").replace(/[^\d+]/g, ""),
+    notas: String(body?.notas || "").trim(),
+  };
+}
+
 module.exports = function (app) {
+  // ─── FINCAS ─────────────────────────────────────────────────────────────
+  app.post("/medico/fincas", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const nombre = String(req.body?.nombre || "").trim();
+    if (!nombre) throw new ErrorHttp(400, "nombre es requerido");
+    const codigo = await siguienteCodigo(Finca, medicoPhone, "F");
+    const finca = await Finca.create({ medicoPhone, codigo, nombre, ...datosDeFinca(req.body) });
+    res.status(201).json({ ok: true, finca });
+  }));
+
+  // Con cuántos lotes activos tiene cada una: es lo que el veterinario mira
+  // para saber a cuál le toca visita.
+  app.get("/medico/fincas", requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const [fincas, conteos] = await Promise.all([
+      Finca.find({ medicoPhone }).sort({ nombre: 1 }).lean(),
+      LoteGanado.aggregate([
+        { $match: { medicoPhone, estado: "activo", fincaId: { $ne: null } } },
+        { $group: { _id: "$fincaId", n: { $sum: 1 } } },
+      ]),
+    ]);
+    const porFinca = new Map(conteos.map(c => [String(c._id), c.n]));
+    res.json({ fincas: fincas.map(f => ({ ...f, lotesActivos: porFinca.get(String(f._id)) || 0 })) });
+  }));
+
+  app.patch("/medico/fincas/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const finca = await fincaDelMedico(req.params.id, medicoPhone);
+    const nombre = String(req.body?.nombre ?? finca.nombre).trim();
+    if (!nombre) throw new ErrorHttp(400, "nombre es requerido");
+    // Solo se tocan los campos que vinieron: editar el teléfono del dueño
+    // no puede borrarle la ubicación a la finca.
+    const nuevos = datosDeFinca(req.body);
+    finca.nombre = nombre;
+    for (const campo of Object.keys(nuevos)) {
+      if (req.body?.[campo] !== undefined) finca[campo] = nuevos[campo];
+    }
+    await finca.save();
+    res.json({ ok: true, finca });
+  }));
+
   // ─── CREAR LOTE ─────────────────────────────────────────────────────────
   app.post("/medico/lotes", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
+    const finca = await fincaDelMedico(req.body?.fincaId, medicoPhone);
     const especie = String(req.body?.especie || "").trim();
     if (!ESPECIES.includes(especie)) throw new ErrorHttp(400, `especie debe ser una de: ${ESPECIES.join(", ")}`);
     const nombre = String(req.body?.nombre || "").trim();
@@ -56,18 +117,41 @@ module.exports = function (app) {
     const codigo = await siguienteCodigo(LoteGanado, medicoPhone, "L");
     const lote = await LoteGanado.create({
       medicoPhone, codigo, especie, nombre, proposito, ubicacion, notas,
+      fincaId: finca ? finca._id : null,
       cantidadInicial, cantidadActual: cantidadInicial, fechaIngreso,
     });
     res.status(201).json({ ok: true, lote });
   }));
 
   // ─── LISTAR LOTES PROPIOS ───────────────────────────────────────────────
+  // Cada lote viene con el nombre de su finca ya puesto, para que la lista
+  // no tenga que pedir las fincas aparte solo para mostrar un rótulo.
   app.get("/medico/lotes", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const filtro = { medicoPhone };
     if (req.query.estado === "activo" || req.query.estado === "cerrado") filtro.estado = req.query.estado;
+    if (req.query.fincaId) {
+      if (!mongoose.isValidObjectId(req.query.fincaId)) throw new ErrorHttp(400, "fincaId no es válido");
+      filtro.fincaId = req.query.fincaId;
+    }
     const lotes = await LoteGanado.find(filtro).sort({ createdAt: -1 }).lean();
-    res.json({ lotes });
+    const ids = [...new Set(lotes.map(l => l.fincaId).filter(Boolean).map(String))];
+    const fincas = ids.length ? await Finca.find({ _id: { $in: ids }, medicoPhone }).select("nombre").lean() : [];
+    const nombreDe = new Map(fincas.map(f => [String(f._id), f.nombre]));
+    res.json({ lotes: lotes.map(l => ({ ...l, fincaNombre: l.fincaId ? nombreDe.get(String(l.fincaId)) || "" : "" })) });
+  }));
+
+  // ─── CAMBIAR UN LOTE DE FINCA ───────────────────────────────────────────
+  // Sobre todo para los lotes cargados antes de que existieran las fincas.
+  app.patch("/medico/lotes/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const lote = await obtenerOFallar(LoteGanado, { _id: req.params.id, medicoPhone }, "Lote no encontrado");
+    if (req.body?.fincaId !== undefined) {
+      const finca = await fincaDelMedico(req.body.fincaId, medicoPhone);
+      lote.fincaId = finca ? finca._id : null;
+    }
+    await lote.save();
+    res.json({ ok: true, lote });
   }));
 
   // ─── DETALLE: eventos, mortalidad acumulada, retiros vigentes y curva ──
@@ -76,10 +160,14 @@ module.exports = function (app) {
   app.get("/medico/lotes/:id", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const lote = await obtenerOFallar(LoteGanado, { _id: req.params.id, medicoPhone }, "Lote no encontrado");
-    const eventos = await EventoLote.find({ loteId: lote._id, medicoPhone }).sort({ fecha: -1 }).lean();
+    const [eventos, finca] = await Promise.all([
+      EventoLote.find({ loteId: lote._id, medicoPhone }).sort({ fecha: -1 }).lean(),
+      lote.fincaId ? Finca.findOne({ _id: lote.fincaId, medicoPhone }).lean() : null,
+    ]);
 
     res.json({
       lote,
+      finca,
       eventos,
       mortalidad: mortalidadAcumulada(lote, eventos),
       retirosVigentes: retirosVigentes(eventos),

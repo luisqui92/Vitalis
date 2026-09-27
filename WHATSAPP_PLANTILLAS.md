@@ -320,8 +320,10 @@ Se registró {{2}} en el lote {{1}}. Período de retiro: {{3}}.
 | `{{3}}` | fechas de retiro, ya armadas en una frase | `libre para faena desde el 15/03/2026` |
 
 La manda `routes/lotesGanado.js` apenas se carga un evento de vacunación o
-tratamiento con período de retiro — al teléfono del médico/veterinario, no
-de un paciente. Casi siempre fuera de la ventana: es la carga de un dato en
+tratamiento con período de retiro — al teléfono del veterinario y, si el
+lote está en una finca con el WhatsApp del dueño cargado, también al dueño
+(es quien decide cuándo se faena o se vende la leche). Si el envío al dueño
+falla, el del veterinario sale igual. Casi siempre fuera de la ventana: es la carga de un dato en
 el Kardex, no una conversación abierta con el WhatsApp de Symphomed.
 
 ---
@@ -339,7 +341,8 @@ El lote {{1}} ya está libre: venció el período de retiro de {{2}}.
 | `{{1}}` | código del lote | `L-0003` |
 | `{{2}}` | producto aplicado | `Enrofloxacina` |
 
-No la dispara ninguna ruta HTTP: la manda `services/alertaRetiroGanado.js`,
+Igual que la anterior, va al veterinario y al dueño de la finca si tiene
+WhatsApp cargado. No la dispara ninguna ruta HTTP: la manda `services/alertaRetiroGanado.js`,
 un trabajo que corre cada hora y revisa qué eventos de tratamiento/vacunación
 ya pasaron su fecha de retiro y todavía no avisaron — mismo mecanismo que
 `recordatorio_medicamento`, pero un aviso único (`avisoLiberacionEnviado`),

@@ -9,27 +9,91 @@ const TIPOS_EVENTO_GANADO = ["mortalidad", "vacunacion", "tratamiento", "pesaje"
 // filtro que el médico ya había elegido — mismo criterio que
 // diaAgendaElegido en agenda.js.
 let ganaderiaFiltro = "activo";
+// "" = todas las fincas. Mismo criterio que el filtro de estado: sobrevive
+// a entrar y salir del detalle de un lote.
+let ganaderiaFincaFiltro = "";
 
 async function renderGanaderia() {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
   try {
-    const query = ganaderiaFiltro === "todos" ? "" : `?estado=${ganaderiaFiltro}`;
-    const data = await api(`/medico/lotes${query}`);
-    pintarGanaderia(data.lotes || []);
+    const params = new URLSearchParams();
+    if (ganaderiaFiltro !== "todos") params.set("estado", ganaderiaFiltro);
+    if (ganaderiaFincaFiltro) params.set("fincaId", ganaderiaFincaFiltro);
+    const query = params.toString() ? `?${params}` : "";
+    const [dataLotes, dataFincas] = await Promise.all([
+      api(`/medico/lotes${query}`),
+      api("/medico/fincas"),
+    ]);
+    const fincas = dataFincas.fincas || [];
+    // La finca elegida pudo dejar de existir (o ser de otra sesión vieja):
+    // se vuelve a "todas" en vez de mostrar una lista vacía sin explicación.
+    if (ganaderiaFincaFiltro && !fincas.some(f => f._id === ganaderiaFincaFiltro)) {
+      ganaderiaFincaFiltro = "";
+      return renderGanaderia();
+    }
+    pintarGanaderia(dataLotes.lotes || [], fincas);
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
   }
 }
 
-function pintarGanaderia(lotes) {
+function opcionesFinca(fincas, elegida) {
+  return `<option value="">${t("ganaderia.finca.sinFinca")}</option>` +
+    fincas.map(f => `<option value="${f._id}"${f._id === elegida ? " selected" : ""}>${esc(f.nombre)}</option>`).join("");
+}
+
+function fincaItemHtml(f) {
+  const dueno = [f.duenoNombre, f.duenoTelefono].filter(Boolean).map(esc).join(" · ");
+  return `
+    <div class="item" style="cursor:default">
+      <div class="top">
+        <div class="nombre">${esc(f.nombre)} <span class="hint">(${esc(f.codigo)})</span></div>
+        <button class="link" data-editar-finca="${f._id}" style="margin:0;width:auto">${t("ganaderia.finca.editar")}</button>
+      </div>
+      <div class="paciente-info">${dueno ? `${t("ganaderia.finca.dueno")}: ${dueno}` : `<span class="hint">${t("ganaderia.finca.sinDueno")}</span>`}</div>
+      <div class="paciente-info">${t("ganaderia.finca.lotesActivos", { n: f.lotesActivos || 0 })}${f.ubicacion ? ` · ${esc(f.ubicacion)}` : ""}</div>
+    </div>`;
+}
+
+// El mismo formulario sirve para crear y para editar: con "finca" viene
+// relleno y guarda con PATCH.
+function fincaFormHtml(finca) {
+  const v = finca || {};
+  return `
+    <label>${t("ganaderia.finca.nombre")}</label>
+    <input id="fincaNombre" type="text" value="${esc(v.nombre || "")}" placeholder="${t("ganaderia.finca.nombrePlaceholder")}">
+    <label>${t("ganaderia.finca.ubicacion")}</label>
+    <input id="fincaUbicacion" type="text" value="${esc(v.ubicacion || "")}">
+    <label>${t("ganaderia.finca.duenoNombre")}</label>
+    <input id="fincaDuenoNombre" type="text" value="${esc(v.duenoNombre || "")}">
+    <label>${t("ganaderia.finca.duenoTelefono")}</label>
+    <input id="fincaDuenoTelefono" type="tel" value="${esc(v.duenoTelefono || "")}">
+    <div class="hint">${t("ganaderia.finca.duenoAyuda")}</div>
+    <div id="fincaErr"></div>
+    <button class="secondary" id="btnGuardarFinca" data-finca-id="${v._id || ""}">${t("ganaderia.finca.guardar")}</button>`;
+}
+
+function pintarGanaderia(lotes, fincas) {
   app.innerHTML = `
     <button class="back" id="btnBack">${t("ganaderia.volver")}</button>
-    <button class="secondary" id="btnNuevoLote">➕ ${t("ganaderia.nuevoLote")}</button>
+
+    <div class="card">
+      <div class="top" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div class="seccion-titulo" style="margin:0">${t("ganaderia.finca.titulo")}</div>
+        <button class="link" id="btnNuevaFinca" style="margin:0;width:auto">➕ ${t("ganaderia.finca.nueva")}</button>
+      </div>
+      <div id="fincaFormBox" style="display:none;margin-top:10px"></div>
+      ${fincas.length === 0 ? `<div class="hint" style="margin-top:8px">${t("ganaderia.finca.vacio")}</div>` : fincas.map(fincaItemHtml).join("")}
+    </div>
+
+    <button class="secondary" id="btnNuevoLote" style="margin-top:12px">➕ ${t("ganaderia.nuevoLote")}</button>
 
     <div id="loteFormBox" style="display:none;margin-top:12px" class="card">
       <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.nuevoLote")}</div>
+      <label>${t("ganaderia.finca.label")}</label>
+      <select id="loteFinca">${opcionesFinca(fincas, ganaderiaFincaFiltro)}</select>
       <label>${t("ganaderia.form.especie")}</label>
       <select id="loteEspecie">
         ${ESPECIES_GANADO.map(e => `<option value="${e}">${t("ganaderia.especie." + e)}</option>`).join("")}
@@ -54,12 +118,17 @@ function pintarGanaderia(lotes) {
           <button type="button" class="chip${ganaderiaFiltro === f ? " activo" : ""}" data-filtro="${f}">${t("ganaderia.filtro." + f)}</button>
         `).join("")}
       </div>
+      ${fincas.length ? `
+        <select id="filtroFinca" style="margin-top:8px">
+          <option value="">${t("ganaderia.finca.todas")}</option>
+          ${fincas.map(f => `<option value="${f._id}"${f._id === ganaderiaFincaFiltro ? " selected" : ""}>${esc(f.nombre)}</option>`).join("")}
+        </select>` : ""}
       ${lotes.length === 0 ? `<div class="empty">${t("ganaderia.vacio")}</div>` : lotes.map(l => `
         <div class="item" data-lote="${l._id}" style="cursor:pointer">
           <div class="top">
             <div class="nombre">${ICONOS.pata}${esc(l.nombre)} <span class="hint">(${esc(l.codigo)})</span></div>
           </div>
-          <div class="paciente-info">${t("ganaderia.especie." + l.especie)} · ${t("ganaderia.item.cantidad", { actual: l.cantidadActual, inicial: l.cantidadInicial })}</div>
+          <div class="paciente-info">${t("ganaderia.especie." + l.especie)} · ${t("ganaderia.item.cantidad", { actual: l.cantidadActual, inicial: l.cantidadInicial })}${l.fincaNombre ? ` · ${esc(l.fincaNombre)}` : ""}</div>
         </div>`).join("")}
     </div>
   `;
@@ -71,6 +140,41 @@ function pintarGanaderia(lotes) {
   };
   document.querySelectorAll("[data-filtro]").forEach(btn => {
     btn.onclick = () => { ganaderiaFiltro = btn.dataset.filtro; renderGanaderia(); };
+  });
+  const filtroFinca = document.getElementById("filtroFinca");
+  if (filtroFinca) filtroFinca.onchange = () => { ganaderiaFincaFiltro = filtroFinca.value; renderGanaderia(); };
+
+  const abrirFormFinca = (finca) => {
+    const box = document.getElementById("fincaFormBox");
+    const mismo = box.style.display !== "none" && box.dataset.fincaId === (finca?._id || "");
+    if (mismo) { box.style.display = "none"; return; }
+    box.dataset.fincaId = finca?._id || "";
+    box.innerHTML = fincaFormHtml(finca);
+    box.style.display = "block";
+    document.getElementById("btnGuardarFinca").onclick = async () => {
+      const errBox = document.getElementById("fincaErr");
+      errBox.innerHTML = "";
+      const nombre = document.getElementById("fincaNombre").value.trim();
+      if (!nombre) { errBox.innerHTML = `<div class="error">${t("ganaderia.finca.errNombre")}</div>`; return; }
+      const cuerpo = {
+        nombre,
+        ubicacion: document.getElementById("fincaUbicacion").value.trim(),
+        duenoNombre: document.getElementById("fincaDuenoNombre").value.trim(),
+        duenoTelefono: document.getElementById("fincaDuenoTelefono").value.trim(),
+      };
+      try {
+        await api(finca ? `/medico/fincas/${finca._id}` : "/medico/fincas", {
+          method: finca ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(cuerpo),
+        });
+        renderGanaderia();
+      } catch (e) {
+        errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.finca.errGuardar"))}</div>`;
+      }
+    };
+  };
+  document.getElementById("btnNuevaFinca").onclick = () => abrirFormFinca(null);
+  document.querySelectorAll("[data-editar-finca]").forEach(btn => {
+    btn.onclick = () => abrirFormFinca(fincas.find(f => f._id === btn.dataset.editarFinca));
   });
   document.querySelectorAll("[data-lote]").forEach(item => {
     item.onclick = () => renderLoteDetalle(item.dataset.lote);
@@ -91,6 +195,7 @@ function pintarGanaderia(lotes) {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
           especie: document.getElementById("loteEspecie").value,
+          fincaId: document.getElementById("loteFinca").value || null,
           nombre, cantidadInicial, fechaIngreso,
           proposito: document.getElementById("loteProposito").value.trim(),
           ubicacion: document.getElementById("loteUbicacion").value.trim(),
@@ -108,8 +213,11 @@ async function renderLoteDetalle(id) {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
   try {
-    const data = await api(`/medico/lotes/${id}`);
-    pintarLoteDetalle(data);
+    const [data, dataFincas] = await Promise.all([
+      api(`/medico/lotes/${id}`),
+      api("/medico/fincas"),
+    ]);
+    pintarLoteDetalle({ ...data, fincas: dataFincas.fincas || [] });
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
@@ -144,7 +252,8 @@ function eventoItemHtml(e) {
 }
 
 function pintarLoteDetalle(data) {
-  const { lote, eventos, mortalidad, retirosVigentes, curvaPeso } = data;
+  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso } = data;
+  const duenoTexto = finca ? [finca.duenoNombre, finca.duenoTelefono].filter(Boolean).map(esc).join(" · ") : "";
 
   app.innerHTML = `
     <button class="back" id="btnBack">${t("ganaderia.detalle.volver")}</button>
@@ -152,6 +261,14 @@ function pintarLoteDetalle(data) {
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${ICONOS.pata}${esc(lote.nombre)} <span class="hint">(${esc(lote.codigo)})</span></div>
       <div class="paciente-info">${t("ganaderia.especie." + lote.especie)}${lote.proposito ? ` · ${esc(lote.proposito)}` : ""}${lote.ubicacion ? ` · ${esc(lote.ubicacion)}` : ""}</div>
+      ${finca ? `
+        <div class="paciente-info">${t("ganaderia.finca.label")}: <b>${esc(finca.nombre)}</b></div>
+        <div class="paciente-info">${duenoTexto
+          ? `${t("ganaderia.finca.dueno")}: ${duenoTexto}${finca.duenoTelefono ? ` <span class="hint">— ${t("ganaderia.finca.recibeAlertas")}</span>` : ""}`
+          : `<span class="hint">${t("ganaderia.finca.sinDueno")}</span>`}</div>` : ""}
+      ${fincas.length && lote.estado !== "cerrado" ? `
+        <label style="margin-top:8px">${t("ganaderia.finca.cambiar")}</label>
+        <select id="loteCambiarFinca">${opcionesFinca(fincas, lote.fincaId || "")}</select>` : ""}
       <div class="paciente-info">${t("ganaderia.item.cantidad", { actual: lote.cantidadActual, inicial: lote.cantidadInicial })}
         — ${t("ganaderia.detalle.mortalidad", { pct: mortalidad.porcentaje.toFixed(1), n: mortalidad.totalMuertes })}</div>
       ${lote.estado === "cerrado" ? `
@@ -239,6 +356,21 @@ function pintarLoteDetalle(data) {
   `;
 
   document.getElementById("btnBack").onclick = renderGanaderia;
+
+  const selectFinca = document.getElementById("loteCambiarFinca");
+  if (selectFinca) {
+    selectFinca.onchange = async () => {
+      try {
+        await api(`/medico/lotes/${lote._id}`, {
+          method: "PATCH", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ fincaId: selectFinca.value || null }),
+        });
+        renderLoteDetalle(lote._id);
+      } catch (e) {
+        alert(e.error || t("ganaderia.finca.errGuardar"));
+      }
+    };
+  }
 
   const btnCerrar = document.getElementById("btnCerrarLote");
   if (btnCerrar) {
