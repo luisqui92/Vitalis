@@ -683,6 +683,10 @@ const loteGanadoSchema = new mongoose.Schema({
   // lote completo (services/lotesGanado.js).
   cantidadActual: { type: Number, required: true, min: 0 },
   fechaIngreso: { type: Date, required: true },
+  // Edad de los animales al entrar al lote, en días (1 para pollitos BB,
+  // ~25 para lechones destetados). Opcional, pero sin ella el calendario
+  // sanitario no puede ubicar las vacunas por edad (services/esquemaGanado.js).
+  edadIngresoDias: { type: Number, default: null, min: 0 },
   estado: { type: String, enum: ["activo", "cerrado"], default: "activo", index: true },
   fechaCierre: { type: Date, default: null },
   motivoCierre: { type: String, default: "" }, // ej. "vendido", "faenado", "trasladado"

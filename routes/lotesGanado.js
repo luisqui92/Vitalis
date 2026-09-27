@@ -11,6 +11,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { siguienteCodigo } = require("../services/codigos");
 const { mortalidadAcumulada, retirosVigentes, curvaPeso } = require("../services/lotesGanado");
+const { calendarioLote } = require("../services/esquemaGanado");
 const { notificarRetiroRegistrado } = require("../services/alertaRetiroGanado");
 const { transcribirNotaDeVoz } = require("../services/assemblyai");
 const { generarEventosLote, crearEventosDesdeSugerencias } = require("../services/notaVozLote");
@@ -44,6 +45,15 @@ async function fincaDelMedico(fincaId, medicoPhone) {
   if (fincaId === undefined || fincaId === null || fincaId === "") return null;
   if (!mongoose.isValidObjectId(fincaId)) throw new ErrorHttp(400, "fincaId no es válido");
   return obtenerOFallar(Finca, { _id: fincaId, medicoPhone }, "Finca no encontrada");
+}
+
+// Días de vida al entrar al lote: entero, de 0 a 30 años. Vacío = no se
+// sabe (null), que es válido — el calendario lo pide aparte.
+function edadIngresoOpcional(valor) {
+  if (valor === undefined || valor === null || valor === "") return null;
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n < 0 || n > 30 * 365) throw new ErrorHttp(400, "edadIngresoDias debe ser un número entero de días, 0 o más");
+  return n;
 }
 
 function datosDeFinca(body) {
@@ -113,11 +123,12 @@ module.exports = function (app) {
     const proposito = String(req.body?.proposito || "").trim();
     const ubicacion = String(req.body?.ubicacion || "").trim();
     const notas = String(req.body?.notas || "").trim();
+    const edadIngresoDias = edadIngresoOpcional(req.body?.edadIngresoDias);
 
     const codigo = await siguienteCodigo(LoteGanado, medicoPhone, "L");
     const lote = await LoteGanado.create({
       medicoPhone, codigo, especie, nombre, proposito, ubicacion, notas,
-      fincaId: finca ? finca._id : null,
+      fincaId: finca ? finca._id : null, edadIngresoDias,
       cantidadInicial, cantidadActual: cantidadInicial, fechaIngreso,
     });
     res.status(201).json({ ok: true, lote });
@@ -150,6 +161,7 @@ module.exports = function (app) {
       const finca = await fincaDelMedico(req.body.fincaId, medicoPhone);
       lote.fincaId = finca ? finca._id : null;
     }
+    if (req.body?.edadIngresoDias !== undefined) lote.edadIngresoDias = edadIngresoOpcional(req.body.edadIngresoDias);
     await lote.save();
     res.json({ ok: true, lote });
   }));
@@ -172,6 +184,8 @@ module.exports = function (app) {
       mortalidad: mortalidadAcumulada(lote, eventos),
       retirosVigentes: retirosVigentes(eventos),
       curvaPeso: curvaPeso(eventos),
+      // Un lote cerrado ya no se vacuna: mostrarle "pendientes" sería ruido.
+      calendario: lote.estado === "cerrado" ? null : calendarioLote(lote, eventos),
     });
   }));
 

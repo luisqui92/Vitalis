@@ -111,6 +111,8 @@ function pintarGanaderia(lotes, fincas) {
       <input id="loteCantidad" type="number" min="1" step="1">
       <label>${t("ganaderia.form.fechaIngreso")}</label>
       <input id="loteFecha" type="date">
+      <label>${t("ganaderia.form.edadIngreso")}</label>
+      <input id="loteEdadIngreso" type="number" min="0" step="1" placeholder="${t("ganaderia.form.edadIngresoPlaceholder")}">
       <label>${t("ganaderia.form.proposito")}</label>
       <input id="loteProposito" type="text" placeholder="${t("ganaderia.form.propositoPlaceholder")}">
       <label>${t("ganaderia.form.ubicacion")}</label>
@@ -203,6 +205,7 @@ function pintarGanaderia(lotes, fincas) {
         body: JSON.stringify({
           especie: document.getElementById("loteEspecie").value,
           fincaId: document.getElementById("loteFinca").value || null,
+          edadIngresoDias: document.getElementById("loteEdadIngreso").value || null,
           nombre, cantidadInicial, fechaIngreso,
           proposito: document.getElementById("loteProposito").value.trim(),
           ubicacion: document.getElementById("loteUbicacion").value.trim(),
@@ -298,6 +301,8 @@ function pintarLoteDetalle(data) {
         ${retirosVigentes.map(retiroVigenteHtml).join("")}
       </div>` : ""}
 
+    ${data.calendario ? calendarioLoteHtml(data.calendario) : ""}
+
     ${produccion?.tipo ? produccionLoteHtml(lote, produccion, retirosVigentes) : ""}
 
     ${costos ? costosLoteHtml(lote, costos) : ""}
@@ -379,6 +384,7 @@ function pintarLoteDetalle(data) {
   if (conReproduccion) engancharReproduccionLote(lote);
   if (produccion?.tipo) engancharProduccionLote(lote, produccion.tipo);
   if (costos) engancharCostosLote(lote);
+  if (data.calendario) engancharCalendarioLote(lote);
 
   const selectFinca = document.getElementById("loteCambiarFinca");
   if (selectFinca) {
@@ -1122,4 +1128,101 @@ function engancharCostosLote(lote) {
       errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
     }
   };
+}
+
+// ─── CALENDARIO SANITARIO ───────────────────────────────────────────────────
+//
+// El estado de cada vacuna lo calcula services/esquemaGanado.js cruzando el
+// esquema de la especie con las vacunaciones ya cargadas. Acá se pinta, y
+// "Registrar" abre el formulario de evento de siempre ya completado: la
+// vacunación que se carga ahí es la que después pone el ítem al día.
+
+const PRIORIDAD_ESTADO_CAL = { pendiente: 0, vencida: 1, perdida: 2, sin_edad: 3, futuro: 4, campana: 5, al_dia: 6 };
+const COLOR_ESTADO_CAL = {
+  pendiente: "var(--warning)", vencida: "var(--danger)", perdida: "var(--danger)",
+  al_dia: "var(--success)", futuro: "var(--text-muted)", sin_edad: "var(--text-muted)", campana: "var(--primary)",
+};
+
+function detalleItemCalendario(i) {
+  const f = fechaCorta;
+  if (i.estado === "al_dia") {
+    return i.proxima
+      ? t("ganaderia.cal.detalle.periodica", { ultima: f(i.ultima.fecha), proxima: f(i.proxima) })
+      : t("ganaderia.cal.detalle.aplicada", { fecha: f(i.aplicada.fecha), producto: esc(i.aplicada.producto || "") });
+  }
+  if (i.estado === "vencida") return t("ganaderia.cal.detalle.vencida", { proxima: f(i.proxima), ultima: f(i.ultima.fecha) });
+  if (i.estado === "pendiente") {
+    return i.desdeFecha ? t("ganaderia.cal.detalle.ventana", { desde: f(i.desdeFecha), hasta: f(i.hastaFecha) }) : t("ganaderia.cal.detalle.nunca");
+  }
+  if (i.estado === "perdida") return t("ganaderia.cal.detalle.perdida", { desde: f(i.desdeFecha), hasta: f(i.hastaFecha) });
+  if (i.estado === "futuro") {
+    return i.hastaFecha ? t("ganaderia.cal.detalle.ventana", { desde: f(i.desdeFecha), hasta: f(i.hastaFecha) }) : t("ganaderia.cal.detalle.desde", { desde: f(i.desdeFecha) });
+  }
+  if (i.estado === "sin_edad") return t("ganaderia.cal.detalle.sinEdad");
+  if (i.estado === "campana") {
+    return i.ultima ? t("ganaderia.cal.detalle.campanaUltima", { fecha: f(i.ultima.fecha) }) : t("ganaderia.cal.detalle.campanaSin");
+  }
+  return "";
+}
+
+function calendarioLoteHtml(cal) {
+  const items = cal.items.slice().sort((a, b) => PRIORIDAD_ESTADO_CAL[a.estado] - PRIORIDAD_ESTADO_CAL[b.estado]);
+  const registrable = (i) => ["pendiente", "vencida", "perdida", "campana"].includes(i.estado);
+  return `
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.cal.titulo")}</div>
+      ${cal.edadDias != null ? `<div class="paciente-info">${t("ganaderia.cal.edad", { n: cal.edadDias })}</div>` : ""}
+      ${cal.faltaEdad ? `
+        <div class="paciente-info" style="color:var(--warning)">${t("ganaderia.cal.faltaEdad")}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin:6px 0">
+          <input id="calEdadIngreso" type="number" min="0" step="1" placeholder="${t("ganaderia.form.edadIngresoPlaceholder")}" style="flex:1;margin:0">
+          <button class="secondary" id="btnGuardarEdadIngreso" style="width:auto;margin:0">${t("ganaderia.cal.guardarEdad")}</button>
+        </div>
+        <div id="calErr"></div>` : ""}
+      ${cal.atender ? `<div class="paciente-info" style="color:var(--warning)">⚠️ ${t("ganaderia.cal.atender", { n: cal.atender })}</div>` : ""}
+      <div style="margin-top:8px">${items.map(i => `
+        <div class="item" style="cursor:default">
+          <div class="top">
+            <div class="nombre">${t("ganaderia.cal.item." + i.id)}</div>
+            <b style="color:${COLOR_ESTADO_CAL[i.estado]};font-size:12.5px">${t("ganaderia.cal.estado." + i.estado)}</b>
+          </div>
+          <div class="paciente-info">${detalleItemCalendario(i)}</div>
+          ${i.nota ? `<div class="hint">${esc(i.nota)}</div>` : ""}
+          ${registrable(i) ? `<button class="link" data-registrar-vacuna="${i.id}" data-grupo-vacuna="${i.grupo}" style="margin:4px 0 0">${t("ganaderia.cal.registrar")}</button>` : ""}
+        </div>`).join("")}</div>
+      <div class="hint" style="margin-top:6px">${t("ganaderia.cal.aviso")}</div>
+    </div>`;
+}
+
+function engancharCalendarioLote(lote) {
+  const btnEdad = document.getElementById("btnGuardarEdadIngreso");
+  if (btnEdad) {
+    btnEdad.onclick = async () => {
+      const valor = document.getElementById("calEdadIngreso").value;
+      if (valor === "") return;
+      try {
+        await api(`/medico/lotes/${lote._id}`, {
+          method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ edadIngresoDias: valor }),
+        });
+        renderLoteDetalle(lote._id);
+      } catch (e) {
+        document.getElementById("calErr").innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
+      }
+    };
+  }
+  // "Registrar" abre el formulario de evento de siempre con la vacunación
+  // ya elegida y el nombre puesto: el veterinario solo corrige el producto
+  // comercial si quiere y guarda.
+  document.querySelectorAll("[data-registrar-vacuna]").forEach(btn => {
+    btn.onclick = () => {
+      const box = document.getElementById("eventoFormBox");
+      if (!box) return;
+      box.style.display = "block";
+      const tipo = document.getElementById("eventoTipo");
+      tipo.value = btn.dataset.grupoVacuna === "desparasitacion" ? "tratamiento" : "vacunacion";
+      tipo.dispatchEvent(new Event("change"));
+      document.getElementById("eventoProducto").value = t("ganaderia.cal.item." + btn.dataset.registrarVacuna);
+      box.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+  });
 }
