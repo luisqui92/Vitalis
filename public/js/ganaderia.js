@@ -8,6 +8,13 @@ const TIPOS_EVENTO_GANADO = ["mortalidad", "vacunacion", "tratamiento", "pesaje"
 // Se mantiene entre pantallas: volver del detalle de un lote no reinicia el
 // filtro que el médico ya había elegido — mismo criterio que
 // diaAgendaElegido en agenda.js.
+// Los íconos de ICONOS son SVG sin tamaño propio: toman el ancho del
+// contenedor. Adentro de una pestaña los achica .tab-icono; suelto en un
+// título, ocupaba la tarjeta entera. Por eso va envuelto a su medida.
+function iconoPata() {
+  return `<span aria-hidden="true" style="display:inline-block;width:18px;height:18px;vertical-align:-3px;margin-right:6px">${ICONOS.pata}</span>`;
+}
+
 let ganaderiaFiltro = "activo";
 // "" = todas las fincas. Mismo criterio que el filtro de estado: sobrevive
 // a entrar y salir del detalle de un lote.
@@ -126,7 +133,7 @@ function pintarGanaderia(lotes, fincas) {
       ${lotes.length === 0 ? `<div class="empty">${t("ganaderia.vacio")}</div>` : lotes.map(l => `
         <div class="item" data-lote="${l._id}" style="cursor:pointer">
           <div class="top">
-            <div class="nombre">${ICONOS.pata}${esc(l.nombre)} <span class="hint">(${esc(l.codigo)})</span></div>
+            <div class="nombre">${iconoPata()}${esc(l.nombre)} <span class="hint">(${esc(l.codigo)})</span></div>
           </div>
           <div class="paciente-info">${t("ganaderia.especie." + l.especie)} · ${t("ganaderia.item.cantidad", { actual: l.cantidadActual, inicial: l.cantidadInicial })}${l.fincaNombre ? ` · ${esc(l.fincaNombre)}` : ""}</div>
         </div>`).join("")}
@@ -213,11 +220,12 @@ async function renderLoteDetalle(id) {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
   try {
-    const [data, dataFincas] = await Promise.all([
+    const [data, dataFincas, dataAnimales] = await Promise.all([
       api(`/medico/lotes/${id}`),
       api("/medico/fincas"),
+      api(`/medico/lotes/${id}/animales`),
     ]);
-    pintarLoteDetalle({ ...data, fincas: dataFincas.fincas || [] });
+    pintarLoteDetalle({ ...data, fincas: dataFincas.fincas || [], animales: dataAnimales.animales || [], resumenRepro: dataAnimales.resumen });
   } catch (e) {
     if (e.status === 401) return logout();
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
@@ -252,14 +260,15 @@ function eventoItemHtml(e) {
 }
 
 function pintarLoteDetalle(data) {
-  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso } = data;
+  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso, animales, resumenRepro } = data;
+  const conReproduccion = lote.especie === "bovino" || lote.especie === "porcino";
   const duenoTexto = finca ? [finca.duenoNombre, finca.duenoTelefono].filter(Boolean).map(esc).join(" · ") : "";
 
   app.innerHTML = `
     <button class="back" id="btnBack">${t("ganaderia.detalle.volver")}</button>
 
     <div class="card">
-      <div class="seccion-titulo" style="margin-top:0">${ICONOS.pata}${esc(lote.nombre)} <span class="hint">(${esc(lote.codigo)})</span></div>
+      <div class="seccion-titulo" style="margin-top:0">${iconoPata()}${esc(lote.nombre)} <span class="hint">(${esc(lote.codigo)})</span></div>
       <div class="paciente-info">${t("ganaderia.especie." + lote.especie)}${lote.proposito ? ` · ${esc(lote.proposito)}` : ""}${lote.ubicacion ? ` · ${esc(lote.ubicacion)}` : ""}</div>
       ${finca ? `
         <div class="paciente-info">${t("ganaderia.finca.label")}: <b>${esc(finca.nombre)}</b></div>
@@ -283,6 +292,8 @@ function pintarLoteDetalle(data) {
         <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.detalle.retiroTitulo")}</div>
         ${retirosVigentes.map(retiroVigenteHtml).join("")}
       </div>` : ""}
+
+    ${conReproduccion ? reproduccionLoteHtml(lote, animales, resumenRepro) : ""}
 
     ${lote.estado !== "cerrado" ? `
       <button class="secondary" id="btnDictarNota" style="margin-top:12px">🎙 ${t("ganaderia.dictado.boton")}</button>
@@ -356,6 +367,7 @@ function pintarLoteDetalle(data) {
   `;
 
   document.getElementById("btnBack").onclick = renderGanaderia;
+  if (conReproduccion) engancharReproduccionLote(lote);
 
   const selectFinca = document.getElementById("loteCambiarFinca");
   if (selectFinca) {
@@ -557,4 +569,275 @@ function pintarLoteDetalle(data) {
 function fechaStrLocalGanado(d) {
   const x = new Date(d);
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+}
+
+// ─── REPRODUCCIÓN (vacas y cerdas) ──────────────────────────────────────────
+//
+// El estado de cada hembra lo calcula el servidor (services/reproduccion.js)
+// a partir de sus eventos: acá solo se pinta. Si lo calculara la pantalla,
+// una vaca podría verse preñada en el celular y vacía en el escritorio según
+// qué versión del código tuviera cada uno.
+
+const TIPOS_EVENTO_REPRO = ["servicio", "diagnostico", "parto", "aborto", "destete", "secado"];
+
+function fechaCorta(f) {
+  return f ? new Date(f).toLocaleDateString(localeActual()) : "";
+}
+
+function estadoReproHtml(repro, activa) {
+  if (activa === false) return `<span class="hint">${t("ganaderia.repro.baja")}</span>`;
+  const color = repro.prenez === "prenada" ? "var(--success)" : repro.prenez === "servida" ? "var(--primary)" : "var(--text-muted)";
+  return `<b style="color:${color}">${t("ganaderia.repro.prenez." + repro.prenez)}</b>${repro.lactando ? ` · ${t("ganaderia.repro.lactando")}` : ""}`;
+}
+
+function alertaReproTexto(a) {
+  return t("ganaderia.repro.alerta." + a.tipo, { dias: a.dias, fecha: fechaCorta(a.fecha) });
+}
+
+function reproduccionLoteHtml(lote, animales, resumen) {
+  const r = resumen || { hembras: 0, prenadas: 0, porcentajePrenez: 0, diagnosticosPendientes: 0, proximosPartos: [] };
+  return `
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.repro.titulo")}</div>
+      ${r.hembras ? `
+        <div class="paciente-info">${t("ganaderia.repro.resumen", { hembras: r.hembras, prenadas: r.prenadas, pct: Math.round(r.porcentajePrenez) })}</div>
+        ${r.diagnosticosPendientes ? `<div class="paciente-info" style="color:var(--warning)">⚠️ ${t("ganaderia.repro.diagnosticosPendientes", { n: r.diagnosticosPendientes })}</div>` : ""}
+        ${r.proximosPartos.length ? `
+          <div class="hint" style="margin-top:8px">${t("ganaderia.repro.proximosPartos")}</div>
+          ${r.proximosPartos.slice(0, 5).map(p => `
+            <div class="paciente-info">${esc(p.identificador)} — ${fechaCorta(p.fecha)} ${p.dias >= 0 ? t("ganaderia.repro.enDias", { n: p.dias }) : t("ganaderia.repro.haceDias", { n: -p.dias })}</div>
+          `).join("")}` : ""}
+      ` : `<div class="hint">${t("ganaderia.repro.vacio")}</div>`}
+
+      ${animales.length ? `<div style="margin-top:10px">${animales.map(a => `
+        <div class="item" data-animal="${a._id}" style="cursor:pointer${a.activa ? "" : ";opacity:.6"}">
+          <div class="top">
+            <div class="nombre">${esc(a.identificador)}${a.nombre ? ` <span class="hint">${esc(a.nombre)}</span>` : ""}</div>
+            <div>${estadoReproHtml(a.reproduccion, a.activa)}</div>
+          </div>
+          ${a.activa && a.reproduccion.alertas.length ? `<div class="paciente-info" style="color:var(--warning)">⚠️ ${alertaReproTexto(a.reproduccion.alertas[0])}</div>` : ""}
+          ${a.activa && !a.reproduccion.alertas.length && a.reproduccion.fechaProbableParto ? `<div class="paciente-info">${t("ganaderia.repro.pareEl", { fecha: fechaCorta(a.reproduccion.fechaProbableParto) })}</div>` : ""}
+        </div>`).join("")}</div>` : ""}
+
+      ${lote.estado !== "cerrado" ? `
+        <button class="link" id="btnNuevaHembra" style="margin-top:8px">➕ ${t("ganaderia.repro.agregar")}</button>
+        <div id="hembraFormBox" style="display:none;margin-top:8px">
+          <label>${t("ganaderia.repro.identificador")}</label>
+          <input id="hembraIdentificador" type="text" placeholder="${t("ganaderia.repro.identificadorPlaceholder")}">
+          <label>${t("ganaderia.repro.nombre")}</label>
+          <input id="hembraNombre" type="text">
+          <label>${t("ganaderia.repro.raza")}</label>
+          <input id="hembraRaza" type="text">
+          <label>${t("ganaderia.repro.fechaNacimiento")}</label>
+          <input id="hembraNacimiento" type="date">
+          <div id="hembraErr"></div>
+          <button class="secondary" id="btnGuardarHembra">${t("ganaderia.repro.guardar")}</button>
+        </div>` : ""}
+    </div>`;
+}
+
+function engancharReproduccionLote(lote) {
+  document.querySelectorAll("[data-animal]").forEach(item => {
+    item.onclick = () => renderAnimalDetalle(item.dataset.animal);
+  });
+  const btnNueva = document.getElementById("btnNuevaHembra");
+  if (!btnNueva) return;
+  btnNueva.onclick = () => {
+    const box = document.getElementById("hembraFormBox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  };
+  document.getElementById("btnGuardarHembra").onclick = async () => {
+    const errBox = document.getElementById("hembraErr");
+    errBox.innerHTML = "";
+    const identificador = document.getElementById("hembraIdentificador").value.trim();
+    if (!identificador) { errBox.innerHTML = `<div class="error">${t("ganaderia.repro.errIdentificador")}</div>`; return; }
+    try {
+      await api(`/medico/lotes/${lote._id}/animales`, {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          identificador,
+          nombre: document.getElementById("hembraNombre").value.trim(),
+          raza: document.getElementById("hembraRaza").value.trim(),
+          fechaNacimiento: document.getElementById("hembraNacimiento").value || null,
+        }),
+      });
+      renderLoteDetalle(lote._id);
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.repro.errGuardar"))}</div>`;
+    }
+  };
+}
+
+// ─── FICHA DE UNA HEMBRA ────────────────────────────────────────────────────
+async function renderAnimalDetalle(id) {
+  detenerPolling();
+  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
+  try {
+    pintarAnimalDetalle(await api(`/medico/animales/${id}`));
+  } catch (e) {
+    if (e.status === 401) return logout();
+    app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
+  }
+}
+
+function eventoReproHtml(e) {
+  let detalle = "";
+  if (e.tipo === "servicio") {
+    detalle = [e.metodo ? t("ganaderia.repro.metodo." + e.metodo) : "", e.reproductor].filter(Boolean).map(esc).join(" · ");
+  } else if (e.tipo === "diagnostico") {
+    detalle = t("ganaderia.repro.resultado." + e.resultado);
+  } else if (e.tipo === "parto") {
+    const partes = [];
+    if (e.criasVivas != null) partes.push(t("ganaderia.repro.vivas", { n: e.criasVivas }));
+    if (e.criasMuertas != null) partes.push(t("ganaderia.repro.muertas", { n: e.criasMuertas }));
+    detalle = partes.join(" · ");
+  } else if (e.tipo === "destete" && e.criasDestetadas != null) {
+    detalle = t("ganaderia.repro.destetadas", { n: e.criasDestetadas });
+  }
+  return `
+    <div class="item" style="cursor:default">
+      <div class="top"><div class="nombre">${t("ganaderia.repro.tipo." + e.tipo)}</div><div class="fecha">${fechaCorta(e.fecha)}</div></div>
+      ${detalle ? `<div class="paciente-info">${detalle}</div>` : ""}
+      ${e.notas ? `<div class="paciente-info">${esc(e.notas)}</div>` : ""}
+    </div>`;
+}
+
+function pintarAnimalDetalle(data) {
+  const { animal, lote, eventos, reproduccion: r } = data;
+  const ind = r.indicadores;
+  const puedeCargar = animal.activa && lote?.estado !== "cerrado";
+
+  app.innerHTML = `
+    <button class="back" id="btnBack">${t("ganaderia.repro.volver")}</button>
+
+    <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">${esc(animal.identificador)}${animal.nombre ? ` — ${esc(animal.nombre)}` : ""}</div>
+      <div class="paciente-info">${t("ganaderia.especie." + animal.especie)}${animal.raza ? ` · ${esc(animal.raza)}` : ""}${lote ? ` · ${esc(lote.nombre)} (${esc(lote.codigo)})` : ""}</div>
+      ${animal.fechaNacimiento ? `<div class="paciente-info">${t("ganaderia.repro.nacida", { fecha: fechaCorta(animal.fechaNacimiento) })}</div>` : ""}
+      <div class="paciente-info" style="margin-top:6px">${estadoReproHtml(r, animal.activa)}</div>
+      ${animal.activa && r.fechaProbableParto ? `<div class="paciente-info">${t("ganaderia.repro.pareEl", { fecha: fechaCorta(r.fechaProbableParto) })}</div>` : ""}
+      ${animal.activa && r.diasAbiertos != null && r.prenez !== "prenada" ? `<div class="paciente-info">${t("ganaderia.repro.diasAbiertos", { n: r.diasAbiertos })}</div>` : ""}
+      ${!animal.activa ? `<div class="hint">${t("ganaderia.repro.dadaDeBaja", { motivo: animal.motivoBaja || "—", fecha: fechaCorta(animal.fechaBaja) })}</div>` : ""}
+      ${animal.activa ? `<button class="link" id="btnBajaAnimal" style="color:var(--danger);margin-top:6px">${t("ganaderia.repro.darDeBaja")}</button>` : ""}
+    </div>
+
+    ${animal.activa && r.alertas.length ? `
+      <div class="card" style="border-color:var(--warning)">
+        ${r.alertas.map(a => `<div class="paciente-info">⚠️ ${alertaReproTexto(a)}</div>`).join("")}
+      </div>` : ""}
+
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.repro.indicadores")}</div>
+      <div class="paciente-info">${t("ganaderia.repro.partos", { n: ind.partos })}</div>
+      ${ind.intervaloEntrePartosPromedio != null ? `<div class="paciente-info">${t("ganaderia.repro.iep", { n: Math.round(ind.intervaloEntrePartosPromedio) })}</div>` : ""}
+      ${ind.criasVivasPromedio != null ? `<div class="paciente-info">${t("ganaderia.repro.criasPromedio", { n: ind.criasVivasPromedio.toFixed(1) })}</div>` : ""}
+      ${ind.criasDestetadasPromedio != null ? `<div class="paciente-info">${t("ganaderia.repro.destetadasPromedio", { n: ind.criasDestetadasPromedio.toFixed(1) })}</div>` : ""}
+    </div>
+
+    ${puedeCargar ? `
+      <button class="secondary" id="btnNuevoEventoRepro" style="margin-top:12px">➕ ${t("ganaderia.repro.registrar")}</button>
+      <div id="eventoReproBox" style="display:none;margin-top:12px" class="card">
+        <label>${t("ganaderia.evento.tipo")}</label>
+        <select id="reproTipo">${TIPOS_EVENTO_REPRO.map(tp => `<option value="${tp}">${t("ganaderia.repro.tipo." + tp)}</option>`).join("")}</select>
+        <label>${t("ganaderia.evento.fecha")}</label>
+        <input id="reproFecha" type="date" value="${fechaStrLocalGanado(new Date())}">
+        <div data-grupo-repro="servicio">
+          <label>${t("ganaderia.repro.metodoLabel")}</label>
+          <select id="reproMetodo">
+            <option value="">—</option>
+            <option value="monta">${t("ganaderia.repro.metodo.monta")}</option>
+            <option value="inseminacion">${t("ganaderia.repro.metodo.inseminacion")}</option>
+          </select>
+          <label>${t("ganaderia.repro.reproductor")}</label>
+          <input id="reproReproductor" type="text" placeholder="${t("ganaderia.repro.reproductorPlaceholder")}">
+        </div>
+        <div data-grupo-repro="diagnostico">
+          <label>${t("ganaderia.repro.resultadoLabel")}</label>
+          <select id="reproResultado">
+            <option value="prenada">${t("ganaderia.repro.resultado.prenada")}</option>
+            <option value="vacia">${t("ganaderia.repro.resultado.vacia")}</option>
+          </select>
+        </div>
+        <div data-grupo-repro="parto">
+          <label>${t("ganaderia.repro.criasVivas")}</label>
+          <input id="reproVivas" type="number" min="0" step="1">
+          <label>${t("ganaderia.repro.criasMuertas")}</label>
+          <input id="reproMuertas" type="number" min="0" step="1">
+        </div>
+        <div data-grupo-repro="destete">
+          <label>${t("ganaderia.repro.criasDestetadas")}</label>
+          <input id="reproDestetadas" type="number" min="0" step="1">
+        </div>
+        <label>${t("ganaderia.evento.notas")}</label>
+        <input id="reproNotas" type="text">
+        <div id="reproErr"></div>
+        <button class="secondary" id="btnGuardarRepro">${t("ganaderia.evento.guardar")}</button>
+      </div>` : ""}
+
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.repro.historial")}</div>
+      ${eventos.length ? eventos.map(eventoReproHtml).join("") : `<div class="empty">${t("ganaderia.repro.sinEventos")}</div>`}
+    </div>
+  `;
+
+  document.getElementById("btnBack").onclick = () => renderLoteDetalle(animal.loteId);
+
+  const btnBaja = document.getElementById("btnBajaAnimal");
+  if (btnBaja) {
+    btnBaja.onclick = async () => {
+      if (!confirm(t("ganaderia.repro.confirmarBaja"))) return;
+      const motivo = prompt(t("ganaderia.repro.motivoBaja")) || "";
+      try {
+        await api(`/medico/animales/${animal._id}/baja`, {
+          method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ motivo }),
+        });
+        renderAnimalDetalle(animal._id);
+      } catch (e) {
+        alert(e.error || t("ganaderia.repro.errGuardar"));
+      }
+    };
+  }
+
+  const btnNuevo = document.getElementById("btnNuevoEventoRepro");
+  if (!btnNuevo) return;
+  btnNuevo.onclick = () => {
+    const box = document.getElementById("eventoReproBox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  };
+  const selectTipo = document.getElementById("reproTipo");
+  const actualizar = () => {
+    document.querySelectorAll("[data-grupo-repro]").forEach(div => {
+      div.style.display = div.dataset.grupoRepro === selectTipo.value ? "block" : "none";
+    });
+  };
+  selectTipo.onchange = actualizar;
+  actualizar();
+
+  document.getElementById("btnGuardarRepro").onclick = async () => {
+    const errBox = document.getElementById("reproErr");
+    errBox.innerHTML = "";
+    const tipo = selectTipo.value;
+    const fecha = document.getElementById("reproFecha").value;
+    if (!fecha) { errBox.innerHTML = `<div class="error">${t("ganaderia.evento.errFaltanDatos")}</div>`; return; }
+    const cuerpo = { tipo, fecha, notas: document.getElementById("reproNotas").value.trim() };
+    if (tipo === "servicio") {
+      cuerpo.metodo = document.getElementById("reproMetodo").value;
+      cuerpo.reproductor = document.getElementById("reproReproductor").value.trim();
+    } else if (tipo === "diagnostico") {
+      cuerpo.resultado = document.getElementById("reproResultado").value;
+    } else if (tipo === "parto") {
+      cuerpo.criasVivas = document.getElementById("reproVivas").value;
+      cuerpo.criasMuertas = document.getElementById("reproMuertas").value;
+    } else if (tipo === "destete") {
+      cuerpo.criasDestetadas = document.getElementById("reproDestetadas").value;
+    }
+    try {
+      await api(`/medico/animales/${animal._id}/eventos`, {
+        method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(cuerpo),
+      });
+      renderAnimalDetalle(animal._id);
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
+    }
+  };
 }

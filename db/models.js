@@ -734,6 +734,67 @@ const eventoLoteSchema = new mongoose.Schema({
 eventoLoteSchema.index({ medicoPhone: 1, loteId: 1, fecha: -1 });
 const EventoLote = mongoose.model("EventoLote", eventoLoteSchema);
 
+// ─── REPRODUCCIÓN (Symphomed Ganadería) ────────────────────────────────────
+//
+// La reproducción es la parte del ganado que SÍ se lleva animal por animal:
+// a una vaca lechera o a una cerda madre se la sigue individualmente, por su
+// arete o su número, porque cada una tiene su propio ciclo. Por eso esto es
+// una ficha aparte, colgada de un lote, y no un EventoLote. Las aves no la
+// usan: nadie lleva el ciclo reproductivo de una gallina.
+//
+// El estado reproductivo (vacía, servida, preñada, lactando) NO se guarda:
+// se calcula de los eventos en services/reproduccion.js.
+const animalGanadoSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  // Copiada del lote al crearla: es lo que decide cuántos días dura la
+  // gestación, y no tiene por qué ir a buscarse al lote cada vez.
+  especie: { type: String, enum: ["bovino", "porcino"], required: true },
+  // Arete, caravana, tatuaje, número de muesca — lo que el veterinario ve
+  // en el animal. Único dentro de su lote (ver el índice de abajo).
+  identificador: { type: String, required: true },
+  nombre: { type: String, default: "" }, // muchas vacas lecheras tienen nombre; las cerdas casi nunca
+  raza: { type: String, default: "" },
+  fechaNacimiento: { type: Date, default: null },
+  notas: { type: String, default: "" },
+  // Una vaca vendida o muerta no se borra: su historia reproductiva sigue
+  // siendo dato del rodeo. Solo deja de contar para los índices de hoy.
+  activa: { type: Boolean, default: true, index: true },
+  motivoBaja: { type: String, default: "" },
+  fechaBaja: { type: Date, default: null },
+}, { timestamps: true });
+animalGanadoSchema.index({ medicoPhone: 1, loteId: 1, identificador: 1 }, { unique: true });
+const AnimalGanado = mongoose.model("AnimalGanado", animalGanadoSchema);
+
+const TIPOS_EVENTO_REPRODUCTIVO = ["servicio", "diagnostico", "parto", "aborto", "destete", "secado"];
+const eventoReproductivoSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  animalId: { type: mongoose.Schema.Types.ObjectId, ref: "AnimalGanado", required: true, index: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  tipo: { type: String, enum: TIPOS_EVENTO_REPRODUCTIVO, required: true },
+  fecha: { type: Date, required: true },
+
+  // servicio
+  metodo: { type: String, enum: ["monta", "inseminacion", ""], default: "" },
+  reproductor: { type: String, default: "" }, // el toro, el verraco o la pajuela de semen
+
+  // diagnóstico de preñez
+  resultado: { type: String, enum: ["prenada", "vacia", ""], default: "" },
+
+  // parto — en la cerda, "criasMuertas" incluye los momificados si el
+  // veterinario no los separa; se anota tal cual lo dicen en la granja.
+  criasVivas: { type: Number, default: null, min: 0 },
+  criasMuertas: { type: Number, default: null, min: 0 },
+
+  // destete
+  criasDestetadas: { type: Number, default: null, min: 0 },
+
+  notas: { type: String, default: "" },
+  registradoPor: { type: String, default: "" },
+}, { timestamps: true });
+eventoReproductivoSchema.index({ medicoPhone: 1, animalId: 1, fecha: 1 });
+const EventoReproductivo = mongoose.model("EventoReproductivo", eventoReproductivoSchema);
+
 // Una nota de voz dictada durante la visita a un lote: el veterinario graba,
 // se transcribe y se le pide a la IA que separe lo dicho en eventos reales
 // (mortalidad, vacunación, tratamiento, pesaje) — mismo mecanismo que
@@ -2935,7 +2996,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

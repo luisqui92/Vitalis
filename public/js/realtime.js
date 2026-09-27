@@ -111,6 +111,7 @@ function refrescarPantallaActual() {
   else if (tipo === "agenda") renderAgenda();
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
   else if (tipo === "ganaderia") renderGanaderia();
+  else if (tipo === "animalDetalle") renderAnimalDetalle(params.animalId);
   else if (tipo === "loteDetalle") renderLoteDetalle(params.loteId);
   else if (tipo === "inicioEscritorio" && typeof renderInicioEscritorio === "function") renderInicioEscritorio();
   else if (tipo === "recordatorios") renderRecordatorios();
@@ -148,6 +149,7 @@ envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", pa
 // justo después de guardar. Mismo bug que ya pasó con renderEquiposRayos.
 envolverParaTiempoReal("renderGanaderia", () => ({ tipo: "ganaderia", params: {} }));
 envolverParaTiempoReal("renderLoteDetalle", (loteId) => ({ tipo: "loteDetalle", params: { loteId } }));
+envolverParaTiempoReal("renderAnimalDetalle", (animalId) => ({ tipo: "animalDetalle", params: { animalId } }));
 // Sin esto, dar de alta un equipo de rayos (un POST) hacía que el aviso de
 // cambio repintara la pantalla ANTERIOR y saltara fuera de la de equipos,
 // justo en el único momento en que el token está a la vista.
