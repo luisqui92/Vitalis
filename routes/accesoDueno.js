@@ -228,14 +228,39 @@ module.exports = function (app) {
     });
   }));
 
+  // Para instalar la página en la pantalla del teléfono (public/campo.html
+  // lo enlaza). El manifiesto es por enlace porque start_url tiene que ser
+  // ESTA finca: con uno fijo, el ícono abriría una página sin llave. No
+  // cuenta como uso: el navegador lo pide solo, el dueño no entró a nada.
+  app.get("/campo/:llave/manifest.webmanifest", limitCampo, asyncRoute(async (req, res) => {
+    const { finca, medico } = await sesionDeCampo(req.params.llave);
+    res.type("application/manifest+json").send(JSON.stringify({
+      name: finca.nombre,
+      short_name: String(finca.nombre).slice(0, 12),
+      start_url: `/campo/${req.params.llave}`,
+      scope: "/campo/",
+      display: "standalone",
+      background_color: "#03101a",
+      theme_color: "#03101a",
+      lang: medico.idioma === "pt" ? "pt-BR" : "es",
+      icons: [
+        { src: "/img/simbolo-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/img/simbolo-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      ],
+    }));
+  }));
+
   app.post("/campo/:llave/lotes/:loteId/mortalidad", limitCampo, asyncRoute(async (req, res) => {
     const sesion = await sesionDeCampo(req.params.llave);
     const lote = await loteDeLaFinca(sesion, req.params.loteId);
-    const { evento } = await registrarMortalidad(lote, {
+    const { evento, duplicado } = await registrarMortalidad(lote, {
       dia: req.body?.dia, cantidadMuertes: req.body?.cantidadMuertes,
       causaPresunta: req.body?.causaPresunta, notas: req.body?.notas,
-      registradoPor: firmaDueno(sesion), origen: "dueno",
+      registradoPor: firmaDueno(sesion), origen: "dueno", idCliente: req.body?.idCliente,
     });
+    // Un reintento de algo que ya había entrado no es una carga nueva: ni
+    // otro aviso al veterinario ni otra línea de auditoría.
+    if (duplicado) return res.json({ ok: true, duplicado: true, evento: eventoParaDueno(evento) });
     despuesDeCargar(req, sesion, "campo_mortalidad", `LoteGanado:${lote._id}`);
     res.status(201).json({ ok: true, evento: eventoParaDueno(evento) });
   }));

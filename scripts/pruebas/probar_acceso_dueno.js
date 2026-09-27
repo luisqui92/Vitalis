@@ -251,6 +251,59 @@ function pedir(puerto, metodo, ruta, token, cuerpo) {
   const dBR = await GET(`/campo/${llaveDe(eBR.cuerpo?.enlace)}/datos`);
   verificar("la página del dueño viene en portugués y en reales", dBR.cuerpo?.idioma === "pt" && dBR.cuerpo?.moneda === "BRL");
 
+  console.log("\n── 9. Reintentos sin señal: lo mismo dos veces no cuenta dos veces ──");
+  const llaveR = llaveDe(eNull.cuerpo?.enlace);
+  const antes = (await LoteGanado.findById(galpon._id).lean()).cantidadActual;
+  const cuerpoM = { dia: hoy, cantidadMuertes: 7, causaPresunta: "reintento", idCliente: "tel-abc12345-m1" };
+  const m1r = await POST(`/campo/${llaveR}/lotes/${galpon._id}/mortalidad`, null, cuerpoM);
+  const m2r = await POST(`/campo/${llaveR}/lotes/${galpon._id}/mortalidad`, null, cuerpoM);
+  verificar("el primero crea (201), el reintento avisa que ya estaba (200, duplicado)", m1r.estado === 201 && m2r.estado === 200 && m2r.cuerpo?.duplicado === true);
+  verificar("  ...los dos devuelven el mismo evento", m1r.cuerpo?.evento?._id === m2r.cuerpo?.evento?._id);
+  verificar("  ...y el lote bajó 7, no 14", (await LoteGanado.findById(galpon._id).lean()).cantidadActual === antes - 7);
+  verificar("  ...un solo evento en la base", (await EventoLote.countDocuments({ idCliente: "tel-abc12345-m1" })) === 1);
+  const simult = await Promise.all([1, 2, 3].map(() =>
+    POST(`/campo/${llaveR}/lotes/${galpon._id}/mortalidad`, null, { ...cuerpoM, idCliente: "tel-abc12345-m2" })));
+  verificar("tres reintentos A LA VEZ: un solo evento y una sola resta",
+    (await EventoLote.countDocuments({ idCliente: "tel-abc12345-m2" })) === 1 &&
+    (await LoteGanado.findById(galpon._id).lean()).cantidadActual === antes - 14 && simult.every(r => r.estado < 300));
+  // Por HTTP los tres suelen llegar uno detrás del otro. Llamando al
+  // servicio directo, los tres preguntan «¿ya existe?» ANTES de que ninguno
+  // cree nada: ahí el que frena es el índice único, no la pregunta.
+  const { registrarMortalidad } = require(path.join(RAIZ, "services", "cargasGanado"));
+  const loteDoc = await LoteGanado.findById(galpon._id);
+  const antesCarrera = loteDoc.cantidadActual;
+  const carrera = await Promise.allSettled([1, 2, 3].map(() =>
+    registrarMortalidad(loteDoc, { dia: hoy, cantidadMuertes: 2, idCliente: "tel-abc12345-m9", origen: "dueno" })));
+  verificar("en carrera real: un solo evento, una sola resta, y ningún error",
+    (await EventoLote.countDocuments({ idCliente: "tel-abc12345-m9" })) === 1 &&
+    (await LoteGanado.findById(galpon._id).lean()).cantidadActual === antesCarrera - 2 &&
+    carrera.every(r => r.status === "fulfilled"));
+  await LoteGanado.updateOne({ _id: galpon._id }, { $inc: { cantidadActual: 2 } });
+  await EventoLote.deleteOne({ idCliente: "tel-abc12345-m9" });
+
+  // El reintento de una carga que ya se restó no puede rechazarse por el
+  // lote ya restado: 988−14 = 974 vivos; si reintento 974 muertes ya
+  // cargadas, tiene que decir «ya estaba», no «no hay tantos animales».
+  const todos = { dia: hoy, cantidadMuertes: antes - 14, idCliente: "tel-abc12345-m3" };
+  const t1 = await POST(`/campo/${llaveR}/lotes/${galpon._id}/mortalidad`, null, todos);
+  const t2 = await POST(`/campo/${llaveR}/lotes/${galpon._id}/mortalidad`, null, todos);
+  verificar("reintentar una carga que dejó el lote en 0 dice «ya estaba», no «no hay tantos»", t1.estado === 201 && t2.estado === 200 && t2.cuerpo?.duplicado === true);
+  verificar("un idCliente con caracteres raros → 400", (await POST(`/campo/${llaveR}/lotes/${tambo._id}/mortalidad`, null, { dia: hoy, cantidadMuertes: 1, idCliente: "a b<c>d$e" })).estado === 400);
+
+  const cuerpoG = { dia: ayer, categoria: "otros", monto: 50, idCliente: "tel-abc12345-g1" };
+  const g1r = await POST(`/campo/${llaveR}/lotes/${tambo._id}/gastos`, null, cuerpoG);
+  const g2r = await POST(`/campo/${llaveR}/lotes/${tambo._id}/gastos`, null, cuerpoG);
+  verificar("un gasto reintentado queda UNA vez", g1r.cuerpo?.gasto?._id === g2r.cuerpo?.gasto?._id &&
+    (await GastoLote.countDocuments({ idCliente: "tel-abc12345-g1" })) === 1);
+  const sinId1 = await POST(`/campo/${llaveR}/lotes/${tambo._id}/gastos`, null, { dia: ayer, categoria: "otros", monto: 5 });
+  const sinId2 = await POST(`/campo/${llaveR}/lotes/${tambo._id}/gastos`, null, { dia: ayer, categoria: "otros", monto: 5 });
+  verificar("sin idCliente (el veterinario, o un teléfono viejo) dos cargas son dos gastos", sinId1.cuerpo?.gasto?._id !== sinId2.cuerpo?.gasto?._id);
+
+  console.log("\n── 10. El manifiesto para instalarla en el teléfono ──");
+  const man = await GET(`/campo/${llaveR}/manifest.webmanifest`);
+  verificar("abre la finca de ESTE enlace al tocar el ícono", man.estado === 200 && man.cuerpo?.start_url === `/campo/${llaveR}` && man.cuerpo?.scope === "/campo/");
+  verificar("un enlace con formato inválido → 404", (await GET("/campo/abc/manifest.webmanifest")).estado === 404);
+
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();

@@ -30,27 +30,63 @@ function validarMuertes(lote, valor) {
   return n;
 }
 
+// idCliente: el id que le puso el teléfono a esta carga (ver ID_CLIENTE en
+// db/models.js). Se valida el formato acá y no en cada ruta.
+function idClienteValido(valor) {
+  if (valor === undefined || valor === null || valor === "") return undefined;
+  const id = String(valor);
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(id)) throw new ErrorHttp(400, "idCliente no es válido");
+  return id;
+}
+
+// Si esta carga ya llegó antes (el reintento de un pedido cuya respuesta se
+// perdió), se devuelve lo que se creó entonces, sin crear nada.
+async function yaCargado(Modelo, medicoPhone, idCliente) {
+  return idCliente ? Modelo.findOne({ medicoPhone, idCliente }) : null;
+}
+
 // La resta es atómica y condicionada: si dos personas cargan muertes a la
 // vez (el dueño desde el galpón, el veterinario desde la camioneta), la
 // segunda no puede dejar el lote en negativo por haber leído un
 // cantidadActual que ya no era cierto.
-async function registrarMortalidad(lote, { dia, cantidadMuertes, causaPresunta, notas, registradoPor, origen = "" }) {
+//
+// El orden importa, por el reintento: PRIMERO se mira si esta carga ya
+// existe —si ya se restó, validarla de nuevo contra el lote ya restado
+// podría rechazar algo que en realidad quedó bien guardado—, DESPUÉS se crea
+// el evento —el índice único de idCliente frena a dos reintentos
+// simultáneos— y RECIÉN AHÍ se resta. Si la resta no entra, se deshace el
+// evento.
+async function registrarMortalidad(lote, { dia, cantidadMuertes, causaPresunta, notas, registradoPor, origen = "", idCliente }) {
+  const id = idClienteValido(idCliente);
+  const previo = await yaCargado(EventoLote, lote.medicoPhone, id);
+  if (previo) return { evento: previo, duplicado: true };
+
   const n = validarMuertes(lote, cantidadMuertes);
   const fecha = new Date(diaPasadoValido(dia, "fecha"));
+  let evento;
+  try {
+    evento = await EventoLote.create({
+      medicoPhone: lote.medicoPhone, loteId: lote._id, tipo: "mortalidad", fecha,
+      cantidadMuertes: n,
+      causaPresunta: String(causaPresunta || "").trim().slice(0, 200),
+      notas: String(notas || "").trim().slice(0, 1000),
+      registradoPor: String(registradoPor || "").trim(), origen,
+      ...(id ? { idCliente: id } : {}),
+    });
+  } catch (e) {
+    if (e?.code === 11000 && id) return { evento: await yaCargado(EventoLote, lote.medicoPhone, id), duplicado: true };
+    throw e;
+  }
   const actualizado = await LoteGanado.findOneAndUpdate(
     { _id: lote._id, medicoPhone: lote.medicoPhone, cantidadActual: { $gte: n } },
     { $inc: { cantidadActual: -n } },
     { new: true }
   );
-  if (!actualizado) throw new ErrorHttp(409, "El lote ya no tiene esa cantidad de animales. Recargá y volvé a intentar.");
-  const evento = await EventoLote.create({
-    medicoPhone: lote.medicoPhone, loteId: lote._id, tipo: "mortalidad", fecha,
-    cantidadMuertes: n,
-    causaPresunta: String(causaPresunta || "").trim().slice(0, 200),
-    notas: String(notas || "").trim().slice(0, 1000),
-    registradoPor: String(registradoPor || "").trim(), origen,
-  });
-  return { evento, lote: actualizado };
+  if (!actualizado) {
+    await EventoLote.deleteOne({ _id: evento._id });
+    throw new ErrorHttp(409, `El lote ya no tiene ${n} animales vivos. Revisá cuántos quedan.`);
+  }
+  return { evento, lote: actualizado, duplicado: false };
 }
 
 // Un registro por día: cargar el mismo día otra vez lo CORRIGE.
@@ -83,6 +119,9 @@ async function guardarProduccion(lote, cuerpo, { registradoPor = "", origen = ""
 }
 
 async function registrarGasto(lote, cuerpo, { moneda, registradoPor = "", origen = "" }) {
+  const id = idClienteValido(cuerpo?.idCliente);
+  const previo = await yaCargado(GastoLote, lote.medicoPhone, id);
+  if (previo) return previo;
   if (lote.estado === "cerrado") throw new ErrorHttp(400, "El lote está cerrado");
   const categoria = String(cuerpo?.categoria || "").trim();
   if (!CATEGORIAS_GASTO.includes(categoria)) throw new ErrorHttp(400, `categoria debe ser una de: ${CATEGORIAS_GASTO.join(", ")}`);
@@ -95,15 +134,21 @@ async function registrarGasto(lote, cuerpo, { moneda, registradoPor = "", origen
   if (!monto && !kg) {
     throw new ErrorHttp(400, categoria === "alimento" ? "Cargá el monto, los kilos, o los dos" : "monto es requerido");
   }
-  return GastoLote.create({
-    medicoPhone: lote.medicoPhone, loteId: lote._id, dia, categoria,
-    concepto: String(cuerpo?.concepto || "").trim().slice(0, 200),
-    // El monto llega en la unidad que se escribe (150,50) y se guarda en
-    // centavos redondeados, como el resto de la plata.
-    montoCentavos: monto != null ? Math.round(monto * 100) : null,
-    moneda: moneda === "BRL" ? "BRL" : "BOB",
-    kg, registradoPor, origen,
-  });
+  try {
+    return await GastoLote.create({
+      medicoPhone: lote.medicoPhone, loteId: lote._id, dia, categoria,
+      concepto: String(cuerpo?.concepto || "").trim().slice(0, 200),
+      // El monto llega en la unidad que se escribe (150,50) y se guarda en
+      // centavos redondeados, como el resto de la plata.
+      montoCentavos: monto != null ? Math.round(monto * 100) : null,
+      moneda: moneda === "BRL" ? "BRL" : "BOB",
+      kg, registradoPor, origen,
+      ...(id ? { idCliente: id } : {}),
+    });
+  } catch (e) {
+    if (e?.code === 11000 && id) return yaCargado(GastoLote, lote.medicoPhone, id);
+    throw e;
+  }
 }
 
 module.exports = {

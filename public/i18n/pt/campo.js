@@ -69,4 +69,14 @@ Object.assign(I18N.pt, {
   "campo.evento.muertes": "{n} mortes",
   "campo.evento.pesaje": "pesagem: {kg} kg em média",
   "campo.evento.tuyo": "anotado por você",
+
+  "campo.errMasMuertes": "Pelo que o celular sabe, restam {n} animais vivos.",
+  "campo.offline.sinSenal": "Sem sinal. Dados salvos em {fecha} — o que anotar fica salvo no celular e é enviado sozinho quando o sinal voltar.",
+  "campo.offline.esperando": "Aguardando sinal para enviar:",
+  "campo.offline.guardadoEnTelefono": "Salvo no celular. É enviado sozinho quando o sinal voltar.",
+  "campo.offline.rechazos": "Isto não pôde ser salvo. Avise seu veterinário:",
+  "campo.offline.entendido": "Entendi",
+  "campo.offline.primeraVez": "Sem sinal. Para usar a fazenda sem sinal, abra este link uma vez com sinal.",
+  "campo.offline.sinEspacio": "O celular não tem espaço para salvar. Tente de novo com sinal.",
+  "campo.offline.borrarSinSenal": "Para apagar um gasto é preciso ter sinal.",
 });

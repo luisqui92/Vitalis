@@ -701,6 +701,16 @@ const LlaveFinca = mongoose.model("LlaveFinca", llaveFincaSchema);
 // esto depende qué puede borrar cada uno.
 const ORIGEN_CARGA = { type: String, enum: ["", "dueno"], default: "" };
 
+// Un id que genera el TELÉFONO al anotar algo sin señal (public/js/campo.js).
+// En el campo la señal va y viene: un pedido puede llegar al servidor y la
+// respuesta perderse en el camino, y el teléfono lo reintenta. Sin esto, 12
+// gallinas muertas reintentadas dos veces serían 24 y el lote quedaría con
+// animales de menos. Con el índice único de abajo, el segundo intento
+// encuentra el primero y no crea nada. Solo en lo que se crea con POST:
+// la producción del día ya es "uno por día" y reintentarla no duplica.
+const ID_CLIENTE = { type: String, default: undefined };
+const INDICE_ID_CLIENTE = [{ medicoPhone: 1, idCliente: 1 }, { unique: true, partialFilterExpression: { idCliente: { $type: "string" } } }];
+
 const loteGanadoSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
   // Opcional: los lotes que se cargaron antes de que existieran las fincas
@@ -769,8 +779,10 @@ const eventoLoteSchema = new mongoose.Schema({
   notas: { type: String, default: "" },
   registradoPor: { type: String, default: "" }, // nombre de quien cargó, cuando no es el médico mismo (ej. encargado del galpón)
   origen: ORIGEN_CARGA,
+  idCliente: ID_CLIENTE,
 }, { timestamps: true });
 eventoLoteSchema.index({ medicoPhone: 1, loteId: 1, fecha: -1 });
+eventoLoteSchema.index(...INDICE_ID_CLIENTE);
 const EventoLote = mongoose.model("EventoLote", eventoLoteSchema);
 
 // ─── REPRODUCCIÓN (Symphomed Ganadería) ────────────────────────────────────
@@ -896,8 +908,10 @@ const gastoLoteSchema = new mongoose.Schema({
   kg: { type: Number, default: null, min: 0 },
   registradoPor: { type: String, default: "" },
   origen: ORIGEN_CARGA,
+  idCliente: ID_CLIENTE,
 }, { timestamps: true });
 gastoLoteSchema.index({ medicoPhone: 1, loteId: 1, dia: -1 });
+gastoLoteSchema.index(...INDICE_ID_CLIENTE);
 const GastoLote = mongoose.model("GastoLote", gastoLoteSchema);
 
 // Una nota de voz dictada durante la visita a un lote: el veterinario graba,
