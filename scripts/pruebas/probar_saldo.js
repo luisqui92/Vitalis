@@ -102,6 +102,20 @@ async function main() {
   const mov = await MovimientoSaldo.findOne({ consultaId: c1._id }).lean();
   verificar("el consumo queda ligado a esa consulta", String(mov.consultaId) === String(c1._id));
   verificar("y anota cómo quedó el saldo después", mov.saldoDespuesCentavos === 18800);
+  verificar("sin 'concepto', el texto de siempre no cambió", mov.concepto === "Consulta transcrita");
+
+  // Symphomed Ganadería reusa cobrarConsulta para el dictado de campo
+  // (routes/lotesGanado.js), con el _id de un NotaVozLote — el libro de
+  // movimientos tiene que decir qué fue de verdad, no "Consulta transcrita"
+  // para un lote de pollos. Cuenta aparte, para no correr la cuenta de Ana
+  // que el resto de esta prueba sigue de a Bs exactos.
+  const vetGanaderia = await Medico.create({ phone: "70000009", nombre: "Dra. Vet", passwordHash: hash, ...gratisAgotadas });
+  await saldos.cargar({ medicoPhone: vetGanaderia.phone, montoCentavos: 20000, referencia: "QR vet", acreditadoPor: "luis" });
+  const notaVozFalsa = new mongoose.Types.ObjectId();
+  await saldos.cobrarConsulta({ medicoPhone: vetGanaderia.phone, consultaId: notaVozFalsa, concepto: "Dictado de campo transcrito" });
+  const movGanaderia = await MovimientoSaldo.findOne({ consultaId: notaVozFalsa }).lean();
+  verificar("con 'concepto', el libro de movimientos dice qué fue de verdad", movGanaderia.concepto === "Dictado de campo transcrito");
+  verificar("  ...y cobra el mismo precio que una consulta humana", movGanaderia.montoCentavos === -1200);
 
   console.log("\n── 4. La misma consulta NO se cobra dos veces ──");
   // Es el error más caro del modelo: la transcripción reintenta y el médico

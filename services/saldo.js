@@ -271,7 +271,16 @@ async function cargar({ medicoPhone, montoCentavos, acreditadoPor, referencia, c
 // NO valida saldo. Para cuando esto corre, la consulta ya está transcrita: el
 // trabajo está hecho y la plata gastada. Negarse acá solo dejaría al médico
 // sin su nota clínica, y encima ya pagamos nosotros la transcripción.
-async function cobrarConsulta({ medicoPhone, consultaId }) {
+// "concepto" es opcional a propósito: lo único que lo necesita hoy es el
+// dictado de campo de Ganadería (routes/lotesGanado.js), que cobra lo mismo
+// y por el mismo mecanismo que una consulta humana, pero el libro de
+// movimientos tiene que decir qué fue de verdad — un médico que además
+// atiende gente no puede ver "Consulta transcrita" en su saldo por un lote
+// de pollos. Sin este parámetro, el comportamiento es EXACTAMENTE el de
+// antes: ningún llamado existente pasa "concepto", así que ninguno cambia.
+async function cobrarConsulta({ medicoPhone, consultaId, concepto }) {
+  const base = concepto || "Consulta transcrita";
+  const conceptoCortesia = concepto ? `${concepto} de cortesía` : "Consulta de cortesía";
   // El guardia de verdad es el índice único; esta consulta es solo para no
   // pegarle a Mongo con un insert que sabemos que va a fallar.
   const yaCobrada = await MovimientoSaldo.findOne({ tipo: "consumo", consultaId }).select("_id").lean();
@@ -322,9 +331,9 @@ async function cobrarConsulta({ medicoPhone, consultaId }) {
       medicoPhone, tipo: "consumo",
       montoCentavos: sinCargo ? 0 : -cfg.precioConsulta,
       moneda: monedaCuenta,
-      concepto: conPlan ? `Consulta transcrita (plan ${medico.suscripcion.plan})`
-        : deCortesia ? "Consulta de cortesía"
-        : "Consulta transcrita",
+      concepto: conPlan ? `${base} (plan ${medico.suscripcion.plan})`
+        : deCortesia ? conceptoCortesia
+        : base,
       consultaId,
     });
     if (sinCargo) return { cobrado: true, conPlan, deCortesia, movimiento: mov, saldoCentavos: mov.saldoDespuesCentavos };

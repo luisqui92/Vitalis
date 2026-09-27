@@ -13,6 +13,7 @@ const { mortalidadAcumulada, retirosVigentes, curvaPeso } = require("../services
 const { notificarRetiroRegistrado } = require("../services/alertaRetiroGanado");
 const { transcribirNotaDeVoz } = require("../services/assemblyai");
 const { generarEventosLote, crearEventosDesdeSugerencias } = require("../services/notaVozLote");
+const { estadoDe, cobrarConsulta } = require("../services/saldo");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -187,6 +188,15 @@ module.exports = function (app) {
     const lote = await obtenerOFallar(LoteGanado, { _id: req.params.id, medicoPhone }, "Lote no encontrado");
     if (lote.estado === "cerrado") throw new ErrorHttp(400, "No se pueden cargar eventos en un lote cerrado");
 
+    // Mismo candado que /medico/consultas: el saldo se mira acá, con la
+    // mano liviana (recién pasado el piso de negativo), porque para cuando
+    // este pedido llega el veterinario YA grabó en el campo. Rechazarlo le
+    // tira a la basura una grabación que no puede repetir en el momento.
+    const saldo = await estadoDe(medicoPhone);
+    if (saldo.bloqueado) {
+      throw new ErrorHttp(402, `Tu saldo llegó al límite (Bs ${saldo.saldoBs}). Cargá saldo para seguir usando el dictado de campo.`);
+    }
+
     const nota = await NotaVozLote.create({ medicoPhone, loteId: lote._id, estado: "procesando" });
     res.status(202).json({ ok: true, nota });
 
@@ -196,6 +206,17 @@ module.exports = function (app) {
       .then(async ({ texto, duracionSegundos }) => {
         nota.transcripcionCompleta = texto;
         nota.duracionSegundos = duracionSegundos;
+
+        // Se cobra apenas la transcripción salió bien — mismo criterio que
+        // una consulta humana (services/saldo.js): si de acá para
+        // adelante la separación en eventos fallara, el veterinario ya
+        // recibió lo que pagó (la transcripción) y no tiene sentido
+        // devolvérsela por un paso posterior.
+        try {
+          await cobrarConsulta({ medicoPhone, consultaId: nota._id, concepto: "Dictado de campo transcrito" });
+        } catch (e) {
+          log.error(`[NOTA_VOZ_LOTE] no se pudo cobrar la nota ${nota._id} de ${medicoPhone}:`, e.message);
+        }
 
         const { eventos } = await generarEventosLote(texto, medico?.idioma);
         // El propio lote pudo cerrarse mientras esto corría en segundo

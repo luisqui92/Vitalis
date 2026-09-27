@@ -2168,6 +2168,11 @@ const movimientoSaldoSchema = new mongoose.Schema({
   concepto: { type: String, default: "" },
   // Qué consulta lo generó. El índice único de abajo es lo que impide cobrar
   // dos veces la misma consulta si la transcripción reintenta.
+  //
+  // También lo usa el dictado de campo de Ganadería (routes/lotesGanado.js),
+  // con el _id de un NotaVozLote en vez de una ConsultaMedica: cobra por el
+  // mismo mecanismo, con el mismo candado contra el doble cobro, y "ref"
+  // acá es solo un dato para quien lea el esquema — Mongo no lo valida.
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
   // De una carga: quién la acreditó y contra qué comprobante. Sin esto, una
   // carga es plata que apareció de la nada.

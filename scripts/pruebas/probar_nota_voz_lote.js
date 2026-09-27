@@ -65,7 +65,8 @@ verificar("un solo audio puede describir varios eventos distintos", varios.lengt
 
   const mongoose = require("mongoose");
   await mongoose.connect(process.env.MONGODB_URI);
-  const { LoteGanado, EventoLote, Medico, NotaVozLote } = require(path.join(RAIZ, "db", "models"));
+  const { LoteGanado, EventoLote, Medico, NotaVozLote, MovimientoSaldo } = require(path.join(RAIZ, "db", "models"));
+  const saldos = require(path.join(RAIZ, "services", "saldo"));
   const { crearEventosDesdeSugerencias } = require(path.join(RAIZ, "services", "notaVozLote"));
   await mongoose.connection.dropDatabase();
 
@@ -133,7 +134,14 @@ verificar("un solo audio puede describir varios eventos distintos", varios.lengt
   const express = require("express");
   const { hashPassword, generarToken } = require(path.join(RAIZ, "services", "auth"));
   const hash = await hashPassword("Prueba123.");
-  await Medico.create({ phone: "70000002", nombre: "Dra. Campo", passwordHash: hash, tipoEspecialidad: "veterinaria", idioma: "es" });
+  // consultasGratisUsadas ya agotadas: sin esto, el cobro de la primera
+  // nota de voz saldría gratis (cortesía) y la prueba de abajo no vería
+  // ningún descuento real — mismo cuidado que probar_saldo.js.
+  await Medico.create({
+    phone: "70000002", nombre: "Dra. Campo", passwordHash: hash,
+    tipoEspecialidad: "veterinaria", idioma: "es", consultasGratisUsadas: 99,
+  });
+  await saldos.cargar({ medicoPhone: "70000002", montoCentavos: 20000, referencia: "QR campo", acreditadoPor: "luis" });
   const token = generarToken("70000002", "medico", 36e5);
 
   const loteHttp = await LoteGanado.create({
@@ -197,6 +205,36 @@ verificar("un solo audio puede describir varios eventos distintos", varios.lengt
   const loteHttpFinal = await LoteGanado.findById(loteHttp._id).lean();
   verificar("la mortalidad dictada por voz sí descontó cantidadActual (200-30=170)",
     loteHttpFinal.cantidadActual === 170);
+
+  console.log("\n── 6. El dictado de campo consume saldo, igual que una consulta humana ──");
+  const movDictado = await MovimientoSaldo.findOne({ consultaId: notaId, tipo: "consumo" }).lean();
+  verificar("se generó un movimiento de consumo ligado a esta nota de voz", Boolean(movDictado));
+  verificar("  ...con el concepto correcto (no dice «Consulta transcrita» de un lote de pollos)",
+    movDictado?.concepto === "Dictado de campo transcrito");
+  verificar("  ...y descontó plata de verdad (no 0, no gratis)", movDictado?.montoCentavos < 0);
+  const saldoCampoFinal = await saldos.estadoDe("70000002");
+  verificar("el saldo del médico bajó ese mismo monto",
+    saldoCampoFinal.saldoCentavos === 20000 + movDictado.montoCentavos);
+
+  console.log("\n── 7. Con el saldo bloqueado, no se acepta una nota de voz nueva ──");
+  await Medico.create({
+    phone: "70000003", nombre: "Dra. Sin Saldo", passwordHash: hash,
+    tipoEspecialidad: "veterinaria", idioma: "es", consultasGratisUsadas: 99,
+  });
+  const tokenSinSaldo = generarToken("70000003", "medico", 36e5);
+  const loteSinSaldo = await LoteGanado.create({
+    medicoPhone: "70000003", especie: "bovino", nombre: "Rodeo sin saldo", codigo: "L-0004",
+    cantidadInicial: 10, cantidadActual: 10, fechaIngreso: new Date("2026-01-01"),
+  });
+  // Directo al límite negativo, sin pasar por diez consultas de mentira.
+  const { LIMITE_NEGATIVO } = saldos;
+  await Medico.updateOne({ phone: "70000003" }, { $set: { saldoCentavos: LIMITE_NEGATIVO - 100 } });
+  const rBloqueado = await pedir("POST", `/medico/lotes/${loteSinSaldo._id}/notas-voz`,
+    { authorization: "Bearer " + tokenSinSaldo, "content-type": "audio/webm", "content-length": audioFalso.length }, audioFalso);
+  verificar("saldo bloqueado → 402, no 202", rBloqueado.estado === 402);
+  const notasDeEseLote = await NotaVozLote.countDocuments({ loteId: loteSinSaldo._id });
+  verificar("  ...y ni siquiera se creó una nota de voz «procesando» que nadie iba a poder pagar",
+    notasDeEseLote === 0);
 
   notaVozLote.generarEventosLote = generarEventosLoteOriginal;
   servidor.close();
