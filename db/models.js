@@ -689,6 +689,11 @@ const eventoLoteSchema = new mongoose.Schema({
   // vitamina para el resto del sistema.
   diasRetiroCarne: { type: Number, default: null, min: 0 },
   diasRetiroLeche: { type: Number, default: null, min: 0 },
+  // Si ya se avisó por WhatsApp que el retiro venció (services/alertaRetiroGanado.js).
+  // Sin esto, el trabajo en segundo plano mandaría el mismo aviso en cada
+  // pasada de ahí en adelante — igual que recordatorio.ultimoEnviado en
+  // Medicamento, pero acá es un solo aviso, no uno recurrente.
+  avisoLiberacionEnviado: { type: Boolean, default: false },
 
   // pesaje — de una MUESTRA, no del lote entero (pesar 8.000 pollos uno por
   // uno no pasa nunca). El promedio de la muestra es la mejor estimación

@@ -3,12 +3,14 @@
 // el comentario sobre LoteGanado en db/models.js para por qué esto es un
 // modelo aparte de Paciente, y no una extensión de la veterinaria de
 // mascotas que ya existía.
-const { LoteGanado, EventoLote } = require("../db/models");
+const { LoteGanado, EventoLote, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { siguienteCodigo } = require("../services/codigos");
 const { mortalidadAcumulada, retirosVigentes, curvaPeso } = require("../services/lotesGanado");
+const { notificarRetiroRegistrado } = require("../services/alertaRetiroGanado");
+const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
 const ESPECIES = ["bovino", "porcino", "avicola"];
@@ -151,6 +153,17 @@ module.exports = function (app) {
 
     const evento = await EventoLote.create(datos);
     if (debeGuardarLote) await lote.save();
+
+    // Fuera del camino de la respuesta: si WhatsApp falla, el evento ya
+    // quedó guardado igual — mismo criterio que la confirmación de cita en
+    // routes/citas.js. El médico ve la fecha de retiro en la ficha aunque
+    // este mensaje no llegue.
+    if (evento.diasRetiroCarne != null || evento.diasRetiroLeche != null) {
+      Medico.findOne({ phone: medicoPhone }).select("phone nombre idioma moneda").lean()
+        .then(medico => medico && notificarRetiroRegistrado(evento, lote, medico))
+        .catch(e => log.error(`[LOTES_GANADO] no se pudo avisar el retiro registrado (evento ${evento._id}):`, e.message));
+    }
+
     res.status(201).json({ ok: true, evento, lote });
   }));
 };

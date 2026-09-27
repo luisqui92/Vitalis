@@ -337,3 +337,4 @@ server.listen(PORT, () => log.info(`🚀 Symphomed corriendo en puerto ${PORT}`)
 // para que un problema con los respaldos nunca impida que Symphomed atienda.
 require("./services/backup").programar();
 require("./services/recordatorioMedicamento").programar();
+require("./services/alertaRetiroGanado").programar();

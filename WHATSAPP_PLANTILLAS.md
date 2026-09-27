@@ -6,7 +6,7 @@ Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
 mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
 de antemano.
 
-De los diez lugares donde Symphomed manda algo por WhatsApp, el único que
+De los doce lugares donde Symphomed manda algo por WhatsApp, el único que
 siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
 acaba de escribir. Los otros nueve los inicia la plataforma, y la persona
 puede no haber escrito nunca:
@@ -23,6 +23,8 @@ puede no haber escrito nunca:
 | La llave a la historia propia | `routes/resumenCompartido.js` | **casi siempre** |
 | Enlace para resetear la contraseña | `routes/reseteoClave.js` | **casi siempre** |
 | Recordatorio de medicación al paciente | `services/recordatorioMedicamento.js` | **siempre** — lo dispara un trabajo en segundo plano, nunca un mensaje reciente del paciente |
+| Retiro de medicamento registrado (Ganadería) | `routes/lotesGanado.js` | **casi siempre** — lo dispara la carga de un evento, no una conversación con el médico |
+| Retiro de medicamento vencido (Ganadería) | `services/alertaRetiroGanado.js` | **siempre** — lo dispara un trabajo en segundo plano |
 
 La de avance a la familia es la que más va a depender de la plantilla: la familia de un chico
 en seguimiento de neurodesarrollo no le escribe al consultorio entre sesión y
@@ -300,6 +302,55 @@ WhatsApp de Symphomed para pedir que le recuerden tomar un medicamento, el
 aviso sale solo. Por eso ésta es la única de las diez donde no tiene sentido
 "intentar primero texto libre" — igual pasa por `enviarTextoOPlantilla()`,
 que simplemente va a caer a la plantilla siempre.
+
+---
+
+### 9. `retiro_ganado_registrado`
+
+Cuerpo:
+
+```
+Se registró {{2}} en el lote {{1}}. Período de retiro: {{3}}.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | código del lote | `L-0003` |
+| `{{2}}` | producto aplicado | `Enrofloxacina` |
+| `{{3}}` | fechas de retiro, ya armadas en una frase | `libre para faena desde el 15/03/2026` |
+
+La manda `routes/lotesGanado.js` apenas se carga un evento de vacunación o
+tratamiento con período de retiro — al teléfono del médico/veterinario, no
+de un paciente. Casi siempre fuera de la ventana: es la carga de un dato en
+el Kardex, no una conversación abierta con el WhatsApp de Symphomed.
+
+---
+
+### 10. `retiro_ganado_libre`
+
+Cuerpo:
+
+```
+El lote {{1}} ya está libre: venció el período de retiro de {{2}}.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | código del lote | `L-0003` |
+| `{{2}}` | producto aplicado | `Enrofloxacina` |
+
+No la dispara ninguna ruta HTTP: la manda `services/alertaRetiroGanado.js`,
+un trabajo que corre cada hora y revisa qué eventos de tratamiento/vacunación
+ya pasaron su fecha de retiro y todavía no avisaron — mismo mecanismo que
+`recordatorio_medicamento`, pero un aviso único (`avisoLiberacionEnviado`),
+no uno recurrente. Es el diferencial real frente a la competencia relevada en
+el estudio de mercado: ningún software de gestión ganadera revisado ofrece
+esto como alerta proactiva — todos dejan la fecha de retiro escrita en algún
+lado, esperando que alguien se acuerde de mirarla.
+
+Siempre cae fuera de la ventana de 24 h, por el mismo motivo que
+`recordatorio_medicamento`: lo dispara un trabajo en segundo plano, nunca un
+mensaje reciente del médico.
 
 ---
 

@@ -86,12 +86,12 @@ console.log("\n── 3. El código pasa tantos valores como variables tiene ─
 const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia", "solicitudesCuenta",
   "resumenCompartido", "reseteoClave"];
 // No todo lo que manda una plantilla vive en routes/: recordatorioMedicamento
-// la dispara un trabajo en segundo plano, no un pedido HTTP — ver
-// services/recordatorioMedicamento.js. Se lee aparte, de su propia carpeta,
-// pero entra al mismo chequeo de abajo: el acoplamiento frágil entre
-// `parametros` y lo que Meta tiene aprobado no distingue de dónde sale la
-// llamada.
-const SERVICIOS = ["recordatorioMedicamento"];
+// y alertaRetiroGanado los disparan trabajos en segundo plano, no un pedido
+// HTTP — ver services/recordatorioMedicamento.js y
+// services/alertaRetiroGanado.js. Se leen aparte, de su propia carpeta, pero
+// entran al mismo chequeo de abajo: el acoplamiento frágil entre `parametros`
+// y lo que Meta tiene aprobado no distingue de dónde sale la llamada.
+const SERVICIOS = ["recordatorioMedicamento", "alertaRetiroGanado"];
 const llamadas = [];
 for (const r of [...RUTAS.map(r => ({ nombre: r, dir: "routes" })), ...SERVICIOS.map(r => ({ nombre: r, dir: "services" }))]) {
   const codigo = fs.readFileSync(path.join(RAIZ, r.dir, `${r.nombre}.js`), "utf8");

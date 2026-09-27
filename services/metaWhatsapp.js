@@ -127,6 +127,14 @@ const PLANTILLAS = {
   // días después de la consulta, no un mensaje que el paciente acaba de
   // mandar.
   recordatorioMedicamento: "recordatorio_medicamento",
+  // Symphomed Ganadería (services/alertaRetiroGanado.js): confirmación de que
+  // se registró un período de retiro, y aviso de que ya venció. Van al
+  // teléfono del MÉDICO/veterinario, no a un paciente — y casi siempre fuera
+  // de la ventana, por el mismo motivo que el recordatorio de medicación: lo
+  // dispara la carga de un evento o un trabajo en segundo plano, no una
+  // conversación abierta.
+  retiroGanadoRegistrado: "retiro_ganado_registrado",
+  retiroGanadoLibre: "retiro_ganado_libre",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es
