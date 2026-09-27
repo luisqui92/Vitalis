@@ -45,6 +45,7 @@ const RUTAS = [
   { ruta: "pagos",         fn: "renderPagos" },
   { ruta: "vincular",      fn: "renderVincular" },
   { ruta: "equipos",       fn: "renderEquiposRayos" },
+  { ruta: "ganaderia",     fn: "renderGanaderia" },
 ];
 
 const BASE = "/app";

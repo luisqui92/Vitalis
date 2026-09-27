@@ -43,6 +43,11 @@ function pestanasPacientes(pendientes) {
       + (OPERADOR_ESTADO?.reseteosPendientes || 0);
     pestanas.push(`<button class="tab" id="btnPagos"><span class="tab-icono">${ICONOS.tendencia}${esperando ? `<b class="tab-globo">${esperando}</b>` : ""}</span>${t("op.nav.pagos")}</button>`);
   }
+  // Symphomed Ganadería: solo para quien atiende veterinaria — ver el mismo
+  // criterio en escritorio.js.
+  if (MEDICO_TIPO_ESPECIALIDAD === "veterinaria") {
+    pestanas.push(`<button class="tab" id="btnGanaderia"><span class="tab-icono">${ICONOS.pata}</span>${t("pacientes.tab.ganaderia")}</button>`);
+  }
   return pestanas;
 }
 
@@ -172,6 +177,8 @@ async function renderDashboard() {
     // Solo existe para quien administra una clínica (ver clinica.js).
     const btnClinica = document.getElementById("btnClinica");
     if (btnClinica) btnClinica.onclick = renderClinica;
+    const btnGanaderia = document.getElementById("btnGanaderia");
+    if (btnGanaderia) btnGanaderia.onclick = renderGanaderia;
     const btnPagos = document.getElementById("btnPagos");
     if (btnPagos) btnPagos.onclick = renderPagos;
     document.querySelectorAll(".item[data-id]").forEach(el => {

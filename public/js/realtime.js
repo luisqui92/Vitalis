@@ -101,6 +101,8 @@ function refrescarPantallaActual() {
   if (tipo === "dashboard") renderDashboard();
   else if (tipo === "agenda") renderAgenda();
   else if (tipo === "pacienteDetalle") renderPacienteDetalle(params.pacienteId, params.tabActiva);
+  else if (tipo === "ganaderia") renderGanaderia();
+  else if (tipo === "loteDetalle") renderLoteDetalle(params.loteId);
   else if (tipo === "inicioEscritorio" && typeof renderInicioEscritorio === "function") renderInicioEscritorio();
   else if (tipo === "recordatorios") renderRecordatorios();
   // La bandeja SÍ se refresca sola: es una pantalla de espera, y lo que se
@@ -131,6 +133,12 @@ envolverParaTiempoReal("renderAgenda", () => ({ tipo: "agenda", params: {} }));
 envolverParaTiempoReal("pintarKardex", (p, _c, _m, _v, _med, _est, _rec, tabActiva) => ({ tipo: "pacienteDetalle", params: { pacienteId: p._id, tabActiva } }));
 envolverParaTiempoReal("renderInicioEscritorio", () => ({ tipo: "inicioEscritorio", params: {} }));
 envolverParaTiempoReal("renderRecordatorios", () => ({ tipo: "recordatorios", params: {} }));
+// Sin esto, cargar un lote o un evento (un POST) dispara el aviso de cambio
+// de siempre, y ese aviso repintaba la pantalla ANTERIOR — la lista de
+// pacientes, si era la última registrada— sacando al médico de Ganadería
+// justo después de guardar. Mismo bug que ya pasó con renderEquiposRayos.
+envolverParaTiempoReal("renderGanaderia", () => ({ tipo: "ganaderia", params: {} }));
+envolverParaTiempoReal("renderLoteDetalle", (loteId) => ({ tipo: "loteDetalle", params: { loteId } }));
 // Sin esto, dar de alta un equipo de rayos (un POST) hacía que el aviso de
 // cambio repintara la pantalla ANTERIOR y saltara fuera de la de equipos,
 // justo en el único momento en que el token está a la vista.

@@ -54,6 +54,14 @@ if (typeof esAdministrador === "function" && esAdministrador()) {
 if (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR) {
   ESCR_NAV_ITEMS.unshift({ id: "pagos", claveLabel: "op.nav.pagos", icono: ICONOS.tendencia, fn: "renderPagos" });
 }
+// Symphomed Ganadería: solo para quien atiende veterinaria — un consultorio
+// de medicina general no tiene lotes que manejar, y agregarle el ítem igual
+// solo ensuciaría un menú que ya no le sirve.
+if (typeof MEDICO_TIPO_ESPECIALIDAD !== "undefined" && MEDICO_TIPO_ESPECIALIDAD === "veterinaria") {
+  const idx = ESCR_NAV_ITEMS.findIndex(i => i.id === "configuracion");
+  ESCR_NAV_ITEMS.splice(idx === -1 ? ESCR_NAV_ITEMS.length : idx, 0,
+    { id: "ganaderia", claveLabel: "escr.nav.ganaderia", icono: ICONOS.pata, fn: "renderGanaderia" });
+}
 
 function escritorioShellActivo() {
   return esEscritorio() && document.getElementById("escritorioShell").style.display !== "none";

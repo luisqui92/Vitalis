@@ -1,0 +1,83 @@
+// Symphomed — Español · Ganadería, lotes de producción animal (public/js/ganaderia.js).
+Object.assign(I18N.es, {
+  "ganaderia.cargando": "Cargando lotes...",
+  "ganaderia.error": "Error cargando la ganadería",
+  "ganaderia.volver": "← Panel",
+  "ganaderia.nuevoLote": "Nuevo lote",
+  "ganaderia.vacio": "No hay lotes todavía.",
+
+  "ganaderia.especie.bovino": "Bovino",
+  "ganaderia.especie.porcino": "Porcino",
+  "ganaderia.especie.avicola": "Avícola",
+
+  "ganaderia.filtro.activo": "Activos",
+  "ganaderia.filtro.cerrado": "Cerrados",
+  "ganaderia.filtro.todos": "Todos",
+
+  "ganaderia.item.cantidad": "{actual} de {inicial}",
+
+  "ganaderia.form.especie": "Especie",
+  "ganaderia.form.nombre": "Nombre del lote",
+  "ganaderia.form.nombrePlaceholder": "Ej. Galpón 3, Corral de engorde norte",
+  "ganaderia.form.cantidadInicial": "Cantidad de animales",
+  "ganaderia.form.fechaIngreso": "Fecha de ingreso",
+  "ganaderia.form.proposito": "Propósito (opcional)",
+  "ganaderia.form.propositoPlaceholder": "Leche, carne, huevo, cría, engorde...",
+  "ganaderia.form.ubicacion": "Ubicación (opcional)",
+  "ganaderia.form.ubicacionPlaceholder": "Finca, potrero, galpón...",
+  "ganaderia.form.guardar": "Guardar lote",
+  "ganaderia.form.errFaltanDatos": "Completá especie, nombre, cantidad y fecha de ingreso.",
+  "ganaderia.form.errGuardar": "No se pudo guardar el lote.",
+
+  "ganaderia.detalle.volver": "← Lotes",
+  "ganaderia.detalle.mortalidad": "{pct}% de mortalidad acumulada ({n} muertes)",
+  "ganaderia.detalle.retiroTitulo": "🔒 Período de retiro vigente",
+  "ganaderia.detalle.libreCarne": "libre para faena desde el {fecha}",
+  "ganaderia.detalle.libreLeche": "leche libre desde el {fecha}",
+  "ganaderia.detalle.cerrar": "Cerrar este lote",
+  "ganaderia.detalle.confirmarCerrar": "¿Cerrar este lote? No vas a poder cargar más eventos.",
+  "ganaderia.detalle.motivoPrompt": "Motivo del cierre (opcional): vendido, faenado, trasladado...",
+  "ganaderia.detalle.errCerrar": "No se pudo cerrar el lote.",
+  "ganaderia.detalle.cerrado": "Lote cerrado — {motivo}",
+  "ganaderia.detalle.nuevoEvento": "Registrar evento",
+
+  "ganaderia.evento.tipo": "Tipo de evento",
+  "ganaderia.evento.tipo.mortalidad": "Mortalidad",
+  "ganaderia.evento.tipo.vacunacion": "Vacunación",
+  "ganaderia.evento.tipo.tratamiento": "Tratamiento",
+  "ganaderia.evento.tipo.pesaje": "Pesaje (muestra)",
+  "ganaderia.evento.fecha": "Fecha",
+  "ganaderia.evento.cantidadMuertes": "Cantidad de animales muertos",
+  "ganaderia.evento.causaPresunta": "Causa presunta (opcional)",
+  "ganaderia.evento.causaPlaceholder": "Ej. estrés calórico, enfermedad respiratoria...",
+  "ganaderia.evento.producto": "Producto aplicado",
+  "ganaderia.evento.productoPlaceholder": "Ej. Enrofloxacina, Newcastle...",
+  "ganaderia.evento.dosis": "Dosis (opcional)",
+  "ganaderia.evento.viaAplicacion": "Vía de aplicación (opcional)",
+  "ganaderia.evento.viaPlaceholder": "Ej. agua de bebida, intramuscular...",
+  "ganaderia.evento.cantidadAplicada": "Cantidad de animales a los que se aplicó (opcional)",
+  "ganaderia.evento.cantidadAplicadaPlaceholder": "Todo el lote ({n}) si se deja vacío",
+  "ganaderia.evento.diasRetiroCarne": "Días de retiro para faena (opcional)",
+  "ganaderia.evento.diasRetiroLeche": "Días de retiro para leche (opcional)",
+  "ganaderia.evento.tamanoMuestra": "Tamaño de la muestra",
+  "ganaderia.evento.pesoPromedioKg": "Peso promedio (kg)",
+  "ganaderia.evento.notas": "Notas (opcional)",
+  "ganaderia.evento.guardar": "Guardar evento",
+  "ganaderia.evento.errFaltanDatos": "Faltan datos para este tipo de evento.",
+  "ganaderia.evento.errGuardar": "No se pudo guardar el evento.",
+  "ganaderia.evento.tieneRetiro": "con período de retiro",
+
+  "ganaderia.eventos.titulo": "Eventos registrados",
+  "ganaderia.eventos.vacio": "Todavía no se cargó ningún evento.",
+  "ganaderia.eventos.mortalidad": "{n} muerte(s)",
+  "ganaderia.eventos.pesaje": "{peso} kg promedio (muestra de {n})",
+
+  "ganaderia.curva.titulo": "Curva de peso",
+  "ganaderia.curva.muestra": "muestra de {n}",
+
+  // Se usan desde escritorio.js y pacientes.js, no desde ganaderia.js —
+  // viven en este módulo porque son las mismas tres letras del nombre del
+  // producto, y es donde alguien que traduzca esto va a buscarlas primero.
+  "escr.nav.ganaderia": "Ganadería",
+  "pacientes.tab.ganaderia": "Ganadería",
+});
