@@ -81,4 +81,8 @@ Object.assign(I18N.es, {
   "campo.offline.primeraVez": "No hay señal. Para usar la finca sin señal, abrí este enlace una vez con señal.",
   "campo.offline.sinEspacio": "El teléfono no tiene espacio para guardarlo. Probá de nuevo con señal.",
   "campo.offline.borrarSinSenal": "Para borrar un gasto hace falta señal.",
+
+  "campo.excel.descargar": "Descargar mi finca en Excel",
+  "campo.excel.ayuda": "Todo lo registrado de tus lotes: sanidad, producción, gastos y vacunas. Sirve para tu contador, el banco o una inspección.",
+  "campo.excel.sinSenal": "Para descargar el Excel hace falta señal.",
 });

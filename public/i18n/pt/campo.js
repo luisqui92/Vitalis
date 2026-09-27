@@ -79,4 +79,8 @@ Object.assign(I18N.pt, {
   "campo.offline.primeraVez": "Sem sinal. Para usar a fazenda sem sinal, abra este link uma vez com sinal.",
   "campo.offline.sinEspacio": "O celular não tem espaço para salvar. Tente de novo com sinal.",
   "campo.offline.borrarSinSenal": "Para apagar um gasto é preciso ter sinal.",
+
+  "campo.excel.descargar": "Baixar minha fazenda em Excel",
+  "campo.excel.ayuda": "Tudo o que foi registrado nos seus lotes: sanidade, produção, gastos e vacinas. Serve para o seu contador, o banco ou uma fiscalização.",
+  "campo.excel.sinSenal": "Para baixar o Excel é preciso ter sinal.",
 });

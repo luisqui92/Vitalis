@@ -389,13 +389,27 @@ function avisoConexionHtml() {
   return partes.length ? `<div class="card">${partes.join("")}</div>` : "";
 }
 
+// La planilla de su finca (routes/accesoDueno.js). Un enlace común: acá
+// no hay sesión en un encabezado, la llave ya va en la dirección. Sin señal
+// no se ofrece: la arma el servidor, y tocarla sería un error seguro.
+function excelHtml() {
+  return `
+    <div class="card">
+      ${DATOS_DE_CUANDO
+        ? `<div class="hint" style="margin-top:0">📊 ${t("campo.excel.sinSenal")}</div>`
+        : `<a id="lnkExcelCampo" href="/campo/${LLAVE}/excel" download
+             style="display:block;text-align:center;text-decoration:none;background:rgba(var(--primary-rgb),.08);color:var(--primary);border-radius:var(--radius-sm);padding:12px;font-size:13.5px;font-weight:600">📊 ${t("campo.excel.descargar")}</a>
+           <div class="hint">${t("campo.excel.ayuda")}</div>`}
+    </div>`;
+}
+
 function pintarCampo() {
   const d = DATOS_CAMPO;
   document.getElementById("campoTitulo").textContent = d.finca.nombre;
   document.getElementById("campoSub").textContent = d.veterinario.nombre ? t("campo.veterinario", { nombre: d.veterinario.nombre }) : "";
   document.title = d.finca.nombre;
   appCampo.innerHTML = avisoConexionHtml() + (d.lotes.length
-    ? d.lotes.map(loteHtml).join("")
+    ? d.lotes.map(loteHtml).join("") + excelHtml()
     : `<div class="card"><div class="hint" style="margin-top:0">${t("campo.sinLotes")}</div></div>`);
   enganchar();
 }

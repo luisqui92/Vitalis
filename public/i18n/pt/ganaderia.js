@@ -311,4 +311,11 @@ Object.assign(I18N.pt, {
   "ganaderia.acceso.errCortar": "Não foi possível cortar o acesso.",
   "ganaderia.acceso.cortadoPorTelefono": "Você mudou o WhatsApp do dono: o acesso que ele tinha foi cortado. Se for o caso, envie um novo.",
   "ganaderia.origen.dueno": "anotado pelo dono {nombre}",
+
+  // Exportar a Excel (routes/exportarGanado.js)
+  "ganaderia.excel.todo": "Baixar em Excel",
+  "ganaderia.excel.finca": "Baixar a fazenda em Excel",
+  "ganaderia.excel.lote": "Baixar este lote em Excel",
+  "ganaderia.excel.preparando": "Preparando a planilha…",
+  "ganaderia.excel.error": "Não foi possível gerar a planilha.",
 });

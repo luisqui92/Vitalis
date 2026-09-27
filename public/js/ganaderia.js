@@ -20,6 +20,38 @@ let ganaderiaFiltro = "activo";
 // a entrar y salir del detalle de un lote.
 let ganaderiaFincaFiltro = "";
 
+// Baja una planilla de Excel del servidor (routes/exportarGanado.js). Con
+// fetch y no con un enlace común porque la sesión viaja en el encabezado
+// Authorization: poner el token en la URL lo dejaría en el historial y en
+// los registros del servidor.
+async function descargarExcelGanado(ruta, boton) {
+  const textoAntes = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = t("ganaderia.excel.preparando");
+  try {
+    const res = await fetch(API + ruta, { headers: { Authorization: "Bearer " + TOKEN } });
+    if (!res.ok) {
+      const datos = await res.json().catch(() => ({}));
+      throw { status: res.status, error: datos.error };
+    }
+    const nombre = (/filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "") || [])[1] || "ganaderia.xlsx";
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    if (e.status === 401) return logout();
+    alert(e.error || t("ganaderia.excel.error"));
+  } finally {
+    boton.disabled = false;
+    boton.textContent = textoAntes;
+  }
+}
+
 async function renderGanaderia() {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
@@ -57,7 +89,10 @@ function fincaItemHtml(f) {
     <div class="item" style="cursor:default">
       <div class="top">
         <div class="nombre">${esc(f.nombre)} <span class="hint">(${esc(f.codigo)})</span></div>
-        <button class="link" data-editar-finca="${f._id}" style="margin:0;width:auto">${t("ganaderia.finca.editar")}</button>
+        <div style="display:flex;gap:12px">
+          <button class="link" data-excel-finca="${f._id}" style="margin:0;width:auto" aria-label="${t("ganaderia.excel.finca")}">📊 Excel</button>
+          <button class="link" data-editar-finca="${f._id}" style="margin:0;width:auto">${t("ganaderia.finca.editar")}</button>
+        </div>
       </div>
       <div class="paciente-info">${dueno ? `${t("ganaderia.finca.dueno")}: ${dueno}` : `<span class="hint">${t("ganaderia.finca.sinDueno")}</span>`}</div>
       <div class="paciente-info">${t("ganaderia.finca.lotesActivos", { n: f.lotesActivos || 0 })}${f.ubicacion ? ` · ${esc(f.ubicacion)}` : ""}</div>
@@ -195,6 +230,7 @@ function pintarGanaderia(lotes, fincas) {
     </div>
 
     <button class="secondary" id="btnNuevoLote" style="margin-top:12px">➕ ${t("ganaderia.nuevoLote")}</button>
+    <button class="link" id="btnExcelGanaderia" style="margin-top:8px">📊 ${t("ganaderia.excel.todo")}</button>
 
     <div id="loteFormBox" style="display:none;margin-top:12px" class="card">
       <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.nuevoLote")}</div>
@@ -242,6 +278,13 @@ function pintarGanaderia(lotes, fincas) {
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
+  document.getElementById("btnExcelGanaderia").onclick = (ev) => {
+    // Lo mismo que se está viendo: el filtro de estado y el de finca.
+    const params = new URLSearchParams();
+    if (ganaderiaFiltro !== "todos") params.set("estado", ganaderiaFiltro);
+    if (ganaderiaFincaFiltro) params.set("fincaId", ganaderiaFincaFiltro);
+    descargarExcelGanado(`/medico/ganaderia/excel${params.toString() ? `?${params}` : ""}`, ev.currentTarget);
+  };
   document.getElementById("btnNuevoLote").onclick = () => {
     const box = document.getElementById("loteFormBox");
     box.style.display = box.style.display === "none" ? "block" : "none";
@@ -284,6 +327,9 @@ function pintarGanaderia(lotes, fincas) {
   };
   document.getElementById("btnNuevaFinca").onclick = () => abrirFormFinca(null);
   engancharAccesoDueno(fincas);
+  document.querySelectorAll("[data-excel-finca]").forEach(btn => {
+    btn.onclick = (ev) => descargarExcelGanado(`/medico/fincas/${btn.dataset.excelFinca}/excel`, ev.currentTarget);
+  });
   document.querySelectorAll("[data-editar-finca]").forEach(btn => {
     btn.onclick = () => abrirFormFinca(fincas.find(f => f._id === btn.dataset.editarFinca));
   });
@@ -390,6 +436,7 @@ function pintarLoteDetalle(data) {
         <select id="loteCambiarFinca">${opcionesFinca(fincas, lote.fincaId || "")}</select>` : ""}
       <div class="paciente-info">${t("ganaderia.item.cantidad", { actual: lote.cantidadActual, inicial: lote.cantidadInicial })}
         — ${t("ganaderia.detalle.mortalidad", { pct: mortalidad.porcentaje.toFixed(1), n: mortalidad.totalMuertes })}</div>
+      <button class="link" id="btnExcelLote" style="margin-top:8px">📊 ${t("ganaderia.excel.lote")}</button>
       ${lote.estado === "cerrado" ? `
         <div class="hint" style="margin-top:6px">${t("ganaderia.detalle.cerrado", { motivo: lote.motivoCierre || "—" })}</div>
       ` : `
@@ -503,6 +550,7 @@ function pintarLoteDetalle(data) {
     };
   }
 
+  document.getElementById("btnExcelLote").onclick = (ev) => descargarExcelGanado(`/medico/lotes/${lote._id}/excel`, ev.currentTarget);
   const btnCerrar = document.getElementById("btnCerrarLote");
   if (btnCerrar) {
     btnCerrar.onclick = async () => {

@@ -163,6 +163,7 @@ require("./routes/costos")(app);
 // El dueño de la finca, por su enlace (/campo/<llave>). Rutas exactas, como
 // /mi y /r: no compiten con nada de abajo.
 require("./routes/accesoDueno")(app);
+require("./routes/exportarGanado")(app);
 require("./routes/fisioterapia")(app);
 require("./routes/socio")(app);
 require("./routes/insumos")(app);

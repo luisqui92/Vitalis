@@ -41,6 +41,8 @@ const {
   TIPO_PRODUCCION, eventosConRetiroLeche, registrarMortalidad, guardarProduccion, registrarGasto,
 } = require("../services/cargasGanado");
 const { nuevoToken, hashDe, revocarLlaves, estadoAcceso } = require("../services/accesoFinca");
+const { libroGanadero, nombreArchivo } = require("../services/exportarGanado");
+const { TIPO_XLSX } = require("../services/xlsx");
 const { CONFIG, log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -248,6 +250,25 @@ module.exports = function (app) {
         { src: "/img/simbolo-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       ],
     }));
+  }));
+
+  // La planilla de su finca: los mismos lotes que ve en la página (los
+  // activos), con todo lo registrado. Es de él: se la pide el contador, el
+  // banco, la inspección sanitaria.
+  app.get("/campo/:llave/excel", limitCampo, asyncRoute(async (req, res) => {
+    const sesion = await sesionDeCampo(req.params.llave);
+    const lotes = await LoteGanado.find({ medicoPhone: sesion.llave.medicoPhone, fincaId: sesion.finca._id, estado: "activo" })
+      .sort({ nombre: 1 }).limit(100);
+    const libro = await libroGanadero(lotes, {
+      medicoPhone: sesion.llave.medicoPhone, idioma: sesion.medico.idioma === "pt" ? "pt" : "es", moneda: sesion.moneda,
+    });
+    registrar({ req, medicoPhone: sesion.llave.medicoPhone, accion: "campo_exportar_excel", recurso: `Finca:${sesion.finca._id}`, detalle: "por el dueño" });
+    res.set({
+      "Content-Type": TIPO_XLSX,
+      "Content-Disposition": `attachment; filename="${nombreArchivo(sesion.finca.nombre)}"`,
+      "Cache-Control": "no-store",
+    });
+    res.send(libro);
   }));
 
   app.post("/campo/:llave/lotes/:loteId/mortalidad", limitCampo, asyncRoute(async (req, res) => {
