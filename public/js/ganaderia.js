@@ -220,15 +220,16 @@ async function renderLoteDetalle(id) {
   detenerPolling();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("ganaderia.cargando")}</div>`;
   try {
-    const [data, dataFincas, dataAnimales, dataProduccion] = await Promise.all([
+    const [data, dataFincas, dataAnimales, dataProduccion, dataCostos] = await Promise.all([
       api(`/medico/lotes/${id}`),
       api("/medico/fincas"),
       api(`/medico/lotes/${id}/animales`),
       api(`/medico/lotes/${id}/produccion`),
+      api(`/medico/lotes/${id}/costos`),
     ]);
     pintarLoteDetalle({
       ...data, fincas: dataFincas.fincas || [], animales: dataAnimales.animales || [],
-      resumenRepro: dataAnimales.resumen, produccion: dataProduccion,
+      resumenRepro: dataAnimales.resumen, produccion: dataProduccion, costos: dataCostos,
     });
   } catch (e) {
     if (e.status === 401) return logout();
@@ -264,7 +265,7 @@ function eventoItemHtml(e) {
 }
 
 function pintarLoteDetalle(data) {
-  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso, animales, resumenRepro, produccion } = data;
+  const { lote, finca, fincas, eventos, mortalidad, retirosVigentes, curvaPeso, animales, resumenRepro, produccion, costos } = data;
   const conReproduccion = lote.especie === "bovino" || lote.especie === "porcino";
   const duenoTexto = finca ? [finca.duenoNombre, finca.duenoTelefono].filter(Boolean).map(esc).join(" · ") : "";
 
@@ -298,6 +299,8 @@ function pintarLoteDetalle(data) {
       </div>` : ""}
 
     ${produccion?.tipo ? produccionLoteHtml(lote, produccion, retirosVigentes) : ""}
+
+    ${costos ? costosLoteHtml(lote, costos) : ""}
 
     ${conReproduccion ? reproduccionLoteHtml(lote, animales, resumenRepro) : ""}
 
@@ -375,6 +378,7 @@ function pintarLoteDetalle(data) {
   document.getElementById("btnBack").onclick = renderGanaderia;
   if (conReproduccion) engancharReproduccionLote(lote);
   if (produccion?.tipo) engancharProduccionLote(lote, produccion.tipo);
+  if (costos) engancharCostosLote(lote);
 
   const selectFinca = document.getElementById("loteCambiarFinca");
   if (selectFinca) {
@@ -993,6 +997,127 @@ function engancharControlLechero(animal) {
         method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ dia, litros }),
       });
       renderAnimalDetalle(animal._id);
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
+    }
+  };
+}
+
+// ─── ALIMENTO Y COSTOS ──────────────────────────────────────────────────────
+//
+// Los indicadores los calcula services/costos.js; acá solo se pintan. La
+// plata llega en centavos y con la moneda de la cuenta.
+
+function plataGanado(centavos, moneda) {
+  if (centavos == null) return "—";
+  const simbolo = moneda === "BRL" ? "R$" : "Bs";
+  return `${simbolo} ${(centavos / 100).toLocaleString(localeActual(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function costosLoteHtml(lote, costos) {
+  const { moneda, resumen: r, gastos, categorias, gastosOtraMoneda } = costos;
+  const esEngorde = lote.especie === "porcino" || lote.especie === "avicola";
+  const conGasto = categorias.filter(cat => r.porCategoria[cat] > 0);
+  const u = r.porUnidad;
+
+  return `
+    <div class="card" style="margin-top:12px">
+      <div class="seccion-titulo" style="margin-top:0">${t("ganaderia.costos.titulo")}</div>
+      ${r.total > 0 ? `
+        <div class="paciente-info">${t("ganaderia.costos.total", { monto: plataGanado(r.total, moneda) })}</div>
+        <div style="display:grid;gap:4px;margin:8px 0">${conGasto.map(cat => `
+          <div style="display:grid;grid-template-columns:92px 1fr auto;gap:8px;align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums">
+            <span class="hint" style="margin:0">${t("ganaderia.costos.categoria." + cat)}</span>
+            <span style="display:block;height:10px;border-radius:5px;background:var(--border)">
+              <span style="display:block;height:10px;border-radius:5px;width:${Math.max(2, (r.porCategoria[cat] / r.total) * 100)}%;background:var(--primary)"></span>
+            </span>
+            <span>${Math.round((r.porCategoria[cat] / r.total) * 100)}%</span>
+          </div>`).join("")}</div>
+      ` : ""}
+      ${r.costoPorAnimal != null ? `<div class="paciente-info">${t("ganaderia.costos.porAnimal", { monto: plataGanado(r.costoPorAnimal, moneda) })}</div>` : ""}
+      ${r.alimentoPorAnimalDia != null ? `<div class="paciente-info">${t("ganaderia.costos.alimentoPorAnimalDia", { kg: numeroCorto(r.alimentoPorAnimalDia, 3) })}</div>` : ""}
+      ${r.conversion.valor != null ? `
+        <div class="paciente-info">${t("ganaderia.costos.conversion", { n: numeroCorto(r.conversion.valor, 2), desde: diaCortoProd(r.conversion.desde), hasta: diaCortoProd(r.conversion.hasta) })}</div>
+        <div class="hint">${t("ganaderia.costos.conversionAyuda")}</div>`
+        : esEngorde && r.conversion.motivo !== "sin_ganancia" ? `<div class="hint">${t("ganaderia.costos.conversionFalta." + r.conversion.motivo)}</div>` : ""}
+      ${u?.tipo === "leche" && u.costoPorLitro != null ? `
+        <div class="paciente-info">${t("ganaderia.costos.porLitro", { monto: plataGanado(u.costoPorLitro, moneda) })}</div>
+        ${u.costoPorLitroVendible != null && u.vendibles < u.litros ? `
+          <div class="paciente-info">${t("ganaderia.costos.porLitroVendible", { monto: plataGanado(u.costoPorLitroVendible, moneda) })}</div>
+          <div class="hint">${t("ganaderia.costos.porLitroVendibleAyuda")}</div>` : ""}` : ""}
+      ${u?.tipo === "huevos" && u.costoPorDocena != null ? `<div class="paciente-info">${t("ganaderia.costos.porDocena", { monto: plataGanado(u.costoPorDocena, moneda) })}</div>` : ""}
+      ${gastosOtraMoneda ? `<div class="hint">${t("ganaderia.costos.otraMoneda", { n: gastosOtraMoneda })}</div>` : ""}
+      ${!gastos.length ? `<div class="hint">${t("ganaderia.costos.vacio")}</div>` : ""}
+
+      ${lote.estado !== "cerrado" ? `
+        <button class="link" id="btnNuevoGasto" style="margin-top:8px">➕ ${t("ganaderia.costos.cargar")}</button>
+        <div id="gastoFormBox" style="display:none;margin-top:8px">
+          <label>${t("ganaderia.evento.fecha")}</label>
+          <input id="gastoDia" type="date" value="${fechaStrLocalGanado(new Date())}">
+          <label>${t("ganaderia.costos.categoriaLabel")}</label>
+          <select id="gastoCategoria">${categorias.map(cat => `<option value="${cat}">${t("ganaderia.costos.categoria." + cat)}</option>`).join("")}</select>
+          <label>${t("ganaderia.costos.concepto")}</label>
+          <input id="gastoConcepto" type="text" placeholder="${t("ganaderia.costos.conceptoPlaceholder")}">
+          <div id="gastoKgBox">
+            <label>${t("ganaderia.costos.kg")}</label>
+            <input id="gastoKg" type="number" min="0" step="0.1">
+          </div>
+          <label>${t("ganaderia.costos.monto", { simbolo: moneda === "BRL" ? "R$" : "Bs" })}</label>
+          <input id="gastoMonto" type="number" min="0" step="0.01">
+          <div id="gastoErr"></div>
+          <button class="secondary" id="btnGuardarGasto">${t("ganaderia.evento.guardar")}</button>
+        </div>` : ""}
+
+      ${gastos.length ? `<div style="margin-top:10px">${gastos.slice(0, 10).map(g => `
+        <div class="item" style="cursor:default">
+          <div class="top">
+            <div class="nombre">${t("ganaderia.costos.categoria." + g.categoria)}${g.concepto ? ` <span class="hint">${esc(g.concepto)}</span>` : ""}</div>
+            <button class="link" data-borrar-gasto="${g._id}" style="margin:0;width:auto;color:var(--danger)" aria-label="${t("ganaderia.costos.borrar")}">✕</button>
+          </div>
+          <div class="paciente-info" style="font-variant-numeric:tabular-nums">${diaCortoProd(g.dia)} · ${plataGanado(g.montoCentavos, g.moneda)}${g.kg != null ? ` · ${numeroCorto(g.kg)} kg` : ""}</div>
+        </div>`).join("")}</div>` : ""}
+    </div>`;
+}
+
+function engancharCostosLote(lote) {
+  document.querySelectorAll("[data-borrar-gasto]").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(t("ganaderia.costos.confirmarBorrar"))) return;
+      try {
+        await api(`/medico/gastos/${btn.dataset.borrarGasto}`, { method: "DELETE" });
+        renderLoteDetalle(lote._id);
+      } catch (e) {
+        alert(e.error || t("ganaderia.evento.errGuardar"));
+      }
+    };
+  });
+  const btn = document.getElementById("btnNuevoGasto");
+  if (!btn) return;
+  btn.onclick = () => {
+    const box = document.getElementById("gastoFormBox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  };
+  const selectCat = document.getElementById("gastoCategoria");
+  const mostrarKg = () => { document.getElementById("gastoKgBox").style.display = selectCat.value === "alimento" ? "block" : "none"; };
+  selectCat.onchange = mostrarKg;
+  mostrarKg();
+
+  document.getElementById("btnGuardarGasto").onclick = async () => {
+    const errBox = document.getElementById("gastoErr");
+    errBox.innerHTML = "";
+    const categoria = selectCat.value;
+    const monto = document.getElementById("gastoMonto").value;
+    const kg = categoria === "alimento" ? document.getElementById("gastoKg").value : "";
+    if (!monto && !kg) { errBox.innerHTML = `<div class="error">${t("ganaderia.costos.errVacio")}</div>`; return; }
+    try {
+      await api(`/medico/lotes/${lote._id}/gastos`, {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          dia: document.getElementById("gastoDia").value, categoria,
+          concepto: document.getElementById("gastoConcepto").value.trim(), monto, kg,
+        }),
+      });
+      renderLoteDetalle(lote._id);
     } catch (e) {
       errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.evento.errGuardar"))}</div>`;
     }

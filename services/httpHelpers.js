@@ -35,4 +35,30 @@ async function obtenerOFallar(Modelo, filtro, mensajeNoEncontrado = "No encontra
   return doc;
 }
 
-module.exports = { asyncRoute, ErrorHttp, obtenerOFallar };
+// Un día civil "YYYY-MM-DD" que exista de verdad (no el 30 de febrero) y
+// que ya haya pasado. Se deja un día de margen: a las once de la noche en
+// Bolivia ya es mañana en UTC. Lo usan los registros por día de Ganadería
+// (producción, gastos).
+function diaPasadoValido(valor, campo = "dia") {
+  const dia = String(valor || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) throw new ErrorHttp(400, `${campo} debe tener formato AAAA-MM-DD`);
+  const f = new Date(`${dia}T12:00:00Z`);
+  if (Number.isNaN(f.getTime()) || f.toISOString().slice(0, 10) !== dia) throw new ErrorHttp(400, `${campo} no es una fecha válida`);
+  const manana = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  if (dia > manana) throw new ErrorHttp(400, "No se puede cargar un día que todavía no pasó");
+  return dia;
+}
+
+// Un número 0 o más, o null si no vino. Cero es un dato real (un día sin
+// producción, un gasto sin costo) y no puede confundirse con "no se cargó".
+function numeroNoNegativo(valor, campo, { requerido = false } = {}) {
+  if (valor === undefined || valor === null || valor === "") {
+    if (requerido) throw new ErrorHttp(400, `${campo} es requerido`);
+    return null;
+  }
+  const n = Number(valor);
+  if (!Number.isFinite(n) || n < 0) throw new ErrorHttp(400, `${campo} debe ser un número, 0 o más`);
+  return n;
+}
+
+module.exports = { asyncRoute, ErrorHttp, obtenerOFallar, diaPasadoValido, numeroNoNegativo };

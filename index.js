@@ -159,6 +159,7 @@ require("./routes/vacunasPet")(app);
 require("./routes/lotesGanado")(app);
 require("./routes/reproduccion")(app);
 require("./routes/produccion")(app);
+require("./routes/costos")(app);
 require("./routes/fisioterapia")(app);
 require("./routes/socio")(app);
 require("./routes/insumos")(app);

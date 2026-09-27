@@ -7,7 +7,7 @@ const {
 } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar, diaPasadoValido: diaValido, numeroNoNegativo } = require("../services/httpHelpers");
 const { diaDe, sumarDias, diasEnRetiroLeche, resumenProduccion, resumenControles, resumenControlLote } = require("../services/produccion");
 
 const requireMedico = requireAuth(["medico"]);
@@ -16,28 +16,6 @@ const DIAS_HISTORIA = 60;
 
 function idValido(id, que) {
   if (!mongoose.isValidObjectId(id)) throw new ErrorHttp(404, `${que} no encontrado`);
-}
-
-// "YYYY-MM-DD", una fecha que exista de verdad, y no futura. Se deja un día
-// de margen: a las once de la noche en Bolivia ya es mañana en UTC.
-function diaValido(valor) {
-  const dia = String(valor || "").trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dia);
-  if (!m) throw new ErrorHttp(400, "dia debe tener formato AAAA-MM-DD");
-  const f = new Date(`${dia}T12:00:00Z`);
-  if (Number.isNaN(f.getTime()) || diaDe(f) !== dia) throw new ErrorHttp(400, "dia no es una fecha válida");
-  if (dia > sumarDias(diaDe(new Date()), 1)) throw new ErrorHttp(400, "No se puede cargar producción de un día que todavía no pasó");
-  return dia;
-}
-
-function numeroNoNegativo(valor, campo, { requerido = false } = {}) {
-  if (valor === undefined || valor === null || valor === "") {
-    if (requerido) throw new ErrorHttp(400, `${campo} es requerido`);
-    return null;
-  }
-  const n = Number(valor);
-  if (!Number.isFinite(n) || n < 0) throw new ErrorHttp(400, `${campo} debe ser un número, 0 o más`);
-  return n;
 }
 
 async function eventosConRetiroLeche(loteId, medicoPhone) {

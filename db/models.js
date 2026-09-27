@@ -833,6 +833,32 @@ const controlLecheroSchema = new mongoose.Schema({
 controlLecheroSchema.index({ medicoPhone: 1, animalId: 1, dia: 1 }, { unique: true });
 const ControlLechero = mongoose.model("ControlLechero", controlLecheroSchema);
 
+// ─── ALIMENTO Y COSTOS (Symphomed Ganadería) ───────────────────────────────
+//
+// Cada gasto del lote tal como pasó: una compra de alimento, una caja de
+// vacunas, un jornal. A diferencia de la producción, puede haber varios el
+// mismo día, así que NO hay índice único por día.
+//
+// La plata va en centavos, como en toda la plataforma, y con su moneda: la
+// de la cuenta al momento de cargarlo. Si mañana la cuenta cambia de
+// moneda, un gasto viejo no puede pasar a leerse en la moneda nueva.
+const gastoLoteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, index: true, required: true },
+  loteId: { type: mongoose.Schema.Types.ObjectId, ref: "LoteGanado", required: true, index: true },
+  dia: { type: String, required: true }, // "YYYY-MM-DD"
+  categoria: { type: String, enum: ["alimento", "sanidad", "mano_obra", "compra_animales", "otros"], required: true },
+  concepto: { type: String, default: "" },
+  // Opcional: el alimento producido en el propio campo no se compra, pero
+  // los kilos igual cuentan para la conversión alimenticia.
+  montoCentavos: { type: Number, default: null, min: 0 },
+  moneda: { type: String, enum: ["BOB", "BRL"], default: "BOB" },
+  // Solo alimento: los kilos. Es lo que da la conversión alimenticia.
+  kg: { type: Number, default: null, min: 0 },
+  registradoPor: { type: String, default: "" },
+}, { timestamps: true });
+gastoLoteSchema.index({ medicoPhone: 1, loteId: 1, dia: -1 });
+const GastoLote = mongoose.model("GastoLote", gastoLoteSchema);
+
 // Una nota de voz dictada durante la visita a un lote: el veterinario graba,
 // se transcribe y se le pide a la IA que separe lo dicho en eventos reales
 // (mortalidad, vacunación, tratamiento, pesaje) — mismo mecanismo que
@@ -3034,7 +3060,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
