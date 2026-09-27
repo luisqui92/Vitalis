@@ -84,7 +84,7 @@ console.log("\n── 3. El código pasa tantos valores como variables tiene ─
 // parámetros y lo que Meta tiene aprobado en esas dos no lo hubiera agarrado
 // nada.
 const RUTAS = ["citas", "reservaPublica", "consultaMedica", "informes", "informeFamilia", "solicitudesCuenta",
-  "resumenCompartido", "reseteoClave"];
+  "resumenCompartido", "reseteoClave", "accesoDueno"];
 // No todo lo que manda una plantilla vive en routes/: recordatorioMedicamento
 // y alertaRetiroGanado los disparan trabajos en segundo plano, no un pedido
 // HTTP — ver services/recordatorioMedicamento.js y

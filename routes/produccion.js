@@ -3,12 +3,13 @@
 // services/produccion.js.
 const mongoose = require("mongoose");
 const {
-  LoteGanado, EventoLote, AnimalGanado, EventoReproductivo, RegistroProduccion, ControlLechero, Medico,
+  LoteGanado, AnimalGanado, EventoReproductivo, RegistroProduccion, ControlLechero, Medico,
 } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar, diaPasadoValido: diaValido, numeroNoNegativo } = require("../services/httpHelpers");
-const { diaDe, sumarDias, diasEnRetiroLeche, resumenProduccion, resumenControles, resumenControlLote } = require("../services/produccion");
+const { eventosConRetiroLeche, guardarProduccion } = require("../services/cargasGanado");
+const { diaDe, sumarDias, resumenProduccion, resumenControles, resumenControlLote } = require("../services/produccion");
 
 const requireMedico = requireAuth(["medico"]);
 const TIPO_POR_ESPECIE = { bovino: "leche", avicola: "huevos" };
@@ -16,11 +17,6 @@ const DIAS_HISTORIA = 60;
 
 function idValido(id, que) {
   if (!mongoose.isValidObjectId(id)) throw new ErrorHttp(404, `${que} no encontrado`);
-}
-
-async function eventosConRetiroLeche(loteId, medicoPhone) {
-  return EventoLote.find({ loteId, medicoPhone, diasRetiroLeche: { $gt: 0 } })
-    .select("tipo fecha diasRetiroLeche producto").lean();
 }
 
 module.exports = function (app) {
@@ -59,32 +55,8 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     idValido(req.params.id, "Lote");
     const lote = await obtenerOFallar(LoteGanado, { _id: req.params.id, medicoPhone }, "Lote no encontrado");
-    const tipo = TIPO_POR_ESPECIE[lote.especie];
-    if (!tipo) throw new ErrorHttp(400, "Los lotes de cerdos no llevan producción diaria: se sigue por los pesajes");
-    if (lote.estado === "cerrado") throw new ErrorHttp(400, "El lote está cerrado");
-
-    const dia = diaValido(req.body?.dia);
-    const cantidad = numeroNoNegativo(req.body?.cantidad, "cantidad", { requerido: true });
-    let animales = numeroNoNegativo(req.body?.animales, "animales");
-    // Sin el dato, en aves se asume que ponen todas las gallinas vivas —
-    // mismo criterio que la vacunación masiva—; sin eso no hay % de postura.
-    if (animales == null && tipo === "huevos") animales = lote.cantidadActual;
-    if (tipo === "huevos" && animales > lote.cantidadActual) {
-      throw new ErrorHttp(400, `El lote tiene ${lote.cantidadActual} aves vivas`);
-    }
-
     const medico = await Medico.findOne({ phone: medicoPhone }).select("nombre").lean();
-    const registro = await RegistroProduccion.findOneAndUpdate(
-      { medicoPhone, loteId: lote._id, tipo, dia },
-      { $set: { cantidad, animales, notas: String(req.body?.notas || "").trim(), registradoPor: medico?.nombre || "" } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    ).lean();
-
-    // Se avisa en la misma respuesta si esa leche está en retiro: es el
-    // momento justo en que alguien puede frenar que vaya al tanque.
-    let retiro = null;
-    if (tipo === "leche") retiro = diasEnRetiroLeche(await eventosConRetiroLeche(lote._id, medicoPhone))(dia);
-    res.json({ ok: true, registro, enRetiro: Boolean(retiro), productoRetiro: retiro ? retiro.producto : null });
+    res.json({ ok: true, ...(await guardarProduccion(lote, req.body, { registradoPor: medico?.nombre || "" })) });
   }));
 
   app.delete("/medico/produccion/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {

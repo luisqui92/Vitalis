@@ -61,7 +61,106 @@ function fincaItemHtml(f) {
       </div>
       <div class="paciente-info">${dueno ? `${t("ganaderia.finca.dueno")}: ${dueno}` : `<span class="hint">${t("ganaderia.finca.sinDueno")}</span>`}</div>
       <div class="paciente-info">${t("ganaderia.finca.lotesActivos", { n: f.lotesActivos || 0 })}${f.ubicacion ? ` · ${esc(f.ubicacion)}` : ""}</div>
+      ${accesoDuenoHtml(f)}
     </div>`;
+}
+
+// El acceso propio del dueño a su finca (routes/accesoDueno.js): un enlace
+// por WhatsApp con el que ve sus lotes y carga producción, muertes y gastos.
+//
+// El enlace recién emitido se guarda acá y no solo en el DOM: emitirlo es un
+// POST, y el aviso de tiempo real que dispara repinta la lista de fincas un
+// instante después. Sin esto, el enlace —que el servidor no vuelve a
+// mostrar nunca, porque no lo guarda— desaparecía antes de poder copiarlo.
+// Mismo problema que el token de equipos en rayos.js (preservarToken).
+let ULTIMO_ACCESO_DUENO = null; // { fincaId, respuesta, hasta }
+const MINUTOS_VISIBLE_ACCESO = 10;
+
+function accesoRecienEmitido(fincaId) {
+  const u = ULTIMO_ACCESO_DUENO;
+  return u && u.fincaId === fincaId && Date.now() < u.hasta ? u.respuesta : null;
+}
+
+function accesoDuenoHtml(f) {
+  if (!f.duenoTelefono) return `<div class="hint">🔑 ${t("ganaderia.acceso.sinTelefono")}</div>`;
+  const a = f.accesoDueno;
+  const estado = a
+    ? `<div class="paciente-info">🔑 ${t("ganaderia.acceso.activo", { tel: esc(a.enviadaA) })} · ${a.ultimoUso
+        ? t("ganaderia.acceso.ultimoUso", { fecha: fechaCorta(a.ultimoUso) })
+        : t("ganaderia.acceso.sinUso")}</div>`
+    : `<div class="hint">🔑 ${t("ganaderia.acceso.explicacion")}</div>`;
+  return `
+    ${estado}
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <button class="link" data-acceso-emitir="${f._id}" style="margin:6px 0 0;width:auto">${a ? t("ganaderia.acceso.reenviar") : t("ganaderia.acceso.dar")}</button>
+      ${a ? `<button class="link" data-acceso-cortar="${f._id}" style="margin:6px 0 0;width:auto;color:var(--danger)">${t("ganaderia.acceso.cortar")}</button>` : ""}
+    </div>
+    <div id="accesoRes-${f._id}">${accesoRecienEmitido(f._id) ? resultadoAccesoHtml(accesoRecienEmitido(f._id)) : ""}</div>`;
+}
+
+function engancharAccesoDueno(fincas) {
+  engancharCopiarAcceso();
+  document.querySelectorAll("[data-acceso-emitir]").forEach(btn => {
+    btn.onclick = async () => {
+      const f = fincas.find(x => x._id === btn.dataset.accesoEmitir);
+      // Reenviar corta el enlace anterior: se avisa antes, porque el dueño
+      // que ya lo venía usando se queda sin entrar hasta abrir el nuevo.
+      if (f?.accesoDueno && !confirm(t("ganaderia.acceso.confirmarReenviar"))) return;
+      const caja = document.getElementById(`accesoRes-${btn.dataset.accesoEmitir}`);
+      btn.disabled = true;
+      try {
+        const r = await api(`/medico/fincas/${btn.dataset.accesoEmitir}/acceso-dueno`, {
+          method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+        });
+        ULTIMO_ACCESO_DUENO = { fincaId: btn.dataset.accesoEmitir, respuesta: r, hasta: Date.now() + MINUTOS_VISIBLE_ACCESO * 60000 };
+        renderGanaderia();
+      } catch (e) {
+        btn.disabled = false;
+        if (caja) caja.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.acceso.errEmitir"))}</div>`;
+      }
+    };
+  });
+  document.querySelectorAll("[data-acceso-cortar]").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(t("ganaderia.acceso.confirmarCortar"))) return;
+      if (ULTIMO_ACCESO_DUENO?.fincaId === btn.dataset.accesoCortar) ULTIMO_ACCESO_DUENO = null;
+      try {
+        await api(`/medico/fincas/${btn.dataset.accesoCortar}/acceso-dueno/revocar`, {
+          method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+        });
+        renderGanaderia();
+      } catch (e) {
+        const caja = document.getElementById(`accesoRes-${btn.dataset.accesoCortar}`);
+        if (caja) caja.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.acceso.errCortar"))}</div>`;
+      }
+    };
+  });
+}
+
+function resultadoAccesoHtml(r) {
+  const aviso = r.enviado
+    ? `<div class="exito">${t("ganaderia.acceso.enviado", { tel: esc(r.acceso?.enviadaA || "") })}</div>`
+    : `<div class="error">${t("ganaderia.acceso.noEnviado")}</div>`;
+  const destino = String(r.acceso?.enviadaA || "").replace(/\D/g, "");
+  return `
+    ${aviso}
+    <div class="hint" style="word-break:break-all">${esc(r.enlace)}</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <button class="link" id="btnCopiarAcceso" style="margin:6px 0 0;width:auto">${t("ganaderia.acceso.copiar")}</button>
+      ${r.enviado ? "" : `<a class="link" style="margin-top:6px;font-size:13px;font-weight:500;color:var(--primary)"
+        href="https://wa.me/${destino}?text=${encodeURIComponent(r.enlace)}" target="_blank" rel="noopener">${t("ganaderia.acceso.mandarWhatsapp")}</a>`}
+    </div>
+    <div class="hint">${t("ganaderia.acceso.unaVez")}</div>`;
+}
+
+function engancharCopiarAcceso() {
+  const b = document.getElementById("btnCopiarAcceso");
+  const r = ULTIMO_ACCESO_DUENO && accesoRecienEmitido(ULTIMO_ACCESO_DUENO.fincaId);
+  if (!b || !r) return;
+  b.onclick = async () => {
+    try { await navigator.clipboard.writeText(r.enlace); b.textContent = t("ganaderia.acceso.copiado"); }
+    catch { /* sin permiso de portapapeles: el enlace está a la vista para copiarlo a mano */ }
+  };
 }
 
 // El mismo formulario sirve para crear y para editar: con "finca" viene
@@ -172,9 +271,11 @@ function pintarGanaderia(lotes, fincas) {
         duenoTelefono: document.getElementById("fincaDuenoTelefono").value.trim(),
       };
       try {
-        await api(finca ? `/medico/fincas/${finca._id}` : "/medico/fincas", {
+        const r = await api(finca ? `/medico/fincas/${finca._id}` : "/medico/fincas", {
           method: finca ? "PATCH" : "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(cuerpo),
         });
+        // Cambiar el WhatsApp del dueño corta su acceso (routes/lotesGanado.js).
+        if (r.accesoRevocado) alert(t("ganaderia.acceso.cortadoPorTelefono"));
         renderGanaderia();
       } catch (e) {
         errBox.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.finca.errGuardar"))}</div>`;
@@ -182,6 +283,7 @@ function pintarGanaderia(lotes, fincas) {
     };
   };
   document.getElementById("btnNuevaFinca").onclick = () => abrirFormFinca(null);
+  engancharAccesoDueno(fincas);
   document.querySelectorAll("[data-editar-finca]").forEach(btn => {
     btn.onclick = () => abrirFormFinca(fincas.find(f => f._id === btn.dataset.editarFinca));
   });
@@ -262,7 +364,7 @@ function eventoItemHtml(e) {
   return `
     <div class="item" style="cursor:default">
       <div class="top"><div class="nombre">${linea}</div></div>
-      <div class="fecha">${fecha}</div>
+      <div class="fecha">${fecha}${e.origen === "dueno" ? ` · 👤 ${t("ganaderia.origen.dueno", { nombre: esc(e.registradoPor || "") })}` : ""}</div>
       ${e.notas ? `<div class="paciente-info">${esc(e.notas)}</div>` : ""}
     </div>`;
 }
@@ -1080,7 +1182,7 @@ function costosLoteHtml(lote, costos) {
             <div class="nombre">${t("ganaderia.costos.categoria." + g.categoria)}${g.concepto ? ` <span class="hint">${esc(g.concepto)}</span>` : ""}</div>
             <button class="link" data-borrar-gasto="${g._id}" style="margin:0;width:auto;color:var(--danger)" aria-label="${t("ganaderia.costos.borrar")}">✕</button>
           </div>
-          <div class="paciente-info" style="font-variant-numeric:tabular-nums">${diaCortoProd(g.dia)} · ${plataGanado(g.montoCentavos, g.moneda)}${g.kg != null ? ` · ${numeroCorto(g.kg)} kg` : ""}</div>
+          <div class="paciente-info" style="font-variant-numeric:tabular-nums">${diaCortoProd(g.dia)} · ${plataGanado(g.montoCentavos, g.moneda)}${g.kg != null ? ` · ${numeroCorto(g.kg)} kg` : ""}${g.origen === "dueno" ? ` · 👤 ${t("ganaderia.origen.dueno", { nombre: esc(g.registradoPor || "") })}` : ""}</div>
         </div>`).join("")}</div>` : ""}
     </div>`;
 }

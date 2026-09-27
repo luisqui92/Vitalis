@@ -1,0 +1,74 @@
+// La página del dueño de la finca (/campo/<llave>, public/js/campo.js).
+// La lee un productor, no un veterinario: nada de «evento», «retiro» sin
+// explicar ni «lote» cuando alcanza con el nombre.
+Object.assign(I18N.es, {
+  "campo.veterinario": "Tu veterinario: {nombre}",
+  "campo.sinLotes": "Todavía no hay lotes activos en esta finca. Cuando tu veterinario cargue uno, aparece acá.",
+  "campo.enlaceInvalido": "Este enlace no es válido. Pedile uno nuevo a tu veterinario.",
+  "campo.errCargar": "No se pudo abrir tu finca. Revisá la señal y volvé a intentar.",
+  "campo.errGuardar": "No se pudo guardar. Revisá la señal y volvé a intentar.",
+  "campo.errCantidad": "Falta la cantidad.",
+
+  "campo.lote.animales": "{n} animales",
+  "campo.lote.mortalidad": "{pct}% de mortalidad",
+
+  "campo.retiro.libre": "Sin medicamentos en retiro: se puede vender.",
+  "campo.retiro.leche": "No vender la leche hasta el {fecha} ({producto})",
+  "campo.retiro.carne": "No faenar ni vender para carne hasta el {fecha} ({producto})",
+
+  "campo.vacunas.titulo": "Vacunas que tocan",
+  "campo.vacunas.hasta": "hasta el {fecha}",
+  "campo.vacunas.ayuda": "Coordiná con tu veterinario. Cuando se apliquen, él las registra y salen de esta lista.",
+
+  "campo.anotar.leche": "🥛 Anotar leche",
+  "campo.anotar.huevos": "🥚 Anotar huevos",
+  "campo.anotar.muertes": "💀 Anotar muertes",
+  "campo.anotar.gasto": "💰 Anotar gasto",
+
+  "campo.form.dia": "Día",
+  "campo.form.litros": "Litros del día",
+  "campo.form.huevos": "Huevos juntados",
+  "campo.form.vacasOrdene": "Vacas ordeñadas (opcional)",
+  "campo.form.gallinas": "Gallinas en postura (opcional)",
+  "campo.form.gallinasPlaceholder": "Si no lo ponés: {n}",
+  "campo.form.corregir": "Si ya anotaste ese día, esto lo corrige: no se suma dos veces.",
+  "campo.form.muertes": "Cuántos murieron",
+  "campo.form.causa": "Causa (si la sabés)",
+  "campo.form.causaPlaceholder": "Ej. calor, diarrea, aplastado",
+  "campo.form.muertesAyuda": "Tu veterinario lo ve al instante. Si son muchos de golpe, llamalo.",
+  "campo.form.categoria": "Tipo de gasto",
+  "campo.form.concepto": "Detalle (opcional)",
+  "campo.form.monto": "Monto en {moneda}",
+  "campo.form.kg": "Kilos de alimento (opcional)",
+  "campo.form.guardar": "Guardar",
+
+  "campo.ok.produccion": "Anotado.",
+  "campo.ok.lecheEnRetiro": "Anotado. Ojo: esa leche está en retiro por {producto} — no va al tanque.",
+  "campo.ok.muertes": "Anotado. Tu veterinario ya lo ve.",
+  "campo.ok.gasto": "Gasto anotado.",
+
+  "campo.prod.titulo": "Producción",
+  "campo.prod.litros": "L",
+  "campo.prod.huevos": "huevos",
+  "campo.prod.promedio7": "Promedio de la última semana: {n} {unidad} por día",
+  "campo.prod.vendible7": "Leche que se pudo vender en la semana: {n} L",
+  "campo.prod.caida": "Bajó {pct}% contra la semana anterior. Avisale a tu veterinario.",
+  "campo.prod.enRetiro": "{litros} L de esta semana estaban en retiro y no se podían vender.",
+  "campo.prod.retiro": "en retiro",
+  "campo.prod.vacio": "Todavía no anotaste producción.",
+
+  "campo.costos.titulo": "Gastos",
+  "campo.costos.total": "Gastado en este lote: {monto}",
+  "campo.costos.porLitro": "Cada litro vendible te cuesta {monto} (últimos 30 días)",
+  "campo.costos.porDocena": "Cada docena te cuesta {monto} (últimos 30 días)",
+  "campo.costos.porAnimal": "Por animal vivo: {monto}",
+  "campo.costos.borrar": "Borrar este gasto",
+  "campo.costos.confirmarBorrar": "¿Borrar este gasto?",
+  "campo.costos.vacio": "Todavía no hay gastos anotados en este lote.",
+  "campo.costos.borrado": "Gasto borrado.",
+
+  "campo.evento.titulo": "Lo último que pasó",
+  "campo.evento.muertes": "{n} muertes",
+  "campo.evento.pesaje": "pesaje: {kg} kg promedio",
+  "campo.evento.tuyo": "lo anotaste vos",
+});

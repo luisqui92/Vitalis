@@ -357,6 +357,44 @@ mensaje reciente del médico.
 
 ---
 
+### 11. `acceso_finca`
+
+Cuerpo:
+
+```
+Hola {{1}}. Este es el acceso a la finca {{2}} en Symphomed.
+
+Desde ahí ves tus lotes, qué está en retiro y qué vacunas tocan, y cargás la producción, las muertes y los gastos. No hace falta contraseña.
+
+{{3}}
+
+Guardá este mensaje y no lo reenvíes: quien lo tenga puede cargar datos en tu finca.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del dueño | `Ramiro` |
+| `{{2}}` | nombre de la finca | `Estancia Los Álamos` |
+| `{{3}}` | enlace de acceso | `https://app.symphomed.com/campo/abc123` |
+
+Va al WhatsApp del **dueño de la finca**, no del veterinario. La emite el
+veterinario desde Ganadería → Fincas → «Dar acceso al dueño»
+(`routes/accesoDueno.js`). Es la llave de la finca, igual que `historia_propia`
+lo es de la historia clínica: quien la tenga puede cargar datos, por eso la
+última línea es una advertencia y va adentro de la plantilla. Emitir otra
+revoca la anterior, y cambiar el WhatsApp del dueño en la finca también la
+revoca.
+
+Necesita una versión en portugués (`pt_BR`) aprobada aparte para las cuentas de
+Brasil, con el mismo orden de variables:
+
+```
+Olá {{1}}. Este é o acesso à fazenda {{2}} no Symphomed.
+…
+```
+
+---
+
 ## Reglas de Meta que hacen que te la rechacen
 
 - El cuerpo **no puede empezar ni terminar con una variable**. Por eso las

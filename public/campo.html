@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mi finca</title>
+<!-- Como /mi: la página no se indexa ni manda el enlace como referer. El
+     enlace ES la llave de la finca (ver routes/accesoDueno.js). -->
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="/img/simbolo-192.png">
+<link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    <img src="/img/simbolo.webp" alt="" class="logo" width="34" height="34">
+    <div>
+      <h1 id="campoTitulo">Mi finca</h1>
+      <p id="campoSub"></p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="app">
+  <div class="loading"><div class="spinner"></div></div>
+</div>
+
+<div class="footer">Symphomed Ganadería</div>
+
+<!-- i18n.js y los diccionarios: el idioma lo decide la cuenta del
+     veterinario, que viene en la respuesta (ver campo.js). -->
+<script src="/js/i18n.js"></script>
+<script src="/i18n/es.js"></script>
+<script src="/i18n/pt.js"></script>
+<script src="/js/campo.js"></script>
+</body>
+</html>

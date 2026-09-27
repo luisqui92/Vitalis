@@ -5,13 +5,15 @@
 // mascotas que ya existía.
 const express = require("express");
 const mongoose = require("mongoose");
-const { Finca, LoteGanado, EventoLote, NotaVozLote, Medico } = require("../db/models");
+const { Finca, LlaveFinca, LoteGanado, EventoLote, NotaVozLote, Medico } = require("../db/models");
+const { revocarLlaves, estadoAcceso } = require("../services/accesoFinca");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { siguienteCodigo } = require("../services/codigos");
 const { mortalidadAcumulada, retirosVigentes, curvaPeso } = require("../services/lotesGanado");
 const { calendarioLote } = require("../services/esquemaGanado");
+const { validarMuertes } = require("../services/cargasGanado");
 const { notificarRetiroRegistrado } = require("../services/alertaRetiroGanado");
 const { transcribirNotaDeVoz } = require("../services/assemblyai");
 const { generarEventosLote, crearEventosDesdeSugerencias } = require("../services/notaVozLote");
@@ -80,15 +82,23 @@ module.exports = function (app) {
   // para saber a cuál le toca visita.
   app.get("/medico/fincas", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const [fincas, conteos] = await Promise.all([
+    const [fincas, conteos, llaves] = await Promise.all([
       Finca.find({ medicoPhone }).sort({ nombre: 1 }).lean(),
       LoteGanado.aggregate([
         { $match: { medicoPhone, estado: "activo", fincaId: { $ne: null } } },
         { $group: { _id: "$fincaId", n: { $sum: 1 } } },
       ]),
+      // Si el dueño tiene acceso propio (routes/accesoDueno.js) y cuándo lo
+      // usó por última vez: es cómo el veterinario sabe si de verdad carga.
+      LlaveFinca.find({ medicoPhone, revocadaEn: null }).lean(),
     ]);
     const porFinca = new Map(conteos.map(c => [String(c._id), c.n]));
-    res.json({ fincas: fincas.map(f => ({ ...f, lotesActivos: porFinca.get(String(f._id)) || 0 })) });
+    const accesoPorFinca = new Map(llaves.map(l => [String(l.fincaId), estadoAcceso(l)]));
+    res.json({ fincas: fincas.map(f => ({
+      ...f,
+      lotesActivos: porFinca.get(String(f._id)) || 0,
+      accesoDueno: accesoPorFinca.get(String(f._id)) || null,
+    })) });
   }));
 
   app.patch("/medico/fincas/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
@@ -99,12 +109,19 @@ module.exports = function (app) {
     // Solo se tocan los campos que vinieron: editar el teléfono del dueño
     // no puede borrarle la ubicación a la finca.
     const nuevos = datosDeFinca(req.body);
+    const telefonoAntes = finca.duenoTelefono || "";
     finca.nombre = nombre;
     for (const campo of Object.keys(nuevos)) {
       if (req.body?.[campo] !== undefined) finca[campo] = nuevos[campo];
     }
     await finca.save();
-    res.json({ ok: true, finca });
+    // Otro WhatsApp es, casi siempre, otro dueño (la finca se vendió, cambió
+    // el encargado). El enlace que tiene el anterior deja de andar en el
+    // mismo acto: que siga cargando datos en una finca que ya no es suya no
+    // puede depender de que el veterinario se acuerde de cortarlo.
+    let accesoRevocado = false;
+    if ((finca.duenoTelefono || "") !== telefonoAntes) accesoRevocado = (await revocarLlaves(finca._id)) > 0;
+    res.json({ ok: true, finca, accesoRevocado });
   }));
 
   // ─── CREAR LOTE ─────────────────────────────────────────────────────────
@@ -219,15 +236,7 @@ module.exports = function (app) {
     let debeGuardarLote = false;
 
     if (tipo === "mortalidad") {
-      const cantidadMuertes = Number(req.body?.cantidadMuertes);
-      if (!Number.isFinite(cantidadMuertes) || cantidadMuertes < 1) {
-        throw new ErrorHttp(400, "cantidadMuertes debe ser un número mayor a 0");
-      }
-      // No se puede reportar más muertes que animales vivos en el lote —
-      // eso sería un error de carga, no un dato real.
-      if (cantidadMuertes > lote.cantidadActual) {
-        throw new ErrorHttp(400, `El lote solo tiene ${lote.cantidadActual} animales activos`);
-      }
+      const cantidadMuertes = validarMuertes(lote, req.body?.cantidadMuertes);
       datos.cantidadMuertes = cantidadMuertes;
       datos.causaPresunta = String(req.body?.causaPresunta || "").trim();
       lote.cantidadActual -= cantidadMuertes;

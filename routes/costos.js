@@ -5,8 +5,9 @@ const mongoose = require("mongoose");
 const { LoteGanado, EventoLote, RegistroProduccion, GastoLote, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp, obtenerOFallar, diaPasadoValido, numeroNoNegativo } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { CATEGORIAS_GASTO, resumenCostos } = require("../services/costos");
+const { registrarGasto } = require("../services/cargasGanado");
 const { diaDe, sumarDias, resumenProduccion } = require("../services/produccion");
 
 const requireMedico = requireAuth(["medico"]);
@@ -57,31 +58,8 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     idValido(req.params.id, "Lote");
     const lote = await obtenerOFallar(LoteGanado, { _id: req.params.id, medicoPhone }, "Lote no encontrado");
-    if (lote.estado === "cerrado") throw new ErrorHttp(400, "El lote está cerrado");
-
-    const categoria = String(req.body?.categoria || "").trim();
-    if (!CATEGORIAS_GASTO.includes(categoria)) throw new ErrorHttp(400, `categoria debe ser una de: ${CATEGORIAS_GASTO.join(", ")}`);
-    const dia = diaPasadoValido(req.body?.dia);
-    const monto = numeroNoNegativo(req.body?.monto, "monto");
-    const kg = categoria === "alimento" ? numeroNoNegativo(req.body?.kg, "kg") : null;
-    // Un gasto tiene que decir ALGO: plata, o kilos de alimento (el que se
-    // produce en el campo no se compra, pero igual cuenta para la
-    // conversión). Uno vacío es un error de carga, no un dato.
-    if (!monto && !kg) {
-      throw new ErrorHttp(400, categoria === "alimento" ? "Cargá el monto, los kilos, o los dos" : "monto es requerido");
-    }
-
     const medico = await Medico.findOne({ phone: medicoPhone }).select("nombre moneda").lean();
-    const gasto = await GastoLote.create({
-      medicoPhone, loteId: lote._id, dia, categoria,
-      concepto: String(req.body?.concepto || "").trim().slice(0, 200),
-      // El monto llega en la unidad que escribe el médico (150,50) y se
-      // guarda en centavos redondeados, como el resto de la plata.
-      montoCentavos: monto != null ? Math.round(monto * 100) : null,
-      moneda: medico?.moneda === "BRL" ? "BRL" : "BOB",
-      kg,
-      registradoPor: medico?.nombre || "",
-    });
+    const gasto = await registrarGasto(lote, req.body, { moneda: medico?.moneda, registradoPor: medico?.nombre || "" });
     res.status(201).json({ ok: true, gasto });
   }));
 

@@ -24,26 +24,38 @@ function verificar(descripcion, condicion) {
   if (!condicion) fallos++;
 }
 
-const html = fs.readFileSync(path.join(RAIZ, "index.html"), "utf8");
-const scripts = [...html.matchAll(/<script src="\/js\/([^"]+\.js)"><\/script>/g)].map(m => m[1]);
-verificar(`index.html carga ${scripts.length} scripts de public/js`, scripts.length > 10);
+// Cada página que carga varios scripts propios se revisa por separado:
+// index.html (la app) y campo.html (el dueño de la finca, que comparte
+// i18n.js con su propio campo.js).
+const PAGINAS = [
+  { html: path.join(RAIZ, "index.html"), minimo: 10 },
+  { html: path.join(RAIZ, "public", "campo.html"), minimo: 2 },
+];
 
 // Declaraciones en el nivel de arriba del archivo (sin sangría): las únicas
 // que quedan globales. Una función adentro de otra no choca con nada.
 const DECL = /^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)|^(?:const|let|var)\s+([A-Za-z_$][\w$]*)/gm;
-const quien = new Map();
-for (const archivo of scripts) {
-  const codigo = fs.readFileSync(path.join(RAIZ, "public", "js", archivo), "utf8");
-  for (const m of codigo.matchAll(DECL)) {
-    const nombre = m[1] || m[2];
-    if (!quien.has(nombre)) quien.set(nombre, []);
-    quien.get(nombre).push(archivo);
-  }
-}
 
-const repetidos = [...quien.entries()].filter(([, archivos]) => archivos.length > 1);
-verificar("ningún nombre global está declarado en dos archivos", repetidos.length === 0);
-for (const [nombre, archivos] of repetidos) console.log(`   «${nombre}» en: ${archivos.join(", ")}`);
+for (const pagina of PAGINAS) {
+  const nombrePagina = path.relative(RAIZ, pagina.html);
+  const html = fs.readFileSync(pagina.html, "utf8");
+  const scripts = [...html.matchAll(/<script src="\/js\/([^"]+\.js)"><\/script>/g)].map(m => m[1]);
+  verificar(`${nombrePagina} carga ${scripts.length} scripts de public/js`, scripts.length >= pagina.minimo);
+
+  const quien = new Map();
+  for (const archivo of scripts) {
+    const codigo = fs.readFileSync(path.join(RAIZ, "public", "js", archivo), "utf8");
+    for (const m of codigo.matchAll(DECL)) {
+      const nombre = m[1] || m[2];
+      if (!quien.has(nombre)) quien.set(nombre, []);
+      quien.get(nombre).push(archivo);
+    }
+  }
+
+  const repetidos = [...quien.entries()].filter(([, archivos]) => archivos.length > 1);
+  verificar(`  ...y en ${nombrePagina} ningún nombre global está declarado en dos archivos`, repetidos.length === 0);
+  for (const [nombre, archivos] of repetidos) console.log(`   «${nombre}» en: ${archivos.join(", ")}`);
+}
 
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);

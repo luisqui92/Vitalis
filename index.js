@@ -160,6 +160,9 @@ require("./routes/lotesGanado")(app);
 require("./routes/reproduccion")(app);
 require("./routes/produccion")(app);
 require("./routes/costos")(app);
+// El dueño de la finca, por su enlace (/campo/<llave>). Rutas exactas, como
+// /mi y /r: no compiten con nada de abajo.
+require("./routes/accesoDueno")(app);
 require("./routes/fisioterapia")(app);
 require("./routes/socio")(app);
 require("./routes/insumos")(app);
@@ -306,6 +309,10 @@ app.get("/teleconsulta/:token", (_req, res) => res.sendFile(path.join(__dirname,
 // veces alguien dicta por teléfono.
 app.get("/r/:token", (_req, res) => res.sendFile(path.join(__dirname, "public", "resumen.html")));
 app.get("/mi/:llave", (_req, res) => res.sendFile(path.join(__dirname, "public", "mi.html")));
+// El dueño de una finca (Symphomed Ganadería). Página propia por lo mismo
+// que /mi: es un productor en el campo, con señal floja, que no necesita el
+// código clínico para anotar los litros del día.
+app.get("/campo/:llave", (_req, res) => res.sendFile(path.join(__dirname, "public", "campo.html")));
 
 // ─── OLVIDÉ MI CONTRASEÑA ──────────────────────────────────────────────────
 // Misma razón que /r y /mi: página propia, no index.html. Quien la abre

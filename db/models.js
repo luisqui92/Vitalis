@@ -651,7 +651,8 @@ const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 // también las alertas de retiro (services/alertaRetiroGanado.js).
 //
 // El dueño NO tiene cuenta en Symphomed: es un contacto, igual que el
-// "telefono" de un paciente. Darle acceso propio es otro paso.
+// "telefono" de un paciente. Lo que sí puede tener es un enlace propio a su
+// finca (LlaveFinca, abajo), que el veterinario le emite.
 const fincaSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
   codigo: { type: String, default: "", index: true },
@@ -666,6 +667,39 @@ const fincaSchema = new mongoose.Schema({
 }, { timestamps: true });
 fincaSchema.index({ medicoPhone: 1, nombre: 1 });
 const Finca = mongoose.model("Finca", fincaSchema);
+
+// ═══ EL ACCESO DEL DUEÑO A SU FINCA ════════════════════════════════════════
+//
+// Mismo razonamiento que la llave del paciente (LlavePaciente, más abajo): un
+// productor no va a recordar una contraseña para una app que le dio su
+// veterinario. Recibe UNA vez por WhatsApp un enlace largo y aleatorio;
+// poseerlo es ser el dueño. Con él ve los lotes de ESA finca y carga lo que
+// se anota todos los días en campo: producción, muertes y gastos.
+//
+// Diferencia con la llave del paciente: acá se guarda el HASH del enlace, no
+// el enlace. Este abre escritura, no solo lectura, y un respaldo de la base
+// que se filtre no tiene que servir para cargar datos en la finca de nadie.
+// El precio es que el veterinario no puede volver a ver el enlace: si se
+// perdió, se emite otro (y el anterior deja de andar).
+const llaveFincaSchema = new mongoose.Schema({
+  fincaId: { type: mongoose.Schema.Types.ObjectId, ref: "Finca", required: true },
+  medicoPhone: { type: String, required: true, index: true },
+  tokenHash: { type: String, required: true, unique: true },
+  enviadaA: { type: String, default: "" },
+  revocadaEn: { type: Date, default: null },
+  usos: { type: Number, default: 0 },
+  ultimoUso: { type: Date, default: null },
+}, { timestamps: true });
+// Una llave viva por finca, garantizado en la base: emitir una nueva revoca
+// la anterior, y dos pedidos simultáneos no pueden dejar dos vivas.
+llaveFincaSchema.index({ fincaId: 1 }, { unique: true, partialFilterExpression: { revocadaEn: null } });
+const LlaveFinca = mongoose.model("LlaveFinca", llaveFincaSchema);
+
+// Quién cargó un registro de campo. "" es el veterinario (todo lo anterior a
+// que existiera el acceso del dueño); "dueno" es lo que entró por su enlace.
+// Un campo aparte y no una marca en registradoPor, que es texto libre: de
+// esto depende qué puede borrar cada uno.
+const ORIGEN_CARGA = { type: String, enum: ["", "dueno"], default: "" };
 
 const loteGanadoSchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
@@ -734,6 +768,7 @@ const eventoLoteSchema = new mongoose.Schema({
 
   notas: { type: String, default: "" },
   registradoPor: { type: String, default: "" }, // nombre de quien cargó, cuando no es el médico mismo (ej. encargado del galpón)
+  origen: ORIGEN_CARGA,
 }, { timestamps: true });
 eventoLoteSchema.index({ medicoPhone: 1, loteId: 1, fecha: -1 });
 const EventoLote = mongoose.model("EventoLote", eventoLoteSchema);
@@ -821,6 +856,7 @@ const registroProduccionSchema = new mongoose.Schema({
   animales: { type: Number, default: null, min: 0 },
   notas: { type: String, default: "" },
   registradoPor: { type: String, default: "" },
+  origen: ORIGEN_CARGA,
 }, { timestamps: true });
 registroProduccionSchema.index({ medicoPhone: 1, loteId: 1, tipo: 1, dia: 1 }, { unique: true });
 const RegistroProduccion = mongoose.model("RegistroProduccion", registroProduccionSchema);
@@ -859,6 +895,7 @@ const gastoLoteSchema = new mongoose.Schema({
   // Solo alimento: los kilos. Es lo que da la conversión alimenticia.
   kg: { type: Number, default: null, min: 0 },
   registradoPor: { type: String, default: "" },
+  origen: ORIGEN_CARGA,
 }, { timestamps: true });
 gastoLoteSchema.index({ medicoPhone: 1, loteId: 1, dia: -1 });
 const GastoLote = mongoose.model("GastoLote", gastoLoteSchema);
@@ -3064,7 +3101,7 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

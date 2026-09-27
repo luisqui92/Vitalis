@@ -135,6 +135,10 @@ const PLANTILLAS = {
   // conversación abierta.
   retiroGanadoRegistrado: "retiro_ganado_registrado",
   retiroGanadoLibre: "retiro_ganado_libre",
+  // El enlace del dueño a su finca (routes/accesoDueno.js). Fuera de la
+  // ventana casi siempre, como la llave del paciente: el veterinario lo
+  // emite desde su panel, no respondiendo a un mensaje del dueño.
+  accesoFinca: "acceso_finca",
 };
 
 // Los códigos con los que Meta dice "esto no entra por la ventana". El 470 es
