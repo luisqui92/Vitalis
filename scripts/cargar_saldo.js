@@ -5,7 +5,7 @@
 // la nada, y el día que los números no cierren no hay cómo reconstruirlo.
 //
 // Uso:
-//   node scripts/cargar_saldo.js <telefono> <bolivianos> "<referencia>"
+//   node scripts/cargar_saldo.js <telefono> <monto> "<referencia>"
 //   node scripts/cargar_saldo.js 76660555 200 "QR BCP 4471-2290"
 //
 //   Con --igual acredita un monto menor al mínimo. Es a propósito: si el
@@ -15,13 +15,18 @@
 //   node scripts/cargar_saldo.js <telefono>              (ver saldo y últimos movimientos)
 //   node scripts/cargar_saldo.js --revisar               (buscar descuadres en todas)
 //
-// El monto va en BOLIVIANOS, como figura en el comprobante. Adentro se guarda
-// en centavos enteros — ver el comentario de MovimientoSaldo en db/models.js.
+// El monto va en la MONEDA DE LA CUENTA, como figura en el comprobante:
+// bolivianos para una cuenta de Bolivia, reales para una de Brasil. Adentro
+// se guarda en centavos enteros — ver el comentario de MovimientoSaldo en
+// db/models.js. Todo lo que se muestra lleva el símbolo de esa moneda: antes
+// decía "Bs" siempre, y cargarle 100 a una cuenta en reales se leía como
+// "Bs 100" aunque fueran R$ 100.
 const readline = require("readline");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const { Medico } = require("../db/models");
 const saldos = require("../services/saldo");
+const monedas = require("../services/monedas");
 
 function preguntar(texto) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -33,14 +38,16 @@ function fecha(d) {
 }
 
 async function mostrar(phone) {
-  const medico = await Medico.findOne({ phone }).select("nombre tipoEspecialidad").lean();
+  const medico = await Medico.findOne({ phone }).select("nombre tipoEspecialidad moneda").lean();
   if (!medico) {
     console.error(`❌ No hay ninguna cuenta con el teléfono ${phone}.`);
     return null;
   }
   const estado = await saldos.estadoDe(phone);
-  console.log(`\n+${phone}  ${medico.nombre}  (${medico.tipoEspecialidad})`);
-  console.log(`Saldo: Bs ${estado.saldoBs}  ·  alcanza para ${estado.consultasRestantes} consulta(s)`);
+  const moneda = monedas.normalizar(medico.moneda);
+  const plata = (c) => monedas.conSimbolo(c, moneda);
+  console.log(`\n+${phone}  ${medico.nombre}  (${medico.tipoEspecialidad})  ·  cuenta en ${moneda}`);
+  console.log(`Saldo: ${plata(estado.saldoCentavos)}  ·  alcanza para ${estado.consultasRestantes} consulta(s)`);
   if (estado.enNegativo) console.log("⚠️  En negativo: consultas que se completaron con el saldo agotado.");
   else if (estado.bajo) console.log("⚠️  Saldo bajo.");
 
@@ -49,8 +56,8 @@ async function mostrar(phone) {
     console.log("\nÚltimos movimientos:");
     for (const m of movs) {
       const signo = m.montoCentavos >= 0 ? "+" : "−";
-      const monto = `${signo}Bs ${saldos.bolivianos(Math.abs(m.montoCentavos))}`.padStart(12);
-      console.log(`  ${fecha(m.createdAt)}  ${monto}  → Bs ${saldos.bolivianos(m.saldoDespuesCentavos).padStart(8)}   ${m.concepto}${m.referencia ? ` [${m.referencia}]` : ""}`);
+      const monto = `${signo}${monedas.conSimbolo(Math.abs(m.montoCentavos), m.moneda || moneda)}`.padStart(13);
+      console.log(`  ${fecha(m.createdAt)}  ${monto}  → ${plata(m.saldoDespuesCentavos).padStart(11)}   ${m.concepto}${m.referencia ? ` [${m.referencia}]` : ""}`);
     }
   } else {
     console.log("\n(sin movimientos todavía)");
@@ -59,7 +66,7 @@ async function mostrar(phone) {
 }
 
 async function revisarTodas() {
-  const medicos = await Medico.find({}).select("phone nombre").lean();
+  const medicos = await Medico.find({}).select("phone nombre moneda").lean();
   console.log(`\nRevisando ${medicos.length} cuenta(s)...\n`);
   let descuadradas = 0;
   for (const m of medicos) {
@@ -67,7 +74,8 @@ async function revisarTodas() {
     if (!r.cuadra) {
       descuadradas++;
       console.log(`❌ +${m.phone} ${m.nombre}`);
-      console.log(`   en la cuenta: Bs ${saldos.bolivianos(r.enLaCuenta)} · según movimientos: Bs ${saldos.bolivianos(r.segunMovimientos)} · difiere Bs ${saldos.bolivianos(r.diferencia)}`);
+      const plata = (c) => monedas.conSimbolo(c, monedas.normalizar(m.moneda));
+      console.log(`   en la cuenta: ${plata(r.enLaCuenta)} · según movimientos: ${plata(r.segunMovimientos)} · difiere ${plata(r.diferencia)}`);
     }
   }
   if (descuadradas === 0) {
@@ -91,7 +99,7 @@ async function main() {
 
   const phone = String(process.argv[2] || "").trim();
   if (!phone) {
-    console.error('Uso: node scripts/cargar_saldo.js <telefono> <bolivianos> "<referencia>"');
+    console.error('Uso: node scripts/cargar_saldo.js <telefono> <monto en la moneda de la cuenta> "<referencia>"');
     console.error("     node scripts/cargar_saldo.js <telefono>          (ver saldo)");
     console.error("     node scripts/cargar_saldo.js --revisar           (buscar descuadres)");
     await mongoose.disconnect();
@@ -106,7 +114,7 @@ async function main() {
 
   const monto = Number(bs);
   if (!Number.isFinite(monto) || monto <= 0) {
-    console.error(`\n❌ "${bs}" no es un monto válido en bolivianos.`);
+    console.error(`\n❌ "${bs}" no es un monto válido.`);
     await mongoose.disconnect();
     process.exit(1);
   }
@@ -120,14 +128,16 @@ async function main() {
 
   // Confirmación con el monto y el nombre juntos: el error caro acá es
   // cargarle 200 a la cuenta equivocada, y eso solo se ve leyendo el nombre.
-  console.log(`\n→ Acreditar Bs ${monto.toFixed(2)} a ${medico.nombre} (+${phone})`);
+  const moneda = monedas.normalizar(medico.moneda);
+  const minimo = monedas.config(moneda).recargaMinima;
+  console.log(`\n→ Acreditar ${monedas.conSimbolo(Math.round(monto * 100), moneda)} a ${medico.nombre} (+${phone})  ·  cuenta en ${moneda}`);
   console.log(`   Referencia: ${referencia}`);
   console.log("");
   console.log("   ⚠️  ¿Viste este pago en el BANCO, no solo en la captura que te mandaron?");
   console.log("      Una captura de pantalla se falsifica en dos minutos.");
-  if (Math.round(monto * 100) < saldos.RECARGA_MINIMA && process.argv.includes("--igual")) {
+  if (Math.round(monto * 100) < minimo && process.argv.includes("--igual")) {
     console.log("");
-    console.log(`   ℹ️  Está bajo el mínimo de Bs ${saldos.bolivianos(saldos.RECARGA_MINIMA)} — va como excepción,`);
+    console.log(`   ℹ️  Está bajo el mínimo de ${monedas.conSimbolo(minimo, moneda)} — va como excepción,`);
     console.log("      y así queda anotado en el movimiento.");
   }
   const ok = await preguntar('\nEscribí SI para confirmar: ');
@@ -157,7 +167,7 @@ async function main() {
       console.error("   Si el pago entró y lo vas a acreditar igual:");
       console.error(`     node scripts/cargar_saldo.js ${phone} ${monto} "${referencia}" --igual`);
       console.error("");
-      console.error("   Si todavía no transfirió, decile que el mínimo es Bs " + saldos.bolivianos(e.minimoCentavos) + ".");
+      console.error("   Si todavía no transfirió, decile que el mínimo es " + monedas.conSimbolo(e.minimoCentavos, moneda) + ".");
       await mongoose.disconnect();
       process.exit(1);
     }
