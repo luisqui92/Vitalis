@@ -98,13 +98,13 @@ verificar("una respuesta vacía no rompe el filtro", ventas.limpiar(null) === nu
 
 console.log("\n── 4. Médico o paciente: dónde se separa ──");
 const bot = fs.readFileSync(path.join(RAIZ, "services", "reservaCitas.js"), "utf8");
-// La separación tiene que estar ANTES de resolver el médico de la reserva. Si
-// se corriera abajo, un médico entraría al flujo de citas y vería la lista de
-// horarios de un consultorio ajeno.
-const iSepara = bot.indexOf('sesion.paso === "medico" || esConsultaDeMedico');
-const iReserva = bot.indexOf("const medicoPhone = sesion.datos?.medicoPhone");
-verificar("la separación corre antes que la lógica de reserva",
-  iSepara > 0 && iReserva > 0 && iSepara < iReserva);
+// Antes la separación la adivinaba el bot, y esta prueba miraba que la
+// adivinanza corriera antes que la reserva. Ahora no se adivina: un número
+// nuevo recibe dos botones (Soy médico / Soy paciente) y cada uno lleva a su
+// rama. Eso se prueba conversando de verdad en probar_menu_whatsapp.js; acá
+// solo se comprueba que ese es el camino de una conversación nueva.
+verificar("una conversación nueva empieza preguntando médico o paciente",
+  /return menuInicio\(numero\);\s*\n\s*\}/.test(bot) && fs.existsSync(path.join(__dirname, "probar_menu_whatsapp.js")));
 
 // El ruteo por heurística: "dice Symphomed". Se ejecuta la función real.
 const guion = bot.slice(bot.indexOf("function sinTildes"), bot.indexOf("const MAX_HISTORIAL"));

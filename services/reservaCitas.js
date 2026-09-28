@@ -8,7 +8,8 @@ const { Medico, Cita, SesionCitaWA, Paciente, ConsultaMedica, Vacuna, Medicament
 const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
 const { eliminarEvento } = require("./googleCalendar");
 const { enrutarMensaje } = require("./asistenteWhatsapp");
-const { atenderMedico } = require("./asistenteVentas");
+const { atenderMedico, precios } = require("./asistenteVentas");
+const monedas = require("./monedas");
 const { crearCitaConfirmada } = require("./crearCita");
 const { CONFIG, log } = require("../config");
 const { horaEnZona, fechaCompletaEnZona, ZONA_POR_DEFECTO } = require("./zonaHoraria");
@@ -54,12 +55,16 @@ function comoTexto(texto) { return { tipo: "texto", texto }; }
 function comoBotones(texto, botones) { return { tipo: "botones", texto, botones }; }
 function comoLista(texto, textoBoton, filas) { return { tipo: "lista", texto, textoBoton, filas }; }
 
-// Si el paciente quedó a mitad de una conversación (se distrajo, cerró
-// WhatsApp, tocó algo raro) y no volvió a escribir en 2 minutos, el
-// próximo mensaje arranca de cero en vez de insistir con un paso viejo que
-// ya no tiene sentido — más simple para el paciente que quedar "trabado"
-// sin entender por qué el bot no le entiende.
-const SESION_MINUTOS_EXPIRA = 2;
+// Si alguien quedó a mitad de una conversación (se distrajo, cerró
+// WhatsApp) y no volvió a escribir en media hora, el próximo mensaje arranca
+// de cero, con la pregunta de médico o paciente.
+//
+// Antes eran 2 minutos, y era parte del problema de «el bot responde
+// cualquier cosa»: el paciente leía la lista de horarios, la pensaba, tocaba
+// uno a los tres minutos… y el bot ya lo había olvidado. Con menús de
+// botones, retomar donde estaba es lo que se espera; y si quiere empezar de
+// nuevo, escribe «menú».
+const SESION_MINUTOS_EXPIRA = 30;
 
 // ═══ LA CONVERSACIÓN CON UN MÉDICO DURA MÁS ═══════════════════════════════
 //
@@ -151,27 +156,18 @@ async function mostrarEspecialidades(numero) {
     title: ETIQUETA_ESPECIALIDAD[m.tipoEspecialidad] || m.tipoEspecialidad,
     description: m.nombre,
   }));
-  if (filas.length < 10) {
-    filas.push({ id: "soy_medico", title: "🩺 Soy médico", description: "Quiero conocer Symphomed" });
-  }
-  return comoLista("¡Hola! 👋 ¿Qué estás buscando?", "Ver opciones", filas);
+  // Ya no lleva la fila «Soy médico»: a esta lista se llega DESPUÉS de tocar
+  // «Soy paciente» (ver menuInicio()).
+  return comoLista("¿Qué consultorio estás buscando?", "Ver consultorios", filas);
 }
 
 async function elegirEspecialidad(numero, t, datos) {
-  // El que se declara médico entra al flujo de ventas por la puerta de
-  // adelante, sin tener que escribir "Symphomed" para que la heurística lo
-  // reconozca.
-  if (t === "soy_medico") {
-    await guardarSesion(numero, "medico", { historial: [], actualizada: new Date() });
-    return comoTexto("¡Qué bueno! 👋 Cuénteme, ¿de qué especialidad es y en qué ciudad atiende? " +
-      "Así le cuento cómo le sirve Symphomed a un consultorio como el suyo.");
-  }
   const idx = t.startsWith("esp_") ? parseInt(t.slice(4), 10) : NaN;
   const opcion = Number.isInteger(idx) ? datos.opciones?.[idx] : null;
   if (!opcion) return comoTexto("Elegí una de las opciones de la lista de arriba para continuar.");
   const medico = await Medico.findOne({ phone: opcion.phone }).lean();
-  if (!medico) return comoTexto("Ups, ese consultorio ya no está disponible. Escribí cualquier cosa para ver las opciones de nuevo.");
-  return iniciarReserva(opcion.phone, numero);
+  if (!medico) return comoTexto("Ups, ese consultorio ya no está disponible. Escribí «menú» para ver las opciones de nuevo.");
+  return menuPaciente(numero, medico);
 }
 
 // ─── El flujo de los médicos que preguntan por Symphomed ───────────────────
@@ -223,7 +219,7 @@ async function atenderComoMedico(numero, texto, sesion, nombrePerfil) {
   // charla sigue viva. Si no, arranca de cero — pero el Interesado se
   // conserva, así que lo que se sabe de él no se pierde nunca.
   const historial = sesion.paso === "medico" ? (sesion.datos?.historial || []) : [];
-  const idioma = interesado?.idioma || "es";
+  const idioma = interesado?.idioma || idiomaDelNumero(numero);
 
   // Se le pasa lo que ya quedó guardado de él: el historial de la charla se
   // vence a la hora, el contacto no. Sin esto, alguien que hace un mes dijo
@@ -263,7 +259,7 @@ async function atenderComoMedico(numero, texto, sesion, nombrePerfil) {
     datos.estado = "interesado";
   }
 
-  await Interesado.findOneAndUpdate({ numero }, { $set: datos, $setOnInsert: { numero } }, { upsert: true });
+  await Interesado.findOneAndUpdate({ numero }, { $set: datos, $setOnInsert: { numero, idioma } }, { upsert: true });
 
   if (r.intencion === "interesado") {
     // Va como error y no como info a propósito: en el log de errores es donde
@@ -277,47 +273,281 @@ async function atenderComoMedico(numero, texto, sesion, nombrePerfil) {
   return comoTexto(r.respuesta);
 }
 
-async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
+// ═══ PRIMERO SE PREGUNTA: ¿MÉDICO O PACIENTE? ══════════════════════════════
+//
+// El mismo número atiende a los dos. Hasta ahora la separación la adivinaba
+// el bot —si el mensaje decía «Symphomed», médico; si no, paciente— y la IA
+// corregía. En la prueba real se equivocaba seguido y contestaba cualquier
+// cosa: un «hola» caía en la reserva, una pregunta de un médico en la agenda
+// de un consultorio.
+//
+// Ahora se pregunta, con dos botones. Cuesta un toque y no se equivoca. Y de
+// ahí cada rama sigue con botones: la IA queda SOLO para cuando la persona
+// hace una pregunta abierta, que es lo único que un botón no resuelve.
+//
+// Lo que se sigue reconociendo sin preguntar: el texto de los botones de
+// symphomed.com («…demostración de Symphomed»). Ese médico ya dijo quién es.
+//
+// Los ids de los botones se atienden estén donde estén: alguien puede tocar
+// un botón de un mensaje de hace una hora, cuando la sesión ya venció, y eso
+// tiene que funcionar igual.
+
+// Brasil escribe en portugués. Se decide por el número porque es lo único que
+// se sabe antes de que la persona escriba nada útil.
+function idiomaDelNumero(numero) {
+  return String(numero || "").startsWith("55") ? "pt" : "es";
+}
+
+const TEXTOS_MENU = {
+  es: {
+    inicio: "¡Hola! 👋 Este es el WhatsApp de Symphomed. Para ayudarte mejor, ¿quién nos escribe?",
+    inicioOtraVez: "Tocá una de las dos opciones 👇",
+    soyMedico: "🩺 Soy médico",
+    soyPaciente: "🙋 Soy paciente",
+    menuMedico: "¡Qué bueno tenerlo por acá! ¿En qué le ayudamos?",
+    menuMedicoOtraVez: "Hola de nuevo. ¿En qué le ayudamos?",
+    verDemo: "Ver una demo",
+    precios: "Precios",
+    yaCliente: "Ya uso Symphomed",
+    otraPregunta: "Otra pregunta",
+    demoSinEspecialidad: "Perfecto, le escribimos hoy mismo para coordinar la demostración: son quince minutos con un caso real. ¿De qué especialidad es su consultorio?",
+    demoConEspecialidad: (esp) => `Perfecto, le escribimos hoy mismo para coordinar la demostración: son quince minutos y se la mostramos con casos de ${esp}. ¿En qué horario le queda mejor que lo llamemos?`,
+    preguntaMedico: "Claro, cuénteme qué quiere saber.",
+    textoPrecios: (p) => `Consulta suelta: ${p.consulta}. Plan mensual: ${p.mensual}, que conviene desde ${p.consultasDelPlan} consultas al mes. Plan anual: ${p.anual}, doce meses al precio de once. Las primeras ${p.gratis} consultas no se cobran y no hay costo de instalación ni permanencia.`,
+    soporte: "¡Hola de nuevo! Cuéntenos en un mensaje qué necesita y se lo pasamos al equipo.",
+    soporteRecibido: "Recibido. Lo revisa una persona del equipo y le escribimos por acá. Si es urgente, mándenos un audio contando qué pasa.",
+  },
+  pt: {
+    inicio: "Olá! 👋 Este é o WhatsApp do Symphomed. Para te ajudar melhor, quem está escrevendo?",
+    inicioOtraVez: "Toque em uma das duas opções 👇",
+    soyMedico: "🩺 Sou médico",
+    soyPaciente: "🙋 Sou paciente",
+    menuMedico: "Que bom ter você por aqui! Como podemos ajudar?",
+    menuMedicoOtraVez: "Olá de novo. Como podemos ajudar?",
+    verDemo: "Ver uma demo",
+    precios: "Preços",
+    yaCliente: "Já uso o Symphomed",
+    otraPregunta: "Outra pergunta",
+    demoSinEspecialidad: "Perfeito, escrevemos hoje mesmo para combinar a demonstração: são quinze minutos com um caso real. Qual é a especialidade do seu consultório?",
+    demoConEspecialidad: (esp) => `Perfeito, escrevemos hoje mesmo para combinar a demonstração: são quinze minutos, com casos de ${esp}. Qual horário é melhor para ligarmos?`,
+    preguntaMedico: "Claro, conte o que você quer saber.",
+    textoPrecios: (p) => `Consulta avulsa: ${p.consulta}. Plano mensal: ${p.mensual}, que compensa a partir de ${p.consultasDelPlan} consultas por mês. Plano anual: ${p.anual}, doze meses pelo preço de onze. As primeiras ${p.gratis} consultas não são cobradas e não há custo de instalação nem fidelidade.`,
+    soporte: "Olá de novo! Conte em uma mensagem o que você precisa e passamos para a equipe.",
+    soporteRecibido: "Recebido. Uma pessoa da equipe vai ver e te responde por aqui. Se for urgente, mande um áudio contando o que aconteceu.",
+  },
+};
+
+const PALABRAS_MENU = new Set(["menu", "menú", "inicio", "volver", "empezar", "reiniciar", "0", "menu_inicio"]);
+
+function botonesRol(idioma) {
+  const T = TEXTOS_MENU[idioma];
+  return [{ id: "rol_medico", title: T.soyMedico }, { id: "rol_paciente", title: T.soyPaciente }];
+}
+
+async function menuInicio(numero, { otraVez = false } = {}) {
+  const idioma = idiomaDelNumero(numero);
+  await guardarSesion(numero, "elegir_rol", {});
+  return comoBotones(otraVez ? TEXTOS_MENU[idioma].inicioOtraVez : TEXTOS_MENU[idioma].inicio, botonesRol(idioma));
+}
+
+// ─── Rama médico ───────────────────────────────────────────────────────────
+
+function botonesMedico(idioma, { sinPrecios = false } = {}) {
+  const T = TEXTOS_MENU[idioma];
+  return [
+    { id: "med_demo", title: T.verDemo },
+    sinPrecios ? { id: "med_pregunta", title: T.otraPregunta } : { id: "med_precios", title: T.precios },
+    { id: "med_cliente", title: T.yaCliente },
+  ];
+}
+
+async function menuMedico(numero, { otraVez = false } = {}) {
+  const idioma = idiomaDelNumero(numero);
+  await guardarSesion(numero, "medico_menu", {});
+  const T = TEXTOS_MENU[idioma];
+  return comoBotones(otraVez ? T.menuMedicoOtraVez : T.menuMedico, botonesMedico(idioma));
+}
+
+// El interesado se guarda desde que toca un botón de la rama médico, no solo
+// cuando pide la demo: el que mira el precio y se va también es alguien a
+// quien llamar.
+async function registrarInteresado(numero, nombrePerfil, cambios = {}) {
+  const idioma = idiomaDelNumero(numero);
+  const previo = await Interesado.findOne({ numero }).lean();
+  const datos = { ultimoMensaje: new Date(), ...cambios };
+  // Solo sube de "nuevo" a "interesado". Nunca pisa "contactado" ni
+  // "descartado": eso lo puso una persona y el bot no lo revisa.
+  if (cambios.estado === "interesado" && previo && !["nuevo", "interesado"].includes(previo.estado)) delete datos.estado;
+  const alta = { numero, idioma };
+  if (nombrePerfil) alta.nombre = nombrePerfil;
+  return Interesado.findOneAndUpdate({ numero }, { $set: datos, $setOnInsert: alta }, { upsert: true, new: true }).lean();
+}
+
+async function pedirDemo(numero, nombrePerfil) {
+  const idioma = idiomaDelNumero(numero);
+  const T = TEXTOS_MENU[idioma];
+  const i = await registrarInteresado(numero, nombrePerfil, { estado: "interesado" });
+  const respuesta = i.especialidad ? T.demoConEspecialidad(i.especialidad) : T.demoSinEspecialidad;
+  // Lo que sigue (la especialidad, el horario) es texto libre: lo atiende la
+  // conversación con la IA de ventas, que ya sabe preguntar sin repetir.
+  await guardarSesion(numero, "medico", { historial: [{ de: "bot", texto: respuesta }], actualizada: new Date() });
+  log.error(`[VENTAS] 🔔 MÉDICO PIDIÓ DEMO — ${numero} · ${i.nombre || "sin nombre"} · ${i.especialidad || "especialidad?"}`);
+  return comoTexto(respuesta);
+}
+
+async function mostrarPrecios(numero, nombrePerfil) {
+  const idioma = idiomaDelNumero(numero);
+  await registrarInteresado(numero, nombrePerfil);
+  await guardarSesion(numero, "medico_menu", {});
+  // Los números salen de las mismas funciones que cobran (asistenteVentas.
+  // precios), no de un texto escrito acá: si cambia el precio, cambia esto.
+  const p = precios(monedas.monedaSegunIdioma(idioma));
+  return comoBotones(TEXTOS_MENU[idioma].textoPrecios(p), botonesMedico(idioma, { sinPrecios: true }));
+}
+
+// «Ya uso Symphomed»: un cliente con un problema no tiene que pasar por el
+// vendedor. Su mensaje queda anotado y se avisa en el log de errores, que es
+// donde se mira lo que importa.
+async function recibirSoporte(numero, texto, nombrePerfil) {
+  const idioma = idiomaDelNumero(numero);
+  const previo = await Interesado.findOne({ numero }).select("conversacion").lean();
+  const conversacion = [...(previo?.conversacion || []), { de: "medico", texto: `[SOPORTE] ${texto}` }].slice(-MAX_HISTORIAL);
+  await registrarInteresado(numero, nombrePerfil, { conversacion, soportePendiente: true });
+  await limpiarSesion(numero);
+  log.error(`[SOPORTE] 🔔 CLIENTE PIDE AYUDA — ${numero} · ${nombrePerfil || "sin nombre"}: ${String(texto).slice(0, 300)}`);
+  return comoTexto(TEXTOS_MENU[idioma].soporteRecibido);
+}
+
+// ─── Rama paciente ─────────────────────────────────────────────────────────
+
+const BOTONES_PACIENTE = [
+  { id: "pac_reservar", title: "📅 Reservar cita" },
+  { id: "pac_cancelar", title: "❌ Cancelar mi cita" },
+  { id: "pac_pregunta", title: "❓ Tengo una duda" },
+];
+
+// El consultorio con el que habla el paciente: el que eligió de la lista (súper
+// número) o el único configurado.
+function medicoDelPaciente(sesion) {
   const superNumero = CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length > 0;
+  return sesion.datos?.medicoPhone || (!superNumero ? CONFIG.SALUD_WHATSAPP_MEDICO_PHONE : null) || null;
+}
+
+async function empezarComoPaciente(numero, sesion) {
+  const medicoPhone = medicoDelPaciente(sesion);
+  if (medicoPhone) {
+    const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+    if (medico) return menuPaciente(numero, medico);
+  }
+  if (CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS.length > 0) return mostrarEspecialidades(numero);
+  await limpiarSesion(numero);
+  return comoTexto("Por ahora este número no toma reservas de pacientes. Si buscás a tu médico, escribile a su WhatsApp directo. 🙏");
+}
+
+async function menuPaciente(numero, medico, { encabezado } = {}) {
+  await guardarSesion(numero, "paciente_menu", { medicoPhone: medico.phone });
+  const nombre = medico.nombre ? ` de ${medico.nombre}` : "";
+  return comoBotones(encabezado || `Consultorio${nombre}. ¿Qué necesitás?`, BOTONES_PACIENTE);
+}
+
+// Una pregunta abierta del paciente: acá SÍ entra la IA, que responde solo con
+// lo que el consultorio cargó (asistenteWhatsapp.js). Si en realidad quiere
+// reservar o cancelar, se lo lleva ahí.
+async function responderPreguntaPaciente(numero, texto, medico) {
+  let r = null;
+  try {
+    const historial = await resumenHistorialPaciente(medico.phone, numero);
+    r = await enrutarMensaje(texto, medico, historial);
+  } catch (e) {
+    log.error("[RESERVA_CITAS] enrutarMensaje (pregunta) falló:", e.message);
+  }
+  if (r?.intencion === "agendar") return iniciarReserva(medico.phone, numero);
+  if (r?.intencion === "cancelar") return iniciarCancelacion(medico.phone, numero);
+  const respuesta = r?.intencion === "pregunta" && r.respuesta
+    ? r.respuesta
+    : "No tengo esa información a mano; el consultorio te la confirma directo.";
+  await guardarSesion(numero, "paciente_menu", { medicoPhone: medico.phone });
+  return comoBotones(`${respuesta}\n\n¿Algo más?`, [
+    { id: "pac_reservar", title: "📅 Reservar cita" },
+    { id: "pac_pregunta", title: "❓ Otra pregunta" },
+    { id: "menu_inicio", title: "🏠 Menú" },
+  ]);
+}
+
+async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
   const sesion = await obtenerSesion(numero);
   const t = texto.trim().toLowerCase();
 
-  // ═══ MÉDICO O PACIENTE ═══════════════════════════════════════════════════
-  //
-  // El mismo número atiende las dos cosas. La separación se hace acá, antes
-  // de cualquier lógica de reserva, y se apoya en algo que ya existía sin
-  // haber sido pensado para esto: los botones de symphomed.com mandan un
-  // texto predefinido —"Hola, quiero ver una demostración de Symphomed"— así
-  // que un médico que llega de la página se identifica solo, sin que haya que
-  // preguntarle nada y sin agregarle un paso al paciente.
-  //
-  // La heurística es "dice Symphomed": un paciente que quiere una cita
-  // escribe "hola" o "quiero un turno", no el nombre de la plataforma que le
-  // maneja la ficha a su médico.
-  //
-  // Y si igual se equivoca no se rompe nada: el asistente de ventas devuelve
-  // intención "paciente" y el mensaje sigue de largo al flujo de reserva. La
-  // heurística rutea, la IA corrige.
-  if (sesion.paso === "medico" || esConsultaDeMedico(t) || await saludoDeUnInteresado(numero, t)) {
+  // «menú» desde cualquier lado vuelve al principio.
+  if (PALABRAS_MENU.has(t)) return menuInicio(numero);
+
+  // ─── Los botones, estén donde estén ───────────────────────────────────
+  if (t === "rol_medico" || t === "soy_medico") return menuMedico(numero);
+  if (t === "rol_paciente") return empezarComoPaciente(numero, sesion);
+  if (t === "med_demo") return pedirDemo(numero, nombrePerfil);
+  if (t === "med_precios") return mostrarPrecios(numero, nombrePerfil);
+  if (t === "med_pregunta") {
+    await guardarSesion(numero, "medico", { historial: sesion.datos?.historial || [], actualizada: new Date() });
+    return comoTexto(TEXTOS_MENU[idiomaDelNumero(numero)].preguntaMedico);
+  }
+  if (t === "med_cliente") {
+    await guardarSesion(numero, "soporte", {});
+    return comoTexto(TEXTOS_MENU[idiomaDelNumero(numero)].soporte);
+  }
+  if (t.startsWith("pac_")) {
+    const medicoPhone = medicoDelPaciente(sesion);
+    const medico = medicoPhone ? await Medico.findOne({ phone: medicoPhone }).lean() : null;
+    if (!medico) return empezarComoPaciente(numero, sesion);
+    if (t === "pac_reservar") return iniciarReserva(medico.phone, numero);
+    if (t === "pac_cancelar") return iniciarCancelacion(medico.phone, numero);
+    if (t === "pac_pregunta") {
+      await guardarSesion(numero, "pregunta", { medicoPhone: medico.phone });
+      return comoTexto("Claro, escribime tu pregunta 👇");
+    }
+  }
+
+  // ─── Según dónde quedó la conversación ────────────────────────────────
+  switch (sesion.paso) {
+    case "medico": {
+      const r = await atenderComoMedico(numero, texto, sesion, nombrePerfil);
+      if (r) return r;
+      // La IA de ventas dice que en realidad es un paciente: a su rama.
+      return empezarComoPaciente(numero, { datos: {} });
+    }
+    case "medico_menu":
+      // Escribió en vez de tocar: es una pregunta para ventas.
+      return (await atenderComoMedico(numero, texto, { paso: "medico", datos: { historial: [] } }, nombrePerfil))
+        || empezarComoPaciente(numero, { datos: {} });
+    case "soporte":
+      return recibirSoporte(numero, texto, nombrePerfil);
+    case "elegir_rol":
+      return menuInicio(numero, { otraVez: true });
+    case "elegir_especialidad":
+      return elegirEspecialidad(numero, t, sesion.datos);
+  }
+
+  // El texto de los botones de symphomed.com: ese médico ya dijo quién es.
+  if (esConsultaDeMedico(t)) {
     const r = await atenderComoMedico(numero, texto, sesion, nombrePerfil);
     if (r) return r;
-    // Era un paciente que nombró Symphomed. Sigue por el camino normal.
   }
 
-  const medicoPhone = sesion.datos?.medicoPhone || (!superNumero ? CONFIG.SALUD_WHATSAPP_MEDICO_PHONE : null);
-  if (!medicoPhone) {
-    if (sesion.paso === "elegir_especialidad") return elegirEspecialidad(numero, t, sesion.datos);
-    return mostrarEspecialidades(numero);
+  const medicoPhone = sesion.datos?.medicoPhone;
+  const medico = medicoPhone ? await Medico.findOne({ phone: medicoPhone }).lean() : null;
+
+  if (!medico) {
+    // Conversación nueva. Un médico que ya dejó sus datos y todavía nadie
+    // llamó no tiene por qué contestar de nuevo si es médico.
+    if (await saludoDeUnInteresado(numero, t)) return menuMedico(numero, { otraVez: true });
+    return menuInicio(numero);
   }
 
-  const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-  if (!medico) return comoTexto("Este número todavía no está configurado. Avisale a la clínica.");
-
-  if (t === "cancelar" || t === "cancelar cita") {
-    return iniciarCancelacion(medicoPhone, numero);
-  }
+  if (t === "cancelar" || t === "cancelar cita") return iniciarCancelacion(medicoPhone, numero);
 
   switch (sesion.paso) {
+    case "paciente_menu":
+    case "pregunta":
+      return responderPreguntaPaciente(numero, texto, medico);
     case "confirmar_cancelacion":
       return confirmarCancelacion(medicoPhone, numero, t, texto, sesion.datos, medico);
     case "elegir_dia":
@@ -329,7 +559,7 @@ async function procesarMensajeEntrante(numero, texto, nombrePerfil) {
     case "pedir_motivo":
       return pedirMotivo(medicoPhone, numero, texto, sesion.datos, medico);
     default:
-      return manejarMensajeLibre(medicoPhone, numero, texto, medico);
+      return menuPaciente(numero, medico);
   }
 }
 
@@ -351,21 +581,6 @@ async function intentarDesvioLibre(medicoPhone, numero, texto, medico) {
     log.error("[RESERVA_CITAS] enrutarMensaje (desvío) falló:", e.message);
   }
   return null;
-}
-
-// Sin una conversación de reserva ya en curso: primero se fija si es una
-// pregunta general (responde con la info del consultorio) o si de verdad
-// quiere agendar — recién ahí arranca la lista de días.
-async function manejarMensajeLibre(medicoPhone, numero, texto, medico) {
-  try {
-    const historial = await resumenHistorialPaciente(medicoPhone, numero);
-    const { intencion, respuesta } = await enrutarMensaje(texto, medico, historial);
-    if (intencion === "cancelar") return iniciarCancelacion(medicoPhone, numero);
-    if (intencion === "pregunta" && respuesta) return comoTexto(respuesta);
-  } catch (e) {
-    log.error("[RESERVA_CITAS] enrutarMensaje falló, sigo con la reserva normal:", e.message);
-  }
-  return iniciarReserva(medicoPhone, numero);
 }
 
 // Las listas interactivas de WhatsApp permiten como máximo 10 filas — se
@@ -428,7 +643,7 @@ async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
     // horarios libres, en vez de mandar al paciente de vuelta al principio.
     const diasActualizados = await obtenerHorariosDisponibles(medicoPhone, 21);
     const diaActualizado = diasActualizados.find(d => d.fecha === datos.diaElegido?.fecha);
-    if (!diaActualizado) return comoTexto("Ups, ese horario se acaba de ocupar y no quedan más libres ese día. Escribí cualquier cosa para ver los días disponibles de nuevo.");
+    if (!diaActualizado) return comoTexto("Ups, ese horario se acaba de ocupar y no quedan más libres ese día. Escribí «menú» para ver los días de nuevo.");
     await guardarSesion(numero, "elegir_hora", { ...datos, diaElegido: diaActualizado });
     const lista = listaDeHorarios(diaActualizado, medico?.zonaHoraria);
     return { ...lista, texto: `Ups, ese horario se acaba de ocupar. ${lista.texto}` };
@@ -460,7 +675,7 @@ async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
     // conversación con un error sin respuesta.
     if (e.horarioOcupado) {
       await limpiarSesion(numero);
-      return comoTexto("Ups, justo se ocupó ese horario mientras conversábamos. Escribí cualquier cosa para volver a ver los días disponibles.");
+      return comoTexto("Ups, justo se ocupó ese horario mientras conversábamos. Escribí «menú» para volver a empezar.");
     }
     throw e;
   }
@@ -476,7 +691,7 @@ async function iniciarCancelacion(medicoPhone, numero) {
   const zona = await zonaDelMedico(medicoPhone);
   if (!cita) {
     await limpiarSesion(numero);
-    return comoTexto("No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí cualquier cosa.");
+    return comoTexto("No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí «menú».");
   }
   await guardarSesion(numero, "confirmar_cancelacion", { medicoPhone, citaId: String(cita._id) });
   return comoBotones(
@@ -505,7 +720,7 @@ async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico
     }
   }
   await limpiarSesion(numero);
-  return comoTexto("Listo, cancelé tu cita. Si querés agendar otra, escribí cualquier cosa.");
+  return comoTexto("Listo, cancelé tu cita. Si querés agendar otra, escribí «menú».");
 }
 
 module.exports = { procesarMensajeEntrante, formatearFechaCompleta, resumenHistorialPaciente };

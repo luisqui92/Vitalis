@@ -291,13 +291,82 @@ const globalesConocidos = new Set([
 
 // Se quitan comentarios y textos: un "PDF" adentro de una plantilla no es
 // una referencia a nada.
+//
+// Antes esto eran tres reemplazos con expresiones regulares (plantillas,
+// comillas dobles, comillas simples), y fallaba con las plantillas anidadas
+// —`${cond ? `<b>${x}</b>` : ""}`, que la app usa por todos lados—: los
+// acentos graves se emparejaban mal, un pedazo de código quedaba tomado por
+// texto y una constante declarada ahí «desaparecía». Daba una alarma falsa
+// (le pasó a COLOR_ESTADO_CAL en ganaderia.js) y, peor, podía esconder una
+// verdadera: lo que se usa ADENTRO de ${…} también es código.
+//
+// Ahora se recorre carácter por carácter: los textos se borran, y lo que va
+// adentro de ${…} se conserva como código, con las anidaciones que haga falta.
 function sinComentariosNiTextos(codigo) {
-  return codigo
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ")
-    .replace(/`(?:\\.|[^`\\])*`/g, " ")
-    .replace(/"(?:\\.|[^"\\])*"/g, " ")
-    .replace(/'(?:\\.|[^'\\])*'/g, " ");
+  let i = 0;
+  const n = codigo.length;
+  // Un "/" empieza una expresión regular (no una división) si lo anterior
+  // no es algo que pueda dividirse: un nombre, un número o un cierre.
+  const antesDeRegex = (salida) => {
+    const previo = salida.replace(/\s+$/, "");
+    const c = previo[previo.length - 1];
+    if (c === undefined) return true;
+    if (/[\w$)\]]/.test(c)) return /\b(return|typeof|case|in|of|void|delete|throw)$/.test(previo);
+    return true;
+  };
+
+  function codigoHasta(cierre) {
+    let salida = "";
+    let profundidad = 0;
+    while (i < n) {
+      const c = codigo[i];
+      const d = codigo[i + 1];
+      if (cierre === "}" && c === "}" && profundidad === 0) { i++; return salida; }
+      if (c === "{") profundidad++;
+      if (c === "}") profundidad--;
+      if (c === "/" && d === "/") { while (i < n && codigo[i] !== "\n") i++; salida += " "; continue; }
+      if (c === "/" && d === "*") { const f = codigo.indexOf("*/", i + 2); i = f === -1 ? n : f + 2; salida += " "; continue; }
+      if (c === '"' || c === "'") {
+        i++;
+        while (i < n && codigo[i] !== c && codigo[i] !== "\n") i += codigo[i] === "\\" ? 2 : 1;
+        i++; salida += " "; continue;
+      }
+      if (c === "`") { i++; salida += " " + plantilla() + " "; continue; }
+      if (c === "/" && antesDeRegex(salida)) {
+        i++;
+        let enClase = false;
+        while (i < n && codigo[i] !== "\n") {
+          const r = codigo[i];
+          if (r === "\\") { i += 2; continue; }
+          if (r === "[") enClase = true;
+          else if (r === "]") enClase = false;
+          else if (r === "/" && !enClase) break;
+          i++;
+        }
+        i++;
+        while (i < n && /[a-z]/.test(codigo[i])) i++;
+        salida += " "; continue;
+      }
+      salida += c;
+      i++;
+    }
+    return salida;
+  }
+
+  // El texto de una plantilla se descarta; lo de adentro de ${…} es código.
+  function plantilla() {
+    let salida = "";
+    while (i < n) {
+      const c = codigo[i];
+      if (c === "\\") { i += 2; continue; }
+      if (c === "`") { i++; return salida; }
+      if (c === "$" && codigo[i + 1] === "{") { i += 2; salida += " " + codigoHasta("}") + " "; continue; }
+      i++;
+    }
+    return salida;
+  }
+
+  return codigoHasta(null);
 }
 
 // Solo NOMBRES_CON_GUION_BAJO: "OD" o "PDF" sueltos dan demasiado ruido, y

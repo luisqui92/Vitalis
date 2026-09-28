@@ -2838,6 +2838,9 @@ const interesadoSchema = new mongoose.Schema({
   }],
   // Qué pasó después. Lo llena una persona, no el bot.
   notas: { type: String, default: "" },
+  // Un cliente que tocó «Ya uso Symphomed» y dejó un mensaje: alguien tiene
+  // que contestarle. Lo pone el bot; lo baja una persona.
+  soportePendiente: { type: Boolean, default: false, index: true },
   ultimoMensaje: { type: Date, default: Date.now, index: true },
 }, { timestamps: true });
 const Interesado = mongoose.model("Interesado", interesadoSchema);

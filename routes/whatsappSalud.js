@@ -118,8 +118,8 @@ async function procesarWebhook(body) {
     // silencio, y cuesta un mensaje adentro de la ventana de 24 h, que es
     // gratis porque lo abrió el paciente.
     await enviarTexto(numero,
-      "Perdón, todavía no puedo abrir ese tipo de archivo 🙏 Si querés reservar una cita, " +
-      "escribime o mandame un audio y te ayudo.").catch(() => {});
+      "Perdón, todavía no puedo abrir ese tipo de archivo 🙏 Escribime o mandame un audio " +
+      "y te ayudo. Si querés empezar de nuevo, escribí «menú».").catch(() => {});
     return;
   }
   if (!numero || !texto.trim()) return;
