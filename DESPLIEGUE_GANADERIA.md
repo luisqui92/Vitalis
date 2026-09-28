@@ -1,9 +1,13 @@
 # Desplegar Ganadería (y lo que venía detrás)
 
 Producción se actualiza con `git pull origin claude/best-voice-transcription-api-536z7k`.
-El último pull confirmado fue `fdc89b4`. Desde ahí la rama trae **22 commits**:
-9 de antes de Ganadería (olvidé mi contraseña, foto de perfil, recordatorio de
-medicación, ofuscar el JS, corregir moneda…) y 13 de Ganadería.
+El último pull confirmado fue `fdc89b4`. Desde ahí la rama trae: 9 commits de
+antes de Ganadería (olvidé mi contraseña, foto de perfil, recordatorio de
+medicación, ofuscar el JS, corregir moneda…), los 13 de Ganadería, y el
+arreglo del WhatsApp (primero «¿médico o paciente?» con botones).
+
+Después del paso 4, probá el WhatsApp desde un celular: escribí «hola» al
+número de Symphomed y tienen que llegar los dos botones.
 
 Todo lo que se describe acá **se ensayó** en una copia: un repositorio parado
 en el commit de producción, con `public/js/` ya ofuscado, al que se le aplicaron
