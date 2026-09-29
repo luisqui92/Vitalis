@@ -46,7 +46,13 @@ function pintarVincular(v) {
     <div class="card" id="vCard">
       <div class="hint">${t("vincular.listo")}</div>
       <div class="hint" style="margin-top:10px" id="vEstado">${t("vincular.esperando")}</div>
+      <div id="grabPendientesRemoto"></div>
     </div>`;
+  // Una grabación de este celular que quedó sin subir (la página se cerró a
+  // mitad): se ofrece subirla. Ver respaldoGrabacion en audio.js.
+  ofrecerGrabacionesPendientes(document.getElementById("grabPendientesRemoto"), {
+    onSubir: async (b, mime, g) => { await subirConsulta(g.pacienteId, b, mime); },
+  });
 
   let mediaRecorder = null, chunks = [], mimeType = "audio/webm", stream = null;
 
@@ -93,6 +99,7 @@ function pintarVincular(v) {
     mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || "";
     mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     chunks = [];
+    const respaldoId = await respaldoGrabacion.iniciar({ pacienteId, pacienteNombre, mimeType: mimeType || "audio/webm" });
     // Este es el caso MÁS expuesto a que la pantalla se apague: el celular
     // queda apoyado en el escritorio mientras el médico usa la compu. El
     // cuidador (audio.js) pide que no se apague y avisa si igual pasó.
@@ -106,7 +113,10 @@ function pintarVincular(v) {
         : tipo === "silencio" ? t("consulta.avisoSilencio") : t("consulta.avisoCortado");
       avisoRemoto.innerHTML = `<div class="error">⚠️ ${texto}</div>`;
     } });
-    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.ondataavailable = e => {
+      chunks.push(e.data);
+      respaldoGrabacion.agregar(respaldoId, e.data);
+    };
     mediaRecorder.onstop = async () => {
       clearInterval(timerId);
       guardian.detener();
@@ -116,11 +126,16 @@ function pintarVincular(v) {
       document.getElementById("vCard").innerHTML = `<div class="hint">${t("vincular.subiendo")}</div>`;
       try {
         const data = await subirConsulta(pacienteActual.pacienteId, blob, mimeType);
+        respaldoGrabacion.borrar(respaldoId);
+        liberarGrabacion();
         await api("/medico/vinculacion/estado", {
           method: "POST", headers: {"Content-Type":"application/json"},
           body: JSON.stringify({ estado: "armado", consultaId: data.consulta._id }),
         });
       } catch (e) {
+        // No se subió: queda en el respaldo del teléfono y se ofrece subirla
+        // en esta misma pantalla.
+        liberarGrabacion();
         await api("/medico/vinculacion/estado", {
           method: "POST", headers: {"Content-Type":"application/json"},
           body: JSON.stringify({ estado: "armado" }),
@@ -128,7 +143,11 @@ function pintarVincular(v) {
       }
       pintarVincular({ vinculado: true, estado: "armado" });
     };
-    mediaRecorder.start();
+    mediaRecorder.start(5000);
+    // Salir por cualquier lado detiene y sube lo grabado (la misma vía que
+    // «Detener acá mismo»).
+    marcarGrabacionEnCurso(() => { try { if (mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch { /* ya estaba */ } });
+    pedirPermisoAvisoGrabacion();
     visual.iniciar(stream);
     document.getElementById("btnDetenerLocal").onclick = () => mediaRecorder.stop();
 

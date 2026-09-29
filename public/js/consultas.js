@@ -51,6 +51,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
     <button class="back" id="btnBack">${t("consulta.volver")}</button>
     <div class="card">
       <div class="hint" style="margin-bottom:14px">${t("consulta.paciente")} <b>${esc(pacienteNombre)}</b></div>
+      <div id="grabPendientes"></div>
 
       <div class="listen-panel" id="listenPanel">
         <div class="listen-orb" id="audioOrb">
@@ -76,7 +77,10 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
       <button class="link" id="btnRemota">${t("consulta.linkRemota")}</button>
     </div>`;
   document.getElementById("btnBack").onclick = () => renderPacienteDetalle(pacienteId, "consultas");
-  document.getElementById("btnRemota").onclick = () => renderNuevaConsultaRemota(pacienteId, pacienteNombre);
+  document.getElementById("btnRemota").onclick = () => {
+    if (!confirmarSalidaDeGrabacion()) return;
+    renderNuevaConsultaRemota(pacienteId, pacienteNombre);
+  };
 
   let mediaRecorder = null, chunks = [], blob = null, mimeType = "audio/webm";
   let seconds = 0, timerId = null, inicioGrabacion = 0;
@@ -91,6 +95,22 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   const transcriptorVivo = crearTranscriptorEnVivo(texto => { liveCaption.textContent = texto; });
   const recAviso = document.getElementById("recAviso");
   let guardian = null;
+  // Id del respaldo en el teléfono de ESTA toma (ver respaldoGrabacion en
+  // audio.js). Se borra al subirla.
+  let respaldoId = null;
+  // Si el médico sale de la pantalla a mitad de la grabación y lo confirma,
+  // se detiene sin pintar nada (la pantalla ya no está).
+  let salioDeLaPantalla = false;
+
+  // Una grabación que quedó sin subir (la página se cerró, se salió a mitad):
+  // se ofrece subirla antes de grabar otra.
+  ofrecerGrabacionesPendientes(document.getElementById("grabPendientes"), {
+    pacienteId,
+    onSubir: async (b, mime) => {
+      const data = await subirConsulta(pacienteId, b, mime);
+      renderDetalle(data.consulta._id);
+    },
+  });
   const minutosDe = (seg) => Math.max(1, Math.round(seg / 60));
   const mostrarAviso = (tipo, datos) => {
     if (tipo === "normal") { recAviso.innerHTML = ""; return; }
@@ -108,9 +128,27 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || "";
         mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         chunks = [];
-        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        // Una toma nueva reemplaza a la anterior que no se subió: grabar de
+        // nuevo es decidir que esa no va.
+        if (respaldoId) respaldoGrabacion.borrar(respaldoId);
+        respaldoId = await respaldoGrabacion.iniciar({ pacienteId, pacienteNombre, mimeType: mimeType || "audio/webm" });
+        const idDeEstaToma = respaldoId;
+        mediaRecorder.ondataavailable = e => {
+          chunks.push(e.data);
+          respaldoGrabacion.agregar(idDeEstaToma, e.data);
+        };
         mediaRecorder.onstop = () => {
           blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+          if (salioDeLaPantalla) {
+            // Salió confirmando: queda en el respaldo del teléfono, para
+            // subirla desde la consulta del paciente.
+            if (guardian) guardian.detener();
+            guardian = null;
+            stream.getTracks().forEach(t => t.stop());
+            onda.detener();
+            transcriptorVivo.detener();
+            return;
+          }
           // Se lee ANTES de detener el cuidador: dice cuánto de la grabación
           // pudo quedar sin sonido, y eso se muestra antes de subirla.
           const r = guardian ? guardian.resumen() : null;
@@ -130,8 +168,16 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
           }
           ncSubir.style.display = "block";
         };
-        mediaRecorder.start();
+        // De a pedazos de 5 s: cada uno va al respaldo del teléfono apenas
+        // llega, así un cierre inesperado no se lleva la grabación entera.
+        mediaRecorder.start(5000);
         guardian = crearGuardianGrabacion(stream, { onAviso: mostrarAviso });
+        marcarGrabacionEnCurso(() => {
+          salioDeLaPantalla = true;
+          clearInterval(timerId);
+          try { if (mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch { /* ya estaba */ }
+        });
+        pedirPermisoAvisoGrabacion();
         recAviso.innerHTML = ""; ncErr.innerHTML = "";
         seconds = 0; recTime.textContent = "00:00"; liveCaption.textContent = "";
         listenPanel.style.display = "block";
@@ -173,6 +219,10 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
     ncSubir.textContent = t("consulta.subiendo");
     try {
       const data = await subirConsulta(pacienteId, blob, mimeType);
+      // Subida: ya no hay nada que proteger ni que respaldar.
+      respaldoGrabacion.borrar(respaldoId);
+      respaldoId = null;
+      liberarGrabacion();
       renderDetalle(data.consulta._id);
     } catch (e) {
       // no se pierde la grabación: se puede reintentar sin volver a grabar

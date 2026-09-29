@@ -136,6 +136,9 @@ function enrutar(nombreFn, caminoDe, opciones) {
   const original = window[nombreFn];
   if (typeof original !== "function") return;
   window[nombreFn] = function (...args) {
+    // Salir de una grabación en curso (o grabada y sin subir) pregunta
+    // antes: ver confirmarSalidaDeGrabacion en audio.js.
+    if (typeof confirmarSalidaDeGrabacion === "function" && !confirmarSalidaDeGrabacion()) return;
     irA(caminoDe(...args), opciones);
     return original.apply(this, args);
   };
@@ -164,6 +167,15 @@ if (typeof pintarKardex === "function") {
 window.addEventListener("popstate", () => {
   // Sin sesión no hay a dónde volver: la pantalla es el login y punto.
   if (typeof TOKEN === "undefined" || !TOKEN) return;
+  // El «atrás» del celular con una grabación en curso: se pregunta, y si se
+  // arrepiente se queda donde estaba (y la dirección vuelve a la de antes).
+  if (typeof hayGrabacionEnCurso === "function" && hayGrabacionEnCurso()) {
+    const volverA = direccionDeLaGrabacion();
+    if (!confirmarSalidaDeGrabacion()) {
+      try { history.pushState(null, "", volverA); } catch { /* sin historial */ }
+      return;
+    }
+  }
   if (!abrirDesdeLaDireccion() && typeof volverAlPanel === "function") {
     restaurando = true;
     try { volverAlPanel(); } finally { restaurando = false; }
@@ -179,6 +191,7 @@ window.addEventListener("popstate", () => {
 if (typeof logout === "function") {
   const salir = logout;
   logout = function (...args) {
+    if (typeof confirmarSalidaDeGrabacion === "function" && !confirmarSalidaDeGrabacion()) return;
     try { history.replaceState(null, "", BASE); } catch {}
     return salir.apply(this, args);
   };

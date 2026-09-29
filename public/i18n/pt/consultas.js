@@ -115,4 +115,13 @@ Object.assign(I18N.pt, {
   "consulta.avisoCortado": "O microfone foi desconectado. Pare a gravação e comece uma nova para não perder o resto.",
   "consulta.resumenSinMicrofono": "Atenção: de {total} de gravação, cerca de {min} min foram com a tela apagada ou fora do Symphomed, e esse trecho pode estar sem som. Você pode enviar mesmo assim.",
   "consulta.resumenSilencio": "Atenção: de {total} de gravação, cerca de {min} min estão sem som. Verifique se o microfone não ficou tampado. Você pode enviar mesmo assim.",
+
+  // Salir con una grabación en curso, y el respaldo en el teléfono (audio.js)
+  "consulta.confirmarSalir": "Há uma gravação em andamento. Se você sair desta tela, ela para: o que foi gravado até agora fica salvo neste celular e você vai poder enviar pela consulta do paciente. Sair mesmo assim?",
+  "consulta.notifTitulo": "⚠️ Symphomed: a gravação está em pausa",
+  "consulta.notifCuerpo": "Você saiu do Symphomed e o celular parou de gravar. Toque aqui para voltar e continuar gravando a consulta.",
+  "consulta.pendienteTexto": "Há uma gravação de {paciente} que não chegou a ser enviada ({min} min, {fecha}).",
+  "consulta.pendienteSubir": "Enviar e transcrever",
+  "consulta.pendienteDescartar": "Descartar",
+  "consulta.pendienteConfirmarDescartar": "Descartar esta gravação? Não será possível recuperá-la.",
 });

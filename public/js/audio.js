@@ -177,6 +177,242 @@ function crearGuardianGrabacion(stream, { onAviso = () => {} } = {}) {
   };
 }
 
+// ═══ UNA GRABACIÓN NO SE PIERDE POR SALIR DE LA PANTALLA ════════════════════
+//
+// Mientras hay una grabación en curso —o una ya terminada que todavía no se
+// subió— salir de la pantalla la tira: vive solo en la memoria de esta
+// página. Pasaba sin aviso por cuatro caminos: el botón «atrás» del celular,
+// tocar otra sección de Symphomed, cerrar la pestaña, y el repintado
+// automático cuando entra algo nuevo (un turno por WhatsApp) — ese último sin
+// que el médico tocara nada.
+//
+// Lo que NO se puede frenar es el botón de cambiar de app o el de inicio: eso
+// es del sistema, y ninguna página se entera ANTES. Para eso están la
+// notificación (avisarSiSeOculta) y el respaldo en el teléfono (abajo).
+//
+// GRABACION_EN_CURSO: null, o { descartar() } — lo que hay que hacer si el
+// médico confirma que quiere salir igual.
+let GRABACION_EN_CURSO = null;
+
+function hayGrabacionEnCurso() {
+  return Boolean(GRABACION_EN_CURSO);
+}
+
+function marcarGrabacionEnCurso(descartar) {
+  // La dirección de ese momento: si el médico toca «atrás» y se arrepiente,
+  // se la vuelve a poner para que la barra no quede mintiendo.
+  GRABACION_EN_CURSO = { descartar: descartar || (() => {}), url: location.pathname };
+}
+
+function direccionDeLaGrabacion() {
+  return GRABACION_EN_CURSO ? GRABACION_EN_CURSO.url : null;
+}
+
+function liberarGrabacion() {
+  GRABACION_EN_CURSO = null;
+}
+
+// true = se puede salir. Si hay grabación, pregunta; si confirma, la descarta
+// (para no dejar el micrófono prendido sin pantalla que lo controle).
+function confirmarSalidaDeGrabacion() {
+  if (!GRABACION_EN_CURSO) return true;
+  if (!confirm(t("consulta.confirmarSalir"))) return false;
+  try { GRABACION_EN_CURSO.descartar(); } catch { /* ya estaba detenida */ }
+  GRABACION_EN_CURSO = null;
+  return true;
+}
+
+// Cerrar la pestaña o recargar: el navegador muestra su propio "¿Salir del
+// sitio?" (no deja personalizar el texto, por seguridad).
+window.addEventListener("beforeunload", (e) => {
+  if (!GRABACION_EN_CURSO) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+// Si cambia de app en medio de la grabación, el celular le corta el micrófono
+// a la página. No se puede impedir, pero sí avisar EN EL MOMENTO, con una
+// notificación del sistema que lo trae de vuelta. Necesita el permiso de
+// notificaciones: se pide al empezar a grabar si todavía no se decidió.
+async function pedirPermisoAvisoGrabacion() {
+  try {
+    if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+  } catch { /* sin notificaciones: quedan los avisos en pantalla */ }
+}
+
+async function avisarSiSeOculta() {
+  if (!GRABACION_EN_CURSO || document.visibilityState !== "hidden") return;
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return;
+    await reg.showNotification(t("consulta.notifTitulo"), {
+      body: t("consulta.notifCuerpo"),
+      icon: "/img/simbolo-192.png",
+      tag: "grabacion-en-curso",
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [300, 150, 300],
+      data: { url: location.pathname },
+    });
+  } catch { /* si no se puede notificar, queda el aviso al volver */ }
+}
+document.addEventListener("visibilitychange", avisarSiSeOculta);
+
+// ═══ EL RESPALDO EN EL TELÉFONO ═════════════════════════════════════════════
+//
+// Al cambiar de app, Android muchas veces no solo le corta el micrófono a la
+// página: la CIERRA para liberar memoria. Con la grabación entera en memoria,
+// se perdía todo, también lo que ya estaba bien grabado.
+//
+// Ahora la grabación se entrega de a pedazos (cada 5 s) y cada pedazo se
+// guarda en el teléfono (IndexedDB). Si la página se cierra, al volver a
+// abrir la consulta de ese paciente aparece «Hay una grabación sin subir» con
+// Subir y Descartar. Se borra sola al subirse. Todo con try/catch: sin
+// espacio o en modo privado, la grabación sigue igual que antes, solo sin
+// respaldo.
+const RESPALDO_DB = "symphomed_grabaciones";
+const RESPALDO_DIAS = 7;
+
+function abrirRespaldo() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) return reject(new Error("sin IndexedDB"));
+    const pedido = indexedDB.open(RESPALDO_DB, 1);
+    pedido.onupgradeneeded = () => {
+      const db = pedido.result;
+      if (!db.objectStoreNames.contains("grabaciones")) db.createObjectStore("grabaciones", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("trozos")) {
+        db.createObjectStore("trozos", { autoIncrement: true }).createIndex("grabacion", "grabacionId");
+      }
+    };
+    pedido.onsuccess = () => resolve(pedido.result);
+    pedido.onerror = () => reject(pedido.error);
+  });
+}
+
+function enTransaccion(db, tiendas, modo, trabajo) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(tiendas, modo);
+    let resultado;
+    Promise.resolve(trabajo(tx)).then(r => { resultado = r; });
+    tx.oncomplete = () => resolve(resultado);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+const respaldoGrabacion = {
+  async iniciar(meta) {
+    try {
+      const db = await abrirRespaldo();
+      const id = `g${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
+      await enTransaccion(db, ["grabaciones"], "readwrite", tx =>
+        tx.objectStore("grabaciones").put({ id, ...meta, inicio: Date.now(), actualizada: Date.now(), bytes: 0 }));
+      db.close();
+      return id;
+    } catch { return null; }
+  },
+  async agregar(id, trozo) {
+    if (!id || !trozo || !trozo.size) return;
+    try {
+      const db = await abrirRespaldo();
+      await enTransaccion(db, ["grabaciones", "trozos"], "readwrite", tx => {
+        tx.objectStore("trozos").add({ grabacionId: id, trozo });
+        const g = tx.objectStore("grabaciones");
+        const pedido = g.get(id);
+        pedido.onsuccess = () => {
+          if (pedido.result) g.put({ ...pedido.result, actualizada: Date.now(), bytes: (pedido.result.bytes || 0) + trozo.size });
+        };
+      });
+      db.close();
+    } catch { /* sin espacio: la grabación sigue en memoria igual */ }
+  },
+  async pendientes(filtro = {}) {
+    try {
+      const db = await abrirRespaldo();
+      const todas = await enTransaccion(db, ["grabaciones"], "readonly", tx => new Promise(res => {
+        const pedido = tx.objectStore("grabaciones").getAll();
+        pedido.onsuccess = () => res(pedido.result || []);
+      }));
+      db.close();
+      const limite = Date.now() - RESPALDO_DIAS * 86400000;
+      for (const g of todas.filter(g => g.actualizada < limite)) await this.borrar(g.id);
+      return todas.filter(g => g.actualizada >= limite && g.bytes > 0 &&
+        (!filtro.pacienteId || g.pacienteId === filtro.pacienteId) && g.id !== filtro.excepto)
+        .sort((a, b) => b.inicio - a.inicio);
+    } catch { return []; }
+  },
+  async armar(id) {
+    const db = await abrirRespaldo();
+    const trozos = await enTransaccion(db, ["trozos"], "readonly", tx => new Promise(res => {
+      const pedido = tx.objectStore("trozos").index("grabacion").getAll(id);
+      pedido.onsuccess = () => res((pedido.result || []).map(r => r.trozo));
+    }));
+    db.close();
+    return trozos;
+  },
+  async borrar(id) {
+    if (!id) return;
+    try {
+      const db = await abrirRespaldo();
+      await enTransaccion(db, ["grabaciones", "trozos"], "readwrite", tx => {
+        tx.objectStore("grabaciones").delete(id);
+        const indice = tx.objectStore("trozos").index("grabacion");
+        const cursor = indice.openKeyCursor(IDBKeyRange.only(id));
+        cursor.onsuccess = () => {
+          const c = cursor.result;
+          if (c) { tx.objectStore("trozos").delete(c.primaryKey); c.continue(); }
+        };
+      });
+      db.close();
+    } catch { /* se borra sola a los 7 días */ }
+  },
+};
+
+// La tarjeta «Hay una grabación sin subir»: la usan la pantalla de nueva
+// consulta y la del celular vinculado. onSubir(blob, mimeType, grabacion)
+// hace la subida; si sale bien, se borra el respaldo.
+async function ofrecerGrabacionesPendientes(contenedor, { pacienteId, excepto, onSubir }) {
+  if (!contenedor) return;
+  const lista = await respaldoGrabacion.pendientes({ pacienteId, excepto });
+  if (!lista.length) { contenedor.innerHTML = ""; return; }
+  const minutos = (g) => Math.max(1, Math.round((g.actualizada - g.inicio) / 60000));
+  contenedor.innerHTML = lista.map(g => `
+    <div class="error" style="margin-top:10px" data-grab="${g.id}">
+      ⚠️ ${t("consulta.pendienteTexto", { paciente: esc(g.pacienteNombre || ""), min: minutos(g), fecha: fechaHora(g.inicio) })}
+      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+        <button class="link" data-grab-subir="${g.id}" style="margin:0;width:auto">⬆️ ${t("consulta.pendienteSubir")}</button>
+        <button class="link" data-grab-descartar="${g.id}" style="margin:0;width:auto;color:var(--danger)">${t("consulta.pendienteDescartar")}</button>
+      </div>
+    </div>`).join("");
+  contenedor.querySelectorAll("[data-grab-subir]").forEach(btn => {
+    btn.onclick = async () => {
+      const g = lista.find(x => x.id === btn.dataset.grabSubir);
+      btn.disabled = true;
+      btn.textContent = t("consulta.subiendo");
+      try {
+        const trozos = await respaldoGrabacion.armar(g.id);
+        const blob = new Blob(trozos, { type: g.mimeType || "audio/webm" });
+        await onSubir(blob, g.mimeType || "audio/webm", g);
+        await respaldoGrabacion.borrar(g.id);
+        // Si quien la subió se quedó en la misma pantalla, se actualiza la lista.
+        ofrecerGrabacionesPendientes(contenedor, { pacienteId, excepto, onSubir });
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = `⬆️ ${t("consulta.pendienteSubir")}`;
+        alert(e.error || t("consulta.errSubir"));
+      }
+    };
+  });
+  contenedor.querySelectorAll("[data-grab-descartar]").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(t("consulta.pendienteConfirmarDescartar"))) return;
+      await respaldoGrabacion.borrar(btn.dataset.grabDescartar);
+      btn.closest("[data-grab]").remove();
+    };
+  });
+}
+
 // Sube el audio grabado/subido y crea la consulta. Se usa tanto grabando
 // local como desde el celular vinculado como micrófono remoto.
 // teleconsultaId, cuando viene, dice dos cosas: que esta consulta salió de

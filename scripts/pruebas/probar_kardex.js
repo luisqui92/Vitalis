@@ -80,6 +80,9 @@ function entorno(idioma) {
     renderNuevaConsulta: () => {}, renderDetalle: () => {}, renderReceta: () => {},
     crearIndicadorAudio: () => ({ iniciar() {}, detener() {} }),
     crearTranscriptorEnVivo: () => ({ iniciar() {}, detener() {} }),
+    // El respaldo de grabaciones en el teléfono (audio.js): en el arnés no
+    // hay IndexedDB ni nada pendiente.
+    ofrecerGrabacionesPendientes: () => {},
     navigator: { mediaDevices: {} }, alert: () => {}, confirm: () => true,
     wireTabMemoria: () => {}, wireTabEvolucion: () => {}, wireTabEstudios: () => {},
     wireTabRecetas: () => {}, wireTabCrecimiento: () => {},
@@ -153,6 +156,7 @@ const sinBloquePersona = (html) => html
   // agregado deliberado: una consulta de 32 minutos llegó con solo los
   // primeros minutos grabados porque el celular se bloqueó.
   .replace(/\n?\s*<div id="recAviso"><\/div>/g, "")
+  .replace(/\n?\s*<div id="grabPendientes"><\/div>/g, "")
   .replace(/\n?\s*<div class="hint" style="text-align:center;margin-top:6px">📱 [^<]*<\/div>/g, "")
   // La fila del CPF: solo se dibuja en cuentas brasileñas (Memed lo necesita
   // para recetar). En el arnés la moneda es BOB, así que el ternario deja el

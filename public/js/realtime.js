@@ -96,6 +96,11 @@ function restaurarScroll(pos) {
 
 function refrescarPantallaActual() {
   if (!PANTALLA_ACTUAL) return;
+  // Con una grabación en curso no se repinta nada: la pantalla de grabar no
+  // está registrada acá, así que el aviso caía sobre la anterior (la ficha
+  // del paciente) y la repintaba ENCIMA de la grabación — que quedaba sin
+  // botón para detenerla ni subirla, sin que el médico tocara nada.
+  if (typeof hayGrabacionEnCurso === "function" && hayGrabacionEnCurso()) return;
   const { tipo, params } = PANTALLA_ACTUAL;
   if (PANTALLAS_SIN_REFRESCO.has(tipo)) return;
 

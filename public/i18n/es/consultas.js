@@ -112,4 +112,13 @@ Object.assign(I18N.es, {
   "consulta.avisoCortado": "El micrófono se desconectó. Detené la grabación y empezá una nueva para no perder el resto.",
   "consulta.resumenSinMicrofono": "Ojo: de {total} de grabación, unos {min} min fueron con la pantalla apagada o fuera de Symphomed, y ese tramo puede no tener sonido. Podés subirla igual.",
   "consulta.resumenSilencio": "Ojo: de {total} de grabación, unos {min} min no tienen sonido. Revisá que el micrófono no haya estado tapado. Podés subirla igual.",
+
+  // Salir con una grabación en curso, y el respaldo en el teléfono (audio.js)
+  "consulta.confirmarSalir": "Hay una grabación en curso. Si salís de esta pantalla, se detiene: lo grabado hasta ahora queda guardado en este teléfono y lo vas a poder subir desde la consulta del paciente. ¿Salir igual?",
+  "consulta.notifTitulo": "⚠️ Symphomed: la grabación está en pausa",
+  "consulta.notifCuerpo": "Saliste de Symphomed y el celular dejó de grabar. Tocá acá para volver y seguir grabando la consulta.",
+  "consulta.pendienteTexto": "Hay una grabación de {paciente} que no se llegó a subir ({min} min, {fecha}).",
+  "consulta.pendienteSubir": "Subir y transcribir",
+  "consulta.pendienteDescartar": "Descartar",
+  "consulta.pendienteConfirmarDescartar": "¿Descartar esta grabación? No se puede recuperar.",
 });
