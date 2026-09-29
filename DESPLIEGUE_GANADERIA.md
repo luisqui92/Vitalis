@@ -41,8 +41,11 @@ echo "ofuscados: $(git status --short | grep -c ' public/js/')"
 ```
 
 - La primera línea es el commit de producción. **Anotalo**: es a donde se vuelve.
-- La segunda tiene que salir **vacía**. Si muestra algún archivo, alguien tocó
-  algo a mano en el servidor: pará y avisá antes de seguir.
+- La segunda tiene que salir **vacía**. Las únicas excepciones permitidas son
+  `services/notaClinica.js` y `scripts/regenerar_nota.js`, que son los
+  temporales del arreglo de la nota vacía (el paso 3 los limpia). Si muestra
+  cualquier otro archivo, alguien tocó algo a mano en el servidor: pará y
+  avisá antes de seguir.
 
 ## Paso 2 — Respaldo (no sigas sin esto)
 
@@ -61,6 +64,8 @@ sigas. (Es el mismo respaldo diario de `services/backup.js`, hecho a mano.)
 ```bash
 cd ~/vitalis-app
 git checkout -- public/js
+git checkout -- services/notaClinica.js
+rm -f scripts/regenerar_nota.js
 git pull --ff-only origin claude/best-voice-transcription-api-536z7k
 npm install --omit=dev
 node scripts/ofuscar.js
