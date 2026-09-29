@@ -318,6 +318,17 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
 // ─── DETALLE DE CONSULTA: transcripción + nota clínica generada por IA ──
 // Mientras la transcripción o la nota clínica siguen en camino, esta
 // pantalla se refresca sola cada 8s hasta que ambas terminan.
+// El aviso bajo un medicamento de la nota que no está en la lista oficial
+// (routes/consultaMedica.js → verificacionMedicamentos). "ok" o sin dato:
+// nada. La sugerencia es un botón: solo cambia si el médico la toca.
+function avisoMedicamentoHtml(v) {
+  if (!v || v.estado === "ok") return "";
+  if (v.estado === "parecido" && v.sugerencia) {
+    return `<button type="button" class="nf-med-sugerencia med-aviso" data-nombre="${esc(v.sugerencia)}">${t("nota.med.quisisteDecir", { nombre: esc(v.sugerencia) })}</button>`;
+  }
+  return `<div class="nf-med-desconocido med-aviso">${t("nota.med.desconocido")}</div>`;
+}
+
 // La nota llegó "completa" pero sin nada adentro: pasó con una consulta en
 // portugués cuyo JSON vino con las claves cambiadas (ver
 // services/notaClinica.js). Mismo criterio que notaVacia() del servidor.
@@ -393,11 +404,12 @@ async function renderDetalle(id, esRefrescoAutomatico) {
             <label>${t("nota.campo.medicamentos")}</label>
             <div id="nfMeds">
               ${(n.medicamentosRecetados || []).map((m, i) => `
-                <div class="med-row" data-i="${i}" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+                <div class="med-row" data-i="${i}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center">
                   <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
                   <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" value="${esc(m.dosis || "")}" style="flex:1;margin:0">
                   <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" value="${esc(m.frecuencia || "")}" style="flex:1;margin:0">
                   <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>
+                  <div class="nf-med-aviso" style="flex-basis:100%">${avisoMedicamentoHtml(c.verificacionMedicamentos?.[i])}</div>
                 </div>`).join("")}
             </div>
             <button class="link" id="nfMedAgregar" style="margin:0 0 10px 0;width:auto">${t("nota.med.agregar")}</button>
@@ -532,21 +544,46 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     const medsBox = document.getElementById("nfMeds");
     if (medsBox) {
       medsBox.onclick = (e) => {
+        // Tocar la sugerencia es la ÚNICA forma en que el nombre cambia sin
+        // que el médico lo escriba: el sistema nunca lo reemplaza solo.
+        const sug = e.target.closest(".nf-med-sugerencia");
+        if (sug) {
+          e.preventDefault();
+          const fila = sug.closest(".med-row");
+          const n = sug.dataset.nombre;
+          fila.querySelector(".nf-med-nombre").value = n.charAt(0).toUpperCase() + n.slice(1);
+          fila.querySelector(".nf-med-aviso").innerHTML = "";
+          return;
+        }
         const quitar = e.target.closest(".nf-med-quitar");
         if (!quitar) return;
         e.preventDefault();
         quitar.closest(".med-row").remove();
       };
+      // Al terminar de escribir un nombre (salir del campo), se revisa ese.
+      medsBox.addEventListener("change", async (e) => {
+        const input = e.target.closest(".nf-med-nombre");
+        if (!input) return;
+        const aviso = input.closest(".med-row").querySelector(".nf-med-aviso");
+        const nombre = input.value.trim();
+        if (!nombre) { aviso.innerHTML = ""; return; }
+        try {
+          const r = await api(`/medico/medicamentos/verificar?nombre=${encodeURIComponent(nombre)}`);
+          // Si mientras tanto lo volvió a cambiar, esta respuesta ya no vale.
+          if (input.value.trim() === nombre) aviso.innerHTML = avisoMedicamentoHtml(r);
+        } catch { /* sin aviso: no bloquea nada */ }
+      });
       document.getElementById("nfMedAgregar").onclick = (e) => {
         e.preventDefault();
         const fila = document.createElement("div");
         fila.className = "med-row";
-        fila.style.cssText = "display:flex;gap:6px;margin-bottom:6px;align-items:center";
+        fila.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center";
         fila.innerHTML = `
           <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" style="flex:2;margin:0">
           <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" style="flex:1;margin:0">
           <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" style="flex:1;margin:0">
-          <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>`;
+          <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>
+          <div class="nf-med-aviso" style="flex-basis:100%"></div>`;
         medsBox.appendChild(fila);
       };
     }

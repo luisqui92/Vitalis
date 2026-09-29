@@ -61,6 +61,10 @@ Object.assign(I18N.es, {
   "nota.med.frecuencia": "Frecuencia",
   "nota.med.quitar": "Quitar",
   "nota.med.agregar": "➕ Agregar medicamento",
+  // Revisión contra la lista oficial (services/medicamentosOficiales.js).
+  // Nunca se cambia solo: el médico toca la sugerencia o corrige a mano.
+  "nota.med.quisisteDecir": "⚠️ ¿Quisiste decir <b>{nombre}</b>? Tocá para cambiarlo.",
+  "nota.med.desconocido": "⚠️ No está en la lista oficial. Si es una marca comercial, está bien; si no, verificá el nombre.",
 
   // ─── Qué aplicar al confirmar ─────────────────────────────────────────
   // Estas llevan el <b> adentro a propósito: son frases enteras, y en otro

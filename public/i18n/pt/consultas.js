@@ -69,6 +69,8 @@ Object.assign(I18N.pt, {
   "nota.med.frecuencia": "Frequência",
   "nota.med.quitar": "Remover",
   "nota.med.agregar": "➕ Adicionar medicamento",
+  "nota.med.quisisteDecir": "⚠️ Você quis dizer <b>{nombre}</b>? Toque para trocar.",
+  "nota.med.desconocido": "⚠️ Não está na lista oficial. Se for um nome comercial, tudo bem; se não, confira o nome.",
 
   // ─── O que aplicar ao confirmar ───────────────────────────────────────
   "confirmar.titulo": "✅ O que aplicar ao confirmar",

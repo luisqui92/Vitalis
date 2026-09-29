@@ -19,12 +19,32 @@ const { avisarCambio } = require("../services/realtime");
 const { registrarCorreccion } = require("../services/correccionesIA");
 const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { medicamentosDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
+const { verificarMedicamento } = require("../services/medicamentosOficiales");
 
 const requireMedico = requireAuth(["medico"]);
 
 // Acepta el audio como body crudo (no JSON): el cliente manda
 // Content-Type: audio/ogg (o wav/mp3/m4a/webm) y el archivo tal cual.
 const audioRaw = express.raw({ type: "audio/*", limit: "80mb" });
+
+// Revisa una lista de nombres con el idioma del médico y su historial.
+// Nunca tira: si la revisión falla, la nota se muestra igual, sin avisos.
+async function verificarLista(medicoPhone, nombres) {
+  try {
+    const [medico, propios] = await Promise.all([
+      Medico.findOne({ phone: medicoPhone }).select("idioma").lean(),
+      medicamentosDelMedico(medicoPhone, 500),
+    ]);
+    const idioma = idiomaSoportado(medico?.idioma);
+    return nombres.map(n => (String(n || "").trim()
+      ? verificarMedicamento(n, { idioma, propios })
+      : { estado: "ok", sugerencia: null }));
+  } catch (e) {
+    log.warn("[MEDICAMENTOS] no se pudo revisar la lista:", e.message);
+    return nombres.map(() => ({ estado: "ok", sugerencia: null }));
+  }
+}
 
 module.exports = function (app) {
 
@@ -42,13 +62,14 @@ module.exports = function (app) {
       // en idiomas distintos para la misma consulta.
       const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("tipoEspecialidad idioma").lean();
       const idioma = idiomaSoportado(medico?.idioma);
+      const delMedico = await medicamentosDelMedico(req.adminUser.usuario);
       res.json({
         token, idioma,
         // Si este idioma tiene Medical Mode lo decide el servidor: una copia
         // de la lista en el navegador es una segunda fuente de verdad que
         // algún día no va a coincidir con ésta.
         medicalMode: IDIOMAS_CON_MEDICAL_MODE.includes(idioma),
-        keyterms: keytermsPara(medico?.tipoEspecialidad, idioma),
+        keyterms: keytermsPara(medico?.tipoEspecialidad, idioma, delMedico),
       });
     } catch (e) {
       log.error("[TRANSCRIPCION_TOKEN]", e.response?.data || e.message);
@@ -130,9 +151,11 @@ module.exports = function (app) {
 
     // La especialidad afina el vocabulario; el idioma decide en qué lengua
     // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
+    // Y lo que este médico receta seguido va primero (services/vocabularioMedico.js).
     const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
+    const delMedico = await medicamentosDelMedico(medicoPhone);
 
-    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal })
+    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico })
       .then(async ({ transcripcionCompleta, segmentos, duracionSegundos }) => {
         consulta.estado = "completado";
         consulta.transcripcionCompleta = transcripcionCompleta;
@@ -245,7 +268,25 @@ module.exports = function (app) {
       }
     }
 
+    // Cada medicamento de la nota, contra la lista oficial y contra lo que
+    // este médico ya recetó (services/medicamentosOficiales.js). Solo
+    // mientras se revisa: una vez confirmada, lo que quedó es lo que él
+    // decidió. Va en la misma posición que medicamentosRecetados.
+    if (!consultaObj.confirmadaEn && consultaObj.notaClinica?.medicamentosRecetados?.length) {
+      consultaObj.verificacionMedicamentos = await verificarLista(
+        medicoPhone, consultaObj.notaClinica.medicamentosRecetados.map(m => m?.nombre));
+    }
+
     res.json({ consulta: consultaObj });
+  }));
+
+  // ─── REVISAR UN NOMBRE MIENTRAS EL MÉDICO LO EDITA ─────────────────────
+  // La misma revisión, para cuando cambia o agrega un medicamento a mano en
+  // la nota. Solo informa: nunca se cambia nada solo.
+  app.get("/medico/medicamentos/verificar", requireMedico, asyncRoute(async (req, res) => {
+    const nombre = String(req.query.nombre || "").slice(0, 120);
+    const [r] = await verificarLista(req.adminUser.usuario, [nombre]);
+    res.json(r);
   }));
 
   // ─── VOLVER A GENERAR LA NOTA ──────────────────────────────────────────

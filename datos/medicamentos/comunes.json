@@ -1,0 +1,16 @@
+{
+  "fuente": "Nombres genéricos y de clase de uso diario en Bolivia y Brasil que las listas oficiales escriben de otra forma (o como combinación). Cada uno es un nombre real; ninguno es una marca.",
+  "nombres": [
+    "cotrimoxazol", "trimetoprima sulfametoxazol", "metamizol", "metamizol sódico", "acetaminofén", "acetaminofeno", "aspirina",
+    "hioscina", "butilhioscina", "butilbromuro de hioscina", "n-butilbromuro de hioscina", "butilbrometo de escopolamina", "escopolamina",
+    "albuterol", "bromuro de ipratropio", "ipratropio", "brometo de ipratrópio",
+    "amoxicilina con ácido clavulánico", "amoxicilina + ácido clavulánico", "ácido clavulánico", "clavulanato", "clavulanato de potássio",
+    "insulina", "insulina nph", "insulina regular", "insulina glargina", "insulina lispro", "insulina asparte", "insulina aspart", "insulina detemir", "insulina degludeca", "insulina degludec",
+    "vitamina a", "vitamina b1", "vitamina b6", "vitamina b12", "vitamina c", "vitamina d", "vitamina d3", "vitamina e", "vitamina k",
+    "complejo b", "complexo b", "polivitamínico", "multivitamínico",
+    "suero oral", "sales de rehidratación oral", "sais de reidratação oral", "soro de reidratação oral", "solução de reidratação oral",
+    "anticonceptivo", "anticonceptivo oral", "anticoncepcional", "anticoncepcional oral",
+    "hierro", "ferro", "calcio", "cálcio", "zinc", "zinco", "magnesio", "magnésio", "omega 3", "ômega 3",
+    "suero fisiológico", "soro fisiológico", "solución salina", "solução salina"
+  ]
+}

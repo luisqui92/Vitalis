@@ -186,8 +186,40 @@ const KEYTERMS_POR_ESPECIALIDAD_PT = {
   ],
 };
 
+// ─── LOS FÁRMACOS MÁS RECETADOS ───────────────────────────────────────────
+// Rellenan el lugar que sobra hasta 100 (una especialidad con lista larga
+// deja menos). Todos están escritos como en la lista oficial de cada país
+// —DCB de ANVISA / LINAME de Bolivia— y lo comprueba
+// scripts/pruebas/probar_medicamentos.js: un término mal escrito acá le
+// enseñaría al transcriptor a escribirlo mal.
+const KEYTERMS_FARMACOS_PT = [
+  "enalapril", "captopril", "anlodipino", "hidroclorotiazida", "furosemida", "espironolactona",
+  "atenolol", "propranolol", "sinvastatina", "rosuvastatina", "glibenclamida", "gliclazida",
+  "levotiroxina", "dexametasona", "prednisolona", "budesonida", "cetirizina", "desloratadina",
+  "dexclorfeniramina", "ácido acetilsalicílico", "clopidogrel", "rivaroxabana", "sertralina",
+  "fluoxetina", "escitalopram", "amitriptilina", "clonazepam", "ondansetrona", "metoclopramida",
+  "bromoprida", "escopolamina", "cefalexina", "ceftriaxona", "sulfametoxazol", "trimetoprima",
+  "nitrofurantoína", "metronidazol", "fluconazol", "pantoprazol", "tramadol", "nimesulida",
+  "cetoprofeno", "estradiol", "progesterona", "ciproterona", "finasterida", "testosterona",
+  "ácido fólico", "sulfato ferroso", "colecalciferol", "ivermectina", "albendazol",
+  "gabapentina", "pregabalina", "quetiapina",
+];
+
+const KEYTERMS_FARMACOS_ES = [
+  "metamizol", "enalapril", "amlodipino", "hidroclorotiazida", "furosemida", "espironolactona",
+  "atenolol", "metoprolol", "carvedilol", "simvastatina", "glibenclamida", "gliclazida",
+  "levotiroxina", "dexametasona", "hidrocortisona", "budesonida", "cetirizina", "clorfenamina",
+  "ácido acetilsalicílico", "clopidogrel", "enoxaparina", "sertralina", "fluoxetina",
+  "escitalopram", "amitriptilina", "clonazepam", "diazepam", "ondansetrón", "metoclopramida",
+  "hioscina", "cefalexina", "ceftriaxona", "cotrimoxazol", "nitrofurantoína", "metronidazol",
+  "fluconazol", "ketorolaco", "naproxeno", "tramadol", "pantoprazol", "levonorgestrel",
+  "medroxiprogesterona", "ácido fólico", "sulfato ferroso", "ácido valproico", "carbamazepina",
+  "albendazol", "nitazoxanida", "ivermectina", "gabapentina", "pregabalina", "quetiapina",
+];
+
 const KEYTERMS_MEDICOS = { es: KEYTERMS_MEDICOS_ES, pt: KEYTERMS_MEDICOS_PT };
 const KEYTERMS_ESPECIALIDAD = { es: KEYTERMS_POR_ESPECIALIDAD_ES, pt: KEYTERMS_POR_ESPECIALIDAD_PT };
+const KEYTERMS_FARMACOS = { es: KEYTERMS_FARMACOS_ES, pt: KEYTERMS_FARMACOS_PT };
 
 // AssemblyAI acepta hasta 100 términos en streaming (más en batch, pero
 // mantenemos una sola lista para que la vista previa y la transcripción
@@ -200,10 +232,39 @@ function idiomaSoportado(idioma) {
   return KEYTERMS_MEDICOS[idioma] ? idioma : "es";
 }
 
-function keytermsPara(tipoEspecialidad, idioma) {
+// Cuántos lugares, como mucho, se llevan los medicamentos del propio médico.
+const MAX_KEYTERMS_DEL_MEDICO = 25;
+
+// Orden = prioridad (si algo se corta al llegar a 100, es lo último):
+//   1. lo que ESTE médico receta (services/vocabularioMedico.js): es lo más
+//      probable que diga, y lo que ninguna lista general va a tener —sus
+//      marcas, sus combinaciones—.
+//   2. su especialidad.
+//   3. el vocabulario general del idioma (incluye cómo se dicta la posología).
+//   4. los fármacos más recetados, hasta llenar.
+// Sin repetidos: «Losartana» del médico y «losartana» de la lista son uno.
+function keytermsPara(tipoEspecialidad, idioma, delMedico = []) {
   const lang = idiomaSoportado(idioma);
-  const propios = KEYTERMS_ESPECIALIDAD[lang][tipoEspecialidad] || [];
-  return [...KEYTERMS_MEDICOS[lang], ...propios].slice(0, MAX_KEYTERMS);
+  const vistos = new Set();
+  const clave = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const lista = [];
+  const sumar = (terminos, tope = Infinity) => {
+    let n = 0;
+    for (const t of terminos) {
+      if (lista.length >= MAX_KEYTERMS || n >= tope) return;
+      const txt = String(t || "").trim();
+      // AssemblyAI rechaza términos de más de 6 palabras.
+      if (!txt || txt.split(/\s+/).length > 6 || vistos.has(clave(txt))) continue;
+      vistos.add(clave(txt));
+      lista.push(txt);
+      n++;
+    }
+  };
+  sumar(Array.isArray(delMedico) ? delMedico : [], MAX_KEYTERMS_DEL_MEDICO);
+  sumar(KEYTERMS_ESPECIALIDAD[lang][tipoEspecialidad] || []);
+  sumar(KEYTERMS_MEDICOS[lang]);
+  sumar(KEYTERMS_FARMACOS[lang]);
+  return lista;
 }
 
 async function subirAudio(audioBuffer) {
@@ -232,7 +293,7 @@ async function subirAudio(audioBuffer) {
 // multichannel y speaker_labels no van juntos, y está bien que no vayan:
 // pedir diarización sobre un audio donde ya sabés quién es quién es pedirle
 // al modelo que dude de un dato que ya tenés.
-async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false } = {}) {
+async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false, delMedico = [] } = {}) {
   const lang = idiomaSoportado(idioma);
   const conMedicalMode = IDIOMAS_CON_MEDICAL_MODE.includes(lang);
   if (!conMedicalMode) {
@@ -267,7 +328,7 @@ async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multican
       // Solo donde existe. Mandarlo igual no rompe (la API lo ignora), pero
       // así la petición dice la verdad de lo que va a pasar.
       ...(conMedicalMode ? { domain: "medical-v1" } : {}),
-      keyterms_prompt: keytermsPara(tipoEspecialidad, lang),
+      keyterms_prompt: keytermsPara(tipoEspecialidad, lang, delMedico),
     },
     {
       headers: { Authorization: CONFIG.ASSEMBLYAI_API_KEY, "Content-Type": "application/json" },
@@ -307,13 +368,13 @@ function quienSegunCanal(canal) {
   return "";
 }
 
-async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false } = {}) {
+async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false, delMedico = [] } = {}) {
   if (!CONFIG.ASSEMBLYAI_API_KEY) {
     throw new Error("ASSEMBLYAI_API_KEY no configurado");
   }
 
   const audioUrl = await subirAudio(audioBuffer);
-  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal });
+  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal, delMedico });
   const data = await esperarTranscripcion(id);
 
   const segmentos = (data.utterances || []).map(u => ({
@@ -392,4 +453,4 @@ async function crearTokenStreaming() {
   return res.data.token;
 }
 
-module.exports = { transcribirConsultaMedica, transcribirNotaDeVoz, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE };
+module.exports = { transcribirConsultaMedica, transcribirNotaDeVoz, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE, MAX_KEYTERMS, KEYTERMS_FARMACOS };
