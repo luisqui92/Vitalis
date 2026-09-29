@@ -104,4 +104,12 @@ Object.assign(I18N.es, {
   "nota.regenerando": "Generando…",
   "nota.regenerarAyuda": "Usa la misma transcripción y no se cobra de nuevo.",
   "nota.errRegenerar": "No se pudo volver a generar la nota.",
+
+  // El cuidador de la grabación (crearGuardianGrabacion en audio.js)
+  "consulta.pantallaEncendida": "Dejá la pantalla encendida y Symphomed abierto mientras grabás: si el celular se bloquea o cambiás de app, el micrófono puede dejar de grabar.",
+  "consulta.avisoOculto": "Saliste de Symphomed o se apagó la pantalla durante unos {min} min. En ese tiempo el micrófono pudo no grabar.",
+  "consulta.avisoSilencio": "No se escucha nada hace más de un minuto. ¿Está tapado el micrófono o lejos de la conversación?",
+  "consulta.avisoCortado": "El micrófono se desconectó. Detené la grabación y empezá una nueva para no perder el resto.",
+  "consulta.resumenSinMicrofono": "Ojo: de {total} de grabación, unos {min} min fueron con la pantalla apagada o fuera de Symphomed, y ese tramo puede no tener sonido. Podés subirla igual.",
+  "consulta.resumenSilencio": "Ojo: de {total} de grabación, unos {min} min no tienen sonido. Revisá que el micrófono no haya estado tapado. Podés subirla igual.",
 });

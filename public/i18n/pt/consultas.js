@@ -107,4 +107,12 @@ Object.assign(I18N.pt, {
   "nota.regenerando": "Gerando…",
   "nota.regenerarAyuda": "Usa a mesma transcrição e não é cobrado de novo.",
   "nota.errRegenerar": "Não foi possível gerar a nota de novo.",
+
+  // El cuidador de la grabación (crearGuardianGrabacion en audio.js)
+  "consulta.pantallaEncendida": "Deixe a tela ligada e o Symphomed aberto enquanto grava: se o celular bloquear ou você trocar de app, o microfone pode parar de gravar.",
+  "consulta.avisoOculto": "Você saiu do Symphomed ou a tela apagou por cerca de {min} min. Nesse tempo o microfone pode não ter gravado.",
+  "consulta.avisoSilencio": "Não se ouve nada há mais de um minuto. O microfone está tampado ou longe da conversa?",
+  "consulta.avisoCortado": "O microfone foi desconectado. Pare a gravação e comece uma nova para não perder o resto.",
+  "consulta.resumenSinMicrofono": "Atenção: de {total} de gravação, cerca de {min} min foram com a tela apagada ou fora do Symphomed, e esse trecho pode estar sem som. Você pode enviar mesmo assim.",
+  "consulta.resumenSilencio": "Atenção: de {total} de gravação, cerca de {min} min estão sem som. Verifique se o microfone não ficou tampado. Você pode enviar mesmo assim.",
 });

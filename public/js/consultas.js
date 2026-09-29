@@ -61,12 +61,14 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         <div class="listen-time" id="recTime">00:00</div>
         <div class="listen-label">${t("consulta.escuchando")}</div>
         <div class="live-caption" id="liveCaption"></div>
+        <div id="recAviso"></div>
       </div>
 
       <div class="rec-box">
         <button class="rec-btn" id="recBtn">${ICONO_MIC}</button>
         <div class="rec-status" id="recStatus">${t("consulta.tocarGrabar")}</div>
       </div>
+      <div class="hint" style="text-align:center;margin-top:6px">📱 ${t("consulta.pantallaEncendida")}</div>
       <label class="file-label" for="ncFile">${t("consulta.subirArchivo")}</label>
       <input type="file" id="ncFile" accept="audio/*" style="display:none">
       <div id="ncErr"></div>
@@ -77,7 +79,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   document.getElementById("btnRemota").onclick = () => renderNuevaConsultaRemota(pacienteId, pacienteNombre);
 
   let mediaRecorder = null, chunks = [], blob = null, mimeType = "audio/webm";
-  let seconds = 0, timerId = null;
+  let seconds = 0, timerId = null, inicioGrabacion = 0;
   const recBtn = document.getElementById("recBtn");
   const recTime = document.getElementById("recTime");
   const recStatus = document.getElementById("recStatus");
@@ -87,6 +89,16 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   const liveCaption = document.getElementById("liveCaption");
   const onda = crearIndicadorAudio(document.getElementById("audioOrb"));
   const transcriptorVivo = crearTranscriptorEnVivo(texto => { liveCaption.textContent = texto; });
+  const recAviso = document.getElementById("recAviso");
+  let guardian = null;
+  const minutosDe = (seg) => Math.max(1, Math.round(seg / 60));
+  const mostrarAviso = (tipo, datos) => {
+    if (tipo === "normal") { recAviso.innerHTML = ""; return; }
+    const texto = tipo === "oculto" ? t("consulta.avisoOculto", { min: minutosDe(datos.segundos) })
+      : tipo === "silencio" ? t("consulta.avisoSilencio")
+      : t("consulta.avisoCortado");
+    recAviso.innerHTML = `<div class="error">⚠️ ${texto}</div>`;
+  };
 
   recBtn.onclick = async () => {
     if (!mediaRecorder || mediaRecorder.state === "inactive") {
@@ -99,19 +111,37 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         mediaRecorder.ondataavailable = e => chunks.push(e.data);
         mediaRecorder.onstop = () => {
           blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+          // Se lee ANTES de detener el cuidador: dice cuánto de la grabación
+          // pudo quedar sin sonido, y eso se muestra antes de subirla.
+          const r = guardian ? guardian.resumen() : null;
+          if (guardian) guardian.detener();
+          guardian = null;
           stream.getTracks().forEach(t => t.stop());
           onda.detener();
           transcriptorVivo.detener();
           listenPanel.style.display = "none";
           recStatus.textContent = t("consulta.grabacionLista", { tiempo: fmt(seconds) });
+          const sinMicro = r ? r.segundosSinMicrofono : 0;
+          const enSilencio = r ? r.segundosEnSilencio : 0;
+          if (sinMicro >= 60 || (seconds >= 120 && enSilencio / seconds >= 0.5)) {
+            ncErr.innerHTML = `<div class="error">⚠️ ${sinMicro >= 60
+              ? t("consulta.resumenSinMicrofono", { min: minutosDe(sinMicro), total: fmt(seconds) })
+              : t("consulta.resumenSilencio", { min: minutosDe(enSilencio), total: fmt(seconds) })}</div>`;
+          }
           ncSubir.style.display = "block";
         };
         mediaRecorder.start();
+        guardian = crearGuardianGrabacion(stream, { onAviso: mostrarAviso });
+        recAviso.innerHTML = ""; ncErr.innerHTML = "";
         seconds = 0; recTime.textContent = "00:00"; liveCaption.textContent = "";
         listenPanel.style.display = "block";
         onda.iniciar(stream);
         transcriptorVivo.iniciar(stream);
-        timerId = setInterval(() => { seconds++; recTime.textContent = fmt(seconds); }, 1000);
+        // El tiempo es el REAL transcurrido, no la cuenta de "tics": con la
+        // pantalla apagada el celular frena los temporizadores, y el reloj
+        // decía 1:36 cuando habían pasado cinco minutos.
+        inicioGrabacion = Date.now();
+        timerId = setInterval(() => { seconds = Math.round((Date.now() - inicioGrabacion) / 1000); recTime.textContent = fmt(seconds); }, 1000);
         recBtn.classList.add("recording");
         recBtn.innerHTML = ICONO_STOP;
         recStatus.textContent = t("consulta.grabando");
@@ -120,6 +150,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         ncErr.innerHTML = `<div class="error">${t("consulta.errMicrofono", { mensaje: esc(e.message) })}</div>`;
       }
     } else {
+      seconds = Math.round((Date.now() - inicioGrabacion) / 1000);
       mediaRecorder.stop();
       clearInterval(timerId);
       recBtn.classList.remove("recording");

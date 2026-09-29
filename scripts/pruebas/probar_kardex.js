@@ -148,6 +148,12 @@ const sinBloquePersona = (html) => html
   .replace(/\n?\s*<div id="personaBox"><\/div>/g, "")
   .replace(/\n?\s*<div id="personaAltaBox"><\/div>/g, "")
   .replace(/\n?\s*<div id="teleMedBox"><\/div>/g, "")
+  // El cuidador de la grabación (crearGuardianGrabacion en audio.js): el
+  // hueco de sus avisos y el consejo de dejar la pantalla encendida. Otro
+  // agregado deliberado: una consulta de 32 minutos llegó con solo los
+  // primeros minutos grabados porque el celular se bloqueó.
+  .replace(/\n?\s*<div id="recAviso"><\/div>/g, "")
+  .replace(/\n?\s*<div class="hint" style="text-align:center;margin-top:6px">📱 [^<]*<\/div>/g, "")
   // La fila del CPF: solo se dibuja en cuentas brasileñas (Memed lo necesita
   // para recetar). En el arnés la moneda es BOB, así que el ternario deja el
   // hueco vacío que hay que descontar.

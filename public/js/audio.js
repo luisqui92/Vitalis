@@ -47,6 +47,136 @@ function crearIndicadorAudio(orbEl) {
   };
 }
 
+// ═══ EL CUIDADOR DE LA GRABACIÓN ═══════════════════════════════════════════
+//
+// Caso real: una consulta de 32 minutos que llegó con el audio de los
+// primeros minutos y el resto en silencio. El archivo duraba 32 minutos —el
+// grabador del navegador sigue contando— pero el micrófono había dejado de
+// captar: en el celular, cuando la pantalla se apaga o el médico cambia de
+// app, el sistema le corta el micrófono a la página. Nadie se enteró hasta
+// ver la transcripción, cuando la consulta ya no se podía repetir.
+//
+// Esto hace tres cosas mientras se graba:
+//   · pide que la pantalla NO se apague (Screen Wake Lock), y lo vuelve a
+//     pedir cuando la página vuelve a estar a la vista;
+//   · si igual la página se ocultó o el sistema silenció el micrófono, lo
+//     cuenta y avisa AL VOLVER cuánto tiempo pudo no grabarse;
+//   · si no entra sonido por un rato largo, avisa en ese momento (y vibra):
+//     un micrófono tapado o un celular en el bolsillo se arreglan en el
+//     momento, no después.
+//
+// onAviso(tipo, datos): "oculto" {segundos} · "silencio" {segundos} ·
+// "cortado" {} · "normal" {} (volvió el sonido).
+const SILENCIO_AVISO_SEGUNDOS = 90;
+
+function crearGuardianGrabacion(stream, { onAviso = () => {} } = {}) {
+  let wakeLock = null, activo = true;
+  let ocultoDesde = null, ocultoMs = 0;
+  let muteDesde = null, muteMs = 0;
+  let silencioSeg = 0, silencioTotalSeg = 0, avisoSilencioDado = false;
+  let audioCtx = null, analyser = null, datos = null, reloj = null;
+  const pista = stream.getAudioTracks()[0];
+
+  async function pedirPantalla() {
+    if (!activo || !("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+    } catch { /* el navegador no lo permite: quedan los avisos */ }
+  }
+
+  function alCambiarVisibilidad() {
+    if (!activo) return;
+    if (document.visibilityState === "hidden") {
+      ocultoDesde = Date.now();
+    } else {
+      if (ocultoDesde) {
+        const seg = Math.round((Date.now() - ocultoDesde) / 1000);
+        ocultoMs += Date.now() - ocultoDesde;
+        ocultoDesde = null;
+        // Unos segundos (mirar una notificación) no cortan nada que importe.
+        if (seg >= 10) onAviso("oculto", { segundos: seg });
+      }
+      pedirPantalla();
+    }
+  }
+
+  function alSilenciar() { if (activo && !muteDesde) muteDesde = Date.now(); }
+  function alReactivar() {
+    if (!muteDesde) return;
+    muteMs += Date.now() - muteDesde;
+    const seg = Math.round((Date.now() - muteDesde) / 1000);
+    muteDesde = null;
+    if (seg >= 10) onAviso("oculto", { segundos: seg });
+  }
+  function alTerminarPista() { if (activo) onAviso("cortado", {}); }
+
+  // El nivel se mide cada segundo con su propio analizador (el del logo
+  // anima con requestAnimationFrame, que el navegador frena en segundo plano).
+  function medir() {
+    if (!analyser) return;
+    analyser.getByteTimeDomainData(datos);
+    let suma = 0;
+    for (let i = 0; i < datos.length; i++) { const v = (datos[i] - 128) / 128; suma += v * v; }
+    const rms = Math.sqrt(suma / datos.length);
+    if (rms < 0.01) {
+      silencioSeg++;
+      silencioTotalSeg++;
+      if (silencioSeg >= SILENCIO_AVISO_SEGUNDOS && !avisoSilencioDado) {
+        avisoSilencioDado = true;
+        try { navigator.vibrate?.([200, 100, 200]); } catch { /* sin vibración */ }
+        onAviso("silencio", { segundos: silencioSeg });
+      }
+    } else {
+      if (avisoSilencioDado) onAviso("normal", {});
+      silencioSeg = 0;
+      avisoSilencioDado = false;
+    }
+  }
+
+  document.addEventListener("visibilitychange", alCambiarVisibilidad);
+  if (pista) {
+    pista.addEventListener("mute", alSilenciar);
+    pista.addEventListener("unmute", alReactivar);
+    pista.addEventListener("ended", alTerminarPista);
+  }
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    datos = new Uint8Array(analyser.fftSize);
+    reloj = setInterval(medir, 1000);
+  } catch { /* sin medición de nivel: quedan los otros avisos */ }
+  pedirPantalla();
+
+  return {
+    // Lo que pasó durante la grabación, para decirlo ANTES de subirla.
+    resumen() {
+      const ahora = Date.now();
+      const oculto = ocultoMs + (ocultoDesde ? ahora - ocultoDesde : 0);
+      const mute = muteMs + (muteDesde ? ahora - muteDesde : 0);
+      return {
+        segundosSinMicrofono: Math.round(Math.max(oculto, mute) / 1000),
+        segundosEnSilencio: silencioTotalSeg,
+      };
+    },
+    detener() {
+      activo = false;
+      document.removeEventListener("visibilitychange", alCambiarVisibilidad);
+      if (pista) {
+        pista.removeEventListener("mute", alSilenciar);
+        pista.removeEventListener("unmute", alReactivar);
+        pista.removeEventListener("ended", alTerminarPista);
+      }
+      if (reloj) clearInterval(reloj);
+      if (audioCtx) audioCtx.close().catch(() => {});
+      audioCtx = null; analyser = null;
+      if (wakeLock) wakeLock.release().catch(() => {});
+      wakeLock = null;
+    },
+  };
+}
+
 // Sube el audio grabado/subido y crea la consulta. Se usa tanto grabando
 // local como desde el celular vinculado como micrófono remoto.
 // teleconsultaId, cuando viene, dice dos cosas: que esta consulta salió de

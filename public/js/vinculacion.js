@@ -82,6 +82,8 @@ function pintarVincular(v) {
         <div class="listen-label">${t("vincular.grabando", { paciente: esc(pacienteNombre) })}</div>
       </div>
       <div class="hint" style="text-align:center">${t("vincular.esperandoDetener")}</div>
+      <div class="hint" style="text-align:center">📱 ${t("consulta.pantallaEncendida")}</div>
+      <div id="recAvisoRemoto"></div>
       <button class="secondary" id="btnDetenerLocal">${t("vincular.detenerAca")}</button>`;
     const visual = crearIndicadorAudio(document.getElementById("audioOrbRemoto"));
     const recTime = document.getElementById("recTimeRemoto");
@@ -91,11 +93,23 @@ function pintarVincular(v) {
     mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || "";
     mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     chunks = [];
-    let seconds = 0;
-    const timerId = setInterval(() => { seconds++; recTime.textContent = fmt(seconds); }, 1000);
+    // Este es el caso MÁS expuesto a que la pantalla se apague: el celular
+    // queda apoyado en el escritorio mientras el médico usa la compu. El
+    // cuidador (audio.js) pide que no se apague y avisa si igual pasó.
+    // El reloj es el tiempo real, no la cuenta de tics que el celular frena.
+    const inicio = Date.now();
+    const timerId = setInterval(() => { recTime.textContent = fmt(Math.round((Date.now() - inicio) / 1000)); }, 1000);
+    const avisoRemoto = document.getElementById("recAvisoRemoto");
+    const guardian = crearGuardianGrabacion(stream, { onAviso: (tipo, datos) => {
+      if (tipo === "normal") { avisoRemoto.innerHTML = ""; return; }
+      const texto = tipo === "oculto" ? t("consulta.avisoOculto", { min: Math.max(1, Math.round(datos.segundos / 60)) })
+        : tipo === "silencio" ? t("consulta.avisoSilencio") : t("consulta.avisoCortado");
+      avisoRemoto.innerHTML = `<div class="error">⚠️ ${texto}</div>`;
+    } });
     mediaRecorder.ondataavailable = e => chunks.push(e.data);
     mediaRecorder.onstop = async () => {
       clearInterval(timerId);
+      guardian.detener();
       visual.detener();
       stream.getTracks().forEach(t => t.stop());
       const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
