@@ -97,4 +97,11 @@ Object.assign(I18N.es, {
   "consulta.sinNombre": "Sin nombre de paciente",
   "consulta.min": " min",
   "consulta.errCargar": "Error cargando la consulta",
+
+  // Volver a generar la nota (routes/consultaMedica.js)
+  "nota.vacia": "⚠️ La nota salió vacía aunque la consulta se transcribió bien. Podés generarla de nuevo.",
+  "nota.regenerar": "Volver a generar la nota",
+  "nota.regenerando": "Generando…",
+  "nota.regenerarAyuda": "Usa la misma transcripción y no se cobra de nuevo.",
+  "nota.errRegenerar": "No se pudo volver a generar la nota.",
 });

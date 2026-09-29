@@ -102,7 +102,12 @@ verificar(`${conIdioma} de ${selects.length} consultas al médico traen el idiom
 // atarse a la posición hacía fallar la prueba por agregar un parámetro que no
 // tiene nada que ver con el idioma.
 verificar("la transcripción recibe el idioma", /transcribirConsultaMedica\(audioBuffer,[^;]*?idioma\s*[,)]/.test(ruta));
-verificar("la nota clínica también", /\},\s*medicoParaVocabulario\?\.idioma\);/.test(ruta));
+// La nota se arma en producirNota() (también la usa «Volver a generar la
+// nota»): el idioma del médico tiene que llegar hasta ahí y de ahí a la IA.
+verificar("la nota clínica también", /producirNota\(consulta, paciente, medicoPhone, medicoParaVocabulario\?\.idioma\)/.test(ruta)
+  && /\},\s*idioma\);/.test(ruta));
+verificar("  ...y al regenerarla, con el idioma de la cuenta", /producirNota\(consulta, paciente, medicoPhone, medico\?\.idioma\)/.test(ruta)
+  && /select\("idioma"\)/.test(ruta));
 
 console.log("\n── 6. La nota clínica sale en el idioma del médico ──");
 const nota = fuente("services/notaClinica.js");

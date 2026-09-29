@@ -8,7 +8,7 @@ const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoT
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("../services/assemblyai");
-const { generarNotaClinica } = require("../services/notaClinica");
+const { generarNotaClinica, notaVacia } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
@@ -153,149 +153,7 @@ module.exports = function (app) {
           log.error(`[SALDO] no se pudo cobrar la consulta ${consulta._id} de ${medicoPhone}:`, e.message);
         }
 
-        try {
-          const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
-            .select("nombre").lean();
-
-          // Solo para odontología y estética (Symphomed Face): le pasamos el
-          // catálogo de precios del consultorio para que la IA pueda
-          // emparejar tratamientos mencionados ("hay que sellar esto",
-          // "hay que hacer un relleno acá") con el ítem correcto.
-          const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
-          let catalogoTratamientos = [];
-          if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
-            const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
-            catalogoTratamientos = catalogo.map(c => c.nombre);
-          }
-          // Solo para oftalmología (Symphomed Visión): la lista de estructuras
-          // oculares válidas, para que la IA narre el examen por ojo.
-          const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
-          const esOdontologia = medico?.tipoEspecialidad === "odontologia";
-          const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
-          const esGinecologia = medico?.tipoEspecialidad === "ginecologia";
-
-          consulta.notaClinica = await generarNotaClinica(transcripcionCompleta, {
-            antecedentesPersonales: paciente.antecedentesPersonales || [],
-            antecedentesFamiliares: paciente.antecedentesFamiliares || [],
-            medicamentosActivos: medicamentosActivos.map(m => m.nombre),
-            catalogoTratamientos,
-            estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
-            estadosPiezaDental: esOdontologia ? ESTADOS_PIEZA_DENTAL : [],
-            organosGineco: esGinecologia ? ORGANOS_GINECO : [],
-            hallazgosGineco: esGinecologia ? HALLAZGOS_GINECO : [],
-            veterinaria: esVeterinaria,
-            especie: esVeterinaria ? paciente.especie : "",
-            raza: esVeterinaria ? paciente.raza : "",
-          // El mismo idioma con el que se transcribió: una nota en español
-          // sobre una consulta en portugués obliga al médico a traducir de
-          // vuelta lo que él mismo dijo.
-          }, medicoParaVocabulario?.idioma);
-          consulta.notaClinicaEstado = "completado";
-
-          // El mapa ocular se actualiza solo apenas termina la nota (el
-          // médico lo revisa/corrige después desde la pestaña Ojos) — cada
-          // cambio queda en el historial con fuente:"voz" y el id de esta
-          // consulta, nunca se pierde el origen del dato.
-          const hallazgos = consulta.notaClinica?.examenOcularSugerido;
-          if (esOftalmologia && hallazgos?.length) {
-            try {
-              let examen = await ExamenOcular.findOne({ pacienteId: paciente._id, medicoPhone });
-              if (!examen) {
-                const estructuras = [];
-                for (const ojo of OJOS) for (const estructura of ESTRUCTURAS_OCULARES) {
-                  estructuras.push({ ojo, estructura, estado: "normal", notas: "", historial: [] });
-                }
-                examen = await ExamenOcular.create({ pacienteId: paciente._id, medicoPhone, estructuras });
-              }
-              for (const h of hallazgos) {
-                if (!OJOS.includes(h.ojo) || !ESTRUCTURAS_OCULARES.includes(h.estructura) || !ESTADOS_ESTRUCTURA_OCULAR.includes(h.estado)) continue;
-                const item = examen.estructuras.find(e => e.ojo === h.ojo && e.estructura === h.estructura);
-                if (!item) continue;
-                item.estado = h.estado;
-                item.notas = h.hallazgo;
-                item.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
-              }
-              await examen.save();
-            } catch (e) {
-              log.error("[EXAMEN_OCULAR]", e.message);
-            }
-          }
-
-          // Symphomed Odonto: mismo patrón — el odontograma se actualiza solo
-          // apenas termina la nota, con fuente:"voz" en el historial de la
-          // pieza para que quede claro que vino de la consulta.
-          const hallazgosOdonto = consulta.notaClinica?.odontogramaSugerido;
-          if (esOdontologia && hallazgosOdonto?.length) {
-            try {
-              let odontograma = await Odontograma.findOne({ pacienteId: paciente._id, medicoPhone });
-              if (!odontograma) {
-                const piezas = PIEZAS_FDI_PERMANENTE.map(numero => ({ numero, estado: "sano", notas: "", historial: [] }));
-                odontograma = await Odontograma.create({ pacienteId: paciente._id, medicoPhone, piezas });
-              }
-              for (const h of hallazgosOdonto) {
-                if (!PIEZAS_FDI_PERMANENTE.includes(h.piezaFdi) || !ESTADOS_PIEZA_DENTAL.includes(h.estado)) continue;
-                const pieza = odontograma.piezas.find(p => p.numero === h.piezaFdi);
-                if (!pieza) continue;
-                pieza.estado = h.estado;
-                pieza.notas = h.hallazgo;
-                pieza.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
-              }
-              await odontograma.save();
-            } catch (e) {
-              log.error("[ODONTOGRAMA]", e.message);
-            }
-          }
-
-          // Symphomed Gineco: mismo patrón, por órgano.
-          const hallazgosGineco = consulta.notaClinica?.ginecoSugerido;
-          if (esGinecologia && hallazgosGineco?.length) {
-            try {
-              let mapa = await ExamenGinecologico.findOne({ pacienteId: paciente._id, medicoPhone });
-              if (!mapa) {
-                const organos = ORGANOS_GINECO.map(organo => ({ organo, hallazgo: "normal", notas: "", historial: [] }));
-                mapa = await ExamenGinecologico.create({ pacienteId: paciente._id, medicoPhone, organos });
-              }
-              for (const h of hallazgosGineco) {
-                if (!ORGANOS_GINECO.includes(h.organo) || !HALLAZGOS_GINECO.includes(h.hallazgo)) continue;
-                const item = mapa.organos.find(o => o.organo === h.organo);
-                if (!item) continue;
-                item.hallazgo = h.hallazgo;
-                item.notas = h.detalle;
-                item.historial.push({ fecha: new Date(), hallazgo: h.hallazgo, notas: h.detalle, fuente: "voz", consultaId: consulta._id });
-              }
-              await mapa.save();
-            } catch (e) {
-              log.error("[MAPA_GINECO]", e.message);
-            }
-          }
-        } catch (e) {
-          log.error("[NOTA_CLINICA]", e.response?.data || e.message);
-          consulta.notaClinicaEstado = "error";
-          consulta.notaClinicaError = e.message;
-        }
-        // Guardado defensivo: aparte de sanearNota() en notaClinica.js, si
-        // por lo que sea el documento igual queda con algo que Mongo no
-        // puede castear, que se pierda SOLO la nota clínica de esta
-        // consulta (nunca el resto del servidor). Antes esto podía tirar
-        // el mismo CastError de nuevo en el .catch de abajo — como esa
-        // segunda falla no la agarraba nadie, tumbaba el proceso entero
-        // para todos los médicos, no solo a esta consulta.
-        try {
-          await consulta.save();
-        } catch (e) {
-          log.error("[NOTA_CLINICA] No se pudo guardar la nota clínica generada (dato inesperado de la IA):", e.message);
-          // OJO: reasignar consulta.notaClinica = undefined y volver a
-          // guardar ESTE MISMO documento en memoria NO alcanza — Mongoose
-          // deja la ruta inválida marcada adentro del subdocumento y el
-          // segundo consulta.save() revienta con el mismo CastError
-          // (comprobado). Un update directo a la base, en cambio, no
-          // arrastra ese estado inválido en memoria.
-          await ConsultaMedica.updateOne(
-            { _id: consulta._id },
-            { $unset: { notaClinica: 1 }, $set: { notaClinicaEstado: "error", notaClinicaError: "No se pudo guardar la nota clínica (formato inesperado)." } }
-          ).catch(e2 => log.error("[NOTA_CLINICA] Tampoco se pudo guardar el estado de error:", e2.message));
-          consulta.notaClinicaEstado = "error"; // para que el chequeo de brief clínico de abajo no dispare con datos corruptos
-        }
+        await producirNota(consulta, paciente, medicoPhone, medicoParaVocabulario?.idioma);
 
         // ═══ AVISARLE AL MÉDICO, QUE ES EL QUE ESTÁ ESPERANDO ═══════════════
         //
@@ -388,6 +246,46 @@ module.exports = function (app) {
     }
 
     res.json({ consulta: consultaObj });
+  }));
+
+  // ─── VOLVER A GENERAR LA NOTA ──────────────────────────────────────────
+  // Para cuando la nota falló o salió vacía: la transcripción está bien y es
+  // lo caro, así que se reusa. No se cobra de nuevo: la consulta ya se cobró
+  // una vez y el médico no recibió lo que pagó.
+  //
+  // Solo si la nota está en error o vacía, y nunca después de confirmar. Una
+  // nota con contenido se corrige a mano: regenerarla pisaría lo que el
+  // médico ya miró, y volvería a aplicar sus hallazgos al odontograma o al
+  // mapa ocular una segunda vez.
+  app.post("/medico/consultas/:id/nota/regenerar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    if (consulta.confirmadaEn) throw new ErrorHttp(409, "Esta consulta ya fue confirmada");
+    if (consulta.estado !== "completado" || !String(consulta.transcripcionCompleta || "").trim()) {
+      throw new ErrorHttp(400, "Esta consulta todavía no tiene transcripción");
+    }
+    if (consulta.notaClinicaEstado === "pendiente") throw new ErrorHttp(409, "La nota ya se está generando");
+    if (consulta.notaClinicaEstado === "completado" && !notaVacia(consulta.notaClinica)) {
+      throw new ErrorHttp(409, "La nota ya tiene contenido: corregila a mano antes de confirmar");
+    }
+    const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
+    const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma").lean();
+
+    consulta.notaClinicaEstado = "pendiente";
+    consulta.notaClinicaError = undefined;
+    await consulta.save();
+    registrar({ req, medicoPhone, accion: "regenerar_nota_clinica", recurso: `ConsultaMedica:${consulta._id}` });
+    res.status(202).json({ ok: true });
+
+    producirNota(consulta, paciente, medicoPhone, medico?.idioma)
+      .then(() => {
+        avisarCambio(medicoPhone);
+        if (consulta.notaClinicaEstado === "completado") {
+          regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
+          generarHilo(consulta._id).catch(e => log.error("[HILO_CLINICO]", e.message));
+        }
+      })
+      .catch(e => log.error("[NOTA_CLINICA] regenerar:", e.message));
   }));
 
   // ─── CONFIRMAR LA CONSULTA (un solo paso) ──────────────────────────────
@@ -704,3 +602,157 @@ module.exports = function (app) {
     res.json({ ok: true });
   }));
 };
+
+// ═══ LA NOTA CLÍNICA, A PARTIR DE LA TRANSCRIPCIÓN ═════════════════════════
+//
+// La usan dos caminos: el de siempre (termina de transcribirse la consulta)
+// y «Volver a generar la nota», que el médico usa cuando la nota salió con
+// error o vacía. Por eso vive aparte: el segundo tiene que hacer exactamente
+// lo mismo que el primero, con el mismo contexto de especialidad y el mismo
+// guardado defensivo, no una versión parecida.
+async function producirNota(consulta, paciente, medicoPhone, idioma) {
+  try {
+    const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
+      .select("nombre").lean();
+
+    // Solo para odontología y estética (Symphomed Face): le pasamos el
+    // catálogo de precios del consultorio para que la IA pueda
+    // emparejar tratamientos mencionados ("hay que sellar esto",
+    // "hay que hacer un relleno acá") con el ítem correcto.
+    const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+    let catalogoTratamientos = [];
+    if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
+      const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
+      catalogoTratamientos = catalogo.map(c => c.nombre);
+    }
+    // Solo para oftalmología (Symphomed Visión): la lista de estructuras
+    // oculares válidas, para que la IA narre el examen por ojo.
+    const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
+    const esOdontologia = medico?.tipoEspecialidad === "odontologia";
+    const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
+    const esGinecologia = medico?.tipoEspecialidad === "ginecologia";
+
+    consulta.notaClinica = await generarNotaClinica(consulta.transcripcionCompleta, {
+      antecedentesPersonales: paciente.antecedentesPersonales || [],
+      antecedentesFamiliares: paciente.antecedentesFamiliares || [],
+      medicamentosActivos: medicamentosActivos.map(m => m.nombre),
+      catalogoTratamientos,
+      estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
+      estadosPiezaDental: esOdontologia ? ESTADOS_PIEZA_DENTAL : [],
+      organosGineco: esGinecologia ? ORGANOS_GINECO : [],
+      hallazgosGineco: esGinecologia ? HALLAZGOS_GINECO : [],
+      veterinaria: esVeterinaria,
+      especie: esVeterinaria ? paciente.especie : "",
+      raza: esVeterinaria ? paciente.raza : "",
+    // El mismo idioma con el que se transcribió: una nota en español
+    // sobre una consulta en portugués obliga al médico a traducir de
+    // vuelta lo que él mismo dijo.
+    }, idioma);
+    consulta.notaClinicaEstado = "completado";
+    consulta.notaClinicaError = undefined;
+
+    // El mapa ocular se actualiza solo apenas termina la nota (el
+    // médico lo revisa/corrige después desde la pestaña Ojos) — cada
+    // cambio queda en el historial con fuente:"voz" y el id de esta
+    // consulta, nunca se pierde el origen del dato.
+    const hallazgos = consulta.notaClinica?.examenOcularSugerido;
+    if (esOftalmologia && hallazgos?.length) {
+      try {
+        let examen = await ExamenOcular.findOne({ pacienteId: paciente._id, medicoPhone });
+        if (!examen) {
+          const estructuras = [];
+          for (const ojo of OJOS) for (const estructura of ESTRUCTURAS_OCULARES) {
+            estructuras.push({ ojo, estructura, estado: "normal", notas: "", historial: [] });
+          }
+          examen = await ExamenOcular.create({ pacienteId: paciente._id, medicoPhone, estructuras });
+        }
+        for (const h of hallazgos) {
+          if (!OJOS.includes(h.ojo) || !ESTRUCTURAS_OCULARES.includes(h.estructura) || !ESTADOS_ESTRUCTURA_OCULAR.includes(h.estado)) continue;
+          const item = examen.estructuras.find(e => e.ojo === h.ojo && e.estructura === h.estructura);
+          if (!item) continue;
+          item.estado = h.estado;
+          item.notas = h.hallazgo;
+          item.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
+        }
+        await examen.save();
+      } catch (e) {
+        log.error("[EXAMEN_OCULAR]", e.message);
+      }
+    }
+
+    // Symphomed Odonto: mismo patrón — el odontograma se actualiza solo
+    // apenas termina la nota, con fuente:"voz" en el historial de la
+    // pieza para que quede claro que vino de la consulta.
+    const hallazgosOdonto = consulta.notaClinica?.odontogramaSugerido;
+    if (esOdontologia && hallazgosOdonto?.length) {
+      try {
+        let odontograma = await Odontograma.findOne({ pacienteId: paciente._id, medicoPhone });
+        if (!odontograma) {
+          const piezas = PIEZAS_FDI_PERMANENTE.map(numero => ({ numero, estado: "sano", notas: "", historial: [] }));
+          odontograma = await Odontograma.create({ pacienteId: paciente._id, medicoPhone, piezas });
+        }
+        for (const h of hallazgosOdonto) {
+          if (!PIEZAS_FDI_PERMANENTE.includes(h.piezaFdi) || !ESTADOS_PIEZA_DENTAL.includes(h.estado)) continue;
+          const pieza = odontograma.piezas.find(p => p.numero === h.piezaFdi);
+          if (!pieza) continue;
+          pieza.estado = h.estado;
+          pieza.notas = h.hallazgo;
+          pieza.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
+        }
+        await odontograma.save();
+      } catch (e) {
+        log.error("[ODONTOGRAMA]", e.message);
+      }
+    }
+
+    // Symphomed Gineco: mismo patrón, por órgano.
+    const hallazgosGineco = consulta.notaClinica?.ginecoSugerido;
+    if (esGinecologia && hallazgosGineco?.length) {
+      try {
+        let mapa = await ExamenGinecologico.findOne({ pacienteId: paciente._id, medicoPhone });
+        if (!mapa) {
+          const organos = ORGANOS_GINECO.map(organo => ({ organo, hallazgo: "normal", notas: "", historial: [] }));
+          mapa = await ExamenGinecologico.create({ pacienteId: paciente._id, medicoPhone, organos });
+        }
+        for (const h of hallazgosGineco) {
+          if (!ORGANOS_GINECO.includes(h.organo) || !HALLAZGOS_GINECO.includes(h.hallazgo)) continue;
+          const item = mapa.organos.find(o => o.organo === h.organo);
+          if (!item) continue;
+          item.hallazgo = h.hallazgo;
+          item.notas = h.detalle;
+          item.historial.push({ fecha: new Date(), hallazgo: h.hallazgo, notas: h.detalle, fuente: "voz", consultaId: consulta._id });
+        }
+        await mapa.save();
+      } catch (e) {
+        log.error("[MAPA_GINECO]", e.message);
+      }
+    }
+  } catch (e) {
+    log.error("[NOTA_CLINICA]", e.response?.data || e.message);
+    consulta.notaClinicaEstado = "error";
+    consulta.notaClinicaError = e.message;
+  }
+  // Guardado defensivo: aparte de sanearNota() en notaClinica.js, si
+  // por lo que sea el documento igual queda con algo que Mongo no
+  // puede castear, que se pierda SOLO la nota clínica de esta
+  // consulta (nunca el resto del servidor). Antes esto podía tirar
+  // el mismo CastError de nuevo en el .catch de abajo — como esa
+  // segunda falla no la agarraba nadie, tumbaba el proceso entero
+  // para todos los médicos, no solo a esta consulta.
+  try {
+    await consulta.save();
+  } catch (e) {
+    log.error("[NOTA_CLINICA] No se pudo guardar la nota clínica generada (dato inesperado de la IA):", e.message);
+    // OJO: reasignar consulta.notaClinica = undefined y volver a
+    // guardar ESTE MISMO documento en memoria NO alcanza — Mongoose
+    // deja la ruta inválida marcada adentro del subdocumento y el
+    // segundo consulta.save() revienta con el mismo CastError
+    // (comprobado). Un update directo a la base, en cambio, no
+    // arrastra ese estado inválido en memoria.
+    await ConsultaMedica.updateOne(
+      { _id: consulta._id },
+      { $unset: { notaClinica: 1 }, $set: { notaClinicaEstado: "error", notaClinicaError: "No se pudo guardar la nota clínica (formato inesperado)." } }
+    ).catch(e2 => log.error("[NOTA_CLINICA] Tampoco se pudo guardar el estado de error:", e2.message));
+    consulta.notaClinicaEstado = "error"; // para que el chequeo de brief clínico de abajo no dispare con datos corruptos
+  }
+}

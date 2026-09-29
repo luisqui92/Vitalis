@@ -237,6 +237,20 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
 // ─── DETALLE DE CONSULTA: transcripción + nota clínica generada por IA ──
 // Mientras la transcripción o la nota clínica siguen en camino, esta
 // pantalla se refresca sola cada 8s hasta que ambas terminan.
+// La nota llegó "completa" pero sin nada adentro: pasó con una consulta en
+// portugués cuyo JSON vino con las claves cambiadas (ver
+// services/notaClinica.js). Mismo criterio que notaVacia() del servidor.
+function notaClinicaVaciaCliente(n) {
+  const lleno = (v) => (Array.isArray(v) ? v.some(x => x && (typeof x !== "string" || x.trim())) : typeof v === "string" && v.trim().length > 0);
+  return !["motivoConsulta", "sintomas", "antecedentesRelevantes", "diagnostico", "plan", "medicamentosRecetados", "examenesSolicitados"]
+    .some(c => lleno(n?.[c]));
+}
+
+function botonRegenerarNotaHtml() {
+  return `<button class="secondary" id="btnRegenerarNota">🔄 ${t("nota.regenerar")}</button>
+    <div class="hint">${t("nota.regenerarAyuda")}</div>`;
+}
+
 async function renderDetalle(id, esRefrescoAutomatico) {
   detenerPolling();
   if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.cargando")}</div>`;
@@ -258,7 +272,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       if (c.notaClinicaEstado === "pendiente") {
         notaHtml = `<div class="card"><div class="hint">${t("nota.generando")}</div></div>`;
       } else if (c.notaClinicaEstado === "error") {
-        notaHtml = `<div class="card"><div class="error">${t("nota.error")}</div></div>`;
+        notaHtml = `<div class="card"><div class="error">${t("nota.error")}</div>${yaConfirmada ? "" : botonRegenerarNotaHtml()}</div>`;
       } else if (n && yaConfirmada) {
         const meds = (n.medicamentosRecetados || []).map(m =>
           esc(m.nombre + (m.dosis ? " " + m.dosis : "") + (m.frecuencia ? " — " + m.frecuencia : ""))
@@ -281,6 +295,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         notaHtml = `
           <div class="card">
             <div class="nota-titulo">${t("nota.tituloIA")}</div>
+            ${notaClinicaVaciaCliente(n) ? `<div class="error" style="margin-top:0">${t("nota.vacia")}</div>${botonRegenerarNotaHtml()}` : ""}
             <div class="hint" style="margin-bottom:12px">${t("nota.revisar")}</div>
             <label>${t("nota.campo.motivo")}</label>
             <input id="nfMotivo" type="text" value="${esc(n.motivoConsulta || "")}">
@@ -518,6 +533,22 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           errBox.innerHTML = `<div class="error">${esc(e.error || t("confirmar.errConfirmar"))}</div>`;
           btnConfirmar.disabled = false;
           btnConfirmar.textContent = t("confirmar.boton");
+        }
+      };
+    }
+
+    const btnRegenerar = document.getElementById("btnRegenerarNota");
+    if (btnRegenerar) {
+      btnRegenerar.onclick = async () => {
+        btnRegenerar.disabled = true;
+        btnRegenerar.textContent = t("nota.regenerando");
+        try {
+          await api(`/medico/consultas/${id}/nota/regenerar`, { method: "POST" });
+          renderDetalle(id);
+        } catch (e) {
+          btnRegenerar.disabled = false;
+          btnRegenerar.textContent = t("nota.regenerar");
+          alert(e.error || t("nota.errRegenerar"));
         }
       };
     }

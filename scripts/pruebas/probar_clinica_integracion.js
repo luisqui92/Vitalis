@@ -126,6 +126,11 @@ async function main() {
   // Base limpia: si quedó algo de una corrida anterior, los números no
   // cierran y la prueba miente en las dos direcciones.
   await mongoose.connection.dropDatabase();
+  // Borrar la base se lleva también los índices que Mongoose empezó a armar
+  // al conectarse, y rearmarlos es asíncrono: sin esperarlos, la prueba del
+  // índice único de citas pasaba o fallaba según quién llegaba primero (la
+  // mitad de las corridas). Se esperan antes de cargar nada.
+  await Cita.syncIndexes();
 
   // ─── LA CLÍNICA ─────────────────────────────────────────────────────────
   const clinicaA = await Clinica.create({ nombre: "Clínica San Rafael", ciudad: "Santa Cruz" });

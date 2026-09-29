@@ -265,17 +265,136 @@ function construirContexto(contexto, idioma) {
   return `\n\n(${partes.join(" ")})`;
 }
 
-async function generarNotaClinica(transcripcion, contexto, idioma) {
+// ═══ LA NOTA QUE LLEGA VACÍA ═══════════════════════════════════════════════
+//
+// Pasó en una consulta real en portugués: 32 minutos bien transcritos y una
+// nota con TODOS los campos en blanco, mostrada como si estuviera lista.
+//
+// El modelo había contestado, pero no con las claves pedidas. Con una
+// consulta en portugués tiende a «traducir» las claves (motivoDaConsulta,
+// plano, medicamentosPrescritos) o a envolver todo en otro objeto
+// ({"notaClinica": {...}}). Mongo guarda solo las claves que conoce del
+// esquema y descarta el resto EN SILENCIO: la nota queda vacía y marcada
+// como completa, y el médico ve un formulario en blanco sin ninguna alarma.
+//
+// Tres redes, de la más barata a la más cara:
+//   1. response_format json_object: el modelo no puede devolver algo que no
+//      sea un JSON válido (ni cortado, ni con texto alrededor).
+//   2. normalizarNota(): acepta las claves traducidas o envueltas y las
+//      lleva a las del esquema.
+//   3. Si con todo eso la nota de una transcripción con contenido sale
+//      vacía, se pide de nuevo UNA vez recordándole el formato; y si vuelve
+//      vacía, se falla con error —se ve como error y se puede regenerar—
+//      en vez de mostrar un formulario en blanco que parece bueno.
+
+const CLAVES_NOTA = [
+  "motivoConsulta", "sintomas", "antecedentesRelevantes", "diagnostico", "diagnosticosDiferenciales",
+  "plan", "medicamentosRecetados", "examenesSolicitados", "proximoControl", "reconsultaSugerida",
+  "tratamientosSugeridos", "examenOcularSugerido", "odontogramaSugerido", "ginecoSugerido",
+  "antecedentesPersonalesNuevos", "antecedentesFamiliaresNuevos", "vacunasMencionadas",
+];
+
+// Sin tildes, en minúsculas y sin separadores: "Motivo_da_Consulta" y
+// "motivoDaConsulta" son la misma clave.
+const plana = (k) => String(k).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// Cómo aparecen las claves cuando el modelo las traduce (portugués e inglés).
+const SINONIMOS = {
+  motivoConsulta: ["motivodaconsulta", "motivodeconsulta", "motivo", "queixaprincipal", "queixa", "chiefcomplaint", "reasonforvisit"],
+  sintomas: ["symptoms"],
+  antecedentesRelevantes: ["antecedentes", "historicorelevante", "historicoclinico", "historiaclinica", "history"],
+  diagnostico: ["diagnosis", "hipotesediagnostica", "impressaodiagnostica"],
+  diagnosticosDiferenciales: ["diagnosticosdiferenciais", "diferenciais", "diferenciales", "differentialdiagnoses", "differentials"],
+  plan: ["plano", "planoterapeutico", "conduta", "conducta", "plandetratamiento", "tratamento", "treatmentplan"],
+  medicamentosRecetados: ["medicamentosprescritos", "medicacoesprescritas", "medicamentos", "prescricao", "prescricoes", "medications", "prescriptions"],
+  examenesSolicitados: ["examessolicitados", "exames", "examenes", "examspedidos", "labs", "testsordered"],
+  proximoControl: ["proximocontrole", "proximoretorno", "retorno", "seguimento", "followup"],
+  reconsultaSugerida: ["retornosugerido", "reconsulta"],
+  antecedentesPersonalesNuevos: ["antecedentespessoaisnovos"],
+  antecedentesFamiliaresNuevos: ["antecedentesfamiliaresnovos"],
+  vacunasMencionadas: ["vacinasmencionadas", "vacinas", "vaccines"],
+};
+const CLAVE_POR_PLANA = new Map();
+for (const clave of CLAVES_NOTA) CLAVE_POR_PLANA.set(plana(clave), clave);
+for (const [clave, alias] of Object.entries(SINONIMOS)) for (const a of alias) CLAVE_POR_PLANA.set(a, clave);
+
+// Adentro de cada medicamento / antecedente familiar, lo mismo.
+const SUBCLAVES = {
+  nombre: ["nome", "name", "medicamento"], dosis: ["dose", "dosagem"], frecuencia: ["frequencia", "frequency", "posologia"],
+  parentesco: ["relationship", "relacao"], condicion: ["condicao", "condition", "doenca"],
+};
+const SUBCLAVE_POR_PLANA = new Map();
+for (const [clave, alias] of Object.entries(SUBCLAVES)) {
+  SUBCLAVE_POR_PLANA.set(plana(clave), clave);
+  for (const a of alias) SUBCLAVE_POR_PLANA.set(a, clave);
+}
+function normalizarSubobjeto(o) {
+  if (!o || typeof o !== "object" || Array.isArray(o)) return o;
+  const salida = {};
+  for (const [k, v] of Object.entries(o)) salida[SUBCLAVE_POR_PLANA.get(plana(k)) || k] = v;
+  return salida;
+}
+
+const CAMPOS_TEXTO = ["motivoConsulta", "antecedentesRelevantes", "diagnostico", "plan", "proximoControl"];
+const CAMPOS_LISTA_TEXTO = ["sintomas", "diagnosticosDiferenciales", "examenesSolicitados", "antecedentesPersonalesNuevos"];
+
+// → { nota, clavesAjustadas } — clavesAjustadas dice si hubo que arreglar algo
+// (se loguea: es la señal de que el modelo se está yendo del formato).
+function normalizarNota(crudo) {
+  let obj = crudo && typeof crudo === "object" ? crudo : {};
+  let clavesAjustadas = false;
+  // Envuelto: {"notaClinica": {...}} o {"nota": {...}} — se desenvuelve si
+  // lo de adentro tiene claves de nota y lo de afuera no.
+  const conocidas = (o) => Object.keys(o || {}).filter(k => CLAVE_POR_PLANA.has(plana(k))).length;
+  if (conocidas(obj) === 0) {
+    const adentro = Object.values(obj).find(v => v && typeof v === "object" && !Array.isArray(v) && conocidas(v) >= 2);
+    if (adentro) { obj = adentro; clavesAjustadas = true; }
+  }
+  const nota = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const clave = CLAVE_POR_PLANA.get(plana(k));
+    if (!clave) continue;
+    if (clave !== k) clavesAjustadas = true;
+    if (nota[clave] === undefined || nota[clave] === null) nota[clave] = v;
+  }
+  // Tipos: una lista que vino como texto se parte por comas; un texto que
+  // vino como lista se une. Si no, Mongo lo descarta o lo guarda mal.
+  for (const c of CAMPOS_TEXTO) {
+    if (Array.isArray(nota[c])) nota[c] = nota[c].filter(Boolean).join("; ");
+    else if (nota[c] != null && typeof nota[c] !== "string") nota[c] = String(nota[c]);
+  }
+  for (const c of CAMPOS_LISTA_TEXTO) {
+    if (typeof nota[c] === "string") nota[c] = nota[c].split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
+  }
+  for (const c of ["medicamentosRecetados", "antecedentesFamiliaresNuevos", "vacunasMencionadas"]) {
+    if (Array.isArray(nota[c])) nota[c] = nota[c].map(normalizarSubobjeto);
+  }
+  return { nota, clavesAjustadas };
+}
+
+// "Vacía" = nada de lo que el médico lee primero. Las sugerencias por
+// especialidad no cuentan: una consulta sin odontograma es lo normal.
+function notaVacia(nota) {
+  const lleno = (v) => (Array.isArray(v) ? v.some(x => x && (typeof x !== "string" || x.trim())) : typeof v === "string" && v.trim().length > 0);
+  return !["motivoConsulta", "sintomas", "antecedentesRelevantes", "diagnostico", "plan", "medicamentosRecetados", "examenesSolicitados"]
+    .some(c => lleno(nota?.[c]));
+}
+
+// Por debajo de esto una nota vacía puede ser legítima (se grabó un saludo y
+// se cortó). Por encima, hubo una consulta y la nota vacía es un error.
+const PALABRAS_MINIMAS_PARA_NOTA = 80;
+
+async function pedirNota(mensajes) {
   const res = await axios.post(
     "https://api.openai.com/v1/chat/completions",
     {
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: promptSistema(idioma) },
-        { role: "user", content: transcripcion + construirContexto(contexto, idioma) },
-      ],
-      max_tokens: 1600,
+      messages: mensajes,
+      // 1600 se quedaba corto para una consulta larga: la respuesta salía
+      // cortada y el JSON, inválido.
+      max_tokens: 3000,
       temperature: 0.1,
+      response_format: { type: "json_object" },
     },
     {
       headers: { Authorization: `Bearer ${CONFIG.OPENAI_KEY}` },
@@ -283,7 +402,39 @@ async function generarNotaClinica(transcripcion, contexto, idioma) {
     }
   );
   const content = res.data.choices[0].message.content.replace(/```json|```/g, "").trim();
-  return sanearNota(JSON.parse(content));
+  const crudo = JSON.parse(content);
+  return { ...normalizarNota(crudo), clavesRecibidas: Object.keys(crudo || {}) };
+}
+
+async function generarNotaClinica(transcripcion, contexto, idioma) {
+  const mensajes = [
+    { role: "system", content: promptSistema(idioma) },
+    { role: "user", content: transcripcion + construirContexto(contexto, idioma) },
+  ];
+  let r = await pedirNota(mensajes);
+  const palabras = String(transcripcion || "").split(/\s+/).filter(Boolean).length;
+
+  // Se loguean los NOMBRES de las claves, nunca los valores: los valores son
+  // la historia clínica del paciente y no tienen por qué quedar en un log.
+  if (r.clavesAjustadas) log.warn(`[NOTA_CLINICA] claves ajustadas (idioma ${idioma || "es"}): ${r.clavesRecibidas.join(", ")}`);
+
+  if (notaVacia(r.nota) && palabras >= PALABRAS_MINIMAS_PARA_NOTA) {
+    log.warn(`[NOTA_CLINICA] nota vacía de una transcripción de ${palabras} palabras (claves: ${r.clavesRecibidas.join(", ") || "ninguna"}) — se pide de nuevo`);
+    r = await pedirNota([
+      ...mensajes,
+      { role: "system", content:
+        "Tu respuesta anterior vino sin contenido, pero la transcripción SÍ tiene una consulta. " +
+        "Volvé a generarla completando cada campo con lo que se dijo. Usá EXACTAMENTE las claves del " +
+        "formato pedido (motivoConsulta, sintomas, antecedentesRelevantes, diagnostico, " +
+        "diagnosticosDiferenciales, plan, medicamentosRecetados, examenesSolicitados, proximoControl…), " +
+        "sin traducirlas y sin envolverlas en otro objeto." },
+    ]);
+    if (notaVacia(r.nota)) {
+      log.error(`[NOTA_CLINICA] nota vacía otra vez (claves: ${r.clavesRecibidas.join(", ") || "ninguna"})`);
+      throw new Error("La IA devolvió una nota vacía. Probá generarla de nuevo.");
+    }
+  }
+  return sanearNota(r.nota);
 }
 
 // La IA a veces no respeta el formato pedido en el prompt para los dos
@@ -320,4 +471,4 @@ function sanearNota(nota) {
 
 // promptSistema se exporta solo para poder verificar el prompt ARMADO en las
 // pruebas, y no que el archivo contenga ciertas palabras sueltas.
-module.exports = { generarNotaClinica, promptSistema };
+module.exports = { generarNotaClinica, promptSistema, normalizarNota, notaVacia };
