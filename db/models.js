@@ -2576,7 +2576,9 @@ const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 // bloquea ni retrasa el flujo real si falla al guardar.
 const correccionIASchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
-  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular", "examen_ginecologico", "nota"], required: true },
+  // "medicamento": un nombre de fármaco de la nota que el médico corrigió.
+  // De esos aprende services/vocabularioMedico.js.
+  tipo: { type: String, enum: ["reconsulta", "tratamiento", "examen_ocular", "examen_ginecologico", "nota", "medicamento"], required: true },
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
   campo: { type: String, default: "" }, // ej: "fechaHora", "nombre", "OD:cristalino"
   valorSugerido: { type: String, default: "" }, // lo que propuso la IA

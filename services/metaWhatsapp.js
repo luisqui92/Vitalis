@@ -7,6 +7,7 @@
 // "+", ej "59176543210") — no hace falta reconstruir ninguna dirección.
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
+const { IDIOMAS } = require("./idiomas");
 
 function urlMensajes() {
   return `https://graph.facebook.com/v21.0/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
@@ -169,12 +170,11 @@ function codigoDe(e) {
 // lugar por el que pasan todas, y una ruta nueva queda cubierta sin que nadie
 // se acuerde. Un código que ya viene con región ("pt_BR", "es_MX") se respeta
 // tal cual: quien lo escribió así sabía lo que pedía.
-const IDIOMA_META = { pt: "pt_BR", es: "es" };
 function codigoDeIdioma(idioma) {
   const i = String(idioma || "").trim();
   if (!i) return "es";
   if (i.includes("_")) return i;
-  return IDIOMA_META[i.toLowerCase()] || i;
+  return IDIOMAS[i.toLowerCase()]?.metaWhatsapp || i;
 }
 
 // ═══ LAS DOS FORMAS DE VARIABLE QUE ACEPTA META ════════════════════════════

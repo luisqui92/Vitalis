@@ -6,6 +6,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { recalcularRecordatorio } = require("../services/recordatorioMedicamento");
+const { olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -35,6 +36,9 @@ module.exports = function (app) {
     // médico tenga que tocar nada aparte.
     recalcularRecordatorio(medicamento, frecuencia, Boolean(paciente.telefono));
     await medicamento.save();
+    // Lo que el médico carga a mano es vocabulario suyo desde ya: la
+    // próxima consulta lo transcribe y lo reconoce (services/vocabularioMedico.js).
+    olvidarVocabulario(medicoPhone);
     registrar({ req, medicoPhone, accion: "crear_medicamento", recurso: `Medicamento:${medicamento._id}` });
     res.status(201).json({ ok: true, medicamento });
   }));
@@ -65,6 +69,7 @@ module.exports = function (app) {
     }
 
     await medicamento.save();
+    if (req.body?.nombre !== undefined) olvidarVocabulario(medicoPhone);
     registrar({ req, medicoPhone, accion: "editar_medicamento", recurso: `Medicamento:${medicamento._id}` });
     res.json({ ok: true, medicamento });
   }));

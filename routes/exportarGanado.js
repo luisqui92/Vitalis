@@ -12,6 +12,7 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { registrar } = require("../services/auditoria");
 const { libroGanadero, nombreArchivo } = require("../services/exportarGanado");
 const { TIPO_XLSX } = require("../services/xlsx");
+const { idiomaDeCuenta } = require("../services/idiomas");
 
 const requireMedico = requireAuth(["medico"]);
 // Un veterinario con cientos de lotes cerrados no necesita bajarlos todos de
@@ -26,7 +27,7 @@ async function mandarLibro(req, res, lotes, base, recurso) {
   const medicoPhone = req.adminUser.usuario;
   const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma moneda").lean();
   const libro = await libroGanadero(lotes, {
-    medicoPhone, idioma: medico?.idioma === "pt" ? "pt" : "es", moneda: medico?.moneda === "BRL" ? "BRL" : "BOB",
+    medicoPhone, idioma: idiomaDeCuenta(medico), moneda: medico?.moneda === "BRL" ? "BRL" : "BOB",
   });
   // Bajar los registros de un establecimiento entero es un acto que alguien
   // puede preguntar después quién hizo, igual que compartir una historia.

@@ -19,6 +19,7 @@
 // Ningún competidor relevado (services/ganaderia — ver el estudio de
 // mercado) ofrece esto como alerta proactiva.
 const { log } = require("../config");
+const { esCuentaBrasil } = require("./idiomas");
 const { LoteGanado, EventoLote, Medico, Finca } = require("../db/models");
 const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("./metaWhatsapp");
 
@@ -61,7 +62,7 @@ async function avisar(lote, medico, texto, respaldo) {
 
 // ─── EL AVISO INMEDIATO, AL CARGAR EL EVENTO ────────────────────────────────
 async function notificarRetiroRegistrado(evento, lote, medico) {
-  const esBrasil = medico?.moneda === "BRL" || medico?.idioma === "pt";
+  const esBrasil = esCuentaBrasil(medico);
   const locale = esBrasil ? "pt-BR" : "es-BO";
   const partes = [];
   if (evento.diasRetiroCarne != null) {
@@ -139,7 +140,7 @@ async function procesarRetirosLiberados() {
 }
 
 async function notificarRetiroLibre(evento, lote, medico) {
-  const esBrasil = medico?.moneda === "BRL" || medico?.idioma === "pt";
+  const esBrasil = esCuentaBrasil(medico);
   const acciones = [];
   if (evento.diasRetiroCarne != null) acciones.push(esBrasil ? "abater" : "faenar");
   if (evento.diasRetiroLeche != null) acciones.push(esBrasil ? "vender o leite" : "vender la leche");

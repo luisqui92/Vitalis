@@ -28,6 +28,7 @@
 // decide es el médico, tocando la sugerencia o escribiendo el nombre.
 const path = require("path");
 const fs = require("fs");
+const { IDIOMAS } = require("./idiomas");
 
 const DIR = path.join(__dirname, "..", "datos", "medicamentos");
 
@@ -105,7 +106,9 @@ let indice = null;
 function cargar() {
   if (indice) return indice;
   indice = { porIdioma: {}, todos: new Map(), canonicas: new Set() };
-  for (const [archivo, idioma] of [["dcb.json", "pt"], ["liname.json", "es"], ["comunes.json", "comunes"]]) {
+  // La lista de cada idioma la dice su perfil (services/idiomas/<idioma>/).
+  const fuentes = [...Object.values(IDIOMAS).map(p => [p.listaMedicamentos, p.codigo]), ["comunes.json", "comunes"]];
+  for (const [archivo, idioma] of fuentes) {
     let nombres = [];
     try { nombres = JSON.parse(fs.readFileSync(path.join(DIR, archivo), "utf8")).nombres || []; } catch { /* sin lista */ }
     const mapa = new Map(); // base → nombre para mostrar (con tildes, sin sal ni dosis)
@@ -183,10 +186,16 @@ function masParecido(base, candidatos) {
 // propios: nombres que este médico ya recetó y confirmó (su historial).
 // Cuentan como conocidos, y se prefieren al sugerir: lo más probable es que
 // haya dicho algo que receta seguido.
-function verificarMedicamento(nombre, { idioma = "es", propios = [] } = {}) {
+// correcciones: lo que este médico ya corrigió antes, [{dijo, correcto}]
+// (services/vocabularioMedico.js). Si lo que llegó es algo que él ya
+// corrigió, se propone lo que él escribió aquella vez.
+function verificarMedicamento(nombre, { idioma = "es", propios = [], correcciones = [] } = {}) {
   const { porIdioma, todos } = cargar();
   const partes = componentes(nombre);
   if (!partes.length) return { estado: "desconocido", sugerencia: null };
+  const base = nombreBase(nombre);
+  const aprendida = correcciones.find(c => canonica(nombreBase(c.dijo)) === canonica(base));
+  if (aprendida) return { estado: "parecido", sugerencia: aprendida.correcto, dijo: base, aprendido: true };
   // Del historial se sugiere el nombre sin la dosis: «Espironolactona», no
   // «Espironolactona 100 mg» (la dosis de hoy puede ser otra).
   const sinDosis = (n) => String(n).replace(/\s*\d.*$/, "").trim() || String(n).trim();

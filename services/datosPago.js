@@ -42,6 +42,7 @@
 const fs = require("fs");
 const path = require("path");
 const { ConfigPago } = require("../db/models");
+const { perfil } = require("./idiomas");
 
 const PAISES = ["bo", "br"];
 
@@ -82,7 +83,7 @@ function delEntorno(pais) {
 // El idioma de la cuenta decide el país. Ver el bloque de arriba sobre por
 // qué no hay un campo aparte todavía.
 function paisDelMedico(medico) {
-  return medico?.idioma === "pt" ? "br" : "bo";
+  return perfil(medico?.idioma).pais.toLowerCase();
 }
 
 function normalizarPais(pais) {

@@ -31,6 +31,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("../services/metaWhatsapp");
 const { CONFIG, log } = require("../config");
+const { esCuentaBrasil } = require("../services/idiomas");
 
 // Igual que el panel de pagos: acá entra también una cuenta administrativa,
 // porque quien administra Symphomed no tiene por qué ser médico.
@@ -75,7 +76,7 @@ async function traerSolicitud(phone) {
 }
 
 async function avisarCuentaAprobada(medico) {
-  const esBrasil = medico.moneda === "BRL" || medico.idioma === "pt";
+  const esBrasil = esCuentaBrasil(medico);
   const destino = normalizarDestino(medico.phone, esBrasil ? "BR" : "BO");
   if (!destino) throw new Error("la cuenta no tiene un teléfono válido");
 

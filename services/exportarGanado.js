@@ -50,6 +50,7 @@ const TEXTOS = {
     tipoRepro: { servicio: "Servicio", diagnostico: "Diagnóstico de preñez", parto: "Parto", aborto: "Aborto", destete: "Destete", secado: "Secado" },
     categoria: { alimento: "Alimento", sanidad: "Sanidad", mano_obra: "Mano de obra", compra_animales: "Compra de animales", otros: "Otros" },
     unidad: { leche: "litros", huevos: "huevos" },
+    producto: { leche: "Leche", huevos: "Huevos" },
     prenez: { vacia: "Vacía", servida: "Servida", prenada: "Preñada" },
     metodo: { monta: "Monta", inseminacion: "Inseminación" },
     resultado: { prenada: "Preñada", vacia: "Vacía" },
@@ -80,6 +81,7 @@ const TEXTOS = {
     tipoRepro: { servicio: "Cobertura", diagnostico: "Diagnóstico de prenhez", parto: "Parto", aborto: "Aborto", destete: "Desmame", secado: "Secagem" },
     categoria: { alimento: "Ração", sanidad: "Sanidade", mano_obra: "Mão de obra", compra_animales: "Compra de animais", otros: "Outros" },
     unidad: { leche: "litros", huevos: "ovos" },
+    producto: { leche: "Leite", huevos: "Ovos" },
     prenez: { vacia: "Vazia", servida: "Coberta", prenada: "Prenhe" },
     metodo: { monta: "Monta natural", inseminacion: "Inseminação" },
     resultado: { prenada: "Prenhe", vacia: "Vazia" },
@@ -184,7 +186,7 @@ async function libroGanadero(lotes, { medicoPhone, idioma = "es", moneda = "BOB"
       for (const r of prod.serie) {
         const o = original.get(String(r._id)) || {};
         filasProduccion.push([
-          nombreLote.get(id), r.dia, T.unidad[tipo] === "litros" ? (idioma === "pt" ? "Leite" : "Leche") : (idioma === "pt" ? "Ovos" : "Huevos"),
+          nombreLote.get(id), r.dia, T.producto[tipo],
           r.cantidad, T.unidad[tipo], r.animales, redondear(r.porAnimal, 2),
           tipo === "leche" ? (r.enRetiro ? T.si : T.no) : "", r.productoRetiro || "", r.notas || "", quien(o, T),
         ]);

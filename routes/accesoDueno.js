@@ -33,6 +33,7 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { registrar } = require("../services/auditoria");
 const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("../services/metaWhatsapp");
 const { avisarCambio } = require("../services/realtime");
+const { idiomaDeCuenta, perfil } = require("../services/idiomas");
 const { mortalidadAcumulada, retirosVigentes } = require("../services/lotesGanado");
 const { calendarioLote } = require("../services/esquemaGanado");
 const { diaDe, sumarDias, resumenProduccion } = require("../services/produccion");
@@ -223,7 +224,7 @@ module.exports = function (app) {
     res.json({
       finca: { nombre: finca.nombre, ubicacion: finca.ubicacion || "", duenoNombre: finca.duenoNombre || "" },
       veterinario: { nombre: medico.nombre || "" },
-      idioma: medico.idioma === "pt" ? "pt" : "es",
+      idioma: idiomaDeCuenta(medico),
       moneda,
       categoriasGasto: CATEGORIAS_GASTO,
       lotes: await Promise.all(lotes.map(l => resumenLoteParaDueno(l, moneda))),
@@ -244,7 +245,7 @@ module.exports = function (app) {
       display: "standalone",
       background_color: "#03101a",
       theme_color: "#03101a",
-      lang: medico.idioma === "pt" ? "pt-BR" : "es",
+      lang: perfil(medico.idioma).lang,
       icons: [
         { src: "/img/simbolo-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
         { src: "/img/simbolo-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
@@ -260,7 +261,7 @@ module.exports = function (app) {
     const lotes = await LoteGanado.find({ medicoPhone: sesion.llave.medicoPhone, fincaId: sesion.finca._id, estado: "activo" })
       .sort({ nombre: 1 }).limit(100);
     const libro = await libroGanadero(lotes, {
-      medicoPhone: sesion.llave.medicoPhone, idioma: sesion.medico.idioma === "pt" ? "pt" : "es", moneda: sesion.moneda,
+      medicoPhone: sesion.llave.medicoPhone, idioma: idiomaDeCuenta(sesion.medico), moneda: sesion.moneda,
     });
     registrar({ req, medicoPhone: sesion.llave.medicoPhone, accion: "campo_exportar_excel", recurso: `Finca:${sesion.finca._id}`, detalle: "por el dueño" });
     res.set({

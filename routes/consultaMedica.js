@@ -19,7 +19,7 @@ const { avisarCambio } = require("../services/realtime");
 const { registrarCorreccion } = require("../services/correccionesIA");
 const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
-const { medicamentosDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
+const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
 
 const requireMedico = requireAuth(["medico"]);
@@ -32,13 +32,14 @@ const audioRaw = express.raw({ type: "audio/*", limit: "80mb" });
 // Nunca tira: si la revisión falla, la nota se muestra igual, sin avisos.
 async function verificarLista(medicoPhone, nombres) {
   try {
-    const [medico, propios] = await Promise.all([
+    const [medico, propios, correcciones] = await Promise.all([
       Medico.findOne({ phone: medicoPhone }).select("idioma").lean(),
       medicamentosDelMedico(medicoPhone, 500),
+      correccionesDelMedico(medicoPhone, 300),
     ]);
     const idioma = idiomaSoportado(medico?.idioma);
     return nombres.map(n => (String(n || "").trim()
-      ? verificarMedicamento(n, { idioma, propios })
+      ? verificarMedicamento(n, { idioma, propios, correcciones })
       : { estado: "ok", sugerencia: null }));
   } catch (e) {
     log.warn("[MEDICAMENTOS] no se pudo revisar la lista:", e.message);
@@ -386,6 +387,24 @@ module.exports = function (app) {
         const despues = valor.map(m => `${m.nombre}|${m.dosis}|${m.frecuencia}`).join("¬");
         if (antes !== despues) {
           registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo: "medicamentosRecetados", valorSugerido: antes, valorFinal: despues });
+          // Cada nombre que el médico cambió queda como par «la IA escribió
+          // X → él escribió Y». Con eso Symphomed aprende sus correcciones
+          // (services/vocabularioMedico.js): la próxima vez que aparezca X,
+          // la nota ya propone Y. "origen" es la fila de la nota original
+          // de la que salió cada medicamento (las filas nuevas no traen).
+          const originales = n.medicamentosRecetados || [];
+          // Se esperan (registrarCorreccion nunca tira): tienen que estar
+          // guardadas antes de que se recalcule su vocabulario, más abajo.
+          const pendientes = [];
+          notaEditada.medicamentosRecetados.forEach((m) => {
+            const i = Number.isInteger(m?.origen) ? m.origen : -1;
+            const antesNombre = String(originales[i]?.nombre || "").trim();
+            const ahora = String(m?.nombre || "").trim();
+            if (antesNombre && ahora && antesNombre !== ahora) {
+              pendientes.push(registrarCorreccion({ medicoPhone, tipo: "medicamento", consultaId: consulta._id, campo: "nombre", valorSugerido: antesNombre, valorFinal: ahora }));
+            }
+          });
+          await Promise.all(pendientes);
           n.medicamentosRecetados = valor;
           huboCambios = true;
         }
@@ -539,6 +558,9 @@ module.exports = function (app) {
 
     consulta.confirmadaEn = new Date();
     await consulta.save();
+    // Lo que acaba de confirmar (y lo que corrigió) ya cuenta para su
+    // vocabulario desde la próxima consulta (services/vocabularioMedico.js).
+    olvidarVocabulario(medicoPhone);
     registrar({ req, medicoPhone, accion: "consulta_confirmada", recurso: `ConsultaMedica:${consulta._id}` });
 
     res.json({ ok: true, aplicado, fallado, recetaId });
@@ -661,6 +683,12 @@ async function producirNota(consulta, paciente, medicoPhone, idioma) {
     // emparejar tratamientos mencionados ("hay que sellar esto",
     // "hay que hacer un relleno acá") con el ítem correcto.
     const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+    // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
+    // marcas como medicamentos y no repite un error que él ya arregló.
+    const [medicamentosHabituales, correccionesMedicamentos] = await Promise.all([
+      medicamentosDelMedico(medicoPhone, 60),
+      correccionesDelMedico(medicoPhone, 30),
+    ]);
     let catalogoTratamientos = [];
     if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
       const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
@@ -677,6 +705,8 @@ async function producirNota(consulta, paciente, medicoPhone, idioma) {
       antecedentesPersonales: paciente.antecedentesPersonales || [],
       antecedentesFamiliares: paciente.antecedentesFamiliares || [],
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
+      medicamentosHabituales,
+      correccionesMedicamentos,
       catalogoTratamientos,
       estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
       estadosPiezaDental: esOdontologia ? ESTADOS_PIEZA_DENTAL : [],

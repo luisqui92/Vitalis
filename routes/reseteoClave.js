@@ -28,6 +28,7 @@ const { enviarTextoOPlantilla, PLANTILLAS, normalizarDestino } = require("../ser
 const { esOperador } = require("../services/operadores");
 const { hashPassword } = require("../services/auth");
 const { CONFIG, log } = require("../config");
+const { esCuentaBrasil } = require("../services/idiomas");
 
 const requireSesion = requireAuth(["medico", "admin"]);
 
@@ -247,7 +248,7 @@ module.exports = function (app) {
     // que se le manda el WhatsApp, con el mismo criterio que
     // avisarCuentaAprobada() en routes/solicitudesCuenta.js.
     const esBrasil = s.tipo === "medico"
-      ? (cuenta.moneda === "BRL" || cuenta.idioma === "pt")
+      ? esCuentaBrasil(cuenta)
       : cuenta.pais === "BR";
     const idioma = esBrasil ? "pt" : "es";
     const destino = normalizarDestino(s.telefono, esBrasil ? "BR" : "BO");

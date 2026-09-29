@@ -9,10 +9,7 @@ const axios = require("axios");
 const { CONFIG, log } = require("../config");
 const { EventoLote } = require("../db/models");
 
-const IDIOMAS_NOTA = { es: "español", pt: "portugués de Brasil" };
-function idiomaNota(idioma) {
-  return IDIOMAS_NOTA[idioma] ? idioma : "es";
-}
+const { perfil } = require("./idiomas");
 
 const PROMPT_SISTEMA = `Sos un asistente para veterinarios de campo que atienden PRODUCCIÓN
 ANIMAL —bovinos, porcinos o aves por LOTE/GALPÓN, no mascotas individuales—.
@@ -58,7 +55,7 @@ Reglas:
   para retiro) — no conviertas unidades vos.`;
 
 function promptSistema(idioma) {
-  const nombre = IDIOMAS_NOTA[idiomaNota(idioma)];
+  const nombre = perfil(idioma).nota.nombre;
   return PROMPT_SISTEMA + `
 
 IDIOMA: escribí "causaPresunta" y "notas" en ${nombre}. Las CLAVES del JSON y

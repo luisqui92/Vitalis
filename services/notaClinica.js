@@ -12,27 +12,11 @@ const { fechaStrBolivia } = require("./utils");
 // las CLAVES del JSON no se tocan. Si el modelo tradujera "diagnostico" a
 // "diagnóstico" o a "diagnóstico" en portugués, la nota no se guarda y el
 // médico pierde la consulta entera.
-const IDIOMAS_NOTA = {
-  es: {
-    nombre: "español",
-    dias: ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"],
-    extra: "",
-  },
-  pt: {
-    nombre: "portugués de Brasil",
-    dias: ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"],
-    // Los nombres de fármacos son el punto donde una nota en portugués se
-    // vuelve peligrosa si sale calcada del español: losartana y no losartán,
-    // varfarina y no warfarina, dipirona y no metamizol.
-    extra: `
-Los nombres de medicamentos van con la denominación que se usa en Brasil (DCB,
-la nomenclatura oficial de ANVISA), no traducidos del español.`,
-  },
-};
-
-function idiomaNota(idioma) {
-  return IDIOMAS_NOTA[idioma] ? idioma : "es";
-}
+//
+// Lo propio de cada idioma (cómo se llama, los días de la semana, reglas
+// extra como la DCB en Brasil) vive en services/idiomas/<idioma>/nota.js.
+const { perfil } = require("./idiomas");
+const notaDe = (idioma) => perfil(idioma).nota;
 
 const PROMPT_SISTEMA = `Eres un asistente clínico. A partir de la transcripción de una consulta
 médica en {IDIOMA} (puede tener errores de transcripción, y a veces no queda
@@ -222,20 +206,20 @@ Reglas:
 // puesto, más la regla de en qué lengua sale el contenido. Las claves del
 // JSON quedan afuera de esa regla a propósito y se dice explícitamente.
 function promptSistema(idioma) {
-  const cfg = IDIOMAS_NOTA[idiomaNota(idioma)];
+  const cfg = notaDe(idioma);
   return PROMPT_SISTEMA.replace("{IDIOMA}", cfg.nombre) + `
 
 IDIOMA DE LA NOTA: escribí el CONTENIDO —todos los valores del JSON— en ${cfg.nombre}.
 Las CLAVES del JSON NO se traducen nunca: van exactamente como están arriba,
 en el mismo idioma y con la misma ortografía. Tampoco se traducen los valores
 que el enunciado pide tomar de una lista dada (ojo, estructura, estado, órgano,
-hallazgo): esos van tal cual figuran en la lista.${cfg.extra}`;
+hallazgo): esos van tal cual figuran en la lista.${cfg.reglasExtra}`;
 }
 
 function construirContexto(contexto, idioma) {
   const partes = [];
   const hoy = new Date();
-  const dias = IDIOMAS_NOTA[idiomaNota(idioma)].dias;
+  const dias = notaDe(idioma).dias;
   partes.push(`Hoy es ${dias[hoy.getDay()]} ${fechaStrBolivia(hoy)}.`);
   if (contexto?.veterinaria) {
     partes.push(`Esta consulta es de medicina VETERINARIA — el paciente es un animal, no una persona${contexto.especie ? ` (${contexto.especie}${contexto.raza ? ", raza " + contexto.raza : ""})` : ""}. Interpretá "el paciente"/"el/la ${contexto.especie || "animal"}" en ese sentido, y las dosis de medicamentos en relación al peso del animal si se menciona.`);
@@ -248,6 +232,18 @@ function construirContexto(contexto, idioma) {
   }
   if (contexto?.medicamentosActivos?.length) {
     partes.push(`Medicamentos ya activos: ${contexto.medicamentosActivos.join(", ")}`);
+  }
+  // Lo que ESTE médico receta (services/vocabularioMedico.js). Sirve para
+  // reconocer y escribir bien un nombre que sí se dijo, nunca para agregarlo.
+  if (contexto?.medicamentosHabituales?.length) {
+    partes.push(`Medicamentos que este médico receta habitualmente (incluye marcas comerciales): ${contexto.medicamentosHabituales.join(", ")}. ` +
+      `Si en la transcripción aparece uno de estos, o algo que suena muy parecido, es un medicamento: escribilo como figura acá. ` +
+      `NUNCA agregues a la nota un medicamento de esta lista que no se haya mencionado en la consulta.`);
+  }
+  if (contexto?.correccionesMedicamentos?.length) {
+    partes.push(`Errores de transcripción que este médico ya corrigió antes (lo que salió escrito → lo que él quiso decir): ` +
+      contexto.correccionesMedicamentos.map(c => `"${c.dijo}" → "${c.correcto}"`).join("; ") +
+      `. Si en la transcripción aparece lo de la izquierda como medicamento, en la nota va lo de la derecha.`);
   }
   if (contexto?.catalogoTratamientos?.length) {
     partes.push(`Catálogo de tratamientos de este consultorio (para "tratamientosSugeridos"): ${contexto.catalogoTratamientos.join("; ")}`);

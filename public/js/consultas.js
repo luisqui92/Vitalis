@@ -608,6 +608,9 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           examenesSolicitados: lista("nfExamenes"),
           proximoControl: val("nfProximoControl"),
           medicamentosRecetados: [...document.querySelectorAll("#nfMeds .med-row")].map(r => ({
+            // De qué fila de la nota original salió: así el servidor sabe
+            // qué nombre corrigió el médico, y lo aprende.
+            origen: r.dataset.i !== undefined ? Number(r.dataset.i) : null,
             nombre: r.querySelector(".nf-med-nombre").value.trim(),
             dosis: r.querySelector(".nf-med-dosis").value.trim(),
             frecuencia: r.querySelector(".nf-med-frec").value.trim(),

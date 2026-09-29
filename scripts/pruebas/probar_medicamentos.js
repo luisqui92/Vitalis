@@ -85,7 +85,8 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
   verificar("lo que el médico ya recetó y confirmó cuenta como conocido (su marca)", revisar("Rivotril", { idioma: "pt", propios: ["Rivotril 2 mg"] }).estado === "ok");
 
   console.log("\n── 4. El vocabulario para transcribir ──");
-  const { keytermsPara, MAX_KEYTERMS, KEYTERMS_FARMACOS } = assemblyai;
+  const { keytermsPara, MAX_KEYTERMS } = assemblyai;
+  const { perfil } = require(path.join(RAIZ, "services", "idiomas"));
   const base = keytermsPara("medicina_general", "pt");
   verificar("sin historial: incluye los fármacos más recetados", base.includes("espironolactona") && base.includes("dipirona"));
   const propios = ["Rivotril", "Glifage XR", "Losartana", ...Array.from({ length: 40 }, (_, i) => `Marca${i}`)];
@@ -101,8 +102,9 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
     !keytermsPara("", "es", ["uno dos tres cuatro cinco seis siete"]).includes("uno dos tres cuatro cinco seis siete"));
   // Un término mal escrito en la lista le enseñaría al transcriptor el error.
   for (const idioma of ["es", "pt"]) {
-    const mal = KEYTERMS_FARMACOS[idioma].filter(n => revisar(n, { idioma }).estado !== "ok");
-    verificar(`los ${KEYTERMS_FARMACOS[idioma].length} fármacos de la lista ${idioma} están en la lista oficial${mal.length ? " — no: " + mal.join(", ") : ""}`, !mal.length);
+    const farmacos = perfil(idioma).transcripcion.farmacos;
+    const mal = farmacos.filter(n => revisar(n, { idioma }).estado !== "ok");
+    verificar(`los ${farmacos.length} fármacos de la lista ${idioma} están en la lista oficial${mal.length ? " — no: " + mal.join(", ") : ""}`, !mal.length);
   }
 
   console.log("\n── 5. Las rutas ──");
@@ -204,6 +206,75 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
   verificar("subir una consulta → 202", sub.estado === 202);
   verificar("la transcripción final recibe el mismo vocabulario del médico",
     llamadaTranscripcion?.opciones?.delMedico?.[0] === "Rivotril" && llamadaTranscripcion.idioma === "pt");
+
+  console.log("\n── 6. Aprende de lo que el médico corrige y carga ──");
+  // La IA de la nota, de mentira: guarda lo que se le pidió.
+  const axios = require(path.join(RAIZ, "node_modules", "axios"));
+  const pedidosIA = [];
+  axios.post = async (url, cuerpo) => {
+    pedidosIA.push(cuerpo);
+    return { data: { choices: [{ message: { content: JSON.stringify({ motivoConsulta: "Controle", medicamentosRecetados: [{ nombre: "Inibidor de ATE" }] }) } }] } };
+  };
+  const confirmar = (id, nota, token = tk) => pedir(puerto, "POST", `/medico/consultas/${id}/confirmar`, token,
+    JSON.stringify({ nota, aplicar: {} }));
+  const nueva = (meds, phone = MED) => ConsultaMedica.create({ medicoPhone: phone, pacienteId: paciente._id, pacienteNombre: paciente.nombre,
+    estado: "completado", transcripcionCompleta: "Consulta de controle. ".repeat(30), notaClinicaEstado: "completado",
+    notaClinica: { motivoConsulta: "Controle", medicamentosRecetados: meds } });
+
+  // El caso real: la IA escribió «Inibidor de ATE», el médico lo corrige.
+  const c1 = await nueva([{ nombre: "Inibidor de ATE", dosis: "25 mg" }, { nombre: "Losartana", dosis: "50 mg" }]);
+  const r1 = await confirmar(c1._id, { motivoConsulta: "Controle", medicamentosRecetados: [
+    { origen: 0, nombre: "Espironolactona", dosis: "25 mg" },
+    // Losartana → Valsartana es un CAMBIO DE IDEA (las dos existen): no se aprende.
+    { origen: 1, nombre: "Valsartana", dosis: "80 mg" },
+    { nombre: "Xarelto", dosis: "20 mg" }, // fila nueva, sin origen
+  ] });
+  verificar("confirmar con nombres corregidos → 200", r1.estado === 200);
+  const { CorreccionIA } = require(path.join(RAIZ, "db", "models"));
+  const pares = await CorreccionIA.find({ medicoPhone: MED, tipo: "medicamento" }).lean();
+  verificar("se guardó cada nombre corregido como par (2: la fila nueva no es corrección)", pares.length === 2
+    && pares.some(p => p.valorSugerido === "Inibidor de ATE" && p.valorFinal === "Espironolactona"));
+
+  const c2 = await nueva([{ nombre: "Inibidor de ATE" }, { nombre: "Losartana" }, { nombre: "Xarelto" }]);
+  const v2 = (await pedir(puerto, "GET", `/medico/consultas/${c2._id}`, tk)).cuerpo.consulta.verificacionMedicamentos;
+  verificar("la próxima vez que sale «Inibidor de ATE» → propone Espironolactona (lo aprendió)",
+    v2[0]?.estado === "parecido" && v2[0]?.sugerencia === "Espironolactona" && v2[0]?.aprendido);
+  verificar("Losartana sigue siendo Losartana (el cambio de idea no se aprendió)", v2[1]?.estado === "ok");
+  verificar("Xarelto, que confirmó en una nota, ya es conocido para él", v2[2]?.estado === "ok");
+  verificar("  ...y el nombre guardado NO se cambió solo", (await ConsultaMedica.findById(c2._id).lean()).notaClinica.medicamentosRecetados[0].nombre === "Inibidor de ATE");
+
+  // Otro médico: lo que corrigió éste no le cambia nada.
+  const MED2 = "70000009";
+  const pacB = await Paciente.create({ medicoPhone: MED2, nombre: "Paciente B" });
+  const c3 = await ConsultaMedica.create({ medicoPhone: MED2, pacienteId: pacB._id, pacienteNombre: "Paciente B", estado: "completado",
+    notaClinicaEstado: "completado", notaClinica: { medicamentosRecetados: [{ nombre: "Inibidor de ATE" }, { nombre: "Xarelto" }] } });
+  const v3 = (await pedir(puerto, "GET", `/medico/consultas/${c3._id}`, tkB)).cuerpo.consulta.verificacionMedicamentos;
+  verificar("otro médico: no hereda la corrección ni el vocabulario", !v3[0]?.aprendido && v3[1]?.estado !== "ok");
+
+  // Lo que carga a mano en el Kardex cuenta YA, sin esperar.
+  const express2 = require("express");
+  const app2 = express2();
+  app2.use(express2.json());
+  require(path.join(RAIZ, "routes", "medicamentos"))(app2);
+  const serv2 = http.createServer(app2);
+  await new Promise((res) => serv2.listen(0, "127.0.0.1", res));
+  const antesKardex = await pedir(puerto, "GET", "/medico/medicamentos/verificar?nombre=Jardiance", tk);
+  await pedir(serv2.address().port, "POST", `/medico/pacientes/${paciente._id}/medicamentos`, tk, JSON.stringify({ nombre: "Jardiance 25 mg" }));
+  const despuesKardex = await pedir(puerto, "GET", "/medico/medicamentos/verificar?nombre=Jardiance", tk);
+  verificar("cargar «Jardiance» en el Kardex → deja de marcarse al instante", antesKardex.cuerpo.estado !== "ok" && despuesKardex.cuerpo.estado === "ok");
+  const tok2 = await pedir(puerto, "GET", "/medico/transcripcion-token", tk);
+  verificar("  ...y ya va en el vocabulario del transcriptor", tok2.cuerpo.keyterms.includes("Jardiance"));
+  serv2.close();
+
+  // La IA de la nota recibe su vocabulario y sus correcciones.
+  const c4 = await ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "completado",
+    transcripcionCompleta: "Consulta de controle. ".repeat(30), notaClinicaEstado: "error" });
+  await pedir(puerto, "POST", `/medico/consultas/${c4._id}/nota/regenerar`, tk);
+  for (let i = 0; i < 50 && !pedidosIA.length; i++) await new Promise((r) => setTimeout(r, 50));
+  const prompt = JSON.stringify(pedidosIA[0]?.messages || []);
+  verificar("la IA de la nota recibe los medicamentos que él receta (con sus marcas)", /receta habitualmente/.test(prompt) && prompt.includes("Jardiance") && prompt.includes("Rivotril"));
+  verificar("  ...y sus correcciones: «Inibidor de ATE» → «Espironolactona»", /Inibidor de ATE\\" → \\"Espironolactona/.test(prompt));
+  verificar("  ...con la regla de NO agregar lo que no se dijo", /NUNCA agregues/.test(prompt));
 
   servidor.close();
   await new Promise((r) => setTimeout(r, 300));

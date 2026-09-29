@@ -25,6 +25,8 @@
 // El precio y el mínimo son por moneda. Hoy los dos arrancan en el mismo
 // número (12 y 100), que NO es una conversión: es una decisión comercial
 // pendiente. R$ 12 y Bs 12 no valen lo mismo.
+const { perfil } = require("./idiomas");
+
 const MONEDAS = {
   BOB: {
     codigo: "BOB",
@@ -63,7 +65,7 @@ function config(codigo) {
 // —que es el único dato de país que hay en ese momento—. De ahí en adelante
 // vive por su cuenta: cambiar el idioma después NO la cambia.
 function monedaSegunIdioma(idioma) {
-  return idioma === "pt" ? "BRL" : "BOB";
+  return perfil(idioma).moneda;
 }
 
 // "1234" → "12.34". Sin símbolo: quién lo muestra decide si va "Bs" o "R$",

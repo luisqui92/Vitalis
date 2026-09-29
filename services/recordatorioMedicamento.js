@@ -30,6 +30,7 @@
 // se nota porque no llega ningún mensaje, el segundo manda un WhatsApp de
 // salud con un horario que nadie dijo.
 const { CONFIG, log } = require("../config");
+const { esCuentaBrasil } = require("./idiomas");
 const { Medicamento, Paciente, Medico } = require("../db/models");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("./metaWhatsapp");
 
@@ -86,7 +87,7 @@ function recalcularRecordatorio(medicamento, frecuencia, tieneTelefono) {
 
 // ─── EL ENVÍO ───────────────────────────────────────────────────────────────
 async function enviarRecordatorio(medicamento, paciente, medico) {
-  const esBrasil = medico?.moneda === "BRL" || medico?.idioma === "pt";
+  const esBrasil = esCuentaBrasil(medico);
   const primerNombre = String(paciente.nombre || "").split(" ")[0] || paciente.nombre;
   const quien = medico?.nombre || "tu médico";
   const dosis = medicamento.dosis ? ` (${medicamento.dosis})` : "";

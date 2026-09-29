@@ -28,6 +28,7 @@
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
 const monedas = require("./monedas");
+const { perfil } = require("./idiomas");
 const saldo = require("./saldo");
 const suscripciones = require("./suscripciones");
 
@@ -238,7 +239,7 @@ async function atenderMedico(mensaje, historial = [], idioma = "es", sabido = nu
 - Plan anual: ${p.anual} (doce meses al precio de once)
 - Las primeras ${p.gratis} consultas de una cuenta nueva no se cobran
 - No hay costo de instalación ni permanencia; las historias se exportan completas el día que quiera irse
-Idioma de la conversación: ${idioma === "pt" ? "portugués de Brasil" : "español"}.`;
+Idioma de la conversación: ${perfil(idioma).nota.nombre}.`;
 
   const yaSabemos = [
     sabido?.nombre && `Se llama ${sabido.nombre}`,
