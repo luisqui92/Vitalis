@@ -17,8 +17,14 @@ const CONFIG = {
   APP_URL: process.env.APP_URL || "",
 
   TIMEOUT_OPENAI: 45000,
+  // La nota de una consulta de 70 minutos es una transcripción de más de
+  // 10.000 palabras y una respuesta larga: 45 s no alcanzan. Corre en
+  // segundo plano, así que esperar más no traba a nadie.
+  TIMEOUT_NOTA_CLINICA: 180000,
   TIMEOUT_ASSEMBLYAI: 120000, // por cada llamada (subir audio, pedir transcripción, cada poll)
-  TIMEOUT_TRANSCRIPCION_TOTAL: 1200000, // 20 min: corre en segundo plano, hay margen de sobra para consultas de 45 min
+  // 45 min: corre en segundo plano. Una consulta de 70 minutos suele estar
+  // en 5-10, pero si AssemblyAI tiene cola no queremos darla por perdida.
+  TIMEOUT_TRANSCRIPCION_TOTAL: 2700000,
 
   // Usado por services/utils.js (fechaStrBolivia) para calcular el día
   // boliviano (vinculación del celular como micrófono remoto).

@@ -113,6 +113,7 @@ Object.assign(I18N.es, {
   "consulta.pantallaEncendida": "Dejá la pantalla encendida y Symphomed abierto mientras grabás: si el celular se bloquea o cambiás de app, el micrófono puede dejar de grabar.",
   "consulta.avisoOculto": "Saliste de Symphomed o se apagó la pantalla durante unos {min} min. En ese tiempo el micrófono pudo no grabar.",
   "consulta.avisoSilencio": "No se escucha nada hace más de un minuto. ¿Está tapado el micrófono o lejos de la conversación?",
+  "consulta.avisoBateria": "Batería en {nivel}% y sin cargar. Conectá el cargador: una consulta larga con la pantalla prendida la gasta rápido, y si el celular se apaga, la grabación se corta ahí.",
   "consulta.avisoCortado": "El micrófono se desconectó. Detené la grabación y empezá una nueva para no perder el resto.",
   "consulta.resumenSinMicrofono": "Ojo: de {total} de grabación, unos {min} min fueron con la pantalla apagada o fuera de Symphomed, y ese tramo puede no tener sonido. Podés subirla igual.",
   "consulta.resumenSilencio": "Ojo: de {total} de grabación, unos {min} min no tienen sonido. Revisá que el micrófono no haya estado tapado. Podés subirla igual.",

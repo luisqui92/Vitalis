@@ -26,7 +26,10 @@ const requireMedico = requireAuth(["medico"]);
 
 // Acepta el audio como body crudo (no JSON): el cliente manda
 // Content-Type: audio/ogg (o wav/mp3/m4a/webm) y el archivo tal cual.
-const audioRaw = express.raw({ type: "audio/*", limit: "80mb" });
+// La app graba a 48 kbps (public/js/audio.js → crearGrabadora): 70 minutos
+// son unos 25 MB. El margen es para un navegador que ignora ese pedido o
+// para un archivo subido a mano, grabado con otra app a más calidad.
+const audioRaw = express.raw({ type: "audio/*", limit: "250mb" });
 
 // Revisa una lista de nombres con el idioma del médico y su historial.
 // Nunca tira: si la revisión falla, la nota se muestra igual, sin avisos.

@@ -67,7 +67,8 @@ function teleGrabIniciar(streamMedico, streamPaciente) {
 
     const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
     teleGrabMime = tipos.find(t => MediaRecorder.isTypeSupported(t)) || "";
-    teleGrabRec = new MediaRecorder(destino.stream, teleGrabMime ? { mimeType: teleGrabMime } : undefined);
+    // Dos canales (médico y paciente): el doble que una voz sola.
+    teleGrabRec = crearGrabadora(destino.stream, teleGrabMime, 2 * BITS_POR_SEGUNDO_VOZ);
     teleGrabTrozos = [];
     teleGrabRec.ondataavailable = (e) => { if (e.data && e.data.size) teleGrabTrozos.push(e.data); };
     // Un trozo por segundo en vez de uno solo al final: si el navegador se

@@ -114,9 +114,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   const minutosDe = (seg) => Math.max(1, Math.round(seg / 60));
   const mostrarAviso = (tipo, datos) => {
     if (tipo === "normal") { recAviso.innerHTML = ""; return; }
-    const texto = tipo === "oculto" ? t("consulta.avisoOculto", { min: minutosDe(datos.segundos) })
-      : tipo === "silencio" ? t("consulta.avisoSilencio")
-      : t("consulta.avisoCortado");
+    const texto = textoAvisoGrabacion(tipo, datos);
     recAviso.innerHTML = `<div class="error">⚠️ ${texto}</div>`;
   };
 
@@ -126,7 +124,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
         mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || "";
-        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        mediaRecorder = crearGrabadora(stream, mimeType);
         chunks = [];
         // Una toma nueva reemplaza a la anterior que no se subió: grabar de
         // nuevo es decidir que esa no va.

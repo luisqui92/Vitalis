@@ -97,7 +97,7 @@ function pintarVincular(v) {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
     mimeType = tipos.find(t => MediaRecorder.isTypeSupported(t)) || "";
-    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    mediaRecorder = crearGrabadora(stream, mimeType);
     chunks = [];
     const respaldoId = await respaldoGrabacion.iniciar({ pacienteId, pacienteNombre, mimeType: mimeType || "audio/webm" });
     // Este es el caso MÁS expuesto a que la pantalla se apague: el celular
@@ -109,8 +109,7 @@ function pintarVincular(v) {
     const avisoRemoto = document.getElementById("recAvisoRemoto");
     const guardian = crearGuardianGrabacion(stream, { onAviso: (tipo, datos) => {
       if (tipo === "normal") { avisoRemoto.innerHTML = ""; return; }
-      const texto = tipo === "oculto" ? t("consulta.avisoOculto", { min: Math.max(1, Math.round(datos.segundos / 60)) })
-        : tipo === "silencio" ? t("consulta.avisoSilencio") : t("consulta.avisoCortado");
+      const texto = textoAvisoGrabacion(tipo, datos);
       avisoRemoto.innerHTML = `<div class="error">⚠️ ${texto}</div>`;
     } });
     mediaRecorder.ondataavailable = e => {

@@ -66,8 +66,43 @@ function crearIndicadorAudio(orbEl) {
 //     momento, no después.
 //
 // onAviso(tipo, datos): "oculto" {segundos} · "silencio" {segundos} ·
-// "cortado" {} · "normal" {} (volvió el sonido).
+// "cortado" {} · "bateria" {nivel} · "normal" {} (volvió el sonido).
 const SILENCIO_AVISO_SEGUNDOS = 90;
+
+// ═══ LA BATERÍA EN UNA CONSULTA LARGA ═══════════════════════════════════════
+// Una hora con la pantalla prendida, el micrófono y la vista previa en vivo
+// se come una buena parte de la batería. Si el celular se apaga por batería
+// a los 50 minutos, la grabación se corta ahí. Se avisa al empezar si está
+// baja y sin cargar, y otra vez si baja mucho durante la consulta.
+// (navigator.getBattery existe en Android; en iPhone no, y no se avisa.)
+const BATERIA_AVISO_AL_EMPEZAR = 0.35;
+const BATERIA_AVISO_DURANTE = 0.15;
+
+// ═══ CALIDAD DE LA GRABACIÓN ════════════════════════════════════════════════
+// Es voz, no música. Sin decirle nada, el navegador graba a 128 kbps o más:
+// una consulta de 70 minutos pasaba de 67 MB, al borde del máximo que
+// acepta el servidor, y tardaba mucho en subir por datos móviles. A 48 kbps
+// la voz se entiende igual (el transcriptor trabaja a 16 kHz) y 70 minutos
+// son unos 25 MB. Un navegador que no acepta el pedido graba como antes.
+const BITS_POR_SEGUNDO_VOZ = 48000;
+function crearGrabadora(stream, mimeType, bits = BITS_POR_SEGUNDO_VOZ) {
+  const opciones = { audioBitsPerSecond: bits };
+  if (mimeType) opciones.mimeType = mimeType;
+  try {
+    return new MediaRecorder(stream, opciones);
+  } catch {
+    return new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  }
+}
+
+// El texto de cada aviso del cuidador, igual en las dos pantallas que graban
+// (la consulta y el celular vinculado).
+function textoAvisoGrabacion(tipo, datos) {
+  if (tipo === "oculto") return t("consulta.avisoOculto", { min: Math.max(1, Math.round((datos?.segundos || 0) / 60)) });
+  if (tipo === "silencio") return t("consulta.avisoSilencio");
+  if (tipo === "bateria") return t("consulta.avisoBateria", { nivel: datos?.nivel ?? "" });
+  return t("consulta.avisoCortado");
+}
 
 function crearGuardianGrabacion(stream, { onAviso = () => {} } = {}) {
   let wakeLock = null, activo = true;
@@ -81,8 +116,36 @@ function crearGuardianGrabacion(stream, { onAviso = () => {} } = {}) {
     if (!activo || !("wakeLock" in navigator) || document.visibilityState !== "visible") return;
     try {
       wakeLock = await navigator.wakeLock.request("screen");
+      // El sistema puede soltarlo solo aunque la página siga a la vista
+      // (ahorro de batería, en algunos Android). Se vuelve a pedir: en una
+      // consulta de una hora, que la pantalla se apague a la mitad es
+      // justo lo que corta el micrófono.
+      wakeLock.addEventListener("release", () => {
+        if (activo && document.visibilityState === "visible") setTimeout(pedirPantalla, 3000);
+      });
     } catch { /* el navegador no lo permite: quedan los avisos */ }
   }
+
+  let bateria = null, avisoBateriaDado = false;
+  function revisarBateria(alEmpezar) {
+    if (!activo || !bateria || bateria.charging) { if (bateria?.charging) avisoBateriaDado = false; return; }
+    const limite = alEmpezar ? BATERIA_AVISO_AL_EMPEZAR : BATERIA_AVISO_DURANTE;
+    if (bateria.level <= limite && !avisoBateriaDado) {
+      avisoBateriaDado = true;
+      try { navigator.vibrate?.([200, 100, 200]); } catch { /* sin vibración */ }
+      onAviso("bateria", { nivel: Math.round(bateria.level * 100) });
+    }
+  }
+  const alCambiarBateria = () => revisarBateria(false);
+  try {
+    navigator.getBattery?.().then((b) => {
+      if (!activo) return;
+      bateria = b;
+      revisarBateria(true);
+      b.addEventListener("levelchange", alCambiarBateria);
+      b.addEventListener("chargingchange", alCambiarBateria);
+    }).catch(() => {});
+  } catch { /* sin información de batería */ }
 
   function alCambiarVisibilidad() {
     if (!activo) return;
@@ -171,6 +234,10 @@ function crearGuardianGrabacion(stream, { onAviso = () => {} } = {}) {
       if (reloj) clearInterval(reloj);
       if (audioCtx) audioCtx.close().catch(() => {});
       audioCtx = null; analyser = null;
+      if (bateria) {
+        bateria.removeEventListener("levelchange", alCambiarBateria);
+        bateria.removeEventListener("chargingchange", alCambiarBateria);
+      }
       if (wakeLock) wakeLock.release().catch(() => {});
       wakeLock = null;
     },

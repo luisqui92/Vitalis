@@ -387,14 +387,15 @@ async function pedirNota(mensajes) {
       model: "gpt-4o-mini",
       messages: mensajes,
       // 1600 se quedaba corto para una consulta larga: la respuesta salía
-      // cortada y el JSON, inválido.
-      max_tokens: 3000,
+      // cortada y el JSON, inválido. Con consultas de 60-70 minutos, 3000
+      // también puede quedar corto; gpt-4o-mini acepta hasta 16.384.
+      max_tokens: 6000,
       temperature: 0.1,
       response_format: { type: "json_object" },
     },
     {
       headers: { Authorization: `Bearer ${CONFIG.OPENAI_KEY}` },
-      timeout: CONFIG.TIMEOUT_OPENAI,
+      timeout: CONFIG.TIMEOUT_NOTA_CLINICA,
     }
   );
   const content = res.data.choices[0].message.content.replace(/```json|```/g, "").trim();
