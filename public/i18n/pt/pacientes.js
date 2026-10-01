@@ -66,6 +66,9 @@ Object.assign(I18N.pt, {
   // ─── Kardex ───────────────────────────────────────────────────────────
   "kardex.cargando": "Carregando...",
   "kardex.error": "Erro ao carregar o paciente",
+  "kardex.pdf.boton": "📄 Baixar PDF",
+  "kardex.pdf.preparando": "Preparando PDF…",
+  "kardex.pdf.error": "Não foi possível gerar o PDF. Tente de novo.",
   "kardex.volver": "← Pacientes",
   "kardex.estado.procesando": "⏳ Transcrevendo",
   "kardex.estado.completado": "✅ Pronto",

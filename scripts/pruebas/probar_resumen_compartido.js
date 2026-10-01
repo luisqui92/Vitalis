@@ -42,6 +42,9 @@ const MODELOS = fs.readFileSync(path.join(RAIZ, "db", "models.js"), "utf8");
 // ("no sale la transcripción"), así que se sacan antes de mirar el código.
 const sinComentarios = (t) => t.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 const RUTA_CODIGO = sinComentarios(RUTA);
+// Lo que se lee de la base para sacarlo del consultorio vive aparte desde que
+// lo comparte el Kardex en PDF (services/kardexDatos.js).
+const LECTURA_CODIGO = sinComentarios(fs.readFileSync(path.join(RAIZ, "services", "kardexDatos.js"), "utf8"));
 
 // ═══ UN KARDEX CON TODO LO QUE NO TIENE QUE SALIR ══════════════════════════
 //
@@ -151,7 +154,10 @@ verificar("ni el precio ni los pagos del plan de tratamiento",
 // no revisó es un borrador de máquina, igual que el brief. Se filtra en la
 // consulta a la base, así que se comprueba ahí.
 verificar("solo salen las consultas que el médico confirmó",
-  /ConsultaMedica\.find\(\{ \.\.\.filtro, confirmadaEn: \{ \$ne: null \} \}\)/.test(RUTA_CODIGO));
+  /ConsultaMedica\.find\(\{ \.\.\.filtro, confirmadaEn: \{ \$ne: null \} \}\)/.test(LECTURA_CODIGO)
+  && /leerKardex/.test(RUTA_CODIGO) && !/ConsultaMedica\.find\(/.test(RUTA_CODIGO));
+verificar("  ...y la transcripción ni se trae de la base",
+  /\.select\("-transcripcionCompleta -segmentos"\)/.test(LECTURA_CODIGO));
 
 // ═══ 2. LAS ALERGIAS ═══════════════════════════════════════════════════════
 console.log("\n── 2. Las alergias, que son lo único que puede matar ──");
@@ -173,6 +179,20 @@ const sinPersona = svc.armarContenido(
   { ...KARDEX, persona: null }, { alcance: "resumen", secciones: svc.normalizarSecciones(null, "resumen") });
 verificar("cuando no hay ninguna registrada, el documento lo dice",
   sinPersona.alergias && sinPersona.alergias.registradas === false);
+
+// Un paciente de un consultorio sin clínica tiene las alergias en SU ficha
+// (no hay persona). Antes el resumen solo miraba la persona y decía «sin
+// alergias registradas» con la penicilina cargada.
+const sinClinica = svc.armarContenido(
+  { ...KARDEX, persona: null, paciente: { ...KARDEX.paciente, alergias: ["Penicilina"] } },
+  { alcance: "resumen", secciones: svc.normalizarSecciones(null, "resumen") });
+verificar("las alergias cargadas en la ficha (paciente sin clínica) salen",
+  sinClinica.alergias.registradas === true && sinClinica.alergias.lista.includes("Penicilina"));
+const lasDos = svc.armarContenido(
+  { ...KARDEX, paciente: { ...KARDEX.paciente, alergias: ["penicilina", "Látex"] } },
+  { alcance: "resumen", secciones: svc.normalizarSecciones(null, "resumen") });
+verificar("  ...y con clínica se juntan las de la persona y las de la ficha, sin repetir",
+  lasDos.alergias.lista.length === 3 && lasDos.alergias.lista.includes("Látex"));
 
 // ═══ 3. QUE EL RESUMEN SEA UN RESUMEN ══════════════════════════════════════
 console.log("\n── 3. Un resumen que se pueda leer ──");

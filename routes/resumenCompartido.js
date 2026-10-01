@@ -30,6 +30,7 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { registrar } = require("../services/auditoria");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { SECCIONES, normalizarSecciones, armarContenido, seccionesPorDefecto } = require("../services/resumenCompartido");
+const { leerKardex } = require("../services/kardexDatos");
 const { CONFIG, log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -56,25 +57,8 @@ const enlaceResumen = (r, req) => `${base(req)}/r/${r.token}`;
 const enlaceLlave = (l, req) => `${base(req)}/mi/${l.token}`;
 
 // ─── Leer el kardex una sola vez ───────────────────────────────────────────
-//
-// Lo usan la previsualización y el guardado, para que sean idénticos. Ver el
-// comentario de armarContenido() sobre por qué eso no es opcional.
-async function leerKardex(paciente) {
-  const filtro = { pacienteId: paciente._id, medicoPhone: paciente.medicoPhone };
-  const [persona, consultas, medicamentos, informes, vacunas, mediciones, tratamientos] = await Promise.all([
-    paciente.personaId ? PersonaClinica.findById(paciente.personaId).lean() : null,
-    // Solo las confirmadas por el médico: una nota clínica que la IA escribió
-    // y que él todavía no revisó no puede salir del consultorio. Es un
-    // borrador de máquina, igual que el brief.
-    ConsultaMedica.find({ ...filtro, confirmadaEn: { $ne: null } }).sort({ createdAt: -1 }).lean(),
-    Medicamento.find(filtro).sort({ fechaInicio: -1 }).lean(),
-    Informe.find({ ...filtro, estado: "firmado" }).sort({ fechaEstudio: -1 }).lean(),
-    Vacuna.find(filtro).sort({ fecha: -1 }).lean(),
-    Medicion.find(filtro).sort({ fecha: -1 }).limit(200).lean(),
-    TratamientoPlan.find(filtro).sort({ createdAt: 1 }).lean(),
-  ]);
-  return { paciente, persona, consultas, medicamentos, informes, vacunas, mediciones, tratamientos };
-}
+// services/kardexDatos.js: lo comparten el resumen y el Kardex en PDF, para
+// que los dos saquen del consultorio exactamente lo mismo.
 
 async function firmaDe(medicoPhone) {
   const [membrete, medico] = await Promise.all([

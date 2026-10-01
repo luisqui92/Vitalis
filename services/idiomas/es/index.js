@@ -14,6 +14,10 @@ module.exports = {
   metaWhatsapp: "es",
   // Lista oficial de medicamentos (datos/medicamentos/): LINAME de Bolivia.
   listaMedicamentos: "liname.json",
+  // Para las horas de las consultas en un documento (el Kardex en PDF),
+  // cuando el navegador no dice la suya.
+  zonaHoraria: "America/La_Paz",
   transcripcion: require("./transcripcion"),
   nota: require("./nota"),
+  kardex: require("./kardex"),
 };

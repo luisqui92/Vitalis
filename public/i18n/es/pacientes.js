@@ -64,6 +64,10 @@ Object.assign(I18N.es, {
   // ─── Kardex ───────────────────────────────────────────────────────────
   "kardex.cargando": "Cargando...",
   "kardex.error": "Error cargando el paciente",
+  // El Kardex en PDF (routes/kardexPdf.js).
+  "kardex.pdf.boton": "📄 Descargar PDF",
+  "kardex.pdf.preparando": "Preparando PDF…",
+  "kardex.pdf.error": "No se pudo generar el PDF. Probá de nuevo.",
   "kardex.volver": "← Pacientes",
   "kardex.estado.procesando": "⏳ Transcribiendo",
   "kardex.estado.completado": "✅ Listo",

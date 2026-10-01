@@ -20,36 +20,14 @@ let ganaderiaFiltro = "activo";
 // a entrar y salir del detalle de un lote.
 let ganaderiaFincaFiltro = "";
 
-// Baja una planilla de Excel del servidor (routes/exportarGanado.js). Con
-// fetch y no con un enlace común porque la sesión viaja en el encabezado
-// Authorization: poner el token en la URL lo dejaría en el historial y en
-// los registros del servidor.
-async function descargarExcelGanado(ruta, boton) {
-  const textoAntes = boton.textContent;
-  boton.disabled = true;
-  boton.textContent = t("ganaderia.excel.preparando");
-  try {
-    const res = await fetch(API + ruta, { headers: { Authorization: "Bearer " + TOKEN } });
-    if (!res.ok) {
-      const datos = await res.json().catch(() => ({}));
-      throw { status: res.status, error: datos.error };
-    }
-    const nombre = (/filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "") || [])[1] || "ganaderia.xlsx";
-    const url = URL.createObjectURL(await res.blob());
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nombre;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-  } catch (e) {
-    if (e.status === 401) return logout();
-    alert(e.error || t("ganaderia.excel.error"));
-  } finally {
-    boton.disabled = false;
-    boton.textContent = textoAntes;
-  }
+// Baja una planilla de Excel del servidor (routes/exportarGanado.js). El
+// cómo (con la sesión en el encabezado) está en descargarArchivo, estado.js.
+function descargarExcelGanado(ruta, boton) {
+  return descargarArchivo(ruta, boton, {
+    preparando: t("ganaderia.excel.preparando"),
+    error: t("ganaderia.excel.error"),
+    nombrePorDefecto: "ganaderia.xlsx",
+  });
 }
 
 async function renderGanaderia() {

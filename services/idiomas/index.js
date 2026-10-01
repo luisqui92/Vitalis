@@ -12,6 +12,7 @@
 //   services/idiomas/pt/index.js         país, moneda, locale, WhatsApp, lista oficial
 //   services/idiomas/pt/transcripcion.js vocabulario para el transcriptor
 //   services/idiomas/pt/nota.js          cómo se escribe la nota clínica
+//   services/idiomas/pt/kardex.js        los textos del Kardex en PDF
 // (los textos de pantalla siguen en public/i18n/pt/, que ya era así).
 //
 // Sumar un idioma = copiar una carpeta, traducirla y agregarla abajo. La

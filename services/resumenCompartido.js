@@ -46,6 +46,8 @@
 // y para el paciente. Un paciente tiene derecho a TODA su historia clínica,
 // y estas cuatro cosas no lo son — son el cuaderno de trabajo de quien la
 // escribió y el borrador de una máquina.
+const { unidadDe } = require("./medicionesTipos");
+
 const SIEMPRE_FUERA = [
   "transcripcionCompleta", "segmentos",
   "briefClinico", "diagnosticosDiferenciales", "hiloClinico",
@@ -133,22 +135,33 @@ function armarContenido({ paciente, persona, consultas, medicamentos, informes, 
       nombre: texto(paciente.nombre),
       fechaNacimiento: fecha(paciente.fechaNacimiento),
       sexo: texto(paciente.sexo),
-      documento: texto(persona?.documento),
+      // El de la persona de la clínica; si no está vinculada, el CPF de la
+      // ficha (Brasil).
+      documento: texto(persona?.documento) || texto(paciente.cpf),
       codigo: texto(paciente.codigo),
     };
   }
 
-  // Las alergias salen de la persona de la clínica si está vinculada —ahí
-  // están estructuradas— y si no, de los antecedentes, que es donde vivían
-  // antes en prosa. Se manda la lista estructurada y, aparte, el aviso de si
-  // no hay: «sin alergias registradas» y «no se preguntó» son cosas muy
-  // distintas para el que va a recetar, y el documento no puede confundirlas.
+  // Las alergias viven en DOS lugares: en la persona de la clínica, si la
+  // ficha está vinculada, y en la ficha misma, que es donde las carga el
+  // médico de un paciente sin vincular (public/js/personas.js →
+  // pintarSinPersona). Antes se leía solo la persona: el paciente de un
+  // consultorio sin clínica salía con «sin alergias registradas» aunque las
+  // tuviera cargadas. Se juntan las dos, sin repetir.
+  //
+  // Se manda la lista y, aparte, el aviso de si no hay: «sin alergias
+  // registradas» y «no se preguntó» son cosas muy distintas para el que va a
+  // recetar, y el documento no puede confundirlas.
   if (usa("alergias")) {
-    const deLaPersona = lista(persona?.alergias);
+    const unicas = new Map();
+    for (const a of [...lista(persona?.alergias), ...lista(paciente.alergias)]) {
+      if (!unicas.has(a.toLocaleLowerCase())) unicas.set(a.toLocaleLowerCase(), a);
+    }
+    const todas = [...unicas.values()];
     c.alergias = {
-      lista: deLaPersona,
+      lista: todas,
       // Se dice explícitamente, porque un hueco se lee como un "no".
-      registradas: deLaPersona.length > 0,
+      registradas: todas.length > 0,
       actualizadasEn: fecha(persona?.alergiasActualizadasEn),
     };
   }
@@ -240,8 +253,16 @@ function armarContenido({ paciente, persona, consultas, medicamentos, informes, 
   }
 
   if (usa("mediciones")) {
+    // La presión son DOS números (sistólica en valor, diastólica en
+    // valorSecundario): antes salía «120» sola. Y la unidad no se guarda con
+    // la medición: sale del tipo (services/medicionesTipos.js).
     const m = (mediciones || [])
-      .map(x => ({ tipo: texto(x.tipo), valor: x.valor, unidad: texto(x.unidad), fecha: fecha(x.fecha || x.createdAt) }))
+      .map(x => ({
+        tipo: texto(x.tipo), valor: x.valor,
+        valorSecundario: x.valorSecundario ?? null,
+        unidad: unidadDe(x.tipo),
+        fecha: fecha(x.fecha || x.createdAt),
+      }))
       .filter(x => x.tipo);
     if (m.length) c.mediciones = m;
   }

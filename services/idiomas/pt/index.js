@@ -10,6 +10,10 @@ module.exports = {
   metaWhatsapp: "pt_BR",
   // DCB de ANVISA (Denominação Comum Brasileira).
   listaMedicamentos: "dcb.json",
+  // Brasília/São Paulo, la de la mayor parte del país. El navegador manda la
+  // suya y tiene prioridad (Manaus, Cuiabá… tienen otra).
+  zonaHoraria: "America/Sao_Paulo",
   transcripcion: require("./transcripcion"),
   nota: require("./nota"),
+  kardex: require("./kardex"),
 };

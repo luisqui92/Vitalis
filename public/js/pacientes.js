@@ -488,7 +488,10 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   app.innerHTML = `
     <button class="back" id="btnBack">${t("kardex.volver")}</button>
-    <div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">${esc(p.nombre)}</div>
+    <div class="kardex-cabecera">
+      <div class="nombre" style="font-size:18px;font-weight:700">${esc(p.nombre)}</div>
+      <button class="secondary kardex-pdf" id="btnKardexPdf">${t("kardex.pdf.boton")}</button>
+    </div>
     ${bloquePersonaHtml()}
     <div class="tabs" role="tablist" aria-label="${esc(t("kardex.seccionesAria"))}">
       ${Object.entries(tabsKardex).map(([key, et]) => `
@@ -511,6 +514,17 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
+  // El Kardex en PDF lo arma el servidor (routes/kardexPdf.js), con la zona
+  // horaria de este aparato para que la hora de cada consulta sea la que vio.
+  document.getElementById("btnKardexPdf").onclick = (ev) => {
+    let zona = "";
+    try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { /* sin zona: la del país */ }
+    descargarArchivo(`/medico/pacientes/${p._id}/kardex.pdf?tz=${encodeURIComponent(zona)}`, ev.currentTarget, {
+      preparando: t("kardex.pdf.preparando"),
+      error: t("kardex.pdf.error"),
+      nombrePorDefecto: "kardex.pdf",
+    });
+  };
   // Aparte y sin await: si el proveedor de video tarda en contestar, la
   // ficha del paciente tiene que estar en pantalla igual.
   if (typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);

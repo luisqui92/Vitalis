@@ -1130,3 +1130,8 @@ button.escr-lista-item:focus-visible{outline:2px solid var(--primary);outline-of
   background:var(--warning-bg);color:var(--text);border:0;border-left:3px solid var(--warning);border-radius:0 var(--radius-sm) var(--radius-sm) 0;}
 button.med-aviso{cursor:pointer;font-weight:400}
 button.med-aviso:hover{background:color-mix(in srgb, var(--warning) 22%, transparent)}
+
+/* El nombre del paciente y «Descargar PDF», en la misma línea (pacientes.js). */
+.kardex-cabecera{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.kardex-cabecera .nombre{min-width:0;overflow-wrap:anywhere;}
+button.kardex-pdf{width:auto;margin:0;padding:8px 14px;font-size:13px;white-space:nowrap;}

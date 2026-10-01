@@ -329,6 +329,38 @@ function tabsKardexPara(tipoEspecialidad) {
   return salida;
 }
 
+// Baja un archivo que arma el servidor (el Kardex en PDF, las planillas de
+// ganadería). Con fetch y no con un enlace común porque la sesión viaja en el
+// encabezado Authorization: poner el token en la URL lo dejaría en el
+// historial y en los registros del servidor.
+async function descargarArchivo(ruta, boton, { preparando, error, nombrePorDefecto }) {
+  const textoAntes = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = preparando;
+  try {
+    const res = await fetch(API + ruta, { headers: { Authorization: "Bearer " + TOKEN } });
+    if (!res.ok) {
+      const datos = await res.json().catch(() => ({}));
+      throw { status: res.status, error: datos.error };
+    }
+    const nombre = (/filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "") || [])[1] || nombrePorDefecto;
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    if (e.status === 401) return logout();
+    alert(e.error || error);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = textoAntes;
+  }
+}
+
 async function api(path, opts = {}) {
   const headers = opts.headers || {};
   if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;

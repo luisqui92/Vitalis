@@ -163,6 +163,11 @@ const sinBloquePersona = (html) => html
   // hueco vacío que hay que descontar.
   .replace(/\n {8}(?=\n {8}<div class="dato-row" style="border-bottom:none">)/g, "")
   .replace(/\n {4}(?=\n {4}<div class="tabs")/g, "")
+  // El botón «Descargar PDF» junto al nombre del paciente (routes/kardexPdf.js),
+  // pedido por médicos. Otro agregado deliberado: el nombre pasó a una fila
+  // con el botón, y la fila se quedó con el margen de abajo que tenía él.
+  .replace(/<div class="kardex-cabecera">\s*<div class="nombre" style="font-size:18px;font-weight:700">([^<]*)<\/div>\s*<button class="secondary kardex-pdf" id="btnKardexPdf">[^<]*<\/button>\s*<\/div>/g,
+    '<div class="nombre" style="font-size:18px;font-weight:700;margin-bottom:10px">$1</div>')
   // Y el bloque plegado de "Más acciones", que es el mismo caso: elemento
   // nuevo y deliberado, no una diferencia que nadie escribió. Se saca junto
   // con el comentario que lo explica — los comentarios de HTML viajan al

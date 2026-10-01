@@ -188,7 +188,7 @@ function resumenVistaHtml(contenido, opciones) {
     rvSeccion("Vacunas", (c.vacunas || []).length
       ? rvLista(c.vacunas.map(v => `${v.nombre}${v.dosis ? " · " + v.dosis : ""} — ${rvFecha(v.fecha)}`)) : ""),
     rvSeccion("Controles", (c.mediciones || []).length
-      ? rvLista(c.mediciones.map(m => `${m.tipo}: ${m.valor}${m.unidad ? " " + m.unidad : ""} — ${rvFecha(m.fecha)}`)) : ""),
+      ? rvLista(c.mediciones.map(m => `${m.tipo}: ${m.valor}${m.valorSecundario != null ? "/" + m.valorSecundario : ""}${m.unidad ? " " + m.unidad : ""} — ${rvFecha(m.fecha)}`)) : ""),
     rvSeccion("Plan de tratamiento", (c.tratamientos || []).length
       ? rvLista(c.tratamientos.map(x => `${x.nombre}${x.piezaFdi ? ` (pieza ${x.piezaFdi})` : ""} — ${x.estado}`)) : ""),
   ].join("");
