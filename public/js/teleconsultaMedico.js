@@ -36,7 +36,8 @@ async function teleMedPintar(pacienteId, pacienteTelefono) {
 
   let lista = [];
   try {
-    const r = await api("/medico/teleconsultas");
+    // Reciente: se repinta en cada pestaña del Kardex (ver apiReciente, estado.js).
+    const r = await apiReciente("/medico/teleconsultas");
     lista = (r.teleconsultas || []).filter(t => String(t.pacienteId) === String(pacienteId));
   } catch { /* sin lista se ofrece crear igual */ }
   if (!caja.isConnected) return;

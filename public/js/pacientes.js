@@ -308,6 +308,10 @@ function renderNuevoPaciente() {
 // para no estar yendo y viniendo cada vez que querés ver otra cosa.
 async function renderPacienteDetalle(pacienteId, tabInicial) {
   detenerPolling();
+  // Abrir un paciente trae todo fresco; las pestañas después reusan lo
+  // reciente (apiReciente, estado.js).
+  olvidarApiReciente(`/medico/pacientes/${pacienteId}/`);
+  olvidarApiReciente("/medico/teleconsultas");
   const serie = nuevaSeriePantalla();
   app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("kardex.cargando")}</div>`;
   try {

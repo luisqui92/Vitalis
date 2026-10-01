@@ -361,7 +361,39 @@ async function descargarArchivo(ruta, boton, { preparando, error, nombrePorDefec
   }
 }
 
+// ═══ LO QUE SE REPITE AL CAMBIAR DE PESTAÑA ═══════════════════════════════
+//
+// El Kardex se repinta entero en cada pestaña, y con él tres cajas que van al
+// servidor: la persona de la clínica, las teleconsultas y los resúmenes
+// compartidos. Nada de eso cambia de una pestaña a otra, pero cada clic las
+// volvía a pedir: recorrer las pestañas de tres pacientes eran 118 pedidos en
+// 25 segundos, el servidor corta a los 60 por minuto (services/ratelimit.js),
+// y el médico veía «Demasiadas peticiones. Esperá un momento.»
+//
+// apiReciente() recuerda esas respuestas 30 segundos. Para que no muestre
+// nada viejo:
+//   · abrir un paciente lo olvida (renderPacienteDetalle): solo las pestañas
+//     reusan;
+//   · CUALQUIER cambio (todo pedido que no sea GET) borra todo lo recordado;
+//   · un aviso de cambio desde otro aparato (realtime.js) también;
+//   · un error no se recuerda.
+const API_RECIENTE = new Map();
+const API_RECIENTE_MS = 30000;
+function apiReciente(path) {
+  const guardado = API_RECIENTE.get(path);
+  if (guardado && guardado.hasta > Date.now()) return guardado.promesa;
+  const promesa = api(path);
+  API_RECIENTE.set(path, { hasta: Date.now() + API_RECIENTE_MS, promesa });
+  promesa.catch(() => { if (API_RECIENTE.get(path)?.promesa === promesa) API_RECIENTE.delete(path); });
+  return promesa;
+}
+function olvidarApiReciente(prefijo) {
+  for (const k of [...API_RECIENTE.keys()]) if (!prefijo || k.startsWith(prefijo)) API_RECIENTE.delete(k);
+}
+
 async function api(path, opts = {}) {
+  // Un cambio puede invalidar cualquier cosa recordada: se olvida todo.
+  if (opts.method && String(opts.method).toUpperCase() !== "GET") olvidarApiReciente();
   const headers = opts.headers || {};
   if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
   const res = await fetch(API + path, { ...opts, headers });

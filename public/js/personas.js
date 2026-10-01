@@ -87,7 +87,8 @@ async function cargarBloquePersona(paciente) {
   pintarAlertaAlergias(paciente.alergias || []);
   let datos;
   try {
-    datos = await api(`/medico/pacientes/${paciente._id}/persona`);
+    // Reciente: se repinta en cada pestaña del Kardex (ver apiReciente, estado.js).
+    datos = await apiReciente(`/medico/pacientes/${paciente._id}/persona`);
   } catch {
     // Que falle esto no puede romper el Kardex: es información de más, no
     // la ficha. Si no carga, la pantalla sigue siendo la de siempre.

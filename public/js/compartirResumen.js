@@ -53,7 +53,8 @@ async function compartirResumenPintar(pacienteId) {
 
   let previos = [];
   try {
-    const r = await api(`/medico/pacientes/${pacienteId}/resumenes`);
+    // Reciente: se repinta en cada pestaña del Kardex (ver apiReciente, estado.js).
+    const r = await apiReciente(`/medico/pacientes/${pacienteId}/resumenes`);
     previos = r.resumenes || [];
   } catch { /* sin la lista se puede compartir igual */ }
   if (!caja.isConnected) return;
