@@ -41,7 +41,7 @@ function traer(ruta) {
     const req = http.get({ host: "127.0.0.1", port: PUERTO, path: ruta }, (res) => {
       let texto = "";
       res.on("data", (c) => { texto += c; });
-      res.on("end", () => resolve({ estado: res.statusCode, texto, tipo: res.headers["content-type"] || "" }));
+      res.on("end", () => resolve({ estado: res.statusCode, texto, tipo: res.headers["content-type"] || "", cabeceras: res.headers }));
     });
     req.on("error", reject);
     req.setTimeout(10000, () => { req.destroy(new Error("timeout")); });
@@ -111,6 +111,11 @@ async function main() {
     console.log("── 1. El proceso levanta ──");
     verificar("responde /health", (await traer("/health")).estado === 200);
     verificar("no imprimió ningún error fatal al arrancar", !/❌|Cannot find module|is not defined/.test(salida.texto));
+
+    // La receta de Memed (Brasil) se quedaba "cargando": con same-origin,
+    // la pestaña del PDF que abre su iframe le volvía como null. Ver index.js.
+    const coop = (await traer("/health")).cabeceras["cross-origin-opener-policy"];
+    verificar(`deja que Memed abra la pestaña del PDF (Cross-Origin-Opener-Policy: ${coop})`, coop === "same-origin-allow-popups");
 
     console.log("\n── 2. Los paquetes de idioma se arman al arrancar ──");
     // Ésta es la razón principal de esta prueba: los paquetes están en

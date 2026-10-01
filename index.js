@@ -92,6 +92,20 @@ app.use(helmet({
       frameSrc: ["'self'", ...DOMINIOS_MEMED],
     },
   },
+  // ═══ LA RECETA DE MEMED SE QUEDABA "CARGANDO" ═══════════════════════════
+  //
+  // helmet manda por defecto Cross-Origin-Opener-Policy: same-origin. Con
+  // eso, una pestaña que abre un iframe de OTRO dominio (el de Memed) le
+  // vuelve como null: Memed abre la pestaña al tocar «baixar», genera el
+  // PDF, y cuando quiere mandarlo ahí no tiene pestaña. No muestra error:
+  // se queda cargando para siempre. Pasó con un médico real desde la PC.
+  //
+  // "same-origin-allow-popups" deja que las ventanas que se abren desde
+  // Symphomed sigan conectadas; lo que protege (que otra página que abra a
+  // Symphomed no pueda manejarla) sigue igual. Es el valor que se usa con
+  // proveedores de pago o de firma que trabajan con ventanas emergentes.
+  // Reproducido en scripts/pruebas/probar_ventanas_emergentes.js.
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
 }));
 
 // El cuerpo CRUDO hace falta para verificar la firma de Meta: el HMAC se
