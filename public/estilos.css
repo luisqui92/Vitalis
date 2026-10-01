@@ -334,8 +334,16 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
   .no-imprimir{display:none !important;}
   body{background:#fff;}
   .wrap{padding:0;max-width:100%;}
-  #recetaHoja{box-shadow:none;border:none;padding:0 !important;}
+  #recetaHoja{box-shadow:none;border:none;padding:0 !important;background:#fff !important;}
+  /* La app es oscura: su texto es blanco. En papel el navegador no imprime
+     los fondos, y la receta salía en un gris apenas legible. En papel,
+     todo en negro. */
+  #recetaHoja, #recetaHoja *{color:#111 !important;border-color:#999 !important;}
 }
+/* Firma y sello, al pie de la receta: en papel es lo que la hace válida. */
+.receta-firma{margin:56px auto 0;width:min(280px,80%);text-align:center;font-size:13px;line-height:1.5;}
+.receta-firma-linea{border-top:1px solid var(--text-muted);margin-bottom:6px;}
+.receta-firma-pie{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;}
 
 /* ─── Odontograma ─────────────────────────────────────────────────────── */
 .pieza-dental rect{transition:opacity .1s ease;}

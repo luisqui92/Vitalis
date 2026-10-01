@@ -67,7 +67,7 @@ module.exports = function (app) {
     const receta = await obtenerOFallar(Receta, { _id: req.params.id, medicoPhone }, "Receta no encontrada");
     const [paciente, medico] = await Promise.all([
       Paciente.findById(receta.pacienteId).select("nombre fechaNacimiento sexo").lean(),
-      Medico.findOne({ phone: medicoPhone }).select("nombre especialidad").lean(),
+      Medico.findOne({ phone: medicoPhone }).select("nombre especialidad matricula conselho").lean(),
     ]);
     registrar({ req, medicoPhone, accion: "ver_receta", recurso: `Receta:${receta._id}` });
     res.json({ receta, paciente, medico });

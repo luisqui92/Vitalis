@@ -244,6 +244,11 @@ async function renderReceta(id) {
     const data = await api("/medico/recetas/" + id);
     const { receta, paciente, medico } = data;
     const edad = edadDesde(paciente.fechaNacimiento);
+    // El registro profesional va en la receta: en papel, es lo que la hace
+    // válida junto con la firma (CRM-SP 123456 en Brasil, la matrícula en
+    // Bolivia). El consejo partido, si lo cargó; si no, el texto libre.
+    const c = medico.conselho || {};
+    const registro = c.sigla && c.uf && c.numero ? `${c.sigla}-${c.uf} ${c.numero}` : (medico.matricula || "");
 
     app.innerHTML = `
       <button class="back no-imprimir" id="btnBack">${t("receta.volver")}</button>
@@ -256,6 +261,7 @@ async function renderReceta(id) {
           <div>
             <div><b>${esc(medico.nombre)}</b></div>
             ${medico.especialidad ? `<div>${esc(medico.especialidad)}</div>` : ""}
+            ${registro ? `<div>${esc(registro)}</div>` : ""}
           </div>
           <div>${fechaCorta(receta.fechaCivil || receta.fecha)}</div>
         </div>
@@ -271,6 +277,12 @@ async function renderReceta(id) {
         ${receta.indicaciones ? `
           <div class="seccion-titulo">${t("receta.indicacionesTitulo")}</div>
           <div style="font-size:13px;white-space:pre-wrap">${esc(receta.indicaciones)}</div>` : ""}
+        <div class="receta-firma">
+          <div class="receta-firma-linea"></div>
+          <div><b>${esc(medico.nombre)}</b></div>
+          ${registro ? `<div>${esc(registro)}</div>` : ""}
+          <div class="receta-firma-pie">${t("receta.firma")}</div>
+        </div>
       </div>
       <button class="secondary no-imprimir" id="btnImprimirReceta">${t("receta.imprimir")}</button>
     `;

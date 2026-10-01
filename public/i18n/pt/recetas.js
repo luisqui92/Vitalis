@@ -26,6 +26,7 @@ Object.assign(I18N.pt, {
   "receta.paciente": "Paciente:",
   "receta.rp": "Uso:",
   "receta.indicacionesTitulo": "Orientações",
+  "receta.firma": "Assinatura e carimbo",
   "receta.imprimir": "🖨️ Imprimir / Baixar PDF",
   "receta.errCargar": "Erro ao carregar a receita",
 

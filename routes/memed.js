@@ -22,8 +22,11 @@ const requireMedico = requireAuth(["medico"]);
 // digital; uno boliviano que la pone en portugués, no. Es la misma razón por
 // la que services/monedas.js no deduce la moneda del idioma: una preferencia
 // de pantalla no decide bajo qué ley se emite un documento.
+//
+// Y solo si Memed está prendido (MEMED_ACTIVO=si, ver services/memed.js):
+// por ahora está apagado y Brasil receta con la receta de Symphomed.
 function recetaPorMemed(medico) {
-  return medico?.moneda === "BRL";
+  return memed.activo() && medico?.moneda === "BRL";
 }
 
 module.exports = function (app) {

@@ -26,6 +26,7 @@ Object.assign(I18N.es, {
   "receta.paciente": "Paciente:",
   "receta.rp": "Rp/",
   "receta.indicacionesTitulo": "Indicaciones",
+  "receta.firma": "Firma y sello",
   "receta.imprimir": "🖨️ Imprimir / Descargar PDF",
   "receta.errCargar": "Error cargando la receta",
 

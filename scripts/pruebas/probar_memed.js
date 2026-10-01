@@ -6,6 +6,10 @@
 // Dos botones de recetar —uno con validez legal y otro sin ella— es una
 // trampa esperando a que alguien apurado use el equivocado.
 //
+// HOY MEMED ESTÁ APAGADO (services/memed.js → activo): Brasil receta con la
+// receta de Symphomed. La sección 0 prueba el apagado; el resto prende
+// MEMED_ACTIVO para que el módulo no se pudra mientras no se usa.
+//
 // Lo que se prueba acá es esa regla y los bordes que la sostienen: que la
 // decisión salga de la MONEDA y no del idioma, que las llaves no se filtren
 // al navegador, que una reimpresión no duplique la receta en el Kardex, y
@@ -117,7 +121,19 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   const GET = (ruta, tk) => pedir(servidor, "GET", ruta, tk);
   const POST = (ruta, tk, c) => pedir(servidor, "POST", ruta, tk, c);
 
-  console.log("── 1. Lo decide la MONEDA, no el idioma ──");
+  console.log("── 0. Apagado (como está hoy) ──");
+  const memedSrv = require(path.join(RAIZ, "services", "memed"));
+  delete process.env.MEMED_ACTIVO;
+  const apagado = await GET("/medico/memed/estado", tkBr);
+  verificar("sin MEMED_ACTIVO, una cuenta brasileña NO receta por Memed (vuelve la receta de Symphomed)",
+    apagado.estado === 200 && apagado.cuerpo?.corresponde === false);
+  verificar("  ...las rutas de Memed no existen (404)", (await GET(`/medico/pacientes/${pacBr._id}/memed/sesion`, tkBr)).estado === 404);
+  verificar("  ...y la CSP ya no deja pasar sus dominios", memedSrv.dominiosCsp().length === 0);
+  process.env.MEMED_ACTIVO = "si";
+  verificar("con MEMED_ACTIVO=si vuelve (sin tocar código)", (await GET("/medico/memed/estado", tkBr)).cuerpo?.corresponde === true
+    && memedSrv.dominiosCsp().length > 0);
+
+  console.log("\n── 1. Lo decide la MONEDA, no el idioma ──");
   // Un médico boliviano con la interfaz en portugués sigue recetando en
   // Bolivia. Una preferencia de pantalla no decide bajo qué ley se emite un
   // documento — es la misma regla que services/monedas.js.

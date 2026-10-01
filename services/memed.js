@@ -57,6 +57,20 @@ function configurado() {
   return Boolean(API_KEY && SECRET_KEY);
 }
 
+// ═══ APAGADO HASTA NUEVO AVISO ═════════════════════════════════════════════
+//
+// Se descartó Memed por el momento: un médico en Brasil no pudo bajar el PDF
+// de la receta, y se decidió volver a la receta de Symphomed (impresa,
+// firmada y sellada a mano) también en Brasil. El código queda, apagado:
+// prenderlo es poner MEMED_ACTIVO=si en el .env, sin tocar nada más.
+//
+// Apagado significa: nadie ve el botón de Memed, la receta de Symphomed
+// vuelve a estar para todos, las rutas de Memed contestan 404 y la CSP deja
+// de permitir sus dominios (una excepción que no se usa no debe quedar).
+function activo() {
+  return String(process.env.MEMED_ACTIVO || "").trim().toLowerCase() === "si";
+}
+
 // Los dominios que la CSP tiene que dejar pasar para que el módulo cargue.
 //
 // Sale de acá y no de una lista escrita a mano en index.js por una razón
@@ -65,6 +79,7 @@ function configurado() {
 // arreglarlo con una variable de entorno evita tener que desplegar a ciegas
 // para probar.
 function dominiosCsp() {
+  if (!activo()) return [];
   const extra = String(process.env.MEMED_DOMINIOS_EXTRA || "")
     .split(",").map(s => s.trim()).filter(Boolean);
   const base = [
@@ -190,6 +205,6 @@ function extraerReceta(datos) {
 }
 
 module.exports = {
-  configurado, dominiosCsp, scriptUrl, tokenDeMedico, consejoCompleto,
+  activo, configurado, dominiosCsp, scriptUrl, tokenDeMedico, consejoCompleto,
   extraerReceta, UF_BRASIL, SIGLAS_CONSEJO,
 };
