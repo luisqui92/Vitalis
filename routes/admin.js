@@ -40,8 +40,13 @@ const { registrar } = require("../services/auditoria");
 // esta lista: el clinicaId sale del token (ver requireAdmin), nunca del
 // cliente, así que un admin no puede pedir los números de otra clínica ni
 // cambiando el pedido a mano.
+//
+// Sin la cuenta administrativa (rol "admin"): no atiende, no tiene consultorio
+// ni pacientes. Con ella adentro, el panel contaba un consultorio de más
+// («5 consultorios» en una clínica de 4) y la mostraba en la tabla como si
+// fuera un médico. Un director (rol "director") sí atiende, y entra.
 async function medicosDeLaClinica(clinicaId) {
-  return Medico.find({ clinicaId, activo: true })
+  return Medico.find({ clinicaId, activo: true, rol: { $ne: "admin" } })
     .select("phone nombre especialidad tipoEspecialidad rol vinculo consultorio idioma createdAt")
     .sort({ nombre: 1 })
     .lean();

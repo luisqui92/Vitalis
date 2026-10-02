@@ -65,7 +65,7 @@ function engancharClinAccesos() {
 async function renderClinica() {
   detenerPolling();
   const serie = nuevaSeriePantalla();
-  app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("clin.cargando")}</div>`;
+  app.innerHTML = `<div class="clin-ancho"><div class="loading"><div class="spinner"></div>${t("clin.cargando")}</div></div>`;
   try {
     clinAgendaFecha = null;
     const [datos, resumen, ocupacion, finanzas, equipos, agenda] = await Promise.all([
@@ -95,8 +95,11 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
     proximosDias.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
   }
 
+  // clin-ancho: en una pantalla de escritorio el panel usa todo el ancho y
+  // se ordena en columnas (public/estilos.css). En el celular no cambia nada.
   app.innerHTML = `
-    <div class="card" style="border-color:var(--primary)">
+    <div class="clin-ancho">
+    <div class="card clin-cabecera" style="border-color:var(--primary)">
       <div class="seccion-titulo" style="margin-top:0">🏥 ${esc(datos.clinica.nombre)}</div>
       <div class="hint" style="margin:0">${t("clin.consultorios", { n: datos.medicos.length })}</div>
       ${clinAccesosHtml()}
@@ -109,7 +112,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
       ${escrStatCardHtml(datos.medicos.length, t("clin.stat.medicos"))}
     </div>
 
-    <div class="card">
+    <div class="card clin-agenda-card">
       <div class="seccion-titulo" style="margin-top:0">${t("clin.agenda")}</div>
       <div class="hint" style="margin:0 0 10px">${t("clin.agendaAyuda")}</div>
       <div class="clin-agenda-dias">
@@ -120,7 +123,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
       <div id="clinAgenda">${agendaClinicaHtml(agenda)}</div>
     </div>
 
-    <div class="card">
+    <div class="card clin-consultorios-card">
       <div class="seccion-titulo" style="margin-top:0">${t("clin.porConsultorio")}</div>
       <div class="hint" style="margin:0 0 10px">${t("clin.porConsultorioAyuda")}</div>
       <div class="clin-tabla-caja">
@@ -138,11 +141,11 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card clin-ocupacion-card">
       <div class="seccion-titulo" style="margin-top:0">${t("clin.ocupacion")}</div>
       <div class="hint" style="margin:0 0 10px">${t("clin.ocupacionAyuda")}</div>
       <div class="clin-tabla-caja">
-        <table class="clin-tabla">
+        <table class="clin-tabla clin-tabla-compacta">
           <thead><tr>
             <th>${t("clin.col.consultorio")}</th>
             ${proximosDias.map(d => {
@@ -170,7 +173,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
     ${finanzasClinicaHtml(finanzas)}
 
     ${equipos.equipos.length ? `
-      <div class="card">
+      <div class="card clin-equipos-card">
         <div class="seccion-titulo" style="margin-top:0">${t("clin.equipos")}</div>
         ${equipos.equipos.map(e => `
           <div class="item" style="cursor:default">
@@ -181,7 +184,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
           </div>`).join("")}
       </div>` : ""}
 
-    <div class="card">
+    <div class="card clin-sumar-card">
       <div class="seccion-titulo" style="margin-top:0">${t("clin.sumar")}</div>
       <div class="hint" style="margin:0 0 10px">${t("clin.sumarAyuda")}</div>
       <label>${t("clin.telefonoMedico")}</label>
@@ -196,6 +199,7 @@ function pintarClinica(datos, resumen, ocupacion, finanzas, equipos, agenda) {
       <input id="clinConsultorio" type="text" placeholder="${t("clin.consultorioPlaceholder")}">
       <div id="clinErr"></div>
       <button class="secondary" id="btnVincularMedico">${t("clin.vincular")}</button>
+    </div>
     </div>`;
 
   engancharFilasDeMedicos();
@@ -432,7 +436,7 @@ async function clinMoverDia(delta) {
 function finanzasClinicaHtml(finanzas) {
   if (finanzas.porMedico.length === 0 && !finanzas.inquilinosExcluidos) return "";
   return `
-    <div class="card">
+    <div class="card clin-finanzas-card">
       <div class="seccion-titulo" style="margin-top:0">${t("clin.finanzas")}</div>
       ${finanzas.inquilinosExcluidos ? `
         <div class="hint" style="margin:0 0 10px">${t("clin.finanzasInquilinos", { n: finanzas.inquilinosExcluidos })}</div>` : ""}

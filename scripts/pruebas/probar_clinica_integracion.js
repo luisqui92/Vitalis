@@ -221,7 +221,12 @@ async function main() {
   const resumen = await GET("/admin/resumen", tk.carla);
   verificar("el administrativo entra al resumen", resumen.estado === 200);
   const porPhone = Object.fromEntries((resumen.cuerpo?.medicos || []).map(m => [m.phone, m]));
-  verificar("están los 4 médicos de la clínica A", (resumen.cuerpo?.medicos || []).length === 4);
+  // El administrativo (rol "admin") NO es médico (db/models.js): no atiende, no
+  // tiene consultorio ni pacientes. Antes la lista lo incluía y el panel
+  // contaba un consultorio de más. El director (Diego) sí atiende, y entra.
+  verificar("están los 3 médicos de la clínica A (Ana, Beto y el director Diego)",
+    (resumen.cuerpo?.medicos || []).length === 3 && Boolean(porPhone[ana.phone] && porPhone[beto.phone] && porPhone[diego.phone]));
+  verificar("la administrativa (Carla) no figura como médica de su propia clínica", !porPhone[carla.phone]);
   verificar("no está la médica de la otra clínica", !porPhone[elena.phone]);
   verificar("las consultas del mes de Ana son 3 (la del año pasado no cuenta)", porPhone[ana.phone]?.consultasMes === 3);
   verificar("las de Beto son 2", porPhone[beto.phone]?.consultasMes === 2);
@@ -233,7 +238,9 @@ async function main() {
   console.log("\n── 2. Una clínica no ve a la otra ──");
   const resumenB = await GET("/admin/resumen", tk.elena);
   const phonesB = (resumenB.cuerpo?.medicos || []).map(m => m.phone);
-  verificar("la clínica B solo ve a los suyos", phonesB.length === 1 && phonesB[0] === elena.phone);
+  const phonesDeLaA = [ana, beto, carla, diego].map(m => m.phone);
+  verificar("la clínica B no ve a nadie de la A (y su administradora no cuenta como médica)",
+    !phonesB.some(p => phonesDeLaA.includes(p)) && phonesB.length === 0);
   verificar("y sus totales no arrastran nada de la A", resumenB.cuerpo?.totales?.consultasMes === 0);
 
   // ── 3. La plata del que alquila no es de la clínica ────────────────────

@@ -31,7 +31,17 @@ let escrActivo = "inicio";
 // otros lados: envolverParaEscritorio() se llama al final de este archivo y
 // se queda con el label en un closure, así que un texto puesto acá quedaría
 // congelado en el idioma que hubiera ANTES del login, para toda la sesión.
-const ESCR_NAV_ITEMS = [
+// ═══ EL MENÚ SE ARMA CADA VEZ QUE SE DIBUJA ════════════════════════════════
+//
+// Antes esta lista se armaba UNA vez, al cargar la página, mirando el rol y la
+// especialidad que había guardados de la sesión anterior. Quien inicia sesión
+// sin recargar —que es lo normal— quedaba con el menú del que NO era: un
+// director no veía «Clínica», un veterinario no veía «Ganadería» y el operador
+// no veía «Pagos», hasta que recargaba la página.
+//
+// Ahora los fijos están acá y los que dependen de quién entró se deciden en
+// escrNavItems(), cada vez que se pinta el menú.
+const ESCR_NAV_FIJOS = [
   { id: "inicio", claveLabel: "escr.nav.inicio", icono: ICONOS.tendencia, fn: "renderInicioEscritorio" },
   { id: "pacientes", claveLabel: "escr.nav.pacientes", icono: ICONOS.persona, fn: "renderDashboard" },
   { id: "agenda", claveLabel: "escr.nav.agenda", icono: ICONOS.calendario, fn: "renderAgenda" },
@@ -43,24 +53,27 @@ const ESCR_NAV_ITEMS = [
   { id: "configuracion", claveLabel: "escr.nav.configuracion", icono: ICONOS.escudo, fn: "renderSeguridad" },
 ];
 
-// El panel de clínica solo aparece para quien administra una. Se agrega
-// primero para que sea lo primero que ve un director al abrir el menú.
-if (typeof esAdministrador === "function" && esAdministrador()) {
-  ESCR_NAV_ITEMS.unshift({ id: "clinica", claveLabel: "clin.nav.clinica", icono: ICONOS.escudo, fn: "renderClinica" });
-}
+// El panel de clínica solo aparece para quien administra una. Va primero para
+// que sea lo primero que ve un director al abrir el menú.
+const ESCR_NAV_CLINICA = { id: "clinica", claveLabel: "clin.nav.clinica", icono: ICONOS.escudo, fn: "renderClinica" };
 // Los pagos también, para quien acredita. Va aparte del bloque de clínica
 // porque son permisos distintos: administrar siete consultorios no da
 // ninguna facultad sobre la plata, y al revés tampoco.
-if (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR) {
-  ESCR_NAV_ITEMS.unshift({ id: "pagos", claveLabel: "op.nav.pagos", icono: ICONOS.tendencia, fn: "renderPagos" });
-}
+const ESCR_NAV_PAGOS = { id: "pagos", claveLabel: "op.nav.pagos", icono: ICONOS.tendencia, fn: "renderPagos" };
 // Symphomed Ganadería: solo para quien atiende veterinaria — un consultorio
 // de medicina general no tiene lotes que manejar, y agregarle el ítem igual
 // solo ensuciaría un menú que ya no le sirve.
-if (typeof MEDICO_TIPO_ESPECIALIDAD !== "undefined" && MEDICO_TIPO_ESPECIALIDAD === "veterinaria") {
-  const idx = ESCR_NAV_ITEMS.findIndex(i => i.id === "configuracion");
-  ESCR_NAV_ITEMS.splice(idx === -1 ? ESCR_NAV_ITEMS.length : idx, 0,
-    { id: "ganaderia", claveLabel: "escr.nav.ganaderia", icono: ICONOS.pata, fn: "renderGanaderia" });
+const ESCR_NAV_GANADERIA = { id: "ganaderia", claveLabel: "escr.nav.ganaderia", icono: ICONOS.pata, fn: "renderGanaderia" };
+
+function escrNavItems() {
+  const items = ESCR_NAV_FIJOS.slice();
+  if (typeof MEDICO_TIPO_ESPECIALIDAD !== "undefined" && MEDICO_TIPO_ESPECIALIDAD === "veterinaria") {
+    const idx = items.findIndex(i => i.id === "configuracion");
+    items.splice(idx === -1 ? items.length : idx, 0, ESCR_NAV_GANADERIA);
+  }
+  if (typeof esAdministrador === "function" && esAdministrador()) items.unshift(ESCR_NAV_CLINICA);
+  if (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR) items.unshift(ESCR_NAV_PAGOS);
+  return items;
 }
 
 function escritorioShellActivo() {
@@ -111,13 +124,13 @@ function desactivarEscritorio() {
 
 function pintarNavEscritorio() {
   const nav = document.getElementById("escrNav");
-  nav.innerHTML = ESCR_NAV_ITEMS.map(it => `
+  nav.innerHTML = escrNavItems().map(it => `
     <button class="escr-nav-item${it.id === escrActivo ? " activo" : ""}" data-id="${it.id}">
       <span class="escr-nav-icono">${it.icono}</span>${esc(t(it.claveLabel))}
     </button>`).join("");
   nav.querySelectorAll(".escr-nav-item").forEach(btn => {
     btn.onclick = () => {
-      const item = ESCR_NAV_ITEMS.find(i => i.id === btn.dataset.id);
+      const item = escrNavItems().find(i => i.id === btn.dataset.id);
       window[item.fn]();
     };
   });
@@ -149,7 +162,7 @@ function alCambiarElAncho() {
 
   // Se repinta la pantalla actual. Si por algo no se puede, se cae al panel
   // de siempre, que es preferible a quedarse con el layout roto.
-  const item = ESCR_NAV_ITEMS.find(i => i.id === escrActivo);
+  const item = escrNavItems().find(i => i.id === escrActivo);
   const volverA = item && typeof window[item.fn] === "function" ? window[item.fn] : window.renderDashboard;
   try { volverA(); } catch { /* si falla, queda lo que había */ }
 }
@@ -311,4 +324,8 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
   });
 }
 
-ESCR_NAV_ITEMS.forEach(it => envolverParaEscritorio(it.fn, it.id, it.claveLabel));
+// Se envuelven TODAS las pantallas posibles, no las del rol de antes del login:
+// el menú de quien entre se decide recién cuando entra.
+[...ESCR_NAV_FIJOS, ESCR_NAV_CLINICA, ESCR_NAV_PAGOS, ESCR_NAV_GANADERIA]
+  .filter(it => typeof window[it.fn] === "function")
+  .forEach(it => envolverParaEscritorio(it.fn, it.id, it.claveLabel));

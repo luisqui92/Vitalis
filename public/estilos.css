@@ -860,7 +860,10 @@ button.escr-lista-item:focus-visible{outline:2px solid var(--primary);outline-of
   width: auto; margin: 0; padding: 7px 12px; font-size: 12px; white-space: nowrap;
 }
 .clin-agenda-fecha { text-align: center; font-size: 13px; line-height: 1.3; }
-.clin-agenda-fecha > div:first-child { text-transform: capitalize; }
+/* Solo la primera letra en mayúscula: «Viernes, 2 de octubre». Con
+   capitalize salía «2 De Octubre» (y «2 De Outubro» en portugués). */
+.clin-agenda-fecha > div:first-child { display: block; }
+.clin-agenda-fecha > div:first-child::first-letter { text-transform: uppercase; }
 /* Ya pasó: se atenúa para que la próxima cita sea la primera fila que el
    ojo encuentra, sin tener que buscar la hora actual. */
 .clin-fila-atendida { opacity: .55; }
@@ -1135,3 +1138,48 @@ button.med-aviso:hover{background:color-mix(in srgb, var(--warning) 22%, transpa
 .kardex-cabecera{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
 .kardex-cabecera .nombre{min-width:0;overflow-wrap:anywhere;}
 button.kardex-pdf{width:auto;margin:0;padding:8px 14px;font-size:13px;white-space:nowrap;}
+
+/* La última columna de «Actividad por consultorio» es el enlace «Editar»: sin
+   aire a la izquierda quedaba pegado al número de «Hoy» («3Editar»). */
+.clin-consultorios-card .clin-tabla th:last-child,
+.clin-consultorios-card .clin-tabla td:last-child { padding-left: 14px; white-space: nowrap; }
+
+/* ─── El panel de la clínica en una pantalla de escritorio ───────────────
+   El administrador no tiene menú lateral (su pantalla es esta), así que en una
+   laptop heredaba la columna de 480 px del celular: costados vacíos y tablas
+   cortadas («Juan Pérez Q»). Acá el panel usa el ancho y se ordena en columnas.
+
+   Solo con :has() y solo desde 1024 px. Sin :has() (un navegador viejo) nada de
+   esto aplica y queda la columna de siempre: ensancharlo sin la grilla lo
+   dejaría peor. En el celular no cambia nada. El orden en el HTML tampoco
+   cambia: las tarjetas se ubican con la grilla, así que el teclado y el celular
+   siguen el orden de siempre. */
+@supports selector(:has(*)) {
+  @media (min-width: 1024px) {
+    .wrap:has(> .clin-ancho) { max-width: 1180px; }
+    .clin-ancho {
+      display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px; align-items: start;
+    }
+    .clin-ancho > * { grid-column: 1 / -1; margin: 0; min-width: 0; }
+    .clin-ancho > .clin-cabecera { grid-column: 1 / span 4; grid-row: 1; align-self: stretch; }
+    .clin-ancho > .escr-stats {
+      grid-column: 5 / -1; grid-row: 1; align-self: stretch;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .clin-ancho > .escr-stats .escr-stat { display: flex; flex-direction: column; justify-content: center; }
+    /* La agenda a la izquierda, ocupando dos filas; a la derecha, la ocupación y
+       el formulario para sumar un médico. Lo demás sigue en orden, a todo el ancho. */
+    .clin-ancho > .clin-agenda-card { grid-column: 1 / span 7; grid-row: 2 / span 2; }
+    .clin-ancho > .clin-ocupacion-card { grid-column: 8 / -1; grid-row: 2; }
+    .clin-ancho > .clin-sumar-card { grid-column: 8 / -1; grid-row: 3; }
+    /* Una agenda larga (30 turnos) no estira la página: se desplaza adentro, con
+       el encabezado de la tabla fijo. */
+    .clin-agenda-card .clin-tabla-caja { max-height: 440px; overflow-y: auto; }
+    .clin-agenda-card .clin-tabla th { position: sticky; top: 0; background: var(--card); z-index: 1; }
+    /* Facturación tiene TRES cifras: en cuatro columnas quedaba un hueco a la derecha. */
+    .clin-finanzas-card .escr-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    /* Los siete días de la ocupación caben sin desplazar. */
+    .clin-tabla-compacta { min-width: 0; }
+  }
+}
