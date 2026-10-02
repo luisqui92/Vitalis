@@ -39,12 +39,12 @@
 //
 // Es idempotente: no duplica la clínica ni los pacientes, y no le pisa la
 // contraseña a ninguna cuenta que ya exista.
-const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const { Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Cita } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 // ─── LOS CUATRO CONSULTORIOS ──────────────────────────────────────────────
 const CONSULTORIOS = [
   {
@@ -114,7 +114,7 @@ async function main() {
   const phoneAdmin = String(process.argv[2] || "79000000").trim();
   const nombreClinica = String(process.argv[3] || "Clínica Symphomed Demo").trim();
   const passwordDada = String(process.argv[4] || "").trim();
-  const password = passwordDada || crypto.randomBytes(9).toString("base64url");
+  const password = passwordDada || CLAVE_DEMO;
 
   if (!/^[0-9]{6,15}$/.test(phoneAdmin)) {
     console.error(`❌ "${phoneAdmin}" no parece un teléfono.`);
@@ -243,7 +243,7 @@ async function main() {
     console.log(`   ${c.consultorio.padEnd(14)}     +7900000${c.sufijo}  ${c.nombre} (${c.vinculo})`);
   }
   if (contrasenaNueva) {
-    console.log(`\n   Contraseña${passwordDada ? "" : " generada"} para las cuentas NUEVAS: ${password}`);
+    console.log(`\n   Contraseña${passwordDada ? "" : " de prueba"} para las cuentas NUEVAS: ${password}`);
     console.log("   Se muestra una sola vez. Anotala ahora.");
     console.log("   Son cuentas reales en un servidor real: si esto no es una demo, poneles otra.");
   }

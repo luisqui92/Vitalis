@@ -8,12 +8,12 @@
 //
 // Es idempotente: si el médico ya existe no le toca la contraseña; si un
 // paciente ya tiene un examen ocular con algún hallazgo cargado, lo saltea.
-const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Medicamento, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 function hace(dias) {
   const d = new Date();
   d.setDate(d.getDate() - dias);
@@ -121,7 +121,7 @@ async function main() {
   const phone = String(process.argv[2] || "").trim();
   const nombre = String(process.argv[3] || "Dr. Ricardo Peñaranda").trim();
   const passwordGenerada = !process.argv[4];
-  const password = String(process.argv[4] || crypto.randomBytes(9).toString("base64url")).trim();
+  const password = String(process.argv[4] || CLAVE_DEMO).trim();
   if (!phone) {
     console.error('Uso: node scripts/seed_oftalmologia_demo.js <telefono> ["Nombre"] [password]');
     process.exit(1);
@@ -136,7 +136,7 @@ async function main() {
       phone, nombre, especialidad: "Oftalmología", tipoEspecialidad: "oftalmologia",
       passwordHash: await hashPassword(password), activo: true,
     });
-    console.log(`✅ Cuenta creada: ${nombre} (+${phone}) — contraseña${passwordGenerada ? " generada" : ""}: ${password}`);
+    console.log(`✅ Cuenta creada: ${nombre} (+${phone}) — contraseña${passwordGenerada ? " de prueba" : ""}: ${password}`);
   } else {
     console.log(`ℹ️  La cuenta +${phone} ya existía (${medico.nombre}). Contraseña sin cambios.`);
   }

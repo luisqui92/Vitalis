@@ -25,13 +25,13 @@
 //
 // Es idempotente: no duplica pacientes ni le pisa la contraseña a una cuenta
 // que ya exista.
-const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CONFIG } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Cita, ConfigPago } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 const saldos = require("../services/saldo");
 
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 // Leídos del QR de public/pago-qr-br.jpg (payload EMV do Pix). Se dejan acá
 // como texto para no depender de una librería de QR en el servidor.
 const PIX = {
@@ -78,7 +78,7 @@ async function main() {
   const phone = String(process.argv[2] || "11987650001").trim();
   const nombre = String(process.argv[3] || "Dra. Fernanda Machado").trim();
   const passwordDada = String(process.argv[4] || "").trim();
-  const password = passwordDada || crypto.randomBytes(9).toString("base64url");
+  const password = passwordDada || CLAVE_DEMO;
 
   if (!/^[0-9]{6,15}$/.test(phone)) {
     console.error(`❌ "${phone}" no parece un teléfono.`);
@@ -186,7 +186,7 @@ async function main() {
   console.log(`\n🇧🇷 ${nombre}`);
   console.log(`   Usuário: +${phone}`);
   if (contrasenaNueva) {
-    console.log(`   Senha${passwordDada ? "" : " gerada"}: ${password}`);
+    console.log(`   Senha${passwordDada ? "" : " de teste"}: ${password}`);
     console.log("   Mostra-se uma única vez. Anote agora.");
   }
   console.log("\nQué mirar al entrar con esta cuenta:");

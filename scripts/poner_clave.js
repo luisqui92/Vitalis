@@ -7,8 +7,12 @@
 // ponerlas de nuevo.
 //
 // Uso:
-//   node scripts/poner_clave.js --clave "Symphomed1234" --demos
-//   node scripts/poner_clave.js --clave "Symphomed1234" 79000000 78811007 ...
+//   node scripts/poner_clave.js --demos                    (con la clave de las demos)
+//   node scripts/poner_clave.js 79000000 78811007 ...      (esas cuentas)
+//   node scripts/poner_clave.js --demos --clave "OtraClave"
+//
+// Sin --clave se usa la de todas las cuentas de prueba (scripts/lib/claveDemo.js),
+// la misma con la que nacen las cuentas de los seeds.
 //
 // --demos son las cuentas que crean los seeds de demostración (la clínica
 // demo: 79000000 a 79000004; el centro de neurodesarrollo: 123 y 123-01 a -03;
@@ -34,6 +38,7 @@ try { require("dotenv").config({ path: path.join(__dirname, "..", ".env") }); } 
 const mongoose = require("mongoose");
 const { Medico, Paciente, AuditLog } = require("../db/models");
 const { hashPassword } = require("../services/auth");
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 
 const DEMOS = [
   "79000000", "79000001", "79000002", "79000003", "79000004",
@@ -63,15 +68,20 @@ async function conectar() {
 async function main() {
   const argv = process.argv.slice(2);
   const iClave = argv.indexOf("--clave");
-  const clave = iClave > -1 ? String(argv[iClave + 1] || "").trim() : "";
+  // --clave sin valor es un error (no se cae en la de las demos sin avisar).
+  const clave = iClave > -1 ? String(argv[iClave + 1] || "").trim() : CLAVE_DEMO;
   const forzar = argv.includes("--forzar");
   // Los teléfonos son lo que queda sin las opciones ni el valor de --clave.
-  const resto = argv.filter((a, i) => !a.startsWith("--") && i !== iClave + 1);
+  // Sin --clave, iClave es -1 y «i !== iClave + 1» sería «i !== 0»: se comería
+  // el primer teléfono. Por eso el valor a saltear se calcula aparte.
+  const posValorClave = iClave > -1 ? iClave + 1 : -1;
+  const resto = argv.filter((a, i) => !a.startsWith("--") && i !== posValorClave);
   const telefonos = [...new Set([...(argv.includes("--demos") ? DEMOS : []), ...resto])];
 
   if (!clave || !telefonos.length) {
-    console.error('\n  Uso: node scripts/poner_clave.js --clave "LaClave" --demos');
-    console.error('       node scripts/poner_clave.js --clave "LaClave" <telefono> [<telefono>...]\n');
+    console.error("\n  Uso: node scripts/poner_clave.js --demos");
+    console.error("       node scripts/poner_clave.js <telefono> [<telefono>...]");
+    console.error('       (con otra clave: agregá --clave "LaClave")\n');
     process.exit(1);
   }
   if (clave.length < 8) console.log(ROJO("\n  ⚠️  La clave tiene menos de 8 caracteres: es muy fácil de adivinar."));
@@ -91,7 +101,7 @@ async function main() {
   }
 
   if (!cuentas.length) { console.log("\n  Ninguna cuenta para cambiar.\n"); return; }
-  console.log(`\n  Se le va a poner la clave nueva a ${cuentas.length} cuenta(s).`);
+  console.log(`\n  Se le va a poner la clave «${clave}» a ${cuentas.length} cuenta(s).`);
   if (await preguntar("  Escribí SI para confirmar: ") !== "SI") { console.log("  Cancelado. No se tocó nada.\n"); return; }
 
   const hash = await hashPassword(clave);

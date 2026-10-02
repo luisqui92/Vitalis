@@ -26,6 +26,7 @@ const { Medico, Paciente, Estudio } = require("../db/models");
 const { hashPassword } = require("../services/auth");
 const { siguienteCodigo } = require("../services/codigos");
 
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 const DIR_ESTUDIOS = path.join(__dirname, "..", "uploads", "estudios");
 const DIR_FOTOS = path.join(__dirname, "demo_fotos_simulador");
 const NOMBRE_PACIENTE = "Paciente Demo — Simulador";
@@ -50,7 +51,7 @@ async function main() {
   const phone = String(process.argv[2] || "").trim();
   const nombre = String(process.argv[3] || "Dr. Marcelo Vaca").trim();
   const passwordGenerada = !process.argv[4];
-  const password = String(process.argv[4] || crypto.randomBytes(9).toString("base64url")).trim();
+  const password = String(process.argv[4] || CLAVE_DEMO).trim();
   if (!phone) {
     console.error('Uso: node scripts/seed_simulador_demo.js <telefono> ["Nombre"] [password]');
     process.exit(1);
@@ -75,7 +76,7 @@ async function main() {
       passwordHash: await hashPassword(password), activo: true,
     });
     console.log(`✅ Cuenta creada: ${nombre} (+${phone})`);
-    console.log(`   Contraseña${passwordGenerada ? " generada" : ""}: ${password}\n`);
+    console.log(`   Contraseña${passwordGenerada ? " de prueba" : ""}: ${password}\n`);
   } else if (medico.tipoEspecialidad !== "estetica") {
     // Cambiarle la especialidad a una cuenta que ya está en uso le daría
     // vuelta la interfaz entera al médico que la usa todos los días. Mejor

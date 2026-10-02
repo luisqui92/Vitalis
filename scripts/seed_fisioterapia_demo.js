@@ -42,6 +42,7 @@ const {
 const { hashPassword } = require("../services/auth");
 const { siguienteCodigo } = require("../services/codigos");
 
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 const DIA = 24 * 60 * 60 * 1000;
 const haceDias = (d) => new Date(Date.now() - d * DIA);
 const enDias = (d) => new Date(Date.now() + d * DIA);
@@ -615,7 +616,7 @@ async function cargarPaciente(p, telefono, nombreProfesional, clinicaId) {
   }
 
   const nombre = process.argv[3] && !process.argv[3].startsWith("--") ? process.argv[3] : "Lic. Fernanda Zeballos";
-  const password = process.argv[4] || "Symphomed123";
+  const password = process.argv[4] || CLAVE_DEMO;
 
   let medico = await Medico.findOne({ phone });
   if (medico) {

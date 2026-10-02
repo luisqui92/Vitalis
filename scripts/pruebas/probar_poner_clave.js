@@ -94,11 +94,16 @@ function correr(uri, args, entrada) {
     await entra("79000000", NUEVA) && await entra("123", NUEVA) && await entra("78811007", NUEVA));
   verificar("dice cuáles no existen (no inventa cuentas)", /123-01\s+no existe/.test(r.salida) && !(await M.Medico.findOne({ phone: "123-01" })));
 
-  console.log("\n── 5. Mal usado ──");
-  r = await correr(uri, ["--demos"], null);
-  verificar("sin --clave: explica el uso y sale con error", r.codigo === 1 && /Uso:/.test(r.salida));
+  console.log("\n── 5. La clave por defecto es la de todas las cuentas de prueba ──");
+  await M.Medico.updateOne({ phone: "79000001" }, { $set: { passwordHash: vieja } });
+  r = await correr(uri, ["79000001"], "SI");
+  verificar("sin --clave se usa Symphomed1234 (la misma que en los seeds)", /«Symphomed1234»/.test(r.salida) && await entra("79000001", "Symphomed1234"));
+
+  console.log("\n── 6. Mal usado ──");
+  r = await correr(uri, ["--clave"], null);
+  verificar("--clave sin valor: no cae en silencio en otra clave", r.codigo === 1 && /Uso:/.test(r.salida));
   r = await correr(uri, ["--clave", NUEVA], null);
-  verificar("sin teléfonos: igual", r.codigo === 1 && /Uso:/.test(r.salida));
+  verificar("sin teléfonos: explica el uso y sale con error", r.codigo === 1 && /Uso:/.test(r.salida));
 
   await mongoose.disconnect();
   await mongod.stop();

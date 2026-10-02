@@ -36,6 +36,7 @@ const { PLANTILLAS_VIGILANCIA } = require("../services/vigilancia");
 const { siguienteCodigo } = require("../services/codigos");
 const { armarBorrador } = require("../services/informeFamilia");
 
+const { CLAVE_DEMO } = require("./lib/claveDemo");
 // ─── FECHAS ───────────────────────────────────────────────────────────────
 const DIA = 24 * 60 * 60 * 1000;
 const haceDias = (d) => new Date(Date.now() - d * DIA);
@@ -859,7 +860,7 @@ function avisarSiEsDebil(phone, password) {
     process.exit(1);
   }
   const nombre = process.argv[3] || "Lic. Fernanda Suárez";
-  const password = process.argv[4] || "demo12345";
+  const password = process.argv[4] || CLAVE_DEMO;
 
   await mongoose.connect(CONFIG.MONGODB_URI);
   console.log("\n  Symphomed Neurodesarrollo — demo de psicología infantil\n");
