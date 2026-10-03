@@ -182,6 +182,25 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
       verificar("un médico común no ve ninguno de los tres", !ids.some((i) => ["clinica", "ganaderia", "pagos"].includes(i)));
       await ctx.close();
     }
+
+    console.log("\n── 4. La pantalla de inicio en el celular: las tarjetas llegan hasta el mismo borde ──");
+    // El saludo de arriba es un <button class="card">, y un botón se achica al
+    // contenido: quedaba en 264 px cuando todo lo demás medía 358.
+    await M.Paciente.create({ medicoPhone: "70031002", nombre: "Ana Paola Vargas" });
+    await M.Paciente.create({ medicoPhone: "70031002", nombre: "Carlos Mamani Choque" });
+    for (const ancho of [360, 390]) {
+      const { page, ctx, errores } = await entrar("70031002", ancho, 800);
+      await page.waitForSelector("#avatarHomeBox", { timeout: 25000 });
+      await page.waitForSelector(".item-paciente", { timeout: 25000 });
+      const m = await page.evaluate(() => {
+        const w = (s) => Math.round(document.querySelector(s).getBoundingClientRect().width);
+        return { saludo: w("#avatarHomeBox"), paciente: w(".item-paciente"), buscador: w("input[placeholder*='uscar']") };
+      });
+      verificar(`${ancho} px: el saludo mide lo mismo que las tarjetas de pacientes y el buscador (${m.saludo} / ${m.paciente} / ${m.buscador})`,
+        Math.abs(m.saludo - m.paciente) <= 1 && Math.abs(m.saludo - m.buscador) <= 1);
+      verificar(`${ancho} px: sin errores de JavaScript`, !errores.length);
+      await ctx.close();
+    }
   } finally {
     if (browser) await browser.close().catch(() => {});
     if (servidor) servidor.kill();

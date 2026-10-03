@@ -128,6 +128,11 @@ button.link{background:none;border:none;color:var(--primary);font-size:13px;font
    el teclado. Un <button> trae su propia tipografía, color y centrado del
    navegador, así que hay que devolverle los del resto de la app — si no, la
    lista cambia de aspecto solo por haberla hecho accesible. */
+/* Una tarjeta que es un <button> (el saludo de la pantalla de inicio, el aviso
+   del operador) se achicaba al ancho de su contenido en vez de ocupar la fila
+   como una tarjeta común: quedaba más corta que todo lo demás. Una regla
+   general en vez de un width:100% puesto a mano en cada una. */
+button.card{width:100%;}
 button.item{width:100%;text-align:left;font-family:inherit;font-size:inherit;color:inherit;display:block;}
 button.item-paciente{display:flex;}
 button.item .nombre,button.item .paciente-info,button.item .preview{display:block;}
