@@ -419,7 +419,7 @@ for (const idioma of ["es", "pt"]) {
     vm.runInContext(`MEDICO_IDIOMA = ${JSON.stringify(idioma)}; MEDICO_ROL = ${JSON.stringify(rol)}; ES_OPERADOR = false;`, sandbox);
     const html = vm.runInContext(`tabsPacientesHtml(3)`, sandbox);
     const botones = (html.match(/<button class="tab"/g) || []).length;
-    const columnas = Number((html.match(/repeat\((\d+),1fr\)/) || [])[1]);
+    const columnas = Number((html.match(/--n:(\d+)/) || [])[1]);   // --n alimenta el CSS de .tabs-inicio
     verificar(`[${idioma}/${rol}] ${esperadas} pestañas`, botones === esperadas);
     verificar(`[${idioma}/${rol}]   ...y la grilla tiene ${esperadas} columnas, no otro número`, columnas === botones);
   }
@@ -442,7 +442,7 @@ const tabsOperador = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
 verificar("el operador tiene pestaña de Cuentas y pagos", tabsOperador.includes('id="btnPagos"'));
 verificar("  ...y son 6 pestañas con la grilla acorde",
   (tabsOperador.match(/<button class="tab"/g) || []).length === 6
-  && /repeat\(6,1fr\)/.test(tabsOperador));
+  && /--n:6/.test(tabsOperador));
 vm.runInContext(`OPERADOR_ESTADO = { operador: true, pendientes: 3, cuentasPendientes: 2 };`, sandbox);
 const tabsOperadorConPendientes = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
 verificar("el globo suma pagos y solicitudes de cuenta", tabsOperadorConPendientes.includes('<b class="tab-globo">5</b>'));
@@ -456,7 +456,7 @@ vm.runInContext(`ES_OPERADOR = true;`, sandbox);
 const tabsAmbos = vm.runInContext(`tabsPacientesHtml(0)`, sandbox);
 verificar("quien es las dos cosas tiene las dos pestañas, y la grilla da 7",
   tabsAmbos.includes('id="btnPagos"') && tabsAmbos.includes('id="btnClinica"')
-  && /repeat\(7,1fr\)/.test(tabsAmbos));
+  && /--n:7/.test(tabsAmbos));
 vm.runInContext(`ES_OPERADOR = false; MEDICO_ROL = "medico";`, sandbox);
 
 // Dos pestañas con el mismo ícono no distinguen nada: pasó con Clínica y

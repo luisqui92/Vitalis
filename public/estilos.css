@@ -1188,3 +1188,25 @@ button.kardex-pdf{width:auto;margin:0;padding:8px 14px;font-size:13px;white-spac
     .clin-tabla-compacta { min-width: 0; }
   }
 }
+
+/* ─── La barra de acciones de la pantalla de inicio ──────────────────────
+   Una columna por botón: 5 para un médico y hasta 8 para un director, un
+   veterinario o un operador. «Recordatorios» y «Configuración» miden ~72 px y
+   cada columna ~75: 3 px de aire, y en un celular de 360 px la barra entera
+   cabía justo, con los textos pegados entre sí y al borde.
+
+   Mientras la app esté en su columna de 480 px (todo lo que no sea el panel de
+   escritorio, de 1024 px en adelante: la barra mide 448 px aunque la pantalla
+   sea más ancha, y a 600 o 700 px seguían siendo 2 px de aire) pasa a 3 por fila: columnas de ~100 px, un
+   texto un poco más grande y la última fila repartida para que no quede un
+   hueco. En el panel de escritorio, una sola fila como siempre. */
+.tabs-inicio { grid-template-columns: repeat(var(--n, 5), 1fr); }
+@media (max-width: 1023px) {
+  .tabs-inicio { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .tabs-inicio .tab { grid-column: span 2; padding: 10px 4px; font-size: 11.5px; }
+  /* Si la última fila queda incompleta, sus botones se reparten el ancho:
+     uno solo ocupa la fila; dos, la mitad cada uno. */
+  .tabs-inicio .tab:last-child:nth-child(3n+1) { grid-column: span 6; }
+  .tabs-inicio .tab:nth-last-child(2):nth-child(3n+1) { grid-column: span 3; }
+  .tabs-inicio .tab:last-child:nth-child(3n+2) { grid-column: span 3; }
+}

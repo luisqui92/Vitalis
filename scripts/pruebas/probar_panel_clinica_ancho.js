@@ -83,6 +83,13 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
     browser = await pw.chromium.launch({ executablePath: navegador() });
 
     // Entra por el login de verdad, sin recargar, y devuelve la página.
+    //
+    // UNA vez por cuenta: el login tiene un límite de 8 intentos cada 10 minutos
+    // por IP (services/ratelimit.js, contra la fuerza bruta) y esta prueba
+    // entra desde la misma IP. Para ver otro tamaño de pantalla se cambia el
+    // tamaño y se recarga la página, que es lo que haría una persona (y la
+    // sesión se restaura sola).
+    const sesiones = [];
     async function entrar(phone, ancho, alto) {
       const ctx = await browser.newContext({ viewport: { width: ancho, height: alto } });
       const page = await ctx.newPage();
@@ -92,7 +99,15 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
       await page.fill("#lPhone", phone);
       await page.fill("#lPass", CLAVE);
       await page.click("#lBtn");
-      return { page, ctx, errores };
+      const sesion = { page, ctx, errores };
+      sesiones.push(sesion);
+      return sesion;
+    }
+    async function enTamano(sesion, ancho, alto) {
+      await sesion.page.setViewportSize({ width: ancho, height: alto });
+      // /app/inicio (de la sesión en el escritorio) en un celular abre el inicio
+      // del escritorio: la pantalla de pacientes se pide por su dirección.
+      await sesion.page.goto(`http://127.0.0.1:${PUERTO}/app/pacientes`);
     }
     const cajas = (page) => page.evaluate(() => {
       const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top + scrollY), w: Math.round(b.width), r: Math.round(b.right) }; };
@@ -110,8 +125,10 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
     });
 
     console.log("── 1. El administrador en una laptop ──");
+    const admin = await entrar("79000000", 1600, 804);
     for (const [ancho, alto] of [[1600, 804], [1366, 768]]) {
-      const { page, ctx, errores } = await entrar("79000000", ancho, alto);
+      const { page, errores } = admin;
+      if (ancho !== 1600) await enTamano(admin, ancho, alto);
       await page.waitForSelector(".clin-agenda-card", { timeout: 25000 });
       await page.waitForTimeout(800);
       const c = await cajas(page);
@@ -131,12 +148,12 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
           api.clinica.medicos.length === 4 && api.resumen.medicos.length === 4 && api.ocupacion.salas.length === 4
           && ![...api.clinica.medicos, ...api.resumen.medicos].some((m) => m.rol === "admin" || /^Administración/.test(m.nombre)));
       }
-      await ctx.close();
     }
 
     console.log("\n── 2. En el celular no cambia nada ──");
     {
-      const { page, ctx, errores } = await entrar("79000000", 390, 844);
+      await enTamano(admin, 390, 844);
+      const { page, errores } = admin;
       await page.waitForSelector(".clin-agenda-card", { timeout: 25000 });
       await page.waitForTimeout(800);
       const c = await cajas(page);
@@ -144,12 +161,12 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
       verificar("las tarjetas van una debajo de otra, en el mismo orden de siempre", c.agenda.x === c.ocupacion.x && c.agenda.y < c.consultorios.y && c.consultorios.y < c.ocupacion.y);
       verificar("la página no se desplaza de costado", !c.scrollPagina);
       verificar("sin errores de JavaScript", !errores.length);
-      await ctx.close();
     }
 
     console.log("\n── 3. El menú de escritorio, al iniciar sesión sin recargar ──");
+    const director = await entrar("79000001", 1440, 800);
     {
-      const { page, ctx, errores } = await entrar("79000001", 1440, 800);
+      const { page, errores } = director;
       await page.waitForSelector(".escr-nav-item", { timeout: 25000 });
       const ids = await page.evaluate(() => [...document.querySelectorAll(".escr-nav-item")].map((b) => b.dataset.id));
       verificar(`un director ve «Clínica» primero en el menú (${ids.slice(0, 3).join(", ")}…)`, ids[0] === "clinica" && ids.includes("pacientes"));
@@ -162,34 +179,33 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
         verificar("…y su panel adentro del menú lateral también va en columnas (no hay a dónde tocar)", false);
       }
       verificar("sin errores de JavaScript", !errores.length);
-      await ctx.close();
     }
     {
-      const { page, ctx } = await entrar("70031001", 1440, 800);
+      const { page } = await entrar("70031001", 1440, 800);
       await page.waitForSelector(".escr-nav-item", { timeout: 25000 });
       const ids = await page.evaluate(() => [...document.querySelectorAll(".escr-nav-item")].map((b) => b.dataset.id));
       verificar("un veterinario ve «Ganadería» (antes solo después de recargar)", ids.includes("ganaderia") && !ids.includes("clinica"));
       const operador = await page.evaluate(() => { ES_OPERADOR = true; return escrNavItems().map((i) => i.id); });
       verificar("un operador de pagos ve «Pagos» primero", operador[0] === "pagos");
-      await ctx.close();
     }
+    // Un médico común: ni Clínica, ni Ganadería, ni Pagos. Con dos pacientes,
+    // para las secciones 4 y 5 (la pantalla de inicio).
+    await M.Medico.create({ phone: "70031002", nombre: "Dr. Común", passwordHash: await hashPassword(CLAVE), activo: true, tipoEspecialidad: "medicina_general" });
+    await M.Paciente.create({ medicoPhone: "70031002", nombre: "Ana Paola Vargas" });
+    await M.Paciente.create({ medicoPhone: "70031002", nombre: "Carlos Mamani Choque" });
+    const comun = await entrar("70031002", 1440, 800);
     {
-      // Un médico común: ni Clínica, ni Ganadería, ni Pagos.
-      await M.Medico.create({ phone: "70031002", nombre: "Dr. Común", passwordHash: await hashPassword(CLAVE), activo: true, tipoEspecialidad: "medicina_general" });
-      const { page, ctx } = await entrar("70031002", 1440, 800);
-      await page.waitForSelector(".escr-nav-item", { timeout: 25000 });
-      const ids = await page.evaluate(() => [...document.querySelectorAll(".escr-nav-item")].map((b) => b.dataset.id));
+      await comun.page.waitForSelector(".escr-nav-item", { timeout: 25000 });
+      const ids = await comun.page.evaluate(() => [...document.querySelectorAll(".escr-nav-item")].map((b) => b.dataset.id));
       verificar("un médico común no ve ninguno de los tres", !ids.some((i) => ["clinica", "ganaderia", "pagos"].includes(i)));
-      await ctx.close();
     }
 
     console.log("\n── 4. La pantalla de inicio en el celular: las tarjetas llegan hasta el mismo borde ──");
     // El saludo de arriba es un <button class="card">, y un botón se achica al
     // contenido: quedaba en 264 px cuando todo lo demás medía 358.
-    await M.Paciente.create({ medicoPhone: "70031002", nombre: "Ana Paola Vargas" });
-    await M.Paciente.create({ medicoPhone: "70031002", nombre: "Carlos Mamani Choque" });
     for (const ancho of [360, 390]) {
-      const { page, ctx, errores } = await entrar("70031002", ancho, 800);
+      await enTamano(comun, ancho, 800);
+      const { page, errores } = comun;
       await page.waitForSelector("#avatarHomeBox", { timeout: 25000 });
       await page.waitForSelector(".item-paciente", { timeout: 25000 });
       const m = await page.evaluate(() => {
@@ -199,7 +215,39 @@ const correr = (archivo, args, env) => new Promise((resolve) => {
       verificar(`${ancho} px: el saludo mide lo mismo que las tarjetas de pacientes y el buscador (${m.saludo} / ${m.paciente} / ${m.buscador})`,
         Math.abs(m.saludo - m.paciente) <= 1 && Math.abs(m.saludo - m.buscador) <= 1);
       verificar(`${ancho} px: sin errores de JavaScript`, !errores.length);
-      await ctx.close();
+    }
+
+    console.log("\n── 5. La barra de acciones del inicio, con aire, en celular ──");
+    // «Recordatorios» y «Configuración» miden ~72 px y las columnas de una sola
+    // fila ~75: 3 px de aire, y los textos pegados entre sí y al borde. La app
+    // está en una columna de 480 px en todo lo que no sea el panel de
+    // escritorio, así que también a 700 px.
+    const medirBarra = (page) => page.evaluate(() => {
+      const items = [...document.querySelectorAll(".tabs-inicio .tab")].map((t) => {
+        const b = t.getBoundingClientRect();
+        let texto = 0;
+        for (const n of t.childNodes) {
+          if (n.nodeType === 3 && n.textContent.trim()) { const rg = document.createRange(); rg.selectNodeContents(n); texto = Math.max(texto, rg.getBoundingClientRect().width); }
+        }
+        return { top: Math.round(b.top), ancho: b.width, texto };
+      });
+      const filas = [...new Set(items.map((i) => i.top))].sort((a, b) => a - b).map((t) => items.filter((i) => i.top === t).length);
+      const enc = document.querySelector("#headerSub");
+      return { filas, aire: Math.round(Math.min(...items.map((i) => (i.ancho - i.texto) / 2))), saludoTarjeta: document.querySelector("#avatarHomeBox").innerText, encabezado: enc ? enc.innerText : document.body.innerText.slice(0, 300) };
+    });
+    for (const [sesion, nombre, esperadas] of [[comun, "médico (5 botones)", [3, 2]], [director, "director (6 botones)", [3, 3]]]) {
+      for (const ancho of [360, 390, 700]) {
+        await enTamano(sesion, ancho, 844);
+        await sesion.page.waitForSelector(".tabs-inicio .tab", { timeout: 25000 });
+        const m = await medirBarra(sesion.page);
+        verificar(`${nombre} a ${ancho} px: ${m.filas.join(" + ")} por fila y ${m.aire} px de aire por lado como mínimo`,
+          JSON.stringify(m.filas) === JSON.stringify(esperadas) && m.aire >= 6);
+        if (sesion === comun && ancho === 390) {
+          verificar("la tarjeta de arriba dice la especialidad, no repite el saludo del encabezado",
+            /Medicina general/.test(m.saludoTarjeta) && !/Hola/.test(m.saludoTarjeta) && /Hola/.test(m.encabezado));
+        }
+        verificar(`${nombre} a ${ancho} px: sin errores de JavaScript`, !sesion.errores.length);
+      }
     }
   } finally {
     if (browser) await browser.close().catch(() => {});

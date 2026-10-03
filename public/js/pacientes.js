@@ -54,7 +54,7 @@ function pestanasPacientes(pendientes) {
 function tabsPacientesHtml(pendientes) {
   const pestanas = pestanasPacientes(pendientes);
   return `
-    <div class="tabs" style="grid-template-columns:repeat(${pestanas.length},1fr);margin-bottom:16px">
+    <div class="tabs tabs-inicio" style="--n:${pestanas.length};margin-bottom:16px">
       ${pestanas.join("")}
     </div>`;
 }
@@ -126,12 +126,19 @@ async function renderDashboard() {
     // solo. Que esté vacía es el caso bueno.
     const sinAsignar = (dataBandeja.entrantes || []).length;
 
+    // El encabezado ya dice «Hola, <nombre>»: repetirlo acá era el mismo texto
+    // dos veces, una debajo de la otra. La tarjeta dice lo que el encabezado no:
+    // la especialidad. (Si la especialidad no tiene etiqueta, vuelve al saludo.)
+    const claveArea = "area." + (MEDICO_TIPO_ESPECIALIDAD || "medicina_general");
+    const etiquetaArea = t(claveArea) === claveArea ? "" : t(claveArea);
+    const tituloTarjeta = etiquetaArea || t("pacientes.saludo", { nombre: MEDICO_NOMBRE || "" });
+
     app.innerHTML = `
       <button type="button" class="card no-imprimir" id="avatarHomeBox"
         style="display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer">
         <span class="avatar avatar-sm" id="avatarHomeImg" aria-hidden="true">${esc(iniciales(MEDICO_NOMBRE))}</span>
         <span>
-          <span style="display:block;font-weight:600">${esc(t("pacientes.saludo", { nombre: MEDICO_NOMBRE || "" }))}</span>
+          <span style="display:block;font-weight:600">${esc(tituloTarjeta)}</span>
           <span class="hint" style="display:block;margin-top:2px">${t("pacientes.verConfiguracion")} →</span>
         </span>
       </button>
