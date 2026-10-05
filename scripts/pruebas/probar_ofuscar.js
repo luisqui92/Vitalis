@@ -9,12 +9,16 @@
 // sobrevivieron intactos, porque si no sobreviven la pantalla queda en
 // blanco.
 //
-// La comprobación de fondo —que el login y el panel funcionan de verdad
-// con el JS ya ofuscado, en un navegador real— se hizo a mano una vez con
-// Playwright al construir esto. Repetirla acá en cada corrida sería pedirle
-// al proyecto una dependencia pesada por una garantía que este archivo ya
-// da de otra forma: si los globales están intactos y la sintaxis es
-// válida, no hay mecanismo por el que el comportamiento cambie.
+// Antes este encabezado decía que, con los globales intactos y la sintaxis
+// válida, «no hay mecanismo por el que el comportamiento cambie». Había uno:
+// el ofuscador agrega sus PROPIAS funciones globales (la tabla de cadenas y
+// su decodificador) con nombres cortos al azar, y dos archivos podían sacar
+// el mismo. El que se cargaba después pisaba al otro, y el primero leía sus
+// cadenas de la tabla ajena. Encontrado con audio.js y neurodesarrollo.js:
+// grabar una consulta fallaba. Por eso ahora también se prueba que ningún
+// nombre inventado por el ofuscador se repita entre archivos (sección 3), y
+// la grabación se prueba en un navegador con el código ofuscado
+// (probar_nota_en_vivo_pantalla.js con OFUSCADO=1).
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 const fs = require("fs");
 const path = require("path");
@@ -90,6 +94,22 @@ const GLOBALES_CRITICOS = [
     const aparece = new RegExp(`\\b${nombre}\\b`).test(todoElOfuscado);
     verificar(`«${nombre}» sigue existiendo con su nombre (no se renombró)`, aparece);
   }
+
+  console.log(`\n── 3. Ningún nombre inventado por el ofuscador se repite entre archivos ──`);
+  const { choquesDeGlobales, nombresGlobales } = require(path.join(RAIZ, "scripts", "ofuscar.js"));
+  const resultados = archivos.map(a => ({ archivo: a, original: fs.readFileSync(path.join(ORIGEN, a), "utf8"), ofuscado: fs.readFileSync(path.join(SALIDA, a), "utf8") }));
+  const choques = choquesDeGlobales(resultados);
+  verificar(`sin nombres globales repetidos entre los ${archivos.length} archivos${choques.length ? " — " + choques.map(([n, xs]) => `${n}: ${xs.join(", ")}`).join("; ") : ""}`, !choques.length);
+  const inventados = resultados.flatMap(r => { const propios = new Set(nombresGlobales(r.original)); return nombresGlobales(r.ofuscado).filter(n => !propios.has(n)).map(n => [r.archivo, n]); });
+  verificar(`cada global inventado lleva el prefijo de SU archivo (${inventados.length} revisados)`,
+    inventados.length > 0 && inventados.every(([a, n]) => n.startsWith("o" + a.replace(/\.js$/, "").replace(/[^A-Za-z0-9]/g, "_") + "_")));
+  // El caso real, armado a mano: dos archivos con la misma tabla «_0x2768».
+  const real = choquesDeGlobales([
+    { archivo: "audio.js", original: "function crearGrabadora(){}", ofuscado: "function _0x2768(){} function crearGrabadora(){}" },
+    { archivo: "neurodesarrollo.js", original: "function renderNeuro(){}", ofuscado: "function _0x2768(){} function renderNeuro(){}" },
+  ]);
+  verificar("el choque de audio.js y neurodesarrollo.js se detecta", real.length === 1 && real[0][0] === "_0x2768");
+  verificar("un global propio de cada archivo no se toma como choque", !real.some(([n]) => n === "crearGrabadora"));
 
   fs.rmSync(SALIDA, { recursive: true, force: true });
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);

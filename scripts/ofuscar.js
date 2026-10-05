@@ -63,11 +63,56 @@ const OPCIONES = {
   simplify: true,
 };
 
-function ofuscarArchivo(rutaOrigen, rutaDestino) {
-  const codigo = fs.readFileSync(rutaOrigen, "utf8");
-  const resultado = JavaScriptObfuscator.obfuscate(codigo, OPCIONES).getObfuscatedCode();
-  fs.mkdirSync(path.dirname(rutaDestino), { recursive: true });
-  fs.writeFileSync(rutaDestino, resultado);
+// ═══ CADA ARCHIVO CON SU PREFIJO ═══════════════════════════════════════════
+//
+// El ofuscador agrega sus propias funciones (la que guarda las cadenas
+// codificadas y la que las decodifica) al nivel superior de cada archivo, con
+// nombres cortos al azar como «_0x2768». En el navegador cada archivo es un
+// <script> aparte, así que esas funciones son GLOBALES: si dos archivos
+// sacan el mismo nombre, el que se carga después pisa al otro, y el primero
+// decodifica sus cadenas con la tabla ajena. Pasó: audio.js y
+// neurodesarrollo.js sacaron «_0x2768» y grabar una consulta tiraba
+// «_0x324bdd[...] is not a function». Con 64 archivos, pasaba en más o menos
+// uno de cada diez despliegues, a una pantalla cualquiera.
+//
+// identifiersPrefix es la solución que da el propio ofuscador: un prefijo
+// distinto por archivo para todo lo global que él inventa.
+function prefijoDe(archivo) {
+  return "o" + archivo.replace(/\.js$/, "").replace(/[^A-Za-z0-9]/g, "_") + "_";
+}
+
+function ofuscarCodigo(codigo, archivo) {
+  return JavaScriptObfuscator.obfuscate(codigo, { ...OPCIONES, identifiersPrefix: prefijoDe(archivo) }).getObfuscatedCode();
+}
+
+// Los nombres declarados en el nivel superior de un archivo: los que quedan
+// globales en el navegador.
+function nombresGlobales(codigo) {
+  let acorn;
+  try { acorn = require("acorn"); } catch { acorn = require(require.resolve("acorn", { paths: [require.resolve("javascript-obfuscator")] })); }
+  let ast;
+  try { ast = acorn.parse(codigo, { ecmaVersion: "latest", sourceType: "script" }); } catch { ast = acorn.parse(codigo, { ecmaVersion: "latest", sourceType: "module" }); }
+  const nombres = [];
+  for (const n of ast.body) {
+    if ((n.type === "FunctionDeclaration" || n.type === "ClassDeclaration") && n.id) nombres.push(n.id.name);
+    if (n.type === "VariableDeclaration") for (const d of n.declarations) if (d.id.type === "Identifier") nombres.push(d.id.name);
+  }
+  return nombres;
+}
+
+// Lo que el ofuscador agregó como global (lo que no estaba en el original) y
+// aparece en más de un archivo. Tiene que dar vacío.
+function choquesDeGlobales(resultados) {
+  const duenos = new Map();
+  for (const { archivo, original, ofuscado } of resultados) {
+    const propios = new Set(nombresGlobales(original));
+    for (const nombre of new Set(nombresGlobales(ofuscado))) {
+      if (propios.has(nombre)) continue;
+      if (!duenos.has(nombre)) duenos.set(nombre, []);
+      duenos.get(nombre).push(archivo);
+    }
+  }
+  return [...duenos].filter(([, archivos]) => archivos.length > 1);
 }
 
 function main() {
@@ -75,20 +120,37 @@ function main() {
   console.log(`Ofuscando ${archivos.length} archivo(s) de ${ORIGEN}`);
   console.log(`  → ${SALIDA}${SALIDA === ORIGEN ? " (en el lugar)" : ""}\n`);
 
-  let ok = 0, fallidos = 0;
+  // Primero todo en memoria, y recién si está bien se escribe: los archivos
+  // se sirven tal cual, así que escribir uno roto es publicarlo al instante.
+  let fallidos = 0;
+  const resultados = [];
   for (const archivo of archivos) {
-    const origen = path.join(ORIGEN, archivo);
-    const destino = path.join(SALIDA, archivo);
     try {
-      ofuscarArchivo(origen, destino);
-      ok++;
+      const original = fs.readFileSync(path.join(ORIGEN, archivo), "utf8");
+      resultados.push({ archivo, original, ofuscado: ofuscarCodigo(original, archivo) });
     } catch (e) {
       fallidos++;
       console.error(`  ✗ ${archivo}: ${e.message}`);
     }
   }
-  console.log(`${ok} ofuscado(s), ${fallidos} fallido(s).`);
-  if (fallidos > 0) process.exit(1);
+  if (fallidos > 0) {
+    console.error(`${fallidos} fallido(s). No se escribió nada: sigue el código anterior.`);
+    process.exit(1);
+  }
+  const choques = choquesDeGlobales(resultados);
+  if (choques.length) {
+    for (const [nombre, archivos2] of choques) console.error(`  ✗ «${nombre}» quedó global en ${archivos2.join(", ")}`);
+    console.error("Dos archivos comparten un nombre global inventado por el ofuscador. No se escribió nada: sigue el código anterior.");
+    process.exit(1);
+  }
+  for (const { archivo, ofuscado } of resultados) {
+    const destino = path.join(SALIDA, archivo);
+    fs.mkdirSync(path.dirname(destino), { recursive: true });
+    fs.writeFileSync(destino, ofuscado);
+  }
+  console.log(`${resultados.length} ofuscado(s), 0 fallido(s), sin nombres globales repetidos.`);
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { choquesDeGlobales, nombresGlobales, prefijoDe, OPCIONES };
