@@ -258,6 +258,10 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
 .listen-time{font-family:var(--font-marca);font-size:25px;margin-top:6px;letter-spacing:.02em;font-weight:600;}
 .listen-label{font-size:12px;opacity:.75;margin-top:2px;letter-spacing:.02em;}
 .live-caption{font-size:14px;line-height:1.5;color:#fff;opacity:.9;margin-top:14px;text-align:left;min-height:20px;max-height:120px;overflow-y:auto;}
+/* La nota en vivo: debajo de lo que se escucha, se va armando la nota.
+   Mismo lenguaje que la nota de la consulta (.nota-titulo, .nota-campo). */
+.nota-vivo{margin-top:12px;padding:12px 14px;border:1px dashed var(--border);border-radius:12px;background:var(--bg);text-align:left;}
+.nota-vivo .nota-campo{font-size:13.5px;}
 
 /* ─── Botón de grabar: círculo con degradé de marca, "respira" suave en
    reposo para no sentirse estático, y un pulso más marcado al grabar ──── */

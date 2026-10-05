@@ -21,6 +21,13 @@ const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo")
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
+const { guardarBorrador, borradorDe, compararMedicamentos } = require("../services/notaEnVivo");
+
+// Lo más largo que se acepta como texto en vivo: una consulta de 70 minutos
+// son unas 10.000 palabras, unos 70.000 caracteres. El doble, de margen.
+const MAX_TEXTO_EN_VIVO = 150000;
+// Con menos que esto no hubo consulta todavía: no vale la pena pedir nota.
+const PALABRAS_MINIMAS_BORRADOR = 15;
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -159,13 +166,16 @@ module.exports = function (app) {
     const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
     const delMedico = await medicamentosDelMedico(medicoPhone);
 
+    const inicioTranscripcion = Date.now();
     transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico })
       .then(async ({ transcripcionCompleta, segmentos, duracionSegundos }) => {
-        consulta.estado = "completado";
-        consulta.transcripcionCompleta = transcripcionCompleta;
-        consulta.segmentos = segmentos;
-        consulta.duracionSegundos = duracionSegundos;
-        await consulta.save();
+        const transcripcionMs = Date.now() - inicioTranscripcion;
+        // Un update y no consulta.save(): mientras AssemblyAI trabajaba, la
+        // nota en vivo pudo haberse guardado en este mismo documento, y el
+        // objeto en memoria no la tiene.
+        await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: {
+          estado: "completado", transcripcionCompleta, segmentos, duracionSegundos, "tiempos.transcripcionMs": transcripcionMs,
+        } });
 
         // El cobro va acá y no al subir el audio: recién ahora sabemos que la
         // consulta salió bien. Si AssemblyAI hubiera fallado, el médico no
@@ -180,63 +190,107 @@ module.exports = function (app) {
           log.error(`[SALDO] no se pudo cobrar la consulta ${consulta._id} de ${medicoPhone}:`, e.message);
         }
 
-        await producirNota(consulta, paciente, medicoPhone, medicoParaVocabulario?.idioma);
-
-        // ═══ AVISARLE AL MÉDICO, QUE ES EL QUE ESTÁ ESPERANDO ═══════════════
-        //
-        // Esto tarda: transcribir una consulta de veinte minutos y escribir la
-        // nota no es instantáneo. Hasta ahora el único que se enteraba era el
-        // que dejaba la pantalla abierta —consulta cada ocho segundos— y el
-        // médico normal NO la deja abierta: cierra y atiende al siguiente.
-        //
-        // Volvía cuando se acordaba. Si la nota había fallado, se enteraba
-        // más tarde todavía, cuando ya no tenía fresco lo que se habló.
-        //
-        // Van los dos avisos y hacen cosas distintas:
-        //   · avisarCambio  → las pantallas ABIERTAS se actualizan al toque,
-        //                     sin esperar los ocho segundos del sondeo.
-        //   · notificarMedico → el que se fue de la pantalla se entera igual.
-        //
-        // Ninguno de los dos puede tumbar la nota si falla: ya está guardada.
-        avisarCambio(medicoPhone);
-        const listo = consulta.notaClinicaEstado === "completado";
-        notificarMedico(medicoPhone, {
-          titulo: listo ? "Nota clínica lista" : "La nota clínica falló",
-          cuerpo: listo
-            ? `${paciente.nombre} — ya la podés revisar y firmar.`
-            : `${paciente.nombre} — no se pudo generar. Entrá para ver qué pasó.`,
-          // Abre DERECHO en esa consulta. Una notificación que deja al médico
-          // en el panel buscando cuál era no le ahorra nada.
-          url: `/?consulta=${consulta._id}`,
-        }).catch(e => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e.message));
-
-        if (consulta.notaClinicaEstado === "completado") {
-          regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
-          // El hilo con las consultas anteriores. Va acá y no antes porque
-          // necesita la nota de HOY ya escrita: la pregunta es "dado este
-          // motivo, ¿qué del historial se relaciona?", y sin motivo no hay
-          // pregunta.
-          //
-          // Sin await y con catch: es un extra. Si falla, la consulta y su
-          // nota clínica quedan intactas, que es lo que importa.
-          generarHilo(consulta._id).catch(e => log.error("[HILO_CLINICO]", e.message));
+        // ¿Quién escribe la nota? Si la nota en vivo ya la reclamó, a esta
+        // transcripción le toca verificarla; si no, la escribe ella, como
+        // siempre. El reclamo es atómico: nunca la escriben las dos.
+        const reclamo = await ConsultaMedica.updateOne(
+          { _id: consulta._id, notaFuente: { $in: ["", null] } }, { $set: { notaFuente: "audio" } });
+        if (!reclamo.modifiedCount) {
+          log.info(`[TIEMPOS] consulta ${consulta._id}: audio ${Math.round(duracionSegundos || 0)} s, transcripción completa ${Math.round(transcripcionMs / 1000)} s (la nota salió en vivo)`);
+          await intentarVerificar(consulta._id);
+          return;
         }
+
+        const actual = await ConsultaMedica.findById(consulta._id);
+        const inicioNota = Date.now();
+        await producirNota(actual, paciente, medicoPhone, medicoParaVocabulario?.idioma);
+        const notaMs = Date.now() - inicioNota;
+        await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { "tiempos.notaMs": notaMs } }).catch(() => {});
+        log.info(`[TIEMPOS] consulta ${consulta._id}: audio ${Math.round(duracionSegundos || 0)} s, transcripción ${Math.round(transcripcionMs / 1000)} s, nota ${Math.round(notaMs / 1000)} s`);
+        avisarNotaLista(actual, paciente, medicoPhone);
       })
       .catch(async (e) => {
         log.error("[CONSULTA_MEDICA] Error transcribiendo:", e.response?.data || e.message);
-        consulta.estado = "error";
-        consulta.error = e.response?.data?.error || e.message;
-        await consulta.save().catch(e2 => log.error("[CONSULTA_MEDICA] No se pudo guardar el estado de error:", e2.message));
+        await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { estado: "error", error: e.response?.data?.error || e.message } })
+          .catch(e2 => log.error("[CONSULTA_MEDICA] No se pudo guardar el estado de error:", e2.message));
+        avisarCambio(medicoPhone);
+        // Si la nota salió en vivo, el médico la tiene: lo que falló es la
+        // verificación, y eso se le dice en la nota (intentarVerificar).
+        const ahora = await ConsultaMedica.findById(consulta._id).select("notaFuente").lean().catch(() => null);
+        if (ahora?.notaFuente === "vivo") return intentarVerificar(consulta._id);
         // El caso donde el silencio cuesta más caro: el médico está esperando
         // algo que no va a llegar nunca. Cuanto antes lo sepa, más fresco
         // tiene lo que se habló para escribirlo a mano.
-        avisarCambio(medicoPhone);
         notificarMedico(medicoPhone, {
           titulo: "No se pudo transcribir la consulta",
           cuerpo: "Entrá a verla: el audio quedó guardado.",
           url: `/?consulta=${consulta._id}`,
         }).catch(e2 => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e2.message));
       });
+  }));
+
+  // ─── LA NOTA EN VIVO (ver services/notaEnVivo.js) ─────────────────────
+  //
+  // El borrador, mientras se graba: el texto de la vista previa entra, la
+  // nota sale. No se guarda nada en la base: todavía no hay consulta, solo
+  // una grabación en curso.
+  app.post("/medico/consultas/nota-en-vivo", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const texto = String(req.body?.texto || "").slice(0, MAX_TEXTO_EN_VIVO);
+    const pacienteId = String(req.body?.pacienteId || "").trim();
+    if (!pacienteId) throw new ErrorHttp(400, "Falta pacienteId");
+    const paciente = await obtenerOFallar(Paciente, { _id: pacienteId, medicoPhone }, "Paciente no encontrado");
+    if (texto.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_BORRADOR) return res.json({ nota: null });
+
+    const guardado = borradorDe(medicoPhone, pacienteId, texto);
+    if (guardado) return res.json({ nota: guardado });
+    const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma").lean();
+    const { contexto } = await contextoDeNota(paciente, medicoPhone);
+    let nota;
+    try {
+      nota = await generarNotaClinica(texto, contexto, medico?.idioma);
+    } catch (e) {
+      // Un borrador que no salió no es un error para el médico: sigue
+      // grabando, y el próximo minuto se intenta de nuevo.
+      log.warn("[NOTA_EN_VIVO] borrador:", e.message);
+      return res.json({ nota: null });
+    }
+    guardarBorrador(medicoPhone, pacienteId, texto, nota);
+    res.json({ nota });
+  }));
+
+  // El texto en vivo de una consulta ya subida: si llegó entero (lo decide
+  // el navegador, que sabe cuánto audio mandó), la nota sale de acá en vez
+  // de esperar a la transcripción completa.
+  app.post("/medico/consultas/:id/texto-en-vivo", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const texto = String(req.body?.texto || "").slice(0, MAX_TEXTO_EN_VIVO);
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    if (texto.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_BORRADOR) return res.json({ ok: true, usada: false });
+
+    // Solo si la transcripción completa todavía no escribió la nota. El
+    // reclamo es atómico: si las dos llegan a la vez, una sola escribe.
+    const reclamo = await ConsultaMedica.updateOne(
+      { _id: consulta._id, medicoPhone, estado: "procesando", notaFuente: { $in: ["", null] }, confirmadaEn: null },
+      { $set: { notaFuente: "vivo", transcripcionEnVivo: texto, notaClinicaEstado: "pendiente", "verificacion.estado": "pendiente" } });
+    if (!reclamo.modifiedCount) return res.json({ ok: true, usada: false });
+    res.status(202).json({ ok: true, usada: true });
+
+    const paciente = await Paciente.findOne({ _id: consulta.pacienteId, medicoPhone });
+    const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma").lean();
+    const actual = await ConsultaMedica.findById(consulta._id);
+    const inicio = Date.now();
+    await producirNota(actual, paciente, medicoPhone, medico?.idioma, {
+      texto, notaHecha: borradorDe(medicoPhone, String(consulta.pacienteId), texto),
+    });
+    const notaVivoMs = Date.now() - inicio;
+    await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { "tiempos.notaVivoMs": notaVivoMs } }).catch(() => {});
+    log.info(`[TIEMPOS] consulta ${consulta._id}: nota en vivo ${Math.round(notaVivoMs / 1000)} s`);
+    if (actual.notaClinicaEstado === "completado") avisarNotaLista(actual, paciente, medicoPhone);
+    else avisarCambio(medicoPhone);
+    // Si la transcripción completa ya terminó, se verifica ahora; si no, lo
+    // hace ella al terminar.
+    await intentarVerificar(consulta._id);
   }));
 
   // ─── LISTAR CONSULTAS PROPIAS ───────────────────────────────────────────
@@ -318,6 +372,9 @@ module.exports = function (app) {
 
     consulta.notaClinicaEstado = "pendiente";
     consulta.notaClinicaError = undefined;
+    // Se escribe de la transcripción completa: ya no hay nada que verificar.
+    consulta.notaFuente = "audio";
+    consulta.verificacion = { estado: "" };
     await consulta.save();
     registrar({ req, medicoPhone, accion: "regenerar_nota_clinica", recurso: `ConsultaMedica:${consulta._id}` });
     res.status(202).json({ ok: true });
@@ -348,6 +405,13 @@ module.exports = function (app) {
     const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
     if (consulta.confirmadaEn) throw new ErrorHttp(409, "Esta consulta ya fue confirmada");
     if (!consulta.notaClinica) throw new ErrorHttp(400, "Esta consulta todavía no tiene nota clínica");
+    // La nota en vivo se confirma recién cuando la transcripción completa
+    // la verificó: confirmar manda la receta y la medicación al Kardex, y
+    // eso no puede salir de un texto que nadie comparó con el audio.
+    // Si la transcripción completa falló, se puede: el médico ya vio el aviso.
+    if (consulta.notaFuente === "vivo" && ["pendiente", "verificando"].includes(consulta.verificacion?.estado)) {
+      throw new ErrorHttp(409, "Esperá unos segundos: se está verificando la nota con el audio completo.");
+    }
 
     const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
     const aplicar = req.body?.aplicar || {};
@@ -676,35 +740,39 @@ module.exports = function (app) {
 // error o vacía. Por eso vive aparte: el segundo tiene que hacer exactamente
 // lo mismo que el primero, con el mismo contexto de especialidad y el mismo
 // guardado defensivo, no una versión parecida.
-async function producirNota(consulta, paciente, medicoPhone, idioma) {
-  try {
-    const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
-      .select("nombre").lean();
+// El contexto con que la IA escribe la nota: el mismo para la nota de
+// siempre, para el borrador en vivo y para la verificación. Si fueran
+// distintos, el borrador diría una cosa y la nota guardada otra.
+async function contextoDeNota(paciente, medicoPhone) {
+  const medicamentosActivos = await Medicamento.find({ pacienteId: paciente._id, medicoPhone, fechaFin: null })
+    .select("nombre").lean();
 
-    // Solo para odontología y estética (Symphomed Face): le pasamos el
-    // catálogo de precios del consultorio para que la IA pueda
-    // emparejar tratamientos mencionados ("hay que sellar esto",
-    // "hay que hacer un relleno acá") con el ítem correcto.
-    const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
-    // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
-    // marcas como medicamentos y no repite un error que él ya arregló.
-    const [medicamentosHabituales, correccionesMedicamentos] = await Promise.all([
-      medicamentosDelMedico(medicoPhone, 60),
-      correccionesDelMedico(medicoPhone, 30),
-    ]);
-    let catalogoTratamientos = [];
-    if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
-      const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
-      catalogoTratamientos = catalogo.map(c => c.nombre);
-    }
-    // Solo para oftalmología (Symphomed Visión): la lista de estructuras
-    // oculares válidas, para que la IA narre el examen por ojo.
-    const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
-    const esOdontologia = medico?.tipoEspecialidad === "odontologia";
-    const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
-    const esGinecologia = medico?.tipoEspecialidad === "ginecologia";
+  // Solo para odontología y estética (Symphomed Face): le pasamos el
+  // catálogo de precios del consultorio para que la IA pueda
+  // emparejar tratamientos mencionados ("hay que sellar esto",
+  // "hay que hacer un relleno acá") con el ítem correcto.
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+  // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
+  // marcas como medicamentos y no repite un error que él ya arregló.
+  const [medicamentosHabituales, correccionesMedicamentos] = await Promise.all([
+    medicamentosDelMedico(medicoPhone, 60),
+    correccionesDelMedico(medicoPhone, 30),
+  ]);
+  let catalogoTratamientos = [];
+  if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
+    const catalogo = await CatalogoTratamiento.find({ medicoPhone }).select("nombre").lean();
+    catalogoTratamientos = catalogo.map(c => c.nombre);
+  }
+  // Solo para oftalmología (Symphomed Visión): la lista de estructuras
+  // oculares válidas, para que la IA narre el examen por ojo.
+  const esOftalmologia = medico?.tipoEspecialidad === "oftalmologia";
+  const esOdontologia = medico?.tipoEspecialidad === "odontologia";
+  const esVeterinaria = medico?.tipoEspecialidad === "veterinaria";
+  const esGinecologia = medico?.tipoEspecialidad === "ginecologia";
 
-    consulta.notaClinica = await generarNotaClinica(consulta.transcripcionCompleta, {
+  return {
+    esOftalmologia, esOdontologia, esGinecologia,
+    contexto: {
       antecedentesPersonales: paciente.antecedentesPersonales || [],
       antecedentesFamiliares: paciente.antecedentesFamiliares || [],
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
@@ -718,10 +786,22 @@ async function producirNota(consulta, paciente, medicoPhone, idioma) {
       veterinaria: esVeterinaria,
       especie: esVeterinaria ? paciente.especie : "",
       raza: esVeterinaria ? paciente.raza : "",
+    },
+  };
+}
+
+// Lo que se le muestra al médico como nota: de la transcripción completa (lo
+// de siempre) o, si se le pasa, de otro texto —el de la vista previa en vivo—
+// o de un borrador que la IA ya escribió para ese mismo texto
+// (services/notaEnVivo.js).
+async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, notaHecha } = {}) {
+  try {
+    const { contexto, esOftalmologia, esOdontologia, esGinecologia } = await contextoDeNota(paciente, medicoPhone);
     // El mismo idioma con el que se transcribió: una nota en español
     // sobre una consulta en portugués obliga al médico a traducir de
     // vuelta lo que él mismo dijo.
-    }, idioma);
+    consulta.notaClinica = notaHecha
+      || await generarNotaClinica(texto ?? consulta.transcripcionCompleta, contexto, idioma);
     consulta.notaClinicaEstado = "completado";
     consulta.notaClinicaError = undefined;
 
@@ -830,3 +910,114 @@ async function producirNota(consulta, paciente, medicoPhone, idioma) {
     consulta.notaClinicaEstado = "error"; // para que el chequeo de brief clínico de abajo no dispare con datos corruptos
   }
 }
+
+// ═══ AVISARLE AL MÉDICO, QUE ES EL QUE ESTÁ ESPERANDO ══════════════════════
+//
+// Esto tarda: transcribir una consulta de veinte minutos y escribir la nota
+// no es instantáneo. Hasta ahora el único que se enteraba era el que dejaba
+// la pantalla abierta —consulta cada ocho segundos— y el médico normal NO la
+// deja abierta: cierra y atiende al siguiente.
+//
+// Van los dos avisos y hacen cosas distintas:
+//   · avisarCambio  → las pantallas ABIERTAS se actualizan al toque,
+//                     sin esperar los ocho segundos del sondeo.
+//   · notificarMedico → el que se fue de la pantalla se entera igual.
+//
+// Ninguno de los dos puede tumbar la nota si falla: ya está guardada.
+function avisarNotaLista(consulta, paciente, medicoPhone) {
+  avisarCambio(medicoPhone);
+  const listo = consulta.notaClinicaEstado === "completado";
+  notificarMedico(medicoPhone, {
+    titulo: listo ? "Nota clínica lista" : "La nota clínica falló",
+    cuerpo: listo
+      ? `${paciente.nombre} — ya la podés revisar y firmar.`
+      : `${paciente.nombre} — no se pudo generar. Entrá para ver qué pasó.`,
+    // Abre DERECHO en esa consulta. Una notificación que deja al médico
+    // en el panel buscando cuál era no le ahorra nada.
+    url: `/?consulta=${consulta._id}`,
+  }).catch(e => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e.message));
+
+  if (listo) {
+    regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
+    // El hilo con las consultas anteriores. Va acá y no antes porque
+    // necesita la nota de HOY ya escrita: la pregunta es "dado este
+    // motivo, ¿qué del historial se relaciona?", y sin motivo no hay
+    // pregunta.
+    //
+    // Sin await y con catch: es un extra. Si falla, la consulta y su
+    // nota clínica quedan intactas, que es lo que importa.
+    generarHilo(consulta._id).catch(e => log.error("[HILO_CLINICO]", e.message));
+  }
+}
+
+// ═══ VERIFICAR LA NOTA EN VIVO CON LA TRANSCRIPCIÓN COMPLETA ════════════════
+//
+// La llaman los dos caminos que terminan por separado —la nota en vivo y la
+// transcripción completa— y hace algo solo cuando los dos terminaron. Así no
+// importa cuál llega primero.
+//
+// Lo que compara es lo que no se puede escuchar mal sin consecuencias: qué
+// medicamentos, en qué dosis y cada cuánto (services/notaEnVivo.js). Las
+// diferencias se guardan y se MUESTRAN; la nota no se toca.
+async function intentarVerificar(consultaId) {
+  const c = await ConsultaMedica.findById(consultaId);
+  if (!c || c.notaFuente !== "vivo" || c.confirmadaEn) return;
+  if (c.estado === "procesando" || c.notaClinicaEstado === "pendiente") return;   // falta uno de los dos
+
+  // La transcripción completa falló: la nota en vivo está, pero nadie la
+  // comparó con el audio. Se le dice al médico, y puede confirmar igual.
+  if (c.estado === "error") {
+    await ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": { $in: ["pendiente", ""] } },
+      { $set: { "verificacion.estado": "error" } });
+    avisarCambio(c.medicoPhone);
+    return;
+  }
+
+  const paciente = await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
+  if (!paciente) return;
+  const medico = await Medico.findOne({ phone: c.medicoPhone }).select("idioma").lean();
+
+  // La nota en vivo falló (la IA no contestó): la escribe la transcripción
+  // completa, como antes. El médico esperó más, pero no se quedó sin nota.
+  if (c.notaClinicaEstado === "error") {
+    const r = await ConsultaMedica.updateOne(
+      { _id: c._id, notaFuente: "vivo", notaClinicaEstado: "error" },
+      { $set: { notaFuente: "audio", notaClinicaEstado: "pendiente", "verificacion.estado": "" } });
+    if (!r.modifiedCount) return;
+    const actual = await ConsultaMedica.findById(c._id);
+    await producirNota(actual, paciente, c.medicoPhone, medico?.idioma);
+    avisarNotaLista(actual, paciente, c.medicoPhone);
+    return;
+  }
+
+  // Solo uno verifica, aunque los dos caminos lleguen a la vez.
+  const reclamo = await ConsultaMedica.updateOne(
+    { _id: c._id, "verificacion.estado": "pendiente" }, { $set: { "verificacion.estado": "verificando" } });
+  if (!reclamo.modifiedCount) return;
+
+  const inicio = Date.now();
+  let set;
+  try {
+    const { contexto } = await contextoDeNota(paciente, c.medicoPhone);
+    const notaAudio = await generarNotaClinica(c.transcripcionCompleta || "", contexto, medico?.idioma);
+    const diferencias = compararMedicamentos(c.notaClinica, notaAudio);
+    set = { "verificacion.estado": diferencias.length ? "diferencias" : "ok", "verificacion.diferencias": diferencias };
+  } catch (e) {
+    // Una transcripción de un audio en silencio no tiene nota que comparar:
+    // tampoco es motivo para trabar la consulta.
+    log.warn(`[NOTA_EN_VIVO] no se pudo verificar la consulta ${c._id}:`, e.message);
+    set = { "verificacion.estado": "error" };
+  }
+  const verificacionMs = Date.now() - inicio;
+  await ConsultaMedica.updateOne({ _id: c._id }, { $set: { ...set, "tiempos.verificacionMs": verificacionMs } });
+  log.info(`[TIEMPOS] consulta ${c._id}: verificación ${Math.round(verificacionMs / 1000)} s → ${set["verificacion.estado"]}${set["verificacion.diferencias"]?.length ? ` (${set["verificacion.diferencias"].length} diferencia(s))` : ""}`);
+  avisarCambio(c.medicoPhone);
+  if (set["verificacion.estado"] === "diferencias") {
+    notificarMedico(c.medicoPhone, {
+      titulo: "Revisá los medicamentos de la nota",
+      cuerpo: `${paciente.nombre} — el audio completo no coincide en ${set["verificacion.diferencias"].length} punto(s).`,
+      url: `/?consulta=${c._id}`,
+    }).catch(e => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e.message));
+  }
+}
+

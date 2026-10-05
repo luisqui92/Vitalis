@@ -479,6 +479,41 @@ const consultaMedicaSchema = new mongoose.Schema({
   // fecha para no volver a aplicar lo mismo si entra de nuevo a la pantalla.
   confirmadaEn: { type: Date, default: null },
   notaEditadaPorMedico: { type: Boolean, default: false },
+
+  // ─── La nota en vivo (ver services/notaEnVivo.js) ──────────────────────
+  //
+  // De qué texto salió la nota:
+  //   · "vivo"  — del texto de la vista previa, que llegó entero mientras se
+  //               grababa. La nota sale en segundos; la transcripción
+  //               completa la VERIFICA después (verificacion, abajo).
+  //   · "audio" — de la transcripción completa, como siempre.
+  //   · ""      — todavía no se decidió. Lo decide el primero que llega,
+  //               con un update atómico: nunca escriben la nota los dos.
+  notaFuente: { type: String, enum: ["", "vivo", "audio"], default: "" },
+  transcripcionEnVivo: { type: String, default: "" },
+  // Solo cuando notaFuente es "vivo". Las diferencias se MUESTRAN; la nota
+  // no se cambia sola, igual que con los nombres de medicamentos.
+  verificacion: {
+    estado: { type: String, enum: ["", "pendiente", "verificando", "ok", "diferencias", "error"], default: "" },
+    diferencias: {
+      type: [{
+        tipo: { type: String, enum: ["dosis", "falta", "noMencionado"] },
+        indice: { type: Number, default: null },   // fila de medicamentosRecetados (dosis / noMencionado)
+        enNota: { type: String, default: "" },
+        enAudio: { type: String, default: "" },
+        medicamento: { nombre: String, dosis: String, frecuencia: String },   // lo que dice el audio completo
+      }],
+      default: undefined,
+    },
+  },
+  // Cuánto tardó cada paso, en milisegundos. Sin datos clínicos: es para
+  // saber dónde se va la espera del médico.
+  tiempos: {
+    transcripcionMs: Number,
+    notaMs: Number,
+    notaVivoMs: Number,
+    verificacionMs: Number,
+  },
   // Qué de las consultas anteriores se relaciona con ESTA. Es la pregunta
   // que el brief clínico no puede hacer, porque el brief se escribe después
   // de cada consulta y no sabe por qué viene el paciente hoy (ver el

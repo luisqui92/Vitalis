@@ -157,6 +157,9 @@ const sinBloquePersona = (html) => html
   // primeros minutos grabados porque el celular se bloqueó.
   .replace(/\n?\s*<div id="recAviso"><\/div>/g, "")
   .replace(/\n?\s*<div id="grabPendientes"><\/div>/g, "")
+  // La nota en vivo (services/notaEnVivo.js): el panel donde se va armando
+  // la nota mientras se graba. Vacío y escondido hasta que hay qué mostrar.
+  .replace(/\n?\s*<div class="nota-vivo" id="notaVivo" style="display:none"><\/div>/g, "")
   .replace(/\n?\s*<div class="hint" style="text-align:center;margin-top:6px">📱 [^<]*<\/div>/g, "")
   // La fila del CPF: solo se dibuja en cuentas brasileñas (Memed lo necesita
   // para recetar). En el arnés la moneda es BOB, así que el ternario deja el

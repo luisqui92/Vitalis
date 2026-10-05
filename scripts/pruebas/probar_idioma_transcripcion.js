@@ -104,8 +104,14 @@ verificar(`${conIdioma} de ${selects.length} consultas al médico traen el idiom
 verificar("la transcripción recibe el idioma", /transcribirConsultaMedica\(audioBuffer,[^;]*?idioma\s*[,)]/.test(ruta));
 // La nota se arma en producirNota() (también la usa «Volver a generar la
 // nota»): el idioma del médico tiene que llegar hasta ahí y de ahí a la IA.
-verificar("la nota clínica también", /producirNota\(consulta, paciente, medicoPhone, medicoParaVocabulario\?\.idioma\)/.test(ruta)
-  && /\},\s*idioma\);/.test(ruta));
+verificar("la nota clínica también", /producirNota\(actual, paciente, medicoPhone, medicoParaVocabulario\?\.idioma\)/.test(ruta)
+  && /generarNotaClinica\(texto \?\? consulta\.transcripcionCompleta, contexto, idioma\)/.test(ruta));
+// La nota en vivo, el borrador y la verificación (services/notaEnVivo.js)
+// también se escriben en el idioma de la cuenta.
+verificar("  ...y la nota en vivo, el borrador y la verificación",
+  /producirNota\(actual, paciente, medicoPhone, medico\?\.idioma, \{/.test(ruta)
+  && /generarNotaClinica\(texto, contexto, medico\?\.idioma\)/.test(ruta)
+  && /generarNotaClinica\(c\.transcripcionCompleta \|\| "", contexto, medico\?\.idioma\)/.test(ruta));
 verificar("  ...y al regenerarla, con el idioma de la cuenta", /producirNota\(consulta, paciente, medicoPhone, medico\?\.idioma\)/.test(ruta)
   && /select\("idioma"\)/.test(ruta));
 

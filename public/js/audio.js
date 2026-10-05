@@ -498,11 +498,18 @@ async function subirConsulta(pacienteId, blob, mimeType, { teleconsultaId } = {}
 // Vista previa en vivo: mientras se graba (para el archivo real, que es lo
 // que se guarda), en paralelo se manda el audio en crudo (PCM 16kHz) al
 // WebSocket de AssemblyAI para mostrar el texto apareciendo mientras se
-// habla. Si esto falla por lo que sea, no afecta la grabación real — es
-// solo decorativo, la transcripción de verdad sigue viniendo del archivo
-// subido al terminar.
+// habla. Si esto falla por lo que sea, no afecta la grabación real: el
+// archivo se sube igual al terminar.
+//
+// Con ese texto también se escribe la nota en vivo (services/notaEnVivo.js),
+// pero SOLO si llegó entero. Para eso se lleva la cuenta de cuántos segundos
+// de audio se mandaron de verdad y de si la conexión se cortó: con la
+// pantalla apagada el celular puede frenar el audio de la vista previa sin
+// que la grabación real se entere, y una nota hecha de un texto con huecos
+// podría no tener justo lo importante. resultado() lo dice.
 function crearTranscriptorEnVivo(onTexto) {
   let ws = null, audioCtx = null, workletNode = null, source = null, detenidoManualmente = false;
+  let textoAcumulado = "", parcial = "", muestrasEnviadas = 0, huboCorte = false;
 
   const CODIGO_WORKLET = `
     class PCMWorklet extends AudioWorkletProcessor {
@@ -544,6 +551,7 @@ function crearTranscriptorEnVivo(onTexto) {
 
   async function iniciar(stream) {
     detenidoManualmente = false;
+    textoAcumulado = ""; parcial = ""; muestrasEnviadas = 0; huboCorte = false;
     try {
       const { token, keyterms, idioma, medicalMode } = await api("/medico/transcripcion-token");
       // Mismo criterio que la transcripción final (services/assemblyai.js):
@@ -584,9 +592,11 @@ function crearTranscriptorEnVivo(onTexto) {
       workletNode = new AudioWorkletNode(audioCtx, "pcm-worklet");
       source.connect(workletNode);
 
-      let textoAcumulado = "";
       workletNode.port.onmessage = (e) => {
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(e.data);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(e.data);
+          muestrasEnviadas += e.data.byteLength / 2;   // PCM de 16 bits
+        }
       };
       ws.onmessage = (ev) => {
         try {
@@ -596,14 +606,17 @@ function crearTranscriptorEnVivo(onTexto) {
           // "transcript", y por eso el cierre (código 3007 y similares)
           // quedaba sin explicación visible.
           if (msg.error || msg.type === "Error") {
+            huboCorte = true;
             onTexto("⚠️ Vista previa en vivo: " + (msg.error || msg.message || JSON.stringify(msg)));
             return;
           }
           if (!msg.transcript) return;
           if (msg.end_of_turn) {
             textoAcumulado += msg.transcript + " ";
+            parcial = "";
             onTexto(textoAcumulado);
           } else {
+            parcial = msg.transcript;
             onTexto(textoAcumulado + msg.transcript);
           }
         } catch {}
@@ -612,15 +625,18 @@ function crearTranscriptorEnVivo(onTexto) {
       // ahora se avisa en el propio texto en vivo para poder diagnosticar
       // sin herramientas de desarrollador (el médico graba desde el celular).
       ws.onerror = () => {
+        huboCorte = true;
         onTexto("⚠️ Vista previa en vivo no disponible (error de conexión). La grabación real no se ve afectada.");
       };
       ws.onclose = (ev) => {
         if (detenidoManualmente) return;
+        huboCorte = true;
         if (ev.code !== 1000) {
           onTexto(`⚠️ Vista previa en vivo se cortó (código ${ev.code}${ev.reason ? ": " + ev.reason : ""}). La grabación real no se ve afectada.`);
         }
       };
     } catch (e) {
+      huboCorte = true;
       onTexto("⚠️ Vista previa en vivo no disponible: " + e.message);
       console.warn("Transcripción en vivo no disponible:", e.message);
     }
@@ -643,5 +659,23 @@ function crearTranscriptorEnVivo(onTexto) {
     ws = null; audioCtx = null; workletNode = null; source = null;
   }
 
-  return { iniciar, detener };
+  // Lo último que estaba diciendo (sin cierre de frase todavía) cuenta: al
+  // tocar «Terminar» suele ser justo la indicación final.
+  function resultado() {
+    return {
+      texto: (textoAcumulado + parcial).trim(),
+      segundosEnviados: muestrasEnviadas / 16000,
+      huboCorte,
+    };
+  }
+
+  return { iniciar, detener, resultado };
+}
+
+// ¿El texto en vivo llegó entero? Sin cortes, y con casi todo el audio de
+// la grabación mandado: el WebSocket tarda un instante en abrir, así que un
+// poco menos es normal; mucho menos es un hueco.
+function textoEnVivoCompleto(r, segundosGrabados) {
+  if (!r || r.huboCorte || !r.texto) return false;
+  return r.segundosEnviados >= Math.max(0, segundosGrabados - 5) * 0.9;
 }

@@ -64,6 +64,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         <div class="live-caption" id="liveCaption"></div>
         <div id="recAviso"></div>
       </div>
+      <div class="nota-vivo" id="notaVivo" style="display:none"></div>
 
       <div class="rec-box">
         <button class="rec-btn" id="recBtn">${ICONO_MIC}</button>
@@ -93,6 +94,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   const liveCaption = document.getElementById("liveCaption");
   const onda = crearIndicadorAudio(document.getElementById("audioOrb"));
   const transcriptorVivo = crearTranscriptorEnVivo(texto => { liveCaption.textContent = texto; });
+  const notaVivo = crearNotaEnVivo(pacienteId, document.getElementById("notaVivo"), transcriptorVivo);
   const recAviso = document.getElementById("recAviso");
   let guardian = null;
   // Id del respaldo en el teléfono de ESTA toma (ver respaldoGrabacion en
@@ -145,6 +147,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
             stream.getTracks().forEach(t => t.stop());
             onda.detener();
             transcriptorVivo.detener();
+            notaVivo.detener();
             return;
           }
           // Se lee ANTES de detener el cuidador: dice cuánto de la grabación
@@ -155,6 +158,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
           stream.getTracks().forEach(t => t.stop());
           onda.detener();
           transcriptorVivo.detener();
+          notaVivo.terminar(seconds);
           listenPanel.style.display = "none";
           recStatus.textContent = t("consulta.grabacionLista", { tiempo: fmt(seconds) });
           const sinMicro = r ? r.segundosSinMicrofono : 0;
@@ -181,6 +185,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
         listenPanel.style.display = "block";
         onda.iniciar(stream);
         transcriptorVivo.iniciar(stream);
+        notaVivo.iniciar();
         // El tiempo es el REAL transcurrido, no la cuenta de "tics": con la
         // pantalla apagada el celular frena los temporizadores, y el reloj
         // decía 1:36 cuando habían pasado cinco minutos.
@@ -206,6 +211,8 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
     const f = e.target.files[0];
     if (!f) return;
     blob = f; mimeType = f.type || "audio/mpeg";
+    // Un archivo subido no tiene texto en vivo: la nota sale del audio.
+    notaVivo.descartar();
     recStatus.textContent = t("consulta.archivoListo", { nombre: f.name });
     ncSubir.style.display = "block";
   };
@@ -217,6 +224,10 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
     ncSubir.textContent = t("consulta.subiendo");
     try {
       const data = await subirConsulta(pacienteId, blob, mimeType);
+      // Si el texto en vivo llegó entero, la nota sale de ahí y no hay que
+      // esperar a la transcripción completa. Si esto falla, no pasa nada:
+      // la nota sale del audio, como antes.
+      await notaVivo.entregar(data.consulta._id);
       // Subida: ya no hay nada que proteger ni que respaldar.
       respaldoGrabacion.borrar(respaldoId);
       respaldoId = null;
@@ -228,6 +239,113 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
       ncSubir.textContent = t("consulta.reintentar");
       ncErr.innerHTML = `<div class="error">${esc(e.error || t("consulta.errSubir"))}</div>`;
     }
+  };
+}
+
+// ─── LA NOTA EN VIVO, MIENTRAS SE GRABA (ver services/notaEnVivo.js) ────
+//
+// Cada tanto, el texto de la vista previa va al servidor y vuelve como nota.
+// Un pedido por vez: si la IA todavía no contestó el anterior, se espera al
+// siguiente turno con el texto más nuevo, en vez de encolar versiones viejas.
+const NOTA_VIVO_CADA_MS = 45000;
+
+function crearNotaEnVivo(pacienteId, caja, transcriptor) {
+  let timer = null, enCurso = null, ultimoTexto = "", nota = null;
+  let completo = false, textoFinal = "", terminando = null;
+  const palabras = (txt) => String(txt || "").split(/\s+/).filter(Boolean).length;
+
+  function pintar(estado) {
+    if (!nota && estado !== "corte") {
+      caja.style.display = "block";
+      caja.innerHTML = `<div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
+        <div class="hint">${t(estado === "pidiendo" ? "vivo.actualizando" : "vivo.esperando")}</div>`;
+      return;
+    }
+    if (estado === "corte") {
+      caja.style.display = "block";
+      caja.innerHTML = `<div class="hint">${t("vivo.corte")}</div>`;
+      return;
+    }
+    const n = nota;
+    const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
+    const meds = (n.medicamentosRecetados || []).map(m => [m.nombre, m.dosis, m.frecuencia].filter(Boolean).join(" ")).join("; ");
+    caja.style.display = "block";
+    caja.innerHTML = `
+      <div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
+      <div class="hint" style="margin-bottom:8px">${t(estado === "final" ? "vivo.final" : estado === "pidiendo" ? "vivo.actualizando" : "vivo.ayuda")}</div>
+      ${campo("nota.motivo", n.motivoConsulta)}
+      ${campo("nota.sintomas", (n.sintomas || []).join(", "))}
+      ${campo("nota.antecedentes", n.antecedentesRelevantes)}
+      ${campo("nota.diagnostico", n.diagnostico)}
+      ${campo("nota.diferenciales", (n.diagnosticosDiferenciales || []).join(", "))}
+      ${campo("nota.plan", n.plan)}
+      ${campo("nota.medicamentos", meds)}
+      ${campo("nota.examenes", (n.examenesSolicitados || []).join(", "))}`;
+  }
+
+  function pedir(texto, estadoAlTerminar) {
+    ultimoTexto = texto;
+    pintar("pidiendo");
+    enCurso = api("/medico/consultas/nota-en-vivo", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pacienteId, texto }),
+    })
+      .then(r => { if (r?.nota) nota = r.nota; })
+      .catch(() => { /* un borrador que no salió no frena nada */ })
+      .finally(() => { enCurso = null; pintar(estadoAlTerminar); });
+    return enCurso;
+  }
+
+  function turno() {
+    if (enCurso) return;
+    const { texto } = transcriptor.resultado();
+    if (palabras(texto) < 15 || texto === ultimoTexto) return;
+    pedir(texto, "vivo");
+  }
+
+  async function terminarAhora(segundosGrabados) {
+    clearInterval(timer); timer = null;
+    const r = transcriptor.resultado();
+    completo = textoEnVivoCompleto(r, segundosGrabados) && palabras(r.texto) >= 15;
+    textoFinal = completo ? r.texto : "";
+    if (!completo) {
+      if (palabras(r.texto) >= 15) pintar("corte"); else caja.style.display = "none";
+      return;
+    }
+    if (enCurso) await enCurso;
+    if (r.texto !== ultimoTexto) pedir(r.texto, "final"); else pintar("final");
+  }
+
+  return {
+    iniciar() {
+      clearInterval(timer);
+      nota = null; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
+      pintar("esperando");
+      timer = setInterval(turno, NOTA_VIVO_CADA_MS);
+    },
+    detener() { clearInterval(timer); timer = null; },
+    descartar() { clearInterval(timer); timer = null; completo = false; textoFinal = ""; caja.style.display = "none"; },
+    // Al tocar «Terminar»: si el texto llegó entero, un último borrador con
+    // todo, para que el médico vea la nota antes de subir. El servidor lo
+    // guarda y lo reusa al subir: no se le pide dos veces lo mismo a la IA.
+    terminar(segundosGrabados) {
+      terminando = terminarAhora(segundosGrabados);
+      return terminando;
+    },
+    // Ya subida la grabación: el texto entero va con ella, y la nota sale
+    // de ahí. Se espera el último borrador para que el servidor lo reuse.
+    async entregar(consultaId) {
+      if (!completo || !textoFinal) return;
+      try {
+        if (terminando) await terminando;
+        if (enCurso) await enCurso;
+        await api(`/medico/consultas/${consultaId}/texto-en-vivo`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto: textoFinal }),
+        });
+      } catch { /* la nota sale de la transcripción completa */ }
+      completo = false; textoFinal = "";
+    },
   };
 }
 
@@ -341,6 +459,113 @@ function botonRegenerarNotaHtml() {
     <div class="hint">${t("nota.regenerarAyuda")}</div>`;
 }
 
+// "quien" solo viene de la teleconsulta, donde el médico y el paciente se
+// grabaron en canales separados y no hay nada que adivinar. En la consulta
+// presencial no está, y ahí sigue el "Hablante A / B" de la diarización —
+// decir "Médico" sobre una adivinanza sería inventar una certeza que no
+// tenemos.
+function transcripcionHtml(segmentos) {
+  return `<div class="seccion-titulo">${t("consulta.transcripcion")}</div>` + segmentos.map(s => `
+    <div class="segmento h${s.quien ? (s.quien === "medico" ? 0 : 1) : (s.hablante && s.hablante.charCodeAt(0) % 2)}">
+      <div class="quien">${s.quien
+        ? t(s.quien === "medico" ? "consulta.quienMedico" : "consulta.quienPaciente")
+        : t("consulta.hablante", { n: esc(s.hablante) })}</div>
+      <div class="texto">${esc(s.texto)}</div>
+    </div>`).join("");
+}
+
+// Las filas de medicamentos de la nota que tienen nombre, en orden: lo que
+// se manda al confirmar.
+function filasMedicamentos() {
+  return [...document.querySelectorAll("#nfMeds .med-row")].filter(r => r.querySelector(".nf-med-nombre").value.trim());
+}
+
+// Una casilla «Cargar a Medicación» por fila, con lo que la fila dice ahora.
+// Lo que el médico ya desmarcó queda desmarcado (por fila, no por posición).
+function pintarChecksMedicacion() {
+  const caja = document.getElementById("cfMeds");
+  if (!caja) return;
+  const antes = new Map([...caja.querySelectorAll(".cf-med")].map(x => [x.dataset.k, x.checked]));
+  caja.innerHTML = filasMedicamentos().map(r => {
+    const nombre = r.querySelector(".nf-med-nombre").value.trim();
+    const dosis = r.querySelector(".nf-med-dosis").value.trim();
+    const k = r.dataset.k;
+    return `<div class="conf-fila">
+      <label class="conf-check"><input type="checkbox" class="cf-med" data-k="${esc(k)}"${antes.get(k) === false ? "" : " checked"}>
+        <span>${t("confirmar.medicacion", { item: esc(nombre + (dosis ? " " + dosis : "")) })}</span></label>
+    </div>`;
+  }).join("");
+}
+
+// ─── LA VERIFICACIÓN DE LA NOTA EN VIVO (services/notaEnVivo.js) ────────
+//
+// La nota se escribió con el texto en vivo; la transcripción completa la
+// compara después. Lo que no coincide se MUESTRA con un botón: la nota no se
+// cambia sola.
+function verificacionHtml(v) {
+  const estado = v?.estado || "";
+  if (estado === "pendiente" || estado === "verificando") return `<div class="hint verif-aviso">${t("verif.pendiente")}</div>`;
+  if (estado === "ok") return `<div class="hint verif-aviso" style="color:var(--success)">${t("verif.ok")}</div>`;
+  if (estado === "error") return `<div class="error verif-aviso">${t("verif.error")}</div>`;
+  if (estado !== "diferencias") return "";
+  const faltan = (v.diferencias || []).map((d, k) => ({ d, k })).filter(x => x.d.tipo === "falta");
+  return `<div class="error verif-aviso">${t("verif.diferencias", { n: (v.diferencias || []).length })}</div>
+    ${faltan.map(({ d, k }) => `
+      <div class="verif-falta" style="margin:6px 0">${t("verif.falta", { texto: esc(d.enAudio) })}
+        <button type="button" class="link verif-agregar" data-k="${k}" style="width:auto;margin:0 0 0 6px">${t("verif.agregar")}</button>
+      </div>`).join("")}`;
+}
+
+// Las marcas que van en la fila de cada medicamento, por su número de fila
+// en la nota original (data-i).
+function pintarVerificacionEnFilas(v) {
+  document.querySelectorAll("#nfMeds .med-row .nf-med-verif").forEach(x => { x.innerHTML = ""; });
+  (v?.diferencias || []).forEach((d, k) => {
+    if (d.indice === null || d.indice === undefined) return;
+    const caja = document.querySelector(`#nfMeds .med-row[data-i="${d.indice}"] .nf-med-verif`);
+    if (!caja) return;
+    caja.innerHTML = d.tipo === "dosis"
+      ? `<div class="med-aviso nf-med-desconocido">${t("verif.dosis", { texto: esc(d.enAudio) })}
+          <button type="button" class="link verif-usar" data-k="${k}" style="width:auto;margin:0 0 0 6px">${t("verif.usarAudio")}</button></div>`
+      : `<div class="med-aviso nf-med-desconocido">${t("verif.noMencionado")}</div>`;
+  });
+}
+
+let verificacionActual = null;
+
+async function vigilarVerificacion(id) {
+  detenerPolling();
+  let c;
+  try {
+    c = (await api("/medico/consultas/" + id)).consulta;
+  } catch (e) {
+    if (e.status === 401) return logout();
+    pollTimeout = setTimeout(() => vigilarVerificacion(id), 8000);
+    return;
+  }
+  // Si el médico ya salió de esta pantalla, no hay nada que actualizar.
+  const caja = document.getElementById("verifBox");
+  const boton = document.getElementById("btnConfirmarConsulta");
+  if (!caja || !boton) return;
+  verificacionActual = c.verificacion;
+  caja.innerHTML = verificacionHtml(c.verificacion);
+  pintarVerificacionEnFilas(c.verificacion);
+  const esperando = !c.confirmadaEn && ["pendiente", "verificando"].includes(c.verificacion?.estado);
+  if (!esperando && boton.disabled && boton.textContent === t("verif.esperarConfirmar")) {
+    boton.disabled = false;
+    boton.textContent = t("confirmar.boton");
+  }
+  if (c.estado !== "procesando") {
+    const cuerpo = document.getElementById("cuerpoTranscripcion");
+    if (cuerpo && c.segmentos?.length) {
+      cuerpo.innerHTML = transcripcionHtml(c.segmentos);
+    } else if (cuerpo && c.estado === "error") {
+      cuerpo.innerHTML = `<div class="error">⚠️ ${esc(c.error || t("consulta.errTranscribir"))}</div>`;
+    }
+  }
+  if (c.estado === "procesando" || esperando) pollTimeout = setTimeout(() => vigilarVerificacion(id), 5000);
+}
+
 async function renderDetalle(id, esRefrescoAutomatico) {
   detenerPolling();
   if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.cargando")}</div>`;
@@ -350,7 +575,11 @@ async function renderDetalle(id, esRefrescoAutomatico) {
 
     const yaConfirmada = !!c.confirmadaEn;
     const n = c.notaClinica;
-    const hayNota = c.estado === "completado" && c.notaClinicaEstado === "completado" && n;
+    // La nota en vivo se muestra apenas está, aunque la transcripción
+    // completa siga en camino: para eso existe (services/notaEnVivo.js).
+    const enVivo = c.notaFuente === "vivo";
+    const hayNota = (c.estado === "completado" || enVivo) && c.notaClinicaEstado === "completado" && n;
+    const esperandoVerif = enVivo && !yaConfirmada && ["pendiente", "verificando"].includes(c.verificacion?.estado);
 
     // ── NOTA CLÍNICA ──
     // Antes de confirmar es un formulario: la IA se equivoca (nombres de
@@ -358,7 +587,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     // corregirlo antes de que eso quede en el Kardex. Después de confirmar
     // se muestra como texto, ya sin editar.
     let notaHtml = "";
-    if (c.estado === "completado") {
+    if (c.estado === "completado" || enVivo) {
       if (c.notaClinicaEstado === "pendiente") {
         notaHtml = `<div class="card"><div class="hint">${t("nota.generando")}</div></div>`;
       } else if (c.notaClinicaEstado === "error") {
@@ -385,6 +614,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         notaHtml = `
           <div class="card">
             <div class="nota-titulo">${t("nota.tituloIA")}</div>
+            ${enVivo ? `<div id="verifBox">${verificacionHtml(c.verificacion)}</div>` : ""}
             ${notaClinicaVaciaCliente(n) ? `<div class="error" style="margin-top:0">${t("nota.vacia")}</div>${botonRegenerarNotaHtml()}` : ""}
             <div class="hint" style="margin-bottom:12px">${t("nota.revisar")}</div>
             <label>${t("nota.campo.motivo")}</label>
@@ -402,12 +632,13 @@ async function renderDetalle(id, esRefrescoAutomatico) {
             <label>${t("nota.campo.medicamentos")}</label>
             <div id="nfMeds">
               ${(n.medicamentosRecetados || []).map((m, i) => `
-                <div class="med-row" data-i="${i}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center">
+                <div class="med-row" data-i="${i}" data-k="${i}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center">
                   <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
                   <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" value="${esc(m.dosis || "")}" style="flex:1;margin:0">
                   <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" value="${esc(m.frecuencia || "")}" style="flex:1;margin:0">
                   <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>
                   <div class="nf-med-aviso" style="flex-basis:100%">${avisoMedicamentoHtml(c.verificacionMedicamentos?.[i])}</div>
+                  <div class="nf-med-verif" style="flex-basis:100%"></div>
                 </div>`).join("")}
             </div>
             <button class="link" id="nfMedAgregar" style="margin:0 0 10px 0;width:auto">${t("nota.med.agregar")}</button>
@@ -466,11 +697,12 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           </div>`);
       }
 
-      (n.medicamentosRecetados || []).forEach((m, i) => filas.push(`
-        <div class="conf-fila">
-          <label class="conf-check"><input type="checkbox" class="cf-med" data-i="${i}" checked>
-            <span>${t("confirmar.medicacion", { item: esc(m.nombre + (m.dosis ? " " + m.dosis : "")) })}</span></label>
-        </div>`));
+      // «Cargar a Medicación» sigue a las filas de la nota tal como están
+      // AHORA (pintarChecksMedicacion): antes se armaba una vez con la nota
+      // original, y una dosis corregida seguía diciendo la vieja, un
+      // medicamento agregado no aparecía, y al borrar una fila los números
+      // se corrían y se cargaba OTRO.
+      filas.push(`<div id="cfMeds"></div>`);
 
       (n.antecedentesPersonalesNuevos || []).forEach((a, i) => filas.push(`
         <div class="conf-fila">
@@ -492,34 +724,27 @@ async function renderDetalle(id, esRefrescoAutomatico) {
 
       confirmarHtml = `
         <div class="card">
-          ${filas.length ? `
+          ${filas.length > 1 || (n.medicamentosRecetados || []).length ? `
             <div class="nota-titulo">${t("confirmar.titulo")}</div>
             <div class="hint" style="margin-bottom:10px">${t("confirmar.ayuda")}</div>
             ${filas.join("")}` : `
-            <div class="hint">${t("confirmar.nada")}</div>`}
+            <div class="hint">${t("confirmar.nada")}</div>
+            ${filas.join("")}`}
           <div id="confirmarErr"></div>
-          <button class="primary" id="btnConfirmarConsulta" style="margin-top:14px">${t("confirmar.boton")}</button>
+          <button class="primary" id="btnConfirmarConsulta" style="margin-top:14px"${esperandoVerif ? " disabled" : ""}>${t(esperandoVerif ? "verif.esperarConfirmar" : "confirmar.boton")}</button>
         </div>`;
     }
 
     let body = "";
-    if (c.estado === "procesando") {
+    if (c.estado === "procesando" && enVivo) {
+      body = `<div class="hint">${t("consulta.procesandoVivo")}</div>
+        <div class="hint" style="white-space:pre-wrap">${esc(c.transcripcionEnVivo || "")}</div>`;
+    } else if (c.estado === "procesando") {
       body = `<div class="hint">${t("consulta.procesando")}</div>`;
     } else if (c.estado === "error") {
       body = `<div class="error">⚠️ ${esc(c.error || t("consulta.errTranscribir"))}</div>`;
     } else if (c.segmentos && c.segmentos.length) {
-      // "quien" solo viene de la teleconsulta, donde el médico y el paciente
-      // se grabaron en canales separados y no hay nada que adivinar. En la
-      // consulta presencial no está, y ahí sigue el "Hablante A / B" de la
-      // diarización — decir "Médico" sobre una adivinanza sería inventar una
-      // certeza que no tenemos.
-      body = `<div class="seccion-titulo">${t("consulta.transcripcion")}</div>` + c.segmentos.map(s => `
-        <div class="segmento h${s.quien ? (s.quien === "medico" ? 0 : 1) : (s.hablante && s.hablante.charCodeAt(0) % 2)}">
-          <div class="quien">${s.quien
-            ? t(s.quien === "medico" ? "consulta.quienMedico" : "consulta.quienPaciente")
-            : t("consulta.hablante", { n: esc(s.hablante) })}</div>
-          <div class="texto">${esc(s.texto)}</div>
-        </div>`).join("");
+      body = transcripcionHtml(c.segmentos);
     } else {
       body = `<div class="hint">${esc(c.transcripcionCompleta || t("consulta.sinTranscripcion"))}</div>`;
     }
@@ -533,7 +758,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       ${hiloClinicoHtml(c)}
       ${notaHtml}
       ${confirmarHtml}
-      <div style="margin-top:14px">${body}</div>
+      <div style="margin-top:14px" id="cuerpoTranscripcion">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
     engancharHiloClinico();
@@ -553,11 +778,26 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           fila.querySelector(".nf-med-aviso").innerHTML = "";
           return;
         }
+        const usar = e.target.closest(".verif-usar");
+        if (usar) {
+          e.preventDefault();
+          const d = verificacionActual?.diferencias?.[Number(usar.dataset.k)];
+          const fila = usar.closest(".med-row");
+          if (d?.medicamento && fila) {
+            fila.querySelector(".nf-med-dosis").value = d.medicamento.dosis || "";
+            fila.querySelector(".nf-med-frec").value = d.medicamento.frecuencia || "";
+            fila.querySelector(".nf-med-verif").innerHTML = "";
+            pintarChecksMedicacion();
+          }
+          return;
+        }
         const quitar = e.target.closest(".nf-med-quitar");
         if (!quitar) return;
         e.preventDefault();
         quitar.closest(".med-row").remove();
+        pintarChecksMedicacion();
       };
+      medsBox.addEventListener("input", pintarChecksMedicacion);
       // Al terminar de escribir un nombre (salir del campo), se revisa ese.
       medsBox.addEventListener("change", async (e) => {
         const input = e.target.closest(".nf-med-nombre");
@@ -571,18 +811,37 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           if (input.value.trim() === nombre) aviso.innerHTML = avisoMedicamentoHtml(r);
         } catch { /* sin aviso: no bloquea nada */ }
       });
-      document.getElementById("nfMedAgregar").onclick = (e) => {
-        e.preventDefault();
+      let filasNuevas = 0;
+      const agregarFila = (m = {}) => {
         const fila = document.createElement("div");
         fila.className = "med-row";
+        fila.dataset.k = "n" + (++filasNuevas);
         fila.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center";
         fila.innerHTML = `
-          <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" style="flex:2;margin:0">
-          <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" style="flex:1;margin:0">
-          <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" style="flex:1;margin:0">
+          <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
+          <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" value="${esc(m.dosis || "")}" style="flex:1;margin:0">
+          <input class="nf-med-frec" type="text" placeholder="${t("nota.med.frecuencia")}" value="${esc(m.frecuencia || "")}" style="flex:1;margin:0">
           <button class="link nf-med-quitar" title="${t("nota.med.quitar")}" style="margin:0;width:auto">✕</button>
           <div class="nf-med-aviso" style="flex-basis:100%"></div>`;
         medsBox.appendChild(fila);
+        pintarChecksMedicacion();
+      };
+      pintarChecksMedicacion();
+      document.getElementById("nfMedAgregar").onclick = (e) => {
+        e.preventDefault();
+        agregarFila();
+      };
+      // Lo que el audio completo dice distinto: solo cambia si el médico
+      // toca el botón, igual que la sugerencia de nombre.
+      verificacionActual = c.verificacion;
+      const verifBox = document.getElementById("verifBox");
+      if (verifBox) verifBox.onclick = (e) => {
+        const b = e.target.closest(".verif-agregar");
+        if (!b) return;
+        e.preventDefault();
+        const d = verificacionActual?.diferencias?.[Number(b.dataset.k)];
+        if (d?.medicamento) agregarFila(d.medicamento);
+        b.closest(".verif-falta").remove();
       };
     }
 
@@ -605,14 +864,14 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           plan: val("nfPlan"),
           examenesSolicitados: lista("nfExamenes"),
           proximoControl: val("nfProximoControl"),
-          medicamentosRecetados: [...document.querySelectorAll("#nfMeds .med-row")].map(r => ({
+          medicamentosRecetados: filasMedicamentos().map(r => ({
             // De qué fila de la nota original salió: así el servidor sabe
             // qué nombre corrigió el médico, y lo aprende.
             origen: r.dataset.i !== undefined ? Number(r.dataset.i) : null,
             nombre: r.querySelector(".nf-med-nombre").value.trim(),
             dosis: r.querySelector(".nf-med-dosis").value.trim(),
             frecuencia: r.querySelector(".nf-med-frec").value.trim(),
-          })).filter(m => m.nombre),
+          })),
         };
 
         const aplicar = {
@@ -628,7 +887,11 @@ async function renderDetalle(id, esRefrescoAutomatico) {
               piezaFdi: r.querySelector(".ts-pieza").value,
               precio: r.querySelector(".ts-precio").value,
             })),
-          medicamentos: [...document.querySelectorAll(".cf-med:checked")].map(x => Number(x.dataset.i)),
+          // Posiciones en la lista que se manda arriba (nota.medicamentosRecetados),
+          // que es contra la que el servidor las busca.
+          medicamentos: filasMedicamentos()
+            .map((r, j) => (document.querySelector(`#cfMeds .cf-med[data-k="${r.dataset.k}"]`)?.checked ? j : -1))
+            .filter(j => j >= 0),
           antecedentesPersonales: [...document.querySelectorAll(".cf-antp:checked")].map(x => Number(x.dataset.i)),
           antecedentesFamiliares: [...document.querySelectorAll(".cf-antf:checked")].map(x => Number(x.dataset.i)),
           vacunas: [...document.querySelectorAll(".cf-vac:checked")].map(x => Number(x.dataset.i)),
@@ -672,8 +935,16 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       };
     }
 
-    if (c.estado === "procesando" || (c.estado === "completado" && c.notaClinicaEstado === "pendiente")) {
-      pollTimeout = setTimeout(() => renderDetalle(id, true), 8000);
+    if (enVivo && hayNota) pintarVerificacionEnFilas(c.verificacion);
+
+    // Con la nota en vivo en pantalla, el médico puede estar corrigiéndola
+    // mientras llega la transcripción completa: repintar todo le borraría lo
+    // que escribió. Se actualiza solo lo que cambia —la verificación, el
+    // botón y la transcripción—, sin tocar los campos.
+    if (hayNota && !yaConfirmada && (c.estado === "procesando" || esperandoVerif)) {
+      pollTimeout = setTimeout(() => vigilarVerificacion(id), 5000);
+    } else if (c.estado === "procesando" || ((c.estado === "completado" || enVivo) && c.notaClinicaEstado === "pendiente")) {
+      pollTimeout = setTimeout(() => renderDetalle(id, true), enVivo ? 3000 : 8000);
     }
   } catch (e) {
     if (e.status === 401) return logout();
