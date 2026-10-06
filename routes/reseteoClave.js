@@ -29,6 +29,7 @@ const { esOperador } = require("../services/operadores");
 const { hashPassword } = require("../services/auth");
 const { CONFIG, log } = require("../config");
 const { esCuentaBrasil } = require("../services/idiomas");
+const { buscarPorTelefono } = require("../services/telefono");
 
 const requireSesion = requireAuth(["medico", "admin"]);
 
@@ -117,8 +118,9 @@ module.exports = function (app) {
     // solo se comprueba contra otros socios). Si pasa, se le arma un pedido a
     // cada cuenta y el admin decide con cuál seguir.
     const [medico, socio] = await Promise.all([
-      Medico.findOne({ phone: telefono }).select("nombre activo estadoCuenta").lean(),
-      Socio.findOne({ phone: telefono }).select("nombre activo").lean(),
+      // Como lo haya escrito (services/telefono.js): es el mismo número.
+      buscarPorTelefono(Medico, telefono, { select: "nombre activo estadoCuenta", lean: true }),
+      Socio.findOne({ phone: telefono }).select("nombre activo phone").lean(),
     ]);
 
     const candidatos = [];
@@ -126,10 +128,12 @@ module.exports = function (app) {
     // reseteo: no puede entrar igual. Pedirle un enlace igual sería trabajo
     // del admin que no resuelve nada.
     if (medico && medico.activo && medico.estadoCuenta === "aprobada") {
-      candidatos.push({ tipo: "medico", nombre: medico.nombre });
+      // El teléfono de la CUENTA, no el escrito: el pedido después se aplica
+      // buscando por este número.
+      candidatos.push({ tipo: "medico", nombre: medico.nombre, telefono: medico.phone });
     }
     if (socio && socio.activo) {
-      candidatos.push({ tipo: "socio", nombre: socio.nombre });
+      candidatos.push({ tipo: "socio", nombre: socio.nombre, telefono: socio.phone });
     }
 
     for (const c of candidatos) {
@@ -145,7 +149,7 @@ module.exports = function (app) {
       // flujo completo, no leyendo el código — es justo el tipo de cosa que
       // una lectura no agarra.
       await SolicitudReseteo.updateMany(
-        { tipo: c.tipo, telefono, estado: "aprobada", tokenExpira: { $lt: new Date() } },
+        { tipo: c.tipo, telefono: c.telefono, estado: "aprobada", tokenExpira: { $lt: new Date() } },
         { $set: { estado: "vencida" } });
 
       // No se pisa un pedido vivo: si ya hay uno pendiente o ya aprobado sin
@@ -153,12 +157,12 @@ module.exports = function (app) {
       // parcial de la base es la garantía real, esto es solo para no ni
       // siquiera intentarlo.
       const yaHay = await SolicitudReseteo.findOne({
-        tipo: c.tipo, telefono, estado: { $in: ["pendiente", "aprobada"] },
+        tipo: c.tipo, telefono: c.telefono, estado: { $in: ["pendiente", "aprobada"] },
       }).lean();
       if (yaHay) continue;
       try {
         await SolicitudReseteo.create({
-          tipo: c.tipo, telefono, nombre: c.nombre,
+          tipo: c.tipo, telefono: c.telefono, nombre: c.nombre,
           ip: req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "",
         });
       } catch (e) {

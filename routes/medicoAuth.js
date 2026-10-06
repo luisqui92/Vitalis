@@ -10,6 +10,7 @@ const { notificarMedico } = require("../services/push");
 const { log } = require("../config");
 const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
+const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
 
 // Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
 // propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
@@ -79,7 +80,9 @@ function datosDeSesion(medico) {
 module.exports = function (app) {
   // ─── REGISTRO ───────────────────────────────────────────────────────────
   app.post("/medico/registro", limitAuth, asyncRoute(async (req, res) => {
-    const phone = String(req.body?.phone || "").trim();
+    // Se guarda solo con dígitos (services/telefono.js): «++55 11…» queda
+    // «5511…», que es como lo escribe todo el sistema y lo que acepta WhatsApp.
+    const phone = soloDigitos(req.body?.phone);
     const nombre = String(req.body?.nombre || "").trim();
     const especialidad = String(req.body?.especialidad || "").trim();
     const tipoEspecialidad = ["odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
@@ -88,6 +91,7 @@ module.exports = function (app) {
     const matricula = String(req.body?.matricula || "").trim().slice(0, 60);
     const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
+    if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
     // No se verifica contra ningún registro —no hay una API del colegio
     // médico— así que exigirla no prueba nada por sí sola. Pero obliga a
@@ -95,7 +99,8 @@ module.exports = function (app) {
     // concreto que mirar en vez de un nombre suelto.
     if (!matricula) throw new ErrorHttp(400, "Falta la matrícula profesional");
 
-    const yaExiste = await Medico.findOne({ phone });
+    // Con o sin «+»: una cuenta vieja guardada como «+5511…» es la misma.
+    const yaExiste = await buscarPorTelefono(Medico, phone, { select: "_id", lean: true });
     if (yaExiste) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
 
     // ─── LA CUENTA NACE APAGADA ─────────────────────────────────────────
@@ -131,9 +136,9 @@ module.exports = function (app) {
   // Si el médico tiene 2FA activo, no devuelve el token real todavía: da un
   // token de corta duración que solo sirve para el paso 2 (/medico/login/2fa).
   app.post("/medico/login", limitAuth, limitLoginPorCuenta, asyncRoute(async (req, res) => {
-    const phone = String(req.body?.phone || "").trim();
+    const escrito = String(req.body?.phone || "").trim();
     const password = String(req.body?.password || "");
-    if (!phone || !password) throw new ErrorHttp(400, "phone y password son requeridos");
+    if (!escrito || !password) throw new ErrorHttp(400, "phone y password son requeridos");
 
     // Se busca SIN filtrar por activo, y el estado de la cuenta se mira
     // DESPUÉS de verificar la contraseña. El orden es la parte que importa:
@@ -141,7 +146,10 @@ module.exports = function (app) {
     // cualquiera podría averiguar qué teléfonos tienen cuenta en Symphomed
     // probando números. Primero probás que sos vos; recién ahí te contamos
     // en qué estado está lo tuyo.
-    const medico = await Medico.findOne({ phone });
+    // Como lo haya escrito: con «+», sin «+», con espacios (services/telefono.js).
+    const medico = await buscarPorTelefono(Medico, escrito);
+    // Lo que queda en la auditoría es la cuenta, no cómo se tipeó.
+    const phone = medico?.phone || soloDigitos(escrito) || escrito;
     const { ok, requiereRehash } = medico
       ? await verificarPassword(password, medico.passwordHash)
       : { ok: false, requiereRehash: false };

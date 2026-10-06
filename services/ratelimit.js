@@ -155,7 +155,12 @@ const limitLoginPorCuenta = rateLimitPorClave(
   "authCuenta", 10, 15 * 60 * 1000,
   "Demasiados intentos para esta cuenta. Esperá unos minutos antes de volver a intentar.",
   (req) => {
-    const phone = String(req.body?.phone || "").trim();
+    // Por los dígitos y no por el texto: el login acepta el número escrito
+    // de cualquier forma (services/telefono.js), y si el límite contara
+    // «+5511…», «5511…» y «++5511…» por separado, alternarlos daría el
+    // triple de intentos contra la misma cuenta.
+    const texto = String(req.body?.phone || "").trim();
+    const phone = texto.replace(/\D/g, "") || texto;
     return phone ? `login:${phone}` : null;
   }
 );
