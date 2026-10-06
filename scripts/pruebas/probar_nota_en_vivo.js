@@ -63,7 +63,11 @@ axios.post = async (url, cuerpo) => {
   if (texto.includes("tengo fiebre")) llamadasIA++;
   if (texto.includes("FALLA_IA")) throw new Error("la IA no contestó");
   let nota;
-  if (texto.includes("DOSIS_AUDIO")) nota = NOTA([{ nombre: "Amoxicilina", dosis: "500 mg", frecuencia: "cada 8 horas" }]);
+  // El caso real: se dijo paracetamol y la IA puso ibuprofeno. Las dos veces
+  // (en vivo y con el audio completo), para probar que no alcanza con que dos
+  // notas de IA coincidan.
+  if (texto.includes("IBU_INVENTADO")) nota = NOTA([{ nombre: "Amoxicilina", dosis: "500 mg", frecuencia: "cada 8 horas" }, { nombre: "Ibuprofeno", dosis: "400 mg", frecuencia: "cada 8 horas" }]);
+  else if (texto.includes("DOSIS_AUDIO")) nota = NOTA([{ nombre: "Amoxicilina", dosis: "500 mg", frecuencia: "cada 8 horas" }]);
   else nota = NOTA([{ nombre: "Amoxicilina", dosis: "50 mg", frecuencia: "cada 8 horas" }]);
   return { data: { choices: [{ message: { content: JSON.stringify(nota) } }] } };
 };
@@ -251,6 +255,39 @@ const TEXTO_AUDIO = "DOSIS_AUDIO Buenos días doctor me duele la garganta hace t
   await hasta(async () => (await leer(id5)).notaClinicaEstado === "completado");
   c = await leer(id5);
   verificar("regenerada desde la transcripción completa: ya no es «en vivo» ni espera verificación", r.estado === 202 && c.notaFuente === "audio" && !c.verificacion?.estado);
+
+  console.log("\n── 13. Un medicamento que nadie nombró (se dijo paracetamol, la IA puso ibuprofeno) ──");
+  const { nombradoEnTexto } = require(path.join(RAIZ, "services", "notaEnVivo"));
+  const DICHO = "IBU_INVENTADO tengo fiebre le doy amoxicilina quinientos cada ocho horas y paracetamol quinientos si hay fiebre";
+  verificar("«Ibuprofeno» no está en lo que se dijo", !nombradoEnTexto("Ibuprofeno", DICHO));
+  verificar("«Paracetamol» y «Amoxicilina» sí", nombradoEnTexto("Paracetamol", DICHO) && nombradoEnTexto("Amoxicilina", DICHO));
+  verificar("un nombre escuchado un poco distinto («amoxisilina») cuenta como dicho", nombradoEnTexto("Amoxicilina", "le doy amoxisilina"));
+  verificar("la sal no hace falta decirla («Losartán potásico» / «losartan»)", nombradoEnTexto("Losartán potásico", "toma losartan de cincuenta"));
+  verificar("lo que el médico ya enseñó a corregir cuenta como dicho",
+    nombradoEnTexto("Espironolactona", "le doy inibidor de ate", [{ dijo: "Inibidor de ATE", correcto: "Espironolactona" }]));
+  verificar("«ácido» solo no hace pasar a «Ácido fólico»", !nombradoEnTexto("Ácido fólico", "tiene el acido urico alto"));
+  r = await pedir(puerto, "POST", "/medico/consultas/nota-en-vivo", tk, { pacienteId: String(paciente._id), texto: DICHO });
+  verificar("el borrador en vivo marca el ibuprofeno (fila 1) mientras se graba", JSON.stringify(r.cuerpo.noNombrados) === "[1]");
+  const { promptSistema } = require(path.join(RAIZ, "services", "notaClinica"));
+  verificar("el prompt dice: solo los medicamentos que se nombran, sin completar", /si el médico dijo paracetamol, es paracetamol/.test(promptSistema("es")) && /si el médico dijo paracetamol/.test(promptSistema("pt")));
+
+  const id9 = await subir();
+  await pedir(puerto, "POST", `/medico/consultas/${id9}/texto-en-vivo`, tk, { texto: DICHO });
+  await hasta(async () => (await leer(id9)).notaClinicaEstado === "completado");
+  r = await pedir(puerto, "GET", `/medico/consultas/${id9}`, tk);
+  const vm = r.cuerpo.consulta.verificacionMedicamentos || [];
+  verificar("en la consulta, antes de verificar: el ibuprofeno avisa «no aparece en lo que se dijo»", vm[1]?.noNombrado === true && !vm[0]?.noNombrado);
+  await terminarTranscripcion(DICHO);
+  await hasta(async () => ["ok", "diferencias", "error"].includes((await leer(id9)).verificacion?.estado));
+  c = await leer(id9);
+  verificar("las dos notas de IA coinciden en el ibuprofeno, y la verificación IGUAL lo marca",
+    c.verificacion.estado === "diferencias" && c.verificacion.diferencias.some(d => d.tipo === "noMencionado" && d.indice === 1));
+  verificar("  ...y no se borró solo: el médico decide", c.notaClinica.medicamentosRecetados.length === 2);
+  const id10 = await subir();
+  await terminarTranscripcion(DICHO);
+  await hasta(async () => (await leer(id10)).notaClinicaEstado === "completado");
+  r = await pedir(puerto, "GET", `/medico/consultas/${id10}`, tk);
+  verificar("también en una nota hecha del audio, sin nota en vivo", r.cuerpo.consulta.verificacionMedicamentos?.[1]?.noNombrado === true);
 
   servidor.close();
   await esperar(300);

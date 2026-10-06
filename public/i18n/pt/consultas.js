@@ -145,4 +145,6 @@ Object.assign(I18N.pt, {
   "verif.agregar": "Adicionar",
   "verif.esperarConfirmar": "Verificando com o áudio completo…",
   "consulta.procesandoVivo": "⏳ A transcrição completa (com quem disse o quê) está a caminho. Enquanto isso, o que foi ouvido ao vivo:",
+  "nota.med.noNombrado": "⚠️ Não aparece no que foi dito na consulta. Revise se foi mesmo prescrito.",
+  "vivo.noNombrado": "⚠️ (não foi ouvido na consulta)",
 });

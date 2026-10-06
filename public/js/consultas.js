@@ -250,7 +250,7 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
 const NOTA_VIVO_CADA_MS = 45000;
 
 function crearNotaEnVivo(pacienteId, caja, transcriptor) {
-  let timer = null, enCurso = null, ultimoTexto = "", nota = null;
+  let timer = null, enCurso = null, ultimoTexto = "", nota = null, noNombrados = [];
   let completo = false, textoFinal = "", terminando = null;
   const palabras = (txt) => String(txt || "").split(/\s+/).filter(Boolean).length;
 
@@ -268,7 +268,9 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
     }
     const n = nota;
     const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
-    const meds = (n.medicamentosRecetados || []).map(m => [m.nombre, m.dosis, m.frecuencia].filter(Boolean).join(" ")).join("; ");
+    // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
+    const meds = (n.medicamentosRecetados || []).map((m, i) => [m.nombre, m.dosis, m.frecuencia].filter(Boolean).join(" ")
+      + (noNombrados.includes(i) ? " " + t("vivo.noNombrado") : "")).join("; ");
     caja.style.display = "block";
     caja.innerHTML = `
       <div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
@@ -290,7 +292,7 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pacienteId, texto }),
     })
-      .then(r => { if (r?.nota) nota = r.nota; })
+      .then(r => { if (r?.nota) { nota = r.nota; noNombrados = Array.isArray(r.noNombrados) ? r.noNombrados : []; } })
       .catch(() => { /* un borrador que no salió no frena nada */ })
       .finally(() => { enCurso = null; pintar(estadoAlTerminar); });
     return enCurso;
@@ -319,7 +321,7 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
   return {
     iniciar() {
       clearInterval(timer);
-      nota = null; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
+      nota = null; noNombrados = []; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
       pintar("esperando");
       timer = setInterval(turno, NOTA_VIVO_CADA_MS);
     },
@@ -438,11 +440,16 @@ function pintarControlRemoto(v, pacienteId, pacienteNombre) {
 // (routes/consultaMedica.js → verificacionMedicamentos). "ok" o sin dato:
 // nada. La sugerencia es un botón: solo cambia si el médico la toca.
 function avisoMedicamentoHtml(v) {
-  if (!v || v.estado === "ok") return "";
+  if (!v) return "";
+  // Un medicamento que nadie nombró en la consulta (la IA completó por su
+  // cuenta: services/notaEnVivo.js → nombradoEnTexto). Va primero: es lo más
+  // grave que puede tener una receta.
+  const noNombrado = v.noNombrado ? `<div class="nf-med-desconocido med-aviso">${t("nota.med.noNombrado")}</div>` : "";
+  if (v.estado === "ok" || !v.estado) return noNombrado;
   if (v.estado === "parecido" && v.sugerencia) {
-    return `<button type="button" class="nf-med-sugerencia med-aviso" data-nombre="${esc(v.sugerencia)}">${t("nota.med.quisisteDecir", { nombre: esc(v.sugerencia) })}</button>`;
+    return noNombrado + `<button type="button" class="nf-med-sugerencia med-aviso" data-nombre="${esc(v.sugerencia)}">${t("nota.med.quisisteDecir", { nombre: esc(v.sugerencia) })}</button>`;
   }
-  return `<div class="nf-med-desconocido med-aviso">${t("nota.med.desconocido")}</div>`;
+  return noNombrado + `<div class="nf-med-desconocido med-aviso">${t("nota.med.desconocido")}</div>`;
 }
 
 // La nota llegó "completa" pero sin nada adentro: pasó con una consulta en
@@ -480,6 +487,11 @@ function filasMedicamentos() {
   return [...document.querySelectorAll("#nfMeds .med-row")].filter(r => r.querySelector(".nf-med-nombre").value.trim());
 }
 
+// Las filas de la nota original con un medicamento que nadie nombró en la
+// consulta: su casilla empieza DESMARCADA, para que llegar al Kardex sea una
+// decisión del médico y no un tilde que no vio.
+let filasNoNombradas = new Set();
+
 // Una casilla «Cargar a Medicación» por fila, con lo que la fila dice ahora.
 // Lo que el médico ya desmarcó queda desmarcado (por fila, no por posición).
 function pintarChecksMedicacion() {
@@ -491,7 +503,7 @@ function pintarChecksMedicacion() {
     const dosis = r.querySelector(".nf-med-dosis").value.trim();
     const k = r.dataset.k;
     return `<div class="conf-fila">
-      <label class="conf-check"><input type="checkbox" class="cf-med" data-k="${esc(k)}"${antes.get(k) === false ? "" : " checked"}>
+      <label class="conf-check"><input type="checkbox" class="cf-med" data-k="${esc(k)}"${(antes.has(k) ? antes.get(k) : !filasNoNombradas.has(k)) ? " checked" : ""}>
         <span>${t("confirmar.medicacion", { item: esc(nombre + (dosis ? " " + dosis : "")) })}</span></label>
     </div>`;
   }).join("");
@@ -765,6 +777,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
 
     // ── medicamentos: quitar / agregar filas en la nota editable ──
     const medsBox = document.getElementById("nfMeds");
+    filasNoNombradas = new Set((c.verificacionMedicamentos || []).map((v, i) => (v?.noNombrado ? String(i) : null)).filter(Boolean));
     if (medsBox) {
       medsBox.onclick = (e) => {
         // Tocar la sugerencia es la ÚNICA forma en que el nombre cambia sin

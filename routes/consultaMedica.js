@@ -21,7 +21,7 @@ const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo")
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
-const { guardarBorrador, borradorDe, compararMedicamentos } = require("../services/notaEnVivo");
+const { guardarBorrador, borradorDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
 
 // Lo más largo que se acepta como texto en vivo: una consulta de 70 minutos
 // son unas 10.000 palabras, unos 70.000 caracteres. El doble, de margen.
@@ -243,7 +243,9 @@ module.exports = function (app) {
     if (texto.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_BORRADOR) return res.json({ nota: null });
 
     const guardado = borradorDe(medicoPhone, pacienteId, texto);
-    if (guardado) return res.json({ nota: guardado });
+    if (guardado) {
+      return res.json({ nota: guardado, noNombrados: medicamentosNoNombrados(guardado, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])) });
+    }
     const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma").lean();
     const { contexto } = await contextoDeNota(paciente, medicoPhone);
     let nota;
@@ -256,7 +258,7 @@ module.exports = function (app) {
       return res.json({ nota: null });
     }
     guardarBorrador(medicoPhone, pacienteId, texto, nota);
-    res.json({ nota });
+    res.json({ nota, noNombrados: medicamentosNoNombrados(nota, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])) });
   }));
 
   // El texto en vivo de una consulta ya subida: si llegó entero (lo decide
@@ -333,6 +335,16 @@ module.exports = function (app) {
     if (!consultaObj.confirmadaEn && consultaObj.notaClinica?.medicamentosRecetados?.length) {
       consultaObj.verificacionMedicamentos = await verificarLista(
         medicoPhone, consultaObj.notaClinica.medicamentosRecetados.map(m => m?.nombre));
+      // Y cada uno contra lo que se DIJO (services/notaEnVivo.js →
+      // nombradoEnTexto): la IA puede completar con un medicamento que nadie
+      // nombró. Se avisa en la fila; la nota no se toca.
+      const texto = consultaObj.transcripcionCompleta || consultaObj.transcripcionEnVivo || "";
+      if (texto.trim()) {
+        const correcciones = await correccionesDelMedico(medicoPhone, 300).catch(() => []);
+        for (const i of medicamentosNoNombrados(consultaObj.notaClinica, texto, correcciones)) {
+          consultaObj.verificacionMedicamentos[i] = { ...(consultaObj.verificacionMedicamentos[i] || { estado: "ok" }), noNombrado: true };
+        }
+      }
     }
 
     res.json({ consulta: consultaObj });
@@ -1001,6 +1013,15 @@ async function intentarVerificar(consultaId) {
     const { contexto } = await contextoDeNota(paciente, c.medicoPhone);
     const notaAudio = await generarNotaClinica(c.transcripcionCompleta || "", contexto, medico?.idioma);
     const diferencias = compararMedicamentos(c.notaClinica, notaAudio);
+    // La otra nota también la escribió una IA y puede equivocarse igual: lo
+    // que no aparece en el TEXTO de la transcripción completa se marca aunque
+    // las dos notas coincidan.
+    const correcciones = await correccionesDelMedico(c.medicoPhone, 300).catch(() => []);
+    for (const indice of medicamentosNoNombrados(c.notaClinica, c.transcripcionCompleta || "", correcciones)) {
+      if (diferencias.some(d => d.indice === indice)) continue;
+      const m = c.notaClinica.medicamentosRecetados[indice];
+      diferencias.push({ tipo: "noMencionado", indice, enNota: [m.nombre, m.dosis, m.frecuencia].filter(Boolean).join(" "), enAudio: "" });
+    }
     set = { "verificacion.estado": diferencias.length ? "diferencias" : "ok", "verificacion.diferencias": diferencias };
   } catch (e) {
     // Una transcripción de un audio en silencio no tiene nota que comparar:

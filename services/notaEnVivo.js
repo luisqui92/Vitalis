@@ -145,4 +145,49 @@ function compararMedicamentos(notaVivo, notaAudio) {
   return diferencias;
 }
 
-module.exports = { guardarBorrador, borradorDe, olvidarCache, compararMedicamentos, mismoMedicamento };
+// ═══ ¿SE DIJO ESTE MEDICAMENTO? ═════════════════════════════════════════════
+//
+// Caso real, en la primera prueba de la nota en vivo: el médico dijo
+// «paracetamol» y la nota puso «ibuprofeno 400 mg cada 8 horas». La IA
+// completó con lo que «suele» indicarse para una faringitis.
+//
+// La verificación con el audio completo compara contra OTRA nota escrita por
+// la IA, que puede equivocarse igual. Esto no depende de ninguna IA: busca el
+// nombre en el TEXTO de lo que se dijo. Si no está, se avisa (no se borra:
+// la transcripción también puede haber escuchado mal, y el que decide es el
+// médico).
+
+// Palabras de un nombre que no dicen qué fármaco es: la sal, la forma.
+const PALABRAS_DE_RELLENO = new Set(["acido", "sodico", "sodica", "potasico", "potasica", "potassico", "potassica",
+  "clorhidrato", "cloridrato", "comprimido", "comprimidos", "tableta", "tabletas", "capsula", "capsulas",
+  "jarabe", "xarope", "gotas", "solucion", "solucao", "crema", "creme", "inyectable", "injetavel", "con", "com"]);
+
+function palabras(texto) {
+  return String(texto || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z]+/g) || [];
+}
+
+function parecidas(x, y) {
+  if (x === y) return true;
+  if (x.length >= 5 && y.length >= 5 && x.slice(0, 5) === y.slice(0, 5)) return true;
+  return x.length >= 6 && y.length >= 6 && Math.abs(x.length - y.length) <= 2 && distancia(x, y) <= 2;
+}
+
+// correcciones: lo que este médico ya enseñó («Inibidor de ATE» →
+// «Espironolactona»): si en el texto está lo que se escuchó mal, cuenta.
+function nombradoEnTexto(nombre, texto, correcciones = []) {
+  const dichas = new Set(palabras(texto));
+  if (!dichas.size) return true;   // sin texto no hay con qué comparar: no se marca
+  const esta = (n) => palabras(n).filter(p => p.length >= 4 && !PALABRAS_DE_RELLENO.has(p))
+    .some(p => dichas.has(p) || [...dichas].some(d => parecidas(p, d)));
+  if (esta(nombre)) return true;
+  return correcciones.some(c => mismoMedicamento(c.correcto, nombre) && esta(c.dijo));
+}
+
+// Las posiciones de los medicamentos de la nota que no se nombraron.
+function medicamentosNoNombrados(nota, texto, correcciones = []) {
+  return (nota?.medicamentosRecetados || [])
+    .map((m, i) => (String(m?.nombre || "").trim() && !nombradoEnTexto(m.nombre, texto, correcciones) ? i : -1))
+    .filter(i => i >= 0);
+}
+
+module.exports = { guardarBorrador, borradorDe, olvidarCache, compararMedicamentos, mismoMedicamento, nombradoEnTexto, medicamentosNoNombrados };

@@ -48,6 +48,11 @@ Reglas:
 - Si algo no se menciona en la transcripción, usá null o un array vacío.
 - NUNCA inventes información clínica que no esté en el texto. Esto es un
   apoyo para el médico, no reemplaza su criterio profesional.
+- "medicamentosRecetados": SOLO los medicamentos que se NOMBRAN en la
+  transcripción, con el nombre que se dijo. No completes con lo que "suele"
+  indicarse para ese cuadro: si el médico dijo paracetamol, es paracetamol y
+  no ibuprofeno; si nombró un antibiótico y nada más, va solo el antibiótico.
+  Una dosis o una frecuencia que no se dijo va en null, no se deduce.
 - "antecedentesPersonalesNuevos"/"antecedentesFamiliaresNuevos"/"vacunasMencionadas":
   te paso lo que el paciente YA tiene registrado (más abajo, si hay). Reportá
   SOLO lo que se menciona en esta transcripción y que NO esté ya en esa lista

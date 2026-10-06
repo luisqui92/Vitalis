@@ -138,7 +138,9 @@ const NOTA_VIVO = {
     let verificada = false;
     await page.route(`**/medico/consultas/${CONSULTA}`, (r) => {
       const base = { _id: CONSULTA, pacienteId: String(paciente._id), pacienteNombre: "Juana Pérez", createdAt: new Date().toISOString(),
-        notaFuente: "vivo", notaClinicaEstado: "completado", notaClinica: NOTA_VIVO, transcripcionEnVivo: TURNOS.join(" ") };
+        notaFuente: "vivo", notaClinicaEstado: "completado", notaClinica: NOTA_VIVO, transcripcionEnVivo: TURNOS.join(" "),
+        // Como si la Amoxicilina no se hubiera nombrado (services/notaEnVivo.js → nombradoEnTexto).
+        verificacionMedicamentos: [{ estado: "ok", noNombrado: true }] };
       const consulta = !verificada
         ? { ...base, estado: "procesando", verificacion: { estado: "pendiente" } }
         : { ...base, estado: "completado", duracionSegundos: 60, segmentos: [{ hablante: "A", texto: "Buenos días doctor (transcripción completa)" }],
@@ -189,6 +191,9 @@ const NOTA_VIVO = {
     verificar("la nota se ve ya, con la transcripción completa todavía en camino", (await page.inputValue("#nfDiagnostico")) === "Faringoamigdalitis aguda");
     verificar("dice que se está verificando", /Verificando medicamentos/.test(await page.innerText("#verifBox")));
     verificar("el botón de confirmar espera", await page.isDisabled("#btnConfirmarConsulta"));
+    verificar("un medicamento que no se nombró avisa en su fila", /No aparece en lo que se dijo/.test(await page.innerText(".med-row[data-i='0'] .nf-med-aviso")));
+    verificar("  ...y su casilla «Cargar a Medicación» empieza DESMARCADA", !(await page.isChecked("#cfMeds .cf-med[data-k='0']")));
+    await page.check("#cfMeds .cf-med[data-k='0']");
     await page.fill("#nfPlan", "Mi corrección del plan");
     await page.focus("#nfMotivo");
     verificada = true;
