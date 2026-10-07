@@ -26,7 +26,8 @@ async function renderSeguridad() {
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
     pintarFotoPerfil();
-    pintarSaldo();
+    // Un estudiante no carga saldo: su acceso es el código (public/js/estudiantes.js).
+    if (!(typeof esCuentaEstudiante === "function" && esCuentaEstudiante())) pintarSaldo();
     // Sin await, como los demás: si Memed no contesta, Configuración se abre
     // igual. Y en cuentas que no recetan por Memed no dibuja nada.
     if (typeof memedPintarConsejo === "function") memedPintarConsejo();

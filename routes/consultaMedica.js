@@ -22,6 +22,17 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
 const { guardarBorrador, borradorDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
+const { estadoDe: estadoDeEstudiante } = require("../services/estudiantes");
+
+// Una cuenta de estudiante vencida o sin horas no empieza consultas nuevas
+// (services/estudiantes.js). Se mira al pedir el token de la vista previa
+// —que es cuando empieza a grabar— y al subir.
+async function frenarEstudianteSinAcceso(req) {
+  if (!req.adminUser?.estudiante) return;
+  const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("phone estudiante").lean();
+  const estado = await estadoDeEstudiante(medico);
+  if (estado?.bloqueado) throw new ErrorHttp(402, estado.motivo);
+}
 
 // Lo más largo que se acepta como texto en vivo: una consulta de 70 minutos
 // son unas 10.000 palabras, unos 70.000 caracteres. El doble, de margen.
@@ -62,6 +73,7 @@ module.exports = function (app) {
   // ─── TOKEN PARA VISTA PREVIA EN VIVO (el navegador se conecta directo
   // al WebSocket de AssemblyAI mientras graba; nunca se manda la API key) ──
   app.get("/medico/transcripcion-token", requireMedico, asyncRoute(async (req, res) => {
+    await frenarEstudianteSinAcceso(req);
     try {
       const token = await crearTokenStreaming();
       // El vocabulario viaja junto al token para que la vista previa en vivo
@@ -120,6 +132,11 @@ module.exports = function (app) {
     // Por eso solo se corta pasado el piso de negativo —cinco consultas de
     // margen— y no en cero. El aviso de "te queda poco" va en la pantalla,
     // ANTES de grabar, que es donde todavía se puede hacer algo.
+    // Un estudiante sin acceso no llega hasta acá desde la app: la pantalla
+    // de grabar ya le avisó y no lo dejó empezar. Si igual llega (una
+    // grabación vieja del respaldo del teléfono), queda guardada en el
+    // celular y se sube cuando renueve.
+    await frenarEstudianteSinAcceso(req);
     const saldo = await estadoDe(medicoPhone);
     if (saldo.bloqueado) {
       throw new ErrorHttp(402, `Tu saldo llegó al límite (Bs ${saldo.saldoBs}). Cargá saldo para seguir transcribiendo consultas.`);
@@ -151,6 +168,7 @@ module.exports = function (app) {
 
     const consulta = await ConsultaMedica.create({
       medicoPhone, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "procesando",
+      deEstudiante: Boolean(req.adminUser.estudiante),
     });
 
     if (teleconsulta) {
@@ -239,6 +257,7 @@ module.exports = function (app) {
     const texto = String(req.body?.texto || "").slice(0, MAX_TEXTO_EN_VIVO);
     const pacienteId = String(req.body?.pacienteId || "").trim();
     if (!pacienteId) throw new ErrorHttp(400, "Falta pacienteId");
+    await frenarEstudianteSinAcceso(req);
     const paciente = await obtenerOFallar(Paciente, { _id: pacienteId, medicoPhone }, "Paciente no encontrado");
     if (texto.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_BORRADOR) return res.json({ nota: null });
 
@@ -426,7 +445,15 @@ module.exports = function (app) {
     }
 
     const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
-    const aplicar = req.body?.aplicar || {};
+    const aplicar = { ...(req.body?.aplicar || {}) };
+    // Un estudiante no receta, no agenda reconsultas por WhatsApp ni arma
+    // presupuestos (services/estudiantes.js): de lo que pida, eso no se
+    // aplica. La nota, la medicación y los antecedentes sí: es su caso.
+    if (req.adminUser.estudiante) {
+      aplicar.receta = false;
+      aplicar.reconsulta = null;
+      aplicar.tratamientos = [];
+    }
     const aplicado = [];
     const fallado = [];
 

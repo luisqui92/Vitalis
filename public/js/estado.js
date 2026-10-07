@@ -412,6 +412,7 @@ function logout() {
   localStorage.removeItem("salud_rol");
   localStorage.removeItem("salud_operador");
   localStorage.removeItem("salud_clinica");
+  if (typeof fijarEstudiante === "function") fijarEstudiante(null);
   if (typeof MEDICO_ROL !== "undefined") MEDICO_ROL = "medico";
   if (typeof MEDICO_CLINICA !== "undefined") MEDICO_CLINICA = "";
   // Al salir, la pantalla de login vuelve al idioma del aparato, no al de

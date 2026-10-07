@@ -46,10 +46,14 @@ function renderLogin() {
       <button class="primary" id="lBtn">${t("auth.ingresar")}</button>
       <button class="link" id="lGoReg">${t("auth.irRegistro")}</button>
       <button class="link" id="lGoOlvide" style="font-size:13px">${t("auth.olvide")}</button>
+      <button class="link" id="lGoEstudiante" style="font-size:13px">${t("est.irRegistro")}</button>
       ${selectorIdiomaHtml()}
     </div>`;
   cablearSelectorIdioma(renderLogin);
   document.getElementById("lGoReg").onclick = renderRegistro;
+  // public/js/estudiantes.js: si no está cargado, el enlace no hace nada en
+  // vez de romper el login entero.
+  document.getElementById("lGoEstudiante").onclick = () => { if (typeof renderRegistroEstudiante === "function") renderRegistroEstudiante(); };
   document.getElementById("lGoOlvide").onclick = () => renderOlvideClave(document.getElementById("lPhone").value.trim());
   document.getElementById("lBtn").onclick = async () => {
     const phone = document.getElementById("lPhone").value.trim();
@@ -139,6 +143,8 @@ function completarLogin(data) {
   // true a mano ve una pestaña que le contesta 404.
   ES_OPERADOR = Boolean(data.operador);
   localStorage.setItem("salud_operador", ES_OPERADOR ? "1" : "");
+  // Cuenta de estudiante: decide qué se dibuja (public/js/estudiantes.js).
+  if (typeof fijarEstudiante === "function") fijarEstudiante(data.estudiante);
   aplicarTemaSegunEspecialidad();
   if (typeof conectarTiempoReal === "function") conectarTiempoReal();
   irAPantallaInicial();

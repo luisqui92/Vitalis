@@ -62,7 +62,11 @@ const sinSelector = (html) => html.replace(/\n\s*<div style="text-align:center;m
 // el resto del login no cambió: sigue valiendo la pena comprobar que un
 // cambio de i18n no le mueve una coma al resto de la pantalla, y esto es lo
 // único que hay que descontar para poder seguir haciendo esa comprobación.
-const sinOlvide = (html) => html.replace(/\n\s*<button class="link" id="lGoOlvide"[^>]*>[\s\S]*?<\/button>/g, "");
+// Lo mismo con «Tengo un código de estudiante» (public/js/estudiantes.js):
+// otro enlace agregado a propósito, que no cambia nada del resto.
+const sinOlvide = (html) => html
+  .replace(/\n\s*<button class="link" id="lGoOlvide"[^>]*>[\s\S]*?<\/button>/g, "")
+  .replace(/\n\s*<button class="link" id="lGoEstudiante"[^>]*>[\s\S]*?<\/button>/g, "");
 
 const antes = execSync(`git -C ${RAIZ} show main:public/js/auth.js`, { encoding: "utf8" });
 const ahora = fs.readFileSync(`${RAIZ}/public/js/auth.js`, "utf8");

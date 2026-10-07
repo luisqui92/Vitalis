@@ -135,6 +135,11 @@ app.use(express.json({
 const { iniciarServidorTiempoReal, middlewareAvisarCambios } = require("./services/realtime");
 app.use(middlewareAvisarCambios);
 
+// ─── CUENTAS DE ESTUDIANTE ───────────────────────────────────────────────
+// Lo que un estudiante no puede hacer (recetar, escribirle a pacientes,
+// cobrar) se corta acá, antes de cualquier ruta. Ver services/estudiantes.js.
+app.use(require("./services/estudiantes").middlewareEstudiantes);
+
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
 // La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en

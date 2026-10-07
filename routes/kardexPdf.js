@@ -30,7 +30,7 @@ module.exports = function (app) {
 
     const [datos, medico, membrete, recetas, consultasSinConfirmar] = await Promise.all([
       leerKardex(paciente),
-      Medico.findOne({ phone: medicoPhone }).select("nombre especialidad matricula conselho idioma").lean(),
+      Medico.findOne({ phone: medicoPhone }).select("nombre especialidad matricula conselho idioma estudiante").lean(),
       Membrete.findOne({ medicoPhone }).lean(),
       Receta.find({ pacienteId: paciente._id, medicoPhone }).sort({ fecha: -1 }).lean(),
       // Las que tienen nota pero el médico no confirmó: no salen, pero el PDF
@@ -42,8 +42,12 @@ module.exports = function (app) {
     const generadoEn = new Date();
     const zonaHoraria = typeof req.query.tz === "string" ? req.query.tz : "";
     const contenido = armarContenido(datos, { alcance: "completo", secciones: normalizarSecciones(null, "completo") });
+    // Lo escribió un estudiante: la cuenta lo es hoy, o alguna consulta de
+    // este paciente se grabó cuando lo era (la marca queda aunque se reciba).
+    const deEstudiante = Boolean(medico?.estudiante?.nivel)
+      || Boolean(await ConsultaMedica.exists({ pacienteId: paciente._id, medicoPhone, deEstudiante: true }));
     const pdf = armarKardexPdf({
-      contenido, paciente, recetas, consultasSinConfirmar, medico, membrete, idioma, zonaHoraria, generadoEn,
+      contenido, paciente, recetas, consultasSinConfirmar, medico, membrete, idioma, zonaHoraria, generadoEn, deEstudiante,
     });
     const nombre = nombreArchivo({ idioma, paciente, generadoEn, zonaHoraria });
 

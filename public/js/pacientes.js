@@ -24,7 +24,8 @@ let kardexFocoEnTabs = false;
 function pestanasPacientes(pendientes) {
   const pestanas = [
     `<button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>${t("pacientes.tab.nuevo")}</button>`,
-    `<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`,
+    // Una cuenta de estudiante no da turnos (public/js/estudiantes.js).
+    ...(typeof esCuentaEstudiante === "function" && esCuentaEstudiante() ? [] : [`<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`]),
     `<button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>`,
     `<button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>`,
     `<button class="tab" id="btnConfiguracion"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.configuracion")}</button>`,
@@ -165,6 +166,8 @@ async function renderDashboard() {
       `}
     `;
     document.getElementById("avatarHomeBox").onclick = renderSeguridad;
+    // Cuenta de estudiante: cuánto audio usó y cuándo vence, arriba de todo.
+    if (typeof pintarAvisoEstudiante === "function") pintarAvisoEstudiante();
     // Sin await, como los demás avisos del panel: si la foto tarda o no hay
     // ninguna subida, el panel se abre igual con las iniciales de siempre.
     pintarAvatarHome();
@@ -177,7 +180,8 @@ async function renderDashboard() {
     const avisoBandeja = document.getElementById("avisoBandeja");
     if (avisoBandeja) avisoBandeja.onclick = () => renderBandejaDicom();
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
-    document.getElementById("btnAgenda").onclick = renderAgenda;
+    const btnAgenda = document.getElementById("btnAgenda");
+    if (btnAgenda) btnAgenda.onclick = renderAgenda;
     document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
     document.getElementById("btnVincular").onclick = renderVincular;
     document.getElementById("btnConfiguracion").onclick = renderSeguridad;
@@ -514,14 +518,14 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     </div>
     <div id="tabContent" role="tabpanel" aria-labelledby="tab-${tabActiva}" tabindex="0">${tabs[tabActiva] || tabConsultas}</div>
 
-    <details class="kardex-mas">
+    ${typeof esCuentaEstudiante === "function" && esCuentaEstudiante() ? "" : `<details class="kardex-mas">
       <summary>${esc(t("kardex.masAcciones"))}</summary>
       <div class="kardex-mas-cuerpo">
         ${typeof bloquePersonaAccionesHtml === "function" ? bloquePersonaAccionesHtml() : ""}
         ${typeof teleMedCajaHtml === "function" ? teleMedCajaHtml() : ""}
         ${typeof compartirResumenCajaHtml === "function" ? compartirResumenCajaHtml() : ""}
       </div>
-    </details>
+    </details>`}
   `;
 
   document.getElementById("btnBack").onclick = renderDashboard;
@@ -538,10 +542,13 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   };
   // Aparte y sin await: si el proveedor de video tarda en contestar, la
   // ficha del paciente tiene que estar en pantalla igual.
-  if (typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
+  // Teleconsulta y resumen compartido le llegan al paciente: no en una cuenta
+  // de estudiante (public/js/estudiantes.js).
+  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
+  if (!estudiante && typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
   // Mismo criterio: pide la lista de lo ya compartido, y si tarda o falla la
   // ficha se abre igual.
-  if (typeof compartirResumenPintar === "function") compartirResumenPintar(p._id);
+  if (!estudiante && typeof compartirResumenPintar === "function") compartirResumenPintar(p._id);
   if (typeof memedCablearCpf === "function") memedCablearCpf(p);
   // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
   // igual. El bloque aparece cuando llega.

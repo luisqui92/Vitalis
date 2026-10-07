@@ -179,6 +179,29 @@ const medicoSchema = new mongoose.Schema({
   // ya hubo alguien que respondió por esa persona, que es justamente lo que
   // esta fila busca.
   estadoCuenta: { type: String, enum: ["pendiente", "aprobada", "rechazada"], default: "aprobada", index: true },
+  // ─── Cuenta de estudiante (ver services/estudiantes.js) ─────────────────
+  //
+  // Estudiantes, internos y residentes entran con un código de invitación
+  // que da Symphomed, uno por persona. Ven un Symphomed más simple: graban,
+  // tienen sus casos y su nota, pero no recetan, no le escriben a pacientes
+  // ni cobran — eso lo bloquea el servidor, no solo la pantalla.
+  //
+  // Vacío en las cuentas de médico. Al recibirse se borra este bloque
+  // (scripts/codigos_estudiante.js convertir) y la cuenta pasa a ser de
+  // médico con todos sus casos.
+  estudiante: {
+    type: {
+      nivel: { type: String, enum: ["estudiante", "interno", "residente"] },
+      // Hasta cuándo puede grabar. Vencido, entra y ve sus casos, pero no
+      // graba consultas nuevas hasta que se renueve.
+      hasta: { type: Date, default: null },
+      // Horas de audio por mes calendario: es lo que cuesta.
+      horasMes: { type: Number, default: 0 },
+      codigo: { type: String, default: "" },
+      universidad: { type: String, default: "" },
+    },
+    default: undefined,
+  },
   // La matrícula profesional. Symphomed NO la verifica contra ningún registro
   // —no hay una API del colegio médico boliviano— así que no es una prueba:
   // es un dato que quien aprueba puede mirar, y que hace que mentir sea una
@@ -489,6 +512,10 @@ const consultaMedicaSchema = new mongoose.Schema({
   //   · "audio" — de la transcripción completa, como siempre.
   //   · ""      — todavía no se decidió. Lo decide el primero que llega,
   //               con un update atómico: nunca escriben la nota los dos.
+  // La grabó una cuenta de estudiante: la nota lleva la marca «sin validez sin
+  // firma del médico responsable» para siempre, aunque la cuenta pase a ser
+  // de médico al recibirse.
+  deEstudiante: { type: Boolean, default: false },
   notaFuente: { type: String, enum: ["", "vivo", "audio"], default: "" },
   transcripcionEnVivo: { type: String, default: "" },
   // Solo cuando notaFuente es "vivo". Las diferencias se MUESTRAN; la nota
@@ -3155,7 +3182,32 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-module.exports = { ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+// ─── CÓDIGOS DE INVITACIÓN PARA ESTUDIANTES ────────────────────────────────
+//
+// Un código, una persona: el primero que lo usa se queda con él, y queda
+// anotado quién. Así Symphomed decide quién entra como estudiante, por
+// cuánto tiempo y con cuántas horas de audio. Los crea y los anula
+// scripts/codigos_estudiante.js.
+const codigoEstudianteSchema = new mongoose.Schema({
+  codigo: { type: String, required: true, unique: true },
+  nivel: { type: String, enum: ["estudiante", "interno", "residente"], required: true },
+  meses: { type: Number, required: true, min: 1, max: 24 },
+  horasMes: { type: Number, required: true, min: 1 },
+  // Lo que se cobró por este acceso, para saber qué paga cada uno.
+  precioCentavos: { type: Number, default: 0 },
+  moneda: { type: String, default: "BOB" },
+  nota: { type: String, default: "" },        // «Univalle, 5to año», «grupo de Juan»
+  // Un código que nadie usó no vale para siempre: si se pierde en un chat,
+  // que no sirva dentro de un año.
+  vence: { type: Date, required: true },
+  anulado: { type: Boolean, default: false },
+  usadoPor: { type: String, default: null, index: true },
+  usadoEn: { type: Date, default: null },
+  creadoPor: { type: String, default: "" },
+}, { timestamps: true });
+const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSchema);
+
+module.exports = { CodigoEstudiante, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

@@ -1,7 +1,7 @@
 // ChatGo Salud — Registro y login de médicos (teléfono + contraseña,
 // opcionalmente 2FA con TOTP) y consulta del propio log de auditoría.
 const QRCode = require("qrcode");
-const { Medico, AuditLog } = require("../db/models");
+const { Medico, AuditLog, CodigoEstudiante } = require("../db/models");
 const { generarToken, verificarToken, hashPassword, verificarPassword, requireAuth } = require("../services/auth");
 const { generarSecreto, generarUriOtpAuth, verificarCodigo } = require("../services/totp");
 const { registrar } = require("../services/auditoria");
@@ -11,6 +11,7 @@ const { log } = require("../config");
 const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
+const { esEstudiante, estadoDe: estadoDeEstudiante, normalizarCodigo } = require("../services/estudiantes");
 
 // Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
 // propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
@@ -53,6 +54,9 @@ function tokenDeMedico(medico) {
   return generarToken(medico.phone, rolToken, 8 * 60 * 60 * 1000, {
     ...(esAdmin ? { admin: true } : {}),
     ...(medico.clinicaId ? { clinicaId: String(medico.clinicaId) } : {}),
+    // La marca que mira services/estudiantes.js en cada pedido para cortar lo
+    // que un estudiante no puede hacer, sin ir a la base cada vez.
+    ...(esEstudiante(medico) ? { estudiante: true } : {}),
   });
 }
 
@@ -74,6 +78,11 @@ function datosDeSesion(medico) {
     // OPERADORES_SALDO, y quien mienta acá se encuentra con un 404. Igual
     // que rol, que también viaja así.
     operador: esOperador(medico.phone),
+    // Para dibujar el Symphomed simple. Igual que rol: no es el permiso, el
+    // permiso lo revisa el servidor (services/estudiantes.js).
+    estudiante: esEstudiante(medico)
+      ? { nivel: medico.estudiante.nivel, hasta: medico.estudiante.hasta, horasMes: medico.estudiante.horasMes }
+      : null,
   };
 }
 
@@ -130,6 +139,70 @@ module.exports = function (app) {
     avisarSolicitudPendiente(medico).catch(e => log.warn("[CUENTAS] no se pudo avisar la solicitud:", e.message));
 
     res.json({ ok: true, pendiente: true, phone: medico.phone, nombre: medico.nombre });
+  }));
+
+  // ─── REGISTRO DE ESTUDIANTE, CON CÓDIGO DE INVITACIÓN ──────────────────
+  //
+  // A diferencia del registro de médico, no queda en fila: el código ES la
+  // aprobación (lo dio Symphomed a una persona puntual) y se entra al toque.
+  // Un código sirve una sola vez: se reclama con un update atómico, así dos
+  // personas con el mismo código no pueden quedarse las dos con él.
+  app.post("/medico/registro-estudiante", limitAuth, asyncRoute(async (req, res) => {
+    const codigo = normalizarCodigo(req.body?.codigo);
+    const phone = soloDigitos(req.body?.phone);
+    const nombre = String(req.body?.nombre || "").trim().slice(0, 120);
+    const password = String(req.body?.password || "");
+    const universidad = String(req.body?.universidad || "").trim().slice(0, 120);
+    const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
+    if (!codigo || !nombre) throw new ErrorHttp(400, "Faltan el código y tu nombre");
+    if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
+    if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
+    if (await buscarPorTelefono(Medico, phone, { select: "_id", lean: true })) {
+      throw new ErrorHttp(409, "Ese teléfono ya tiene una cuenta. Entrá con tu contraseña.");
+    }
+
+    const ahora = new Date();
+    const cod = await CodigoEstudiante.findOneAndUpdate(
+      { codigo, usadoPor: null, anulado: false, vence: { $gt: ahora } },
+      { $set: { usadoPor: phone, usadoEn: ahora } },
+      { new: true });
+    if (!cod) {
+      registrar({ req, medicoPhone: phone, accion: "codigo_estudiante_invalido", exito: false, detalle: codigo });
+      throw new ErrorHttp(400, "Ese código no existe, ya se usó o venció. Pedí uno nuevo a Symphomed.");
+    }
+
+    const hasta = new Date(ahora);
+    hasta.setMonth(hasta.getMonth() + cod.meses);
+    let medico;
+    try {
+      medico = await Medico.create({
+        phone, nombre, idioma,
+        especialidad: { estudiante: "Estudiante de medicina", interno: "Interno de medicina", residente: "Médico residente" }[cod.nivel],
+        tipoEspecialidad: "medicina_general",
+        moneda: cod.moneda || (idioma === "pt" ? "BRL" : "BOB"),
+        passwordHash: await hashPassword(password),
+        activo: true,
+        estadoCuenta: "aprobada",
+        estudiante: { nivel: cod.nivel, hasta, horasMes: cod.horasMes, codigo: cod.codigo, universidad },
+        // El plan que ya existe hace que sus consultas no descuenten saldo:
+        // lo que pagó por el código cubre el período.
+        suscripcion: { plan: "mensual", desde: ahora, hasta, precioCentavos: cod.precioCentavos, moneda: cod.moneda, activadaPor: "codigo:" + cod.codigo },
+      });
+    } catch (e) {
+      // El código vuelve a quedar libre: la cuenta no se creó.
+      await CodigoEstudiante.updateOne({ _id: cod._id }, { $set: { usadoPor: null, usadoEn: null } }).catch(() => {});
+      throw e;
+    }
+    registrar({ req, medicoPhone: phone, accion: "registro_estudiante", detalle: `${cod.codigo} · ${cod.nivel} · ${cod.meses} mes(es)` });
+    log.info(`[ESTUDIANTES] ${nombre} (${phone}) entró con ${cod.codigo} — ${cod.nivel}, ${cod.meses} mes(es)`);
+    res.json({ token: tokenDeMedico(medico), ...datosDeSesion(medico) });
+  }));
+
+  // Cómo está la cuenta de estudiante: horas usadas, vencimiento, si puede
+  // grabar. La pantalla lo pide para avisar ANTES de grabar.
+  app.get("/medico/estudiante/estado", requireMedico, asyncRoute(async (req, res) => {
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("phone estudiante").lean();
+    res.json({ estudiante: await estadoDeEstudiante(medico) });
   }));
 
   // ─── LOGIN (paso 1: teléfono + contraseña) ──────────────────────────────

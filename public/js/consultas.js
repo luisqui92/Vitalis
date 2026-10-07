@@ -104,6 +104,17 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   // se detiene sin pintar nada (la pantalla ya no está).
   let salioDeLaPantalla = false;
 
+  // Cuenta de estudiante sin acceso (vencida o sin horas del mes): se dice
+  // ANTES de grabar, que es cuando todavía se puede hacer algo
+  // (public/js/estudiantes.js). El servidor frena igual si llegara.
+  if (typeof esCuentaEstudiante === "function" && esCuentaEstudiante()) {
+    estadoEstudiante().then((e) => {
+      if (!e?.bloqueado || !document.body.contains(recBtn)) return;
+      recBtn.disabled = true;
+      recStatus.innerHTML = `<div class="error" style="margin-top:0">⚠️ ${esc(e.motivo)}</div>`;
+    });
+  }
+
   // Una grabación que quedó sin subir (la página se cerró, se salió a mitad):
   // se ofrece subirla antes de grabar otra.
   ofrecerGrabacionesPendientes(document.getElementById("grabPendientes"), {
@@ -611,6 +622,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         notaHtml = `
           <div class="card">
             <div class="nota-titulo">${t("nota.titulo")}${c.notaEditadaPorMedico ? t("nota.corregida") : ""}</div>
+            ${c.deEstudiante && typeof marcaNotaEstudianteHtml === "function" ? marcaNotaEstudianteHtml() : ""}
             <div class="hint" style="color:var(--success);margin-bottom:10px">${t("nota.confirmada", { fecha: new Date(c.confirmadaEn).toLocaleString(localeActual()) })}</div>
             ${n.motivoConsulta ? `<div class="nota-campo"><b>${t("nota.motivo")}</b> ${esc(n.motivoConsulta)}</div>` : ""}
             ${(n.sintomas||[]).length ? `<div class="nota-campo"><b>${t("nota.sintomas")}</b> ${esc(n.sintomas.join(", "))}</div>` : ""}
@@ -626,6 +638,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
         notaHtml = `
           <div class="card">
             <div class="nota-titulo">${t("nota.tituloIA")}</div>
+            ${c.deEstudiante && typeof marcaNotaEstudianteHtml === "function" ? marcaNotaEstudianteHtml() : ""}
             ${enVivo ? `<div id="verifBox">${verificacionHtml(c.verificacion)}</div>` : ""}
             ${notaClinicaVaciaCliente(n) ? `<div class="error" style="margin-top:0">${t("nota.vacia")}</div>${botonRegenerarNotaHtml()}` : ""}
             <div class="hint" style="margin-bottom:12px">${t("nota.revisar")}</div>
@@ -669,8 +682,12 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     if (hayNota && !yaConfirmada) {
       const filas = [];
 
+      // Una cuenta de estudiante no receta, no agenda reconsultas por WhatsApp
+      // ni arma presupuestos: esas filas no se ofrecen (el servidor tampoco
+      // las aplicaría — routes/consultaMedica.js, confirmar).
+      const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
       const reconsulta = n.reconsultaSugerida;
-      if (reconsulta?.fechaHora && reconsulta.estado === "pendiente") {
+      if (!estudiante && reconsulta?.fechaHora && reconsulta.estado === "pendiente") {
         // datetime-local necesita "YYYY-MM-DDTHH:mm" en hora local, no UTC.
         const f = new Date(reconsulta.fechaHora);
         const valorInput = new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -685,7 +702,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
 
       // El parámetro se llama "trat" y no "t": dentro de este bloque "t" es
       // la función de traducción, y usarla de nombre de variable la taparía.
-      (n.tratamientosSugeridos || []).filter(trat => trat.estado === "pendiente").forEach(trat => {
+      (estudiante ? [] : (n.tratamientosSugeridos || [])).filter(trat => trat.estado === "pendiente").forEach(trat => {
         filas.push(`
           <div class="conf-fila" data-tratsug="${trat._id}">
             <label class="conf-check"><input type="checkbox" class="cf-trat" checked>
@@ -701,7 +718,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
           </div>`);
       });
 
-      if ((n.medicamentosRecetados || []).length) {
+      if (!estudiante && (n.medicamentosRecetados || []).length) {
         filas.push(`
           <div class="conf-fila">
             <label class="conf-check"><input type="checkbox" id="cfReceta" checked>

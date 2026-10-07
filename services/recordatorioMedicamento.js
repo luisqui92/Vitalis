@@ -136,8 +136,14 @@ async function procesarRecordatoriosVencidos() {
     try {
       const [paciente, medico] = await Promise.all([
         Paciente.findById(medicamento.pacienteId).select("nombre telefono").lean(),
-        Medico.findOne({ phone: medicamento.medicoPhone }).select("nombre idioma moneda").lean(),
+        Medico.findOne({ phone: medicamento.medicoPhone }).select("nombre idioma moneda estudiante").lean(),
       ]);
+      // Una cuenta de estudiante no le escribe a pacientes
+      // (services/estudiantes.js): el recordatorio se apaga en vez de salir.
+      if (medico?.estudiante?.nivel) {
+        await Medicamento.updateOne({ _id: medicamento._id }, { $set: { "recordatorio.activo": false } });
+        continue;
+      }
       // El paciente pudo perder el teléfono (se lo borraron de la ficha) o
       // la ficha pudo borrarse entera desde que se activó el recordatorio —
       // se apaga en vez de reintentar para siempre contra un destino que ya

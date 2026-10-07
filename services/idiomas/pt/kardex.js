@@ -40,6 +40,10 @@ module.exports = {
     tutor: "Responsável",
   },
 
+  estudiante: {
+    titulo: "REGISTRO DE ESTUDANTE",
+    texto: "Escrito a partir de uma conta de estudante. Sem a assinatura do médico responsável, não tem validade como prontuário.",
+  },
   alergias: {
     titulo: "ALERGIAS",
     ninguna: "Não há alergias registradas. Não estar registrado não significa que não tenha: confirmar com o paciente antes de prescrever.",

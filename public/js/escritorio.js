@@ -65,7 +65,15 @@ const ESCR_NAV_PAGOS = { id: "pagos", claveLabel: "op.nav.pagos", icono: ICONOS.
 // solo ensuciaría un menú que ya no le sirve.
 const ESCR_NAV_GANADERIA = { id: "ganaderia", claveLabel: "escr.nav.ganaderia", icono: ICONOS.pata, fn: "renderGanaderia" };
 
+// Lo que ve una cuenta de estudiante (public/js/estudiantes.js): sus casos,
+// grabar y su configuración. Agenda, indicaciones, estudios, reportes y
+// finanzas son de un consultorio.
+const ESCR_NAV_ESTUDIANTE = ["inicio", "pacientes", "voz", "configuracion"];
+
 function escrNavItems() {
+  if (typeof esCuentaEstudiante === "function" && esCuentaEstudiante()) {
+    return ESCR_NAV_FIJOS.filter(i => ESCR_NAV_ESTUDIANTE.includes(i.id));
+  }
   const items = ESCR_NAV_FIJOS.slice();
   if (typeof MEDICO_TIPO_ESPECIALIDAD !== "undefined" && MEDICO_TIPO_ESPECIALIDAD === "veterinaria") {
     const idx = items.findIndex(i => i.id === "configuracion");
