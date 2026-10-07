@@ -146,4 +146,6 @@ Object.assign(I18N.es, {
   "consulta.procesandoVivo": "⏳ La transcripción completa (con quién dijo qué) está en camino. Mientras tanto, lo que se escuchó en vivo:",
   "nota.med.noNombrado": "⚠️ No aparece en lo que se dijo en la consulta. Revisá si de verdad se recetó.",
   "vivo.noNombrado": "⚠️ (no se escuchó en la consulta)",
+  "consulta.reconectando": "Reconectando con el servidor…",
+  "consulta.reintentarCargar": "Intentar de nuevo",
 });

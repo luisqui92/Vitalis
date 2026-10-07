@@ -589,7 +589,14 @@ async function vigilarVerificacion(id) {
   if (c.estado === "procesando" || esperando) pollTimeout = setTimeout(() => vigilarVerificacion(id), 5000);
 }
 
-async function renderDetalle(id, esRefrescoAutomatico) {
+// Cuántas veces se reintenta antes de mostrar el error, y cada cuánto.
+// Cubre los segundos en que el servidor se reinicia por un despliegue o se
+// corta el internet del consultorio: un médico abrió una consulta justo en
+// ese momento y vio «Error al cargar la consulta» con la consulta intacta.
+const REINTENTOS_DETALLE = 3;
+const ESPERA_REINTENTO_MS = 2500;
+
+async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
   detenerPolling();
   if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.cargando")}</div>`;
   try {
@@ -978,6 +985,23 @@ async function renderDetalle(id, esRefrescoAutomatico) {
     }
   } catch (e) {
     if (e.status === 401) return logout();
-    app.innerHTML = `<div class="error">${esc(e.error || t("consulta.errCargar"))}</div>`;
+    // Sin respuesta del servidor (se está reiniciando, o no hay internet) o
+    // un 502/503/504: se reintenta solo, con el cargando a la vista. Un 404 o
+    // un 403 son respuestas de verdad y se muestran al toque.
+    const pasajero = !e.status || e.status >= 502;
+    if (pasajero && intento < REINTENTOS_DETALLE) {
+      if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.reconectando")}</div>`;
+      pollTimeout = setTimeout(() => renderDetalle(id, esRefrescoAutomatico, intento + 1), ESPERA_REINTENTO_MS);
+      return;
+    }
+    // Si no fue el servidor, fue esta pantalla: que quede en la consola del
+    // navegador para poder diagnosticarlo, en vez de solo el mensaje genérico.
+    if (!e.status) console.error("[renderDetalle]", e);
+    // Un 5xx trae «Error de conexión» del servidor, siempre en español: se
+    // muestra el mensaje en el idioma del médico.
+    app.innerHTML = `<div class="error">${esc((e.status && e.status < 500 && e.error) || t("consulta.errCargar"))}</div>
+      <button class="secondary" id="btnReintentarDetalle">${t("consulta.reintentarCargar")}</button>`;
+    const btn = document.getElementById("btnReintentarDetalle");
+    if (btn) btn.onclick = () => renderDetalle(id);
   }
 }

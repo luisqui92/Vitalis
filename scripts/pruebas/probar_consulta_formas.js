@@ -55,6 +55,18 @@ const FORMAS = {
   tele: { ...base, estado: "completado", notaClinicaEstado: "completado", notaClinica: nota, segmentos: [{ hablante: "A", quien: "medico", texto: "x" }] },
   tratamientos: { ...base, estado: "completado", notaClinicaEstado: "completado", notaClinica: { ...nota, tratamientosSugeridos: [{ _id: "t1", estado: "pendiente", itemMencionado: "x", piezaFdi: 11 }] } },
   antecedentes: { ...base, estado: "completado", notaClinicaEstado: "completado", notaClinica: { ...nota, antecedentesPersonalesNuevos: ["HAS"], antecedentesFamiliaresNuevos: [{ parentesco: "mae", condicion: "DM" }], vacunasMencionadas: [{ nombre: "BCG" }] } },
+  // La forma exacta de una consulta real que mostró «Erro ao carregar a
+  // consulta» (un médico de Brasil): campos en null donde la pantalla
+  // esperaba listas u objetos, verificación sin estado, hilo sin conexiones.
+  yerko: { ...base, estado: "completado", notaClinicaEstado: "completado", notaFuente: "audio", transcripcionEnVivo: "",
+    verificacion: { estado: "" }, hiloClinico: { generadoEn: null }, confirmadaEn: null, notaEditadaPorMedico: false,
+    duracionSegundos: 600, tiempos: { transcripcionMs: 30000, notaMs: 9000 }, transcripcionCompleta: "texto",
+    segmentos: Array.from({ length: 40 }, (_, i) => ({ hablante: i % 2 ? "B" : "A", quien: "", texto: "frase", inicioSeg: i, finSeg: i + 1 })),
+    notaClinica: { motivoConsulta: "m", sintomas: ["a", "b"], antecedentesRelevantes: "x", diagnostico: "d", diagnosticosDiferenciales: null,
+      plan: "p", medicamentosRecetados: [{ nombre: "A", dosis: "1", frecuencia: null }, { nombre: "B", dosis: "2", frecuencia: null }],
+      examenesSolicitados: ["e1", "e2"], proximoControl: "c", reconsultaSugerida: null, antecedentesPersonalesNuevos: [], antecedentesFamiliaresNuevos: [],
+      vacunasMencionadas: [], tratamientosSugeridos: [], examenOcularSugerido: [], odontogramaSugerido: [], ginecoSugerido: [] },
+    verificacionMedicamentos: [{ estado: "ok" }, { estado: "desconocido", noNombrado: true }] },
   estudiante: { ...base, estado: "completado", deEstudiante: true, notaClinicaEstado: "completado", notaClinica: nota },
 };
 
@@ -95,6 +107,28 @@ const FORMAS = {
     const mal = /carregar a consulta|cargar la consulta|THROW/i.test(msg) || errores.length;
     if (mal) fallos++;
     console.log(`${mal ? "❌" : "✅"} ${nombre}${mal ? " → " + msg.replace(/\s+/g, " ") + " " + errores.join(" | ") : ""}`);
+    await page.evaluate(() => detenerPolling());
+  }
+  if (idioma === "es") {
+    // El servidor reiniciándose: dos pedidos sin respuesta, después sí.
+    let caidas = 2;
+    actual = FORMAS.editable;
+    await page.unroute(`**/medico/consultas/${ID}`);
+    await page.route(`**/medico/consultas/${ID}`, (r) => (caidas-- > 0 ? r.abort("connectionrefused") : r.fulfill({ json: { consulta: actual } })));
+    await page.evaluate((id) => { renderDetalle(id); }, ID);
+    await page.waitForSelector("#nfDiagnostico", { timeout: 15000 }).catch(() => {});
+    const ok = await page.locator("#nfDiagnostico").count() === 1;
+    if (!ok) fallos++;
+    console.log(`${ok ? "✅" : "❌"} el servidor no contesta dos veces (reiniciándose) → reintenta solo y abre la consulta`);
+    // Una respuesta de verdad (no existe): se muestra al toque, con «Intentar de nuevo».
+    await page.unroute(`**/medico/consultas/${ID}`);
+    await page.route(`**/medico/consultas/${ID}`, (r) => r.fulfill({ status: 404, json: { error: "Consulta no encontrada" } }));
+    const t0 = Date.now();
+    await page.evaluate((id) => { renderDetalle(id); }, ID);
+    await page.waitForSelector("#btnReintentarDetalle", { timeout: 5000 }).catch(() => {});
+    const ok2 = (await page.locator("#btnReintentarDetalle").count()) === 1 && Date.now() - t0 < 2000 && /no encontrada/.test(await page.innerText("#app"));
+    if (!ok2) fallos++;
+    console.log(`${ok2 ? "✅" : "❌"} un 404 se muestra enseguida, con su mensaje y «Intentar de nuevo»`);
     await page.evaluate(() => detenerPolling());
   }
   await page.close();
