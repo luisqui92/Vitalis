@@ -9,6 +9,7 @@ async function renderVincular() {
     pintarVincular(data.vinculacion);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderVincular");
     app.innerHTML = `<div class="error">${esc(e.error || t("vincular.error"))}</div>`;
   }
 }

@@ -169,6 +169,7 @@ async function renderRecetaOptica(id) {
     document.getElementById("btnImprimirRecetaOptica").onclick = () => window.print();
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderRecetaOptica");
     app.innerHTML = `<div class="error">${esc(e.error || t("optica.errCargarUna"))}</div>`;
   }
 }
@@ -290,6 +291,7 @@ async function renderReceta(id) {
     document.getElementById("btnImprimirReceta").onclick = () => window.print();
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderReceta");
     app.innerHTML = `<div class="error">${esc(e.error || t("receta.errCargar"))}</div>`;
   }
 }

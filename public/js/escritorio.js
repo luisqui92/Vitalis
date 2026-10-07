@@ -215,6 +215,7 @@ async function renderInicioEscritorio() {
     );
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderInicioEscritorio");
     app.innerHTML = `<div class="error">${esc(e.error || t("escr.error"))}</div>`;
   }
 }

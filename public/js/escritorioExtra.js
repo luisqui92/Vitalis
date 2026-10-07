@@ -17,6 +17,7 @@ async function renderVozEscritorio() {
     pintarVozEscritorio(llamadas);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderVozEscritorio");
     app.innerHTML = `<div class="error">${esc(e.error || t("voz.error"))}</div>`;
   }
 }
@@ -48,6 +49,7 @@ async function renderIndicacionesEscritorio() {
     pintarIndicacionesEscritorio(data.recetas || []);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderIndicacionesEscritorio");
     app.innerHTML = `<div class="error">${esc(e.error || t("indic.error"))}</div>`;
   }
 }
@@ -83,6 +85,7 @@ async function renderEstudiosEscritorio() {
     pintarEstudiosEscritorio(data.estudios || []);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderEstudiosEscritorio");
     app.innerHTML = `<div class="error">${esc(e.error || t("escrEst.error"))}</div>`;
   }
 }
@@ -138,6 +141,7 @@ async function renderReportesEscritorio() {
     pintarReportesEscritorio(data);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderReportesEscritorio");
     app.innerHTML = `<div class="error">${esc(e.error || t("rep.error"))}</div>`;
   }
 }
@@ -178,6 +182,7 @@ async function renderFinanzasEscritorio() {
     pintarFinanzasEscritorio(data);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderFinanzasEscritorio");
     app.innerHTML = `<div class="error">${esc(e.error || t("fin.error"))}</div>`;
   }
 }

@@ -83,6 +83,7 @@ async function renderClinica() {
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
+    if (typeof reportarError === "function") reportarError(e, "renderClinica");
     app.innerHTML = `<div class="error">${esc(e.error || t("clin.error"))}</div>`;
   }
 }

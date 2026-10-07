@@ -186,6 +186,7 @@ async function renderEquiposRayos(pacienteVuelta, { preservarToken = false } = {
     equipos = (await api("/medico/rayos/estado")).equipos || [];
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderEquiposRayos");
     app.innerHTML = `<div class="error">${esc(e.error || t("rx.errEquipos"))}</div>`;
     return;
   }

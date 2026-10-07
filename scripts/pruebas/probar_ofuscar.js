@@ -111,7 +111,10 @@ const GLOBALES_CRITICOS = [
   verificar("el choque de audio.js y neurodesarrollo.js se detecta", real.length === 1 && real[0][0] === "_0x2768");
   verificar("un global propio de cada archivo no se toma como choque", !real.some(([n]) => n === "crearGrabadora"));
 
+  // Los mapas de esta prueba (scripts/ofuscar.js los deja al lado de --salida).
+  verificar("los mapas quedan aparte, no entre los archivos publicados", fs.existsSync(SALIDA + "-mapas") && !fs.readdirSync(SALIDA).some(f => f.endsWith(".map")));
   fs.rmSync(SALIDA, { recursive: true, force: true });
+  fs.rmSync(SALIDA + "-mapas", { recursive: true, force: true });
   console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
   process.exit(fallos === 0 ? 0 : 1);
 })().catch(e => { console.error("💥", e.message); process.exit(1); });

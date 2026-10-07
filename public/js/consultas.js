@@ -372,6 +372,7 @@ async function renderNuevaConsultaRemota(pacienteId, pacienteNombre) {
     pintarControlRemoto(data.vinculacion, pacienteId, pacienteNombre);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderNuevaConsultaRemota");
     app.innerHTML = `<div class="error">${esc(e.error || t("consulta.errVinculacion"))}</div>`;
   }
 }
@@ -988,7 +989,8 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
     // Sin respuesta del servidor (se está reiniciando, o no hay internet) o
     // un 502/503/504: se reintenta solo, con el cargando a la vista. Un 404 o
     // un 403 son respuestas de verdad y se muestran al toque.
-    const pasajero = !e.status || e.status >= 502;
+    const corteDeRed = e instanceof TypeError && /fetch|network|load failed/i.test(e.message || "");
+    const pasajero = corteDeRed || e.status >= 502;
     if (pasajero && intento < REINTENTOS_DETALLE) {
       if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.reconectando")}</div>`;
       pollTimeout = setTimeout(() => renderDetalle(id, esRefrescoAutomatico, intento + 1), ESPERA_REINTENTO_MS);
@@ -996,7 +998,10 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
     }
     // Si no fue el servidor, fue esta pantalla: que quede en la consola del
     // navegador para poder diagnosticarlo, en vez de solo el mensaje genérico.
-    if (!e.status) console.error("[renderDetalle]", e);
+    if (!e.status) {
+      console.error("[renderDetalle]", e);
+      if (typeof reportarError === "function") reportarError(e, "renderDetalle");
+    }
     // Un 5xx trae «Error de conexión» del servidor, siempre en español: se
     // muestra el mensaje en el idioma del médico.
     app.innerHTML = `<div class="error">${esc((e.status && e.status < 500 && e.error) || t("consulta.errCargar"))}</div>

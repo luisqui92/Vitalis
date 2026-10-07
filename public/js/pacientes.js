@@ -211,6 +211,7 @@ async function renderDashboard() {
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
+    if (typeof reportarError === "function") reportarError(e, "renderDashboard");
     app.innerHTML = `<div class="error">${esc(e.error || t("pacientes.error"))}</div>`;
   }
 }
@@ -337,6 +338,7 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
   } catch (e) {
     if (e.status === 401) return logout();
     if (!seriePantallaVigente(serie)) return;
+    if (typeof reportarError === "function") reportarError(e, "renderPacienteDetalle");
     app.innerHTML = `<div class="error">${esc(e.error || t("kardex.error"))}</div>`;
   }
 }

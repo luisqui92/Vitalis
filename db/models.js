@@ -3224,7 +3224,30 @@ const codigoEstudianteSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSchema);
 
-module.exports = { LISTAS_DE_LA_NOTA, CodigoEstudiante, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+// ─── ERRORES DE LA PANTALLA (ver services/erroresCliente.js) ───────────────
+//
+// Lo que falla en el celular o la compu de un médico. Agrupado: el mismo
+// error repetido es UNA fila con un contador, no mil. Sin datos de
+// pacientes: el mensaje técnico, dónde, en qué pantalla y en qué versión.
+// Se borra solo a los 30 días.
+const errorClienteSchema = new mongoose.Schema({
+  huella: { type: String, required: true, unique: true },
+  mensaje: { type: String, default: "" },
+  pila: { type: String, default: "" },
+  contexto: { type: String, default: "" },   // «global», «promesa», «renderDetalle»…
+  pantalla: { type: String, default: "" },
+  version: { type: String, default: "" },     // la del ofuscado (ofuscado-mapas/actual.json)
+  idioma: { type: String, default: "" },
+  navegador: { type: String, default: "" },
+  veces: { type: Number, default: 0 },
+  medicos: { type: [String], default: [] },   // hasta 20, para saber a cuántos afecta
+  primera: { type: Date, default: Date.now },
+  ultima: { type: Date, default: Date.now },
+});
+errorClienteSchema.index({ ultima: 1 }, { expireAfterSeconds: 30 * 86400 });
+const ErrorCliente = mongoose.model("ErrorCliente", errorClienteSchema);
+
+module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, CodigoEstudiante, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

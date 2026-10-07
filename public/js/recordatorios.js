@@ -31,6 +31,7 @@ async function renderRecordatorios() {
     wireRecordatorios(pacientes);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderRecordatorios");
     app.innerHTML = `<div class="error">${esc(e.error || t("record.error"))}</div>`;
   }
 }

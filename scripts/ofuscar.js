@@ -81,8 +81,48 @@ function prefijoDe(archivo) {
   return "o" + archivo.replace(/\.js$/, "").replace(/[^A-Za-z0-9]/g, "_") + "_";
 }
 
+// ═══ EL MAPA DE CADA ARCHIVO ════════════════════════════════════════════════
+//
+// Un error en el celular de un médico llega como «consultas.js, línea 1,
+// columna 48213»: en el ofuscado todo es una sola línea, y así no se puede
+// saber qué falló. El mapa traduce esa posición a la del código original
+// («consultas.js:745, renderDetalle»). Lo usa scripts/errores_pantalla.js.
+//
+// Los mapas NO se publican: tienen el código legible adentro, que es justo
+// lo que la ofuscación esconde. Van a ofuscado-mapas/<versión>/, fuera de
+// public/, y el ofuscado no los menciona.
 function ofuscarCodigo(codigo, archivo) {
-  return JavaScriptObfuscator.obfuscate(codigo, { ...OPCIONES, identifiersPrefix: prefijoDe(archivo) }).getObfuscatedCode();
+  return ofuscarConMapa(codigo, archivo).codigo;
+}
+
+function ofuscarConMapa(codigo, archivo) {
+  const r = JavaScriptObfuscator.obfuscate(codigo, {
+    ...OPCIONES, identifiersPrefix: prefijoDe(archivo),
+    sourceMap: true, sourceMapMode: "separate", sourceMapSourcesMode: "sources-content", inputFileName: archivo,
+  });
+  // Por las dudas: que el ofuscado nunca apunte a su mapa.
+  return { codigo: r.getObfuscatedCode().replace(/\n?\/\/# sourceMappingURL=.*$/m, ""), mapa: r.getSourceMap() };
+}
+
+const MAPAS_A_GUARDAR = 5;   // versiones: las de los últimos despliegues
+
+// Dónde van los mapas: en el despliegue (en el lugar), ofuscado-mapas/ en
+// la raíz; probando con --salida, al lado de esa carpeta.
+function carpetaDeMapas() {
+  return SALIDA === ORIGEN ? path.join(__dirname, "..", "ofuscado-mapas") : SALIDA + "-mapas";
+}
+
+function guardarMapas(resultados) {
+  const raiz = carpetaDeMapas();
+  const version = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "") + "-" + Math.random().toString(36).slice(2, 6);
+  const dir = path.join(raiz, version);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const { archivo, mapa } of resultados) if (mapa) fs.writeFileSync(path.join(dir, archivo + ".map"), mapa);
+  fs.writeFileSync(path.join(raiz, "actual.json"), JSON.stringify({ version, fecha: new Date().toISOString() }));
+  // Solo las últimas versiones: un error de hace un mes ya no importa.
+  const viejas = fs.readdirSync(raiz, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name).sort().reverse().slice(MAPAS_A_GUARDAR);
+  for (const v of viejas) fs.rmSync(path.join(raiz, v), { recursive: true, force: true });
+  return version;
 }
 
 // Los nombres declarados en el nivel superior de un archivo: los que quedan
@@ -127,7 +167,8 @@ function main() {
   for (const archivo of archivos) {
     try {
       const original = fs.readFileSync(path.join(ORIGEN, archivo), "utf8");
-      resultados.push({ archivo, original, ofuscado: ofuscarCodigo(original, archivo) });
+      const { codigo, mapa } = ofuscarConMapa(original, archivo);
+      resultados.push({ archivo, original, ofuscado: codigo, mapa });
     } catch (e) {
       fallidos++;
       console.error(`  ✗ ${archivo}: ${e.message}`);
@@ -148,7 +189,8 @@ function main() {
     fs.mkdirSync(path.dirname(destino), { recursive: true });
     fs.writeFileSync(destino, ofuscado);
   }
-  console.log(`${resultados.length} ofuscado(s), 0 fallido(s), sin nombres globales repetidos.`);
+  const version = guardarMapas(resultados);
+  console.log(`${resultados.length} ofuscado(s), 0 fallido(s), sin nombres globales repetidos. Versión ${version}.`);
 }
 
 if (require.main === module) main();

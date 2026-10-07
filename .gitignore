@@ -19,3 +19,7 @@ caja-dicom/config.json
 # Paquetes de idioma: se arman solos al arrancar, a partir de public/i18n/<idioma>/.
 # Tener el generado en git garantiza que algún día quede desincronizado del original.
 /public/i18n/*.js
+
+# Mapas del JS ofuscado (scripts/ofuscar.js): tienen el código legible
+# adentro. Se generan en cada despliegue y no se publican.
+ofuscado-mapas/

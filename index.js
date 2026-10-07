@@ -142,6 +142,8 @@ app.use(require("./services/estudiantes").middlewareEstudiantes);
 
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
+// Los errores de la pantalla llegan acá (public/js/errores.js).
+require("./routes/erroresCliente")(app);
 // La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en
 // Symphomed no da acceso — ver el encabezado de routes/solicitudesCuenta.js.
 require("./routes/solicitudesCuenta")(app);

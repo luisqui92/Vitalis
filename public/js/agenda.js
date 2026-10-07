@@ -18,6 +18,7 @@ async function renderAgenda() {
     pintarAgenda(dataCitas.citas || [], dataPacientes.pacientes || [], dataWA);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderAgenda");
     app.innerHTML = `<div class="error">${esc(e.error || t("agenda.error"))}</div>`;
   }
 }
@@ -224,6 +225,7 @@ async function renderConfigHorario() {
     pintarConfigHorario(data.horario);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderConfigHorario");
     app.innerHTML = `<div class="error">${esc(e.error || t("horario.error"))}</div>`;
   }
 }

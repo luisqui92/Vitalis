@@ -52,6 +52,7 @@ async function renderGanaderia() {
     pintarGanaderia(dataLotes.lotes || [], fincas);
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderGanaderia");
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
   }
 }
@@ -362,6 +363,7 @@ async function renderLoteDetalle(id) {
     });
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderLoteDetalle");
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
   }
 }
@@ -825,6 +827,7 @@ async function renderAnimalDetalle(id) {
     pintarAnimalDetalle({ ...data, controles });
   } catch (e) {
     if (e.status === 401) return logout();
+    if (typeof reportarError === "function") reportarError(e, "renderAnimalDetalle");
     app.innerHTML = `<div class="error">${esc(e.error || t("ganaderia.error"))}</div>`;
   }
 }
