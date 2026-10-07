@@ -637,6 +637,23 @@ const consultaMedicaSchema = new mongoose.Schema({
   },
   notaClinicaError: String,
 }, { timestamps: true });
+// Ninguna lista de la nota se guarda con una fila vacía (null): la pantalla
+// de la consulta, el resumen, el brief y el hilo leen «fila.nombre» sin
+// preguntar, y una sola fila vacía los hacía caer. La limpieza de la nota de
+// la IA ya las saca (services/notaClinica.js → normalizarNota); esto es la
+// red para cualquier otro camino que guarde la consulta.
+const LISTAS_DE_LA_NOTA = ["medicamentosRecetados", "vacunasMencionadas", "antecedentesFamiliaresNuevos", "tratamientosSugeridos",
+  "examenOcularSugerido", "odontogramaSugerido", "ginecoSugerido"];
+consultaMedicaSchema.pre("save", function (next) {
+  for (const lista of LISTAS_DE_LA_NOTA) {
+    const ruta = `notaClinica.${lista}`;
+    const valor = this.get(ruta);
+    if (Array.isArray(valor) && valor.some(x => x == null)) {
+      this.set(ruta, valor.filter(x => x != null).map(x => (typeof x?.toObject === "function" ? x.toObject() : x)));
+    }
+  }
+  next();
+});
 consultaMedicaSchema.index({ medicoPhone: 1, createdAt: -1 });
 consultaMedicaSchema.index({ pacienteId: 1, createdAt: -1 });
 const ConsultaMedica = mongoose.model("ConsultaMedica", consultaMedicaSchema);
@@ -3207,7 +3224,7 @@ const codigoEstudianteSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSchema);
 
-module.exports = { CodigoEstudiante, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { LISTAS_DE_LA_NOTA, CodigoEstudiante, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

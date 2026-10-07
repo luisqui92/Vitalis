@@ -280,7 +280,7 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
     const n = nota;
     const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
     // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
-    const meds = (n.medicamentosRecetados || []).map((m, i) => [m.nombre, m.dosis, m.frecuencia].filter(Boolean).join(" ")
+    const meds = (n.medicamentosRecetados || []).map((m, i) => [m?.nombre, m?.dosis, m?.frecuencia].filter(Boolean).join(" ")
       + (noNombrados.includes(i) ? " " + t("vivo.noNombrado") : "")).join("; ");
     caja.style.display = "block";
     caja.innerHTML = `
@@ -616,7 +616,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
       } else if (c.notaClinicaEstado === "error") {
         notaHtml = `<div class="card"><div class="error">${t("nota.error")}</div>${yaConfirmada ? "" : botonRegenerarNotaHtml()}</div>`;
       } else if (n && yaConfirmada) {
-        const meds = (n.medicamentosRecetados || []).map(m =>
+        const meds = (n.medicamentosRecetados || []).filter(Boolean).map(m =>
           esc(m.nombre + (m.dosis ? " " + m.dosis : "") + (m.frecuencia ? " — " + m.frecuencia : ""))
         ).join("; ");
         notaHtml = `
@@ -656,7 +656,7 @@ async function renderDetalle(id, esRefrescoAutomatico) {
             <textarea id="nfPlan" rows="3">${esc(n.plan || "")}</textarea>
             <label>${t("nota.campo.medicamentos")}</label>
             <div id="nfMeds">
-              ${(n.medicamentosRecetados || []).map((m, i) => `
+              ${(n.medicamentosRecetados || []).map((m, i) => [m || {}, i]).map(([m, i]) => `
                 <div class="med-row" data-i="${i}" data-k="${i}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center">
                   <input class="nf-med-nombre" type="text" placeholder="${t("nota.med.nombre")}" value="${esc(m.nombre || "")}" style="flex:2;margin:0">
                   <input class="nf-med-dosis" type="text" placeholder="${t("nota.med.dosis")}" value="${esc(m.dosis || "")}" style="flex:1;margin:0">

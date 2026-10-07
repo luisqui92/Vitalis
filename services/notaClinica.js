@@ -370,6 +370,18 @@ function normalizarNota(crudo) {
   for (const c of ["medicamentosRecetados", "antecedentesFamiliaresNuevos", "vacunasMencionadas"]) {
     if (Array.isArray(nota[c])) nota[c] = nota[c].map(normalizarSubobjeto);
   }
+  // La IA a veces deja una fila vacía (null) o escribe el medicamento como
+  // texto suelto («Amoxicilina 500 mg») en vez de un objeto. Una fila vacía
+  // guardada hacía caer la pantalla de la consulta («Error al cargar la
+  // consulta»); el texto suelto ni se podía guardar. El texto se convierte en
+  // lo que quiso decir, y lo vacío se descarta.
+  const comoObjeto = { medicamentosRecetados: "nombre", vacunasMencionadas: "nombre", antecedentesFamiliaresNuevos: "condicion" };
+  for (const [c, campo] of Object.entries(comoObjeto)) {
+    if (!Array.isArray(nota[c])) continue;
+    nota[c] = nota[c]
+      .map(x => (typeof x === "string" ? (x.trim() ? { [campo]: x.trim() } : null) : x))
+      .filter(x => x && typeof x === "object" && !Array.isArray(x));
+  }
   return { nota, clavesAjustadas };
 }
 
