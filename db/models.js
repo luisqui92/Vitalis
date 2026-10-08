@@ -3259,10 +3259,17 @@ const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSche
 // razonamiento que hizo de cada consulta (ConsultaMedica.razonamiento), sin
 // pedirle nada nuevo a la IA. Se repasan espaciadas: la que sabe vuelve cada
 // vez más lejos; la que no, vuelve mañana.
+//
+// Las de tipo "pregunta" son las que erró en un simulacro (PreguntaSimulacro,
+// más abajo): no tienen consulta, tienen la pregunta.
 const tarjetaEstudioSchema = new mongoose.Schema({
   medicoPhone: { type: String, required: true },
-  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", required: true },
-  tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar"], required: true },
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null,
+    required() { return this.tipo !== "pregunta"; } },
+  tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar", "pregunta"], required: true },
+  preguntaId: { type: mongoose.Schema.Types.ObjectId, ref: "PreguntaSimulacro", default: null },
+  area: { type: String, default: "" },        // la del simulacro
+  enunciado: { type: String, default: "" },   // la viñeta y la pregunta del simulacro
   // El caso, sin el nombre del paciente: lo que se lee arriba de la pregunta.
   caso: {
     sexo: { type: String, default: "" },
@@ -3299,9 +3306,120 @@ const tarjetaEstudioSchema = new mongoose.Schema({
     motivo: { type: String, enum: ["", "respuesta", "pregunta", "datos"], default: "" },
   },
 }, { timestamps: true });
-tarjetaEstudioSchema.index({ consultaId: 1, tipo: 1 }, { unique: true });
+tarjetaEstudioSchema.index({ consultaId: 1, tipo: 1 }, { unique: true, partialFilterExpression: { consultaId: { $type: "objectId" } } });
+tarjetaEstudioSchema.index({ medicoPhone: 1, preguntaId: 1 }, { unique: true, partialFilterExpression: { preguntaId: { $type: "objectId" } } });
 tarjetaEstudioSchema.index({ medicoPhone: 1, proxima: 1 });
 const TarjetaEstudio = mongoose.model("TarjetaEstudio", tarjetaEstudioSchema);
+
+// Lo que un estudiante marcó como «está mal» en algo del banco compartido (un
+// caso del paciente virtual, una pregunta de simulacro). Con dos estudiantes
+// distintos, sale del banco.
+const reporteBancoSchema = { type: [{ medicoPhone: String, motivo: String, en: Date, _id: false }], default: [] };
+
+// ─── PACIENTE VIRTUAL (ver services/pacienteVirtual.js) ────────────────────
+//
+// Casos inventados para practicar la entrevista: ningún dato es de un
+// paciente real. El guion (lo que el paciente sabe y cuenta, el examen, los
+// estudios y el diagnóstico) lo arma una IA y otra lo resuelve a ciegas antes
+// de guardarlo. Se reusan entre estudiantes, como las estaciones de un examen
+// práctico: cada uno ve cada caso una sola vez.
+const casoVirtualSchema = new mongoose.Schema({
+  idioma: { type: String, required: true },
+  area: { type: String, required: true },
+  dificultad: { type: String, enum: ["basico", "intermedio", "avanzado"], required: true },
+  guion: { type: mongoose.Schema.Types.Mixed, required: true },
+  usos: { type: Number, default: 0 },
+  reportes: reporteBancoSchema,
+  oculto: { type: Boolean, default: false },
+}, { timestamps: true });
+casoVirtualSchema.index({ idioma: 1, area: 1, dificultad: 1, oculto: 1, usos: 1 });
+const CasoVirtual = mongoose.model("CasoVirtual", casoVirtualSchema);
+
+// Una práctica con un paciente virtual: la conversación, lo que pidió
+// examinar y los estudios, su diagnóstico y la evaluación.
+const simulacionPacienteSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true },
+  idioma: { type: String, default: "es" },
+  area: { type: String, required: true },
+  dificultad: { type: String, required: true },
+  estado: { type: String, enum: ["preparando", "en_curso", "evaluando", "terminada", "error", "abandonada"], default: "preparando" },
+  casoId: { type: mongoose.Schema.Types.ObjectId, ref: "CasoVirtual", default: null },
+  // Una copia del guion: el banco puede cambiar; su práctica, no.
+  guion: { type: mongoose.Schema.Types.Mixed, default: null },
+  mensajes: {
+    type: [{
+      rol: { type: String, enum: ["estudiante", "paciente", "sistema"] },
+      tipo: { type: String, enum: ["inicio", "pregunta", "examen", "estudio"] },
+      texto: String,
+      en: Date,
+      _id: false,
+    }],
+    default: [],
+  },
+  // Lo que ya se contestó de examen y de estudios: pedir dos veces lo mismo
+  // da lo mismo, aunque no estuviera en el guion.
+  hallazgos: { type: [{ tipo: String, clave: String, texto: String, _id: false }], default: [] },
+  respuesta: {
+    principal: { type: String, default: "" },
+    diferenciales: { type: [String], default: [] },
+    plan: { type: String, default: "" },
+    en: { type: Date, default: null },
+  },
+  evaluacion: { type: mongoose.Schema.Types.Mixed, default: null },
+  terminadaEn: { type: Date, default: null },
+}, { timestamps: true });
+simulacionPacienteSchema.index({ medicoPhone: 1, createdAt: -1 });
+const SimulacionPaciente = mongoose.model("SimulacionPaciente", simulacionPacienteSchema);
+
+// ─── SIMULACROS (ver services/simulacros.js) ───────────────────────────────
+//
+// Preguntas tipo examen de residencia, por área. Las escribe una IA y otra
+// las responde a ciegas: solo se guardan las que las dos contestan igual y
+// sin dudar. El banco es compartido entre los estudiantes de un idioma; cada
+// uno ve cada pregunta una sola vez.
+const preguntaSimulacroSchema = new mongoose.Schema({
+  idioma: { type: String, required: true },
+  area: { type: String, required: true },
+  tema: { type: String, default: "" },
+  enunciado: { type: String, required: true },
+  opciones: { type: [String], required: true },
+  correcta: { type: Number, required: true },
+  explicacion: { type: String, default: "" },
+  porOpcion: { type: [String], default: [] },   // por qué cada opción es o no es
+  vistas: { type: Number, default: 0 },
+  aciertos: { type: Number, default: 0 },
+  reportes: reporteBancoSchema,
+  oculta: { type: Boolean, default: false },
+}, { timestamps: true });
+preguntaSimulacroSchema.index({ idioma: 1, area: 1, oculta: 1 });
+const PreguntaSimulacro = mongoose.model("PreguntaSimulacro", preguntaSimulacroSchema);
+
+// Un intento: qué preguntas le tocaron y qué contestó.
+const simulacroSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true },
+  idioma: { type: String, default: "es" },
+  area: { type: String, required: true },
+  // práctica: ve la respuesta en cada pregunta. examen: con tiempo, al final.
+  modo: { type: String, enum: ["practica", "examen"], default: "practica" },
+  cantidad: { type: Number, required: true },
+  estado: { type: String, enum: ["preparando", "listo", "terminado", "error"], default: "preparando" },
+  preguntas: {
+    type: [{
+      preguntaId: { type: mongoose.Schema.Types.ObjectId, ref: "PreguntaSimulacro" },
+      elegida: { type: Number, default: null },
+      acerto: { type: Boolean, default: null },
+      en: { type: Date, default: null },
+      _id: false,
+    }],
+    default: [],
+  },
+  aciertos: { type: Number, default: 0 },
+  limiteSegundos: { type: Number, default: 0 },   // solo en modo examen
+  empezadoEn: { type: Date, default: null },
+  terminadoEn: { type: Date, default: null },
+}, { timestamps: true });
+simulacroSchema.index({ medicoPhone: 1, createdAt: -1 });
+const Simulacro = mongoose.model("Simulacro", simulacroSchema);
 
 // ─── ERRORES DE LA PANTALLA (ver services/erroresCliente.js) ───────────────
 //
@@ -3326,7 +3444,7 @@ const errorClienteSchema = new mongoose.Schema({
 errorClienteSchema.index({ ultima: 1 }, { expireAfterSeconds: 30 * 86400 });
 const ErrorCliente = mongoose.model("ErrorCliente", errorClienteSchema);
 
-module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, CodigoEstudiante, TarjetaEstudio,ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, CodigoEstudiante, TarjetaEstudio, CasoVirtual, SimulacionPaciente, PreguntaSimulacro, Simulacro, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

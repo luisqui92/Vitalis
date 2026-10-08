@@ -26,13 +26,17 @@
 // Lo caro es la transcripción. Cada nivel trae sus horas de audio por mes;
 // pasado el tope no se empiezan consultas nuevas hasta el mes siguiente.
 // Vencido el acceso, entra y ve sus casos, pero no graba.
+//
+// El paciente virtual y los simulacros (etapa 4) también usan IA, mucho más
+// barata que el audio (centavos de dólar por práctica), pero con su tope por
+// mes para que nadie la use sin límite.
 const { ConsultaMedica } = require("../db/models");
 
 // Lo que trae cada nivel si el código no dice otra cosa.
 const NIVELES = {
-  estudiante: { horasMes: 6, precio: { BOB: 4900, BRL: 2900 } },
-  interno: { horasMes: 12, precio: { BOB: 8900, BRL: 4900 } },
-  residente: { horasMes: 25, precio: { BOB: 17900, BRL: 9900 } },
+  estudiante: { horasMes: 6, pacientesMes: 20, simulacrosMes: 30, precio: { BOB: 4900, BRL: 2900 } },
+  interno: { horasMes: 12, pacientesMes: 30, simulacrosMes: 45, precio: { BOB: 8900, BRL: 4900 } },
+  residente: { horasMes: 25, pacientesMes: 40, simulacrosMes: 60, precio: { BOB: 17900, BRL: 9900 } },
 };
 
 // Sin letras que se confunden al dictarlas o copiarlas (0/O, 1/I/L).

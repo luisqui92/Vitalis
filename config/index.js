@@ -12,6 +12,10 @@ require("dotenv").config({ override: true });
 
 const CONFIG = {
   OPENAI_KEY: process.env.OPENAI_KEY,
+  // A dónde van los pedidos de services/ia.js. En producción, OpenAI; las
+  // pruebas de pantalla levantan una IA de mentira y apuntan acá, para probar
+  // de punta a punta sin gastar ni depender de internet.
+  OPENAI_URL: process.env.OPENAI_URL || "https://api.openai.com/v1/chat/completions",
   ASSEMBLYAI_API_KEY: process.env.ASSEMBLYAI_API_KEY,
   MONGODB_URI: process.env.MONGODB_URI,
   APP_URL: process.env.APP_URL || "",

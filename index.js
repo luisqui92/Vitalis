@@ -156,8 +156,11 @@ require("./routes/perfilFoto")(app);
 // así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);
 require("./routes/consultaMedica")(app);
-// Cuentas de estudiante: repasar sus propios casos (services/estudio.js).
+// Cuentas de estudiante: repasar sus propios casos (services/estudio.js),
+// practicar con un paciente virtual y rendir simulacros.
 require("./routes/estudio")(app);
+require("./routes/pacienteVirtual")(app);
+require("./routes/simulacros")(app);
 require("./routes/pacientes")(app);
 require("./routes/medicamentos")(app);
 require("./routes/vacunas")(app);

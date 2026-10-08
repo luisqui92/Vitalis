@@ -8,6 +8,10 @@
 //
 // La pantalla nunca presenta la respuesta como la verdad: es la del
 // razonamiento de ese caso, y el diagnóstico lo confirma su tutor.
+//
+// Etapa 4: arriba, tres pestañas — sus casos (esto), el paciente virtual
+// (public/js/pacienteVirtual.js) y los simulacros (public/js/simulacros.js).
+// Las preguntas que erra en un simulacro vuelven acá, como tarjetas.
 
 // La sentada en curso: las tarjetas, por cuál va y cómo le va.
 let SENTADA = null;
@@ -18,8 +22,68 @@ const LETRAS_OPCION = ["A", "B", "C", "D", "E"];
 const ICONO_LOGRO = {
   primerCaso: "🩺", casos10: "📚", casos50: "🏛️", aciertos5: "🎯", aciertos25: "🏹",
   racha3: "🔥", racha7: "🔥", racha30: "🔥", dominadas10: "🧠", dominadas50: "🧠",
+  paciente1: "🗣️", pacientes10: "🗣️", pacientes30: "🗣️", simulacro1: "📝", simulacros10: "📝", simulacro80: "🏆",
 };
 const MOTIVOS_REPORTE_ESTUDIO = ["respuesta", "pregunta", "datos"];
+// Las que se contestan eligiendo una opción (la de diagnóstico de un caso y
+// las de simulacro); las otras, «me acordaba o no».
+const TARJETAS_DE_OPCIONES = ["dx", "pregunta"];
+
+// ─── LAS TRES PESTAÑAS ─────────────────────────────────────────────────────
+const PESTANAS_ESTUDIO = [
+  { id: "casos", clave: "estudio.pestana.casos", fn: "renderEstudiar" },
+  { id: "paciente", clave: "estudio.pestana.paciente", fn: "renderPacienteVirtual" },
+  { id: "simulacros", clave: "estudio.pestana.simulacros", fn: "renderSimulacros" },
+];
+
+function pestanasEstudioHtml(activa) {
+  return `<div class="est-pestanas" role="tablist">${PESTANAS_ESTUDIO.map(p => `
+    <button type="button" role="tab" class="est-pestana${p.id === activa ? " activa" : ""}" data-pestana="${p.id}" aria-selected="${p.id === activa}">${t(p.clave)}</button>`).join("")}
+  </div>`;
+}
+
+function engancharPestanasEstudio() {
+  document.querySelectorAll(".est-pestana[data-pestana]").forEach(b => {
+    const p = PESTANAS_ESTUDIO.find(x => x.id === b.dataset.pestana);
+    b.onclick = () => { if (typeof window[p.fn] === "function") window[p.fn](); };
+  });
+}
+
+// Lo que se espera mientras se prepara algo en el servidor (un paciente
+// virtual, un simulacro): pregunta cada pocos segundos. Si el estudiante se
+// fue a otra pantalla (la marca ya no está), deja de preguntar.
+async function esperarEstudio(ruta, campo, marca, terminados, maxMs = 5 * 60 * 1000) {
+  const hasta = Date.now() + maxMs;
+  while (Date.now() < hasta) {
+    await new Promise(r => setTimeout(r, 2500));
+    if (!document.getElementById(marca)) return null;
+    const d = await api(ruta);
+    if (terminados.includes(d[campo]?.estado)) return d[campo];
+  }
+  return { estado: "error" };
+}
+
+const nombreArea = (area) => t("estudio.area." + area);
+
+// Para elegir una opción de una lista corta (área, dificultad, modo).
+function chipsHtml(id, valores, elegido, clave) {
+  return `<div class="est-chips" id="${id}">${valores.map(v => `
+    <button type="button" class="est-chip${v === elegido ? " activo" : ""}" data-valor="${esc(String(v))}" aria-pressed="${v === elegido}">${t(clave(v))}</button>`).join("")}
+  </div>`;
+}
+
+function engancharChips(id, alElegir) {
+  const caja = document.getElementById(id);
+  if (!caja) return;
+  caja.querySelectorAll(".est-chip").forEach(b => {
+    b.onclick = () => {
+      caja.querySelectorAll(".est-chip").forEach(x => { x.classList.remove("activo"); x.setAttribute("aria-pressed", "false"); });
+      b.classList.add("activo");
+      b.setAttribute("aria-pressed", "true");
+      alElegir(b.dataset.valor);
+    };
+  });
+}
 
 // ─── LA PORTADA ────────────────────────────────────────────────────────────
 
@@ -68,6 +132,7 @@ function pintarPortadaEstudio(r, tarjetas) {
   const masDeUnaVez = (r.paraHoy || 0) > tarjetas.length;
   app.innerHTML = `
     ${volverEstudioHtml()}
+    ${pestanasEstudioHtml("casos")}
     <div class="card est-portada">
       <div class="nota-titulo" style="margin-top:0">${t("estudio.titulo")}</div>
       <div class="est-cabeza">
@@ -91,6 +156,7 @@ function pintarPortadaEstudio(r, tarjetas) {
     ${logrosHtml(r.logros)}
     <div class="hint est-aviso-ia">🎓 ${t("estudio.aviso")}</div>`;
   engancharVolverEstudio();
+  engancharPestanasEstudio();
   const empezar = document.getElementById("estEmpezar");
   if (empezar) empezar.onclick = () => empezarSentada(tarjetas, "hoy");
   const repasar = document.getElementById("estRepasar");
@@ -223,9 +289,10 @@ function pintarTarjeta() {
     <div class="est-progreso" role="progressbar" aria-valuemin="0" aria-valuemax="${s.tarjetas.length}" aria-valuenow="${s.i}"><span style="width:${avance}%"></span></div>
     <div class="card est-tarjeta" id="estTarjeta" data-tipo="${esc(tj.tipo)}">
       ${s.modo === "repaso" ? `<div class="est-modo">${t("estudio.modoRepaso")}</div>` : ""}
-      ${casoEstudioHtml(tj)}
-      <div class="est-pregunta">${preguntaEstudio(tj)}</div>
-      <div id="estZona">${tj.tipo === "dx" ? opcionesEstudioHtml(tj) : `<button class="secondary" id="estMostrar">${t("estudio.mostrar")}</button>`}</div>
+      ${tj.tipo === "pregunta"
+        ? `<div class="est-caso-caja"><div class="est-caso-rotulo">${t("estudio.deSimulacro", { area: esc(nombreArea(tj.area)) })}</div><div class="sim-enunciado">${esc(tj.enunciado)}</div></div>`
+        : `${casoEstudioHtml(tj)}<div class="est-pregunta">${preguntaEstudio(tj)}</div>`}
+      <div id="estZona">${TARJETAS_DE_OPCIONES.includes(tj.tipo) ? opcionesEstudioHtml(tj) : `<button class="secondary" id="estMostrar">${t("estudio.mostrar")}</button>`}</div>
       <div id="estExplica"></div>
       <div class="est-pie">
         <button type="button" class="link est-reportar" id="estReportar">⚑ ${t("estudio.reportar")}</button>
@@ -235,7 +302,7 @@ function pintarTarjeta() {
   irArribaEstudio();
   document.getElementById("estSalir").onclick = renderEstudiar;
   document.getElementById("estReportar").onclick = () => abrirReporte(tj);
-  if (tj.tipo === "dx") {
+  if (TARJETAS_DE_OPCIONES.includes(tj.tipo)) {
     document.querySelectorAll(".est-opcion").forEach(b => { b.onclick = () => responderOpcion(b, tj); });
   } else {
     document.getElementById("estMostrar").onclick = () => mostrarRespuesta(tj);
@@ -257,7 +324,9 @@ function opcionesEstudioHtml(tj) {
     </button>`).join("")}</div>`;
 }
 
+// De dónde salió: su consulta (se puede abrir) o un simulacro.
 function fuenteEstudioHtml(tj) {
+  if (tj.tipo === "pregunta") return `<span class="hint" style="margin:0">${t("estudio.deSimulacroFecha", { area: esc(nombreArea(tj.area)), fecha: esc(fechaEstudio(tj.fecha)) })}</span>`;
   return `<button type="button" class="link est-fuente" id="estFuente">${t("estudio.fuente", { fecha: esc(fechaEstudio(tj.caso?.fecha)) })}</button>`;
 }
 
@@ -305,8 +374,10 @@ async function responderOpcion(boton, tj) {
     });
     const vuelve = cuandoVuelve(r.proxima);
     explica.innerHTML = `
-      <div class="est-veredicto ${r.correcto ? "bien" : "mal"}">${r.correcto ? "✓ " + t("estudio.bien") : "✗ " + t("estudio.mal", { dx: esc(correcta?.texto || "") })}</div>
-      ${!r.correcto && r.enContraElegida ? `<div class="nota-campo"><b>${t("estudio.enContraTuya")}</b> ${esc(r.enContraElegida)}</div>` : ""}
+      <div class="est-veredicto ${r.correcto ? "bien" : "mal"}">${tj.tipo === "pregunta"
+        ? (r.correcto ? "✓ " + t("estudio.bienPregunta") : "✗ " + t("estudio.malPregunta", { opcion: esc(correcta?.texto || "") }))
+        : (r.correcto ? "✓ " + t("estudio.bien") : "✗ " + t("estudio.mal", { dx: esc(correcta?.texto || "") }))}</div>
+      ${!r.correcto && r.enContraElegida ? `<div class="nota-campo"><b>${t(tj.tipo === "pregunta" ? "estudio.porQueNoTuya" : "estudio.enContraTuya")}</b> ${esc(r.enContraElegida)}</div>` : ""}
       ${(r.aFavor || []).length ? `<div class="nota-campo"><b>${t("estudio.aFavorDe", { dx: esc(correcta?.texto || "") })}</b> ${esc(r.aFavor.join("; "))}</div>` : ""}
       ${r.perla ? `<div class="tutor-perla">💡 ${esc(r.perla)}</div>` : ""}
       <div class="est-sigue">

@@ -27,9 +27,9 @@
 //   pantalla lo dice siempre.
 // · A la IA no le llega el nombre del paciente: edad, sexo, antecedentes y
 //   alergias alcanzan para razonar.
-const axios = require("axios");
-const { CONFIG, log } = require("../config");
+const { log } = require("../config");
 const { perfil } = require("./idiomas");
+const ia = require("./ia");
 
 const MAX_TEXTO = 80000;            // una consulta de 70 minutos entra con margen
 const PALABRAS_MINIMAS = 15;
@@ -42,20 +42,7 @@ function reglaDeIdioma(idioma) {
   return `Escribí el CONTENIDO en ${perfil(idioma).nota.nombre}. Las CLAVES del JSON van exactamente como están, sin traducir.`;
 }
 
-async function pedirJson(sistema, usuario, maxTokens) {
-  const res = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-4o-mini",
-      messages: [{ role: "system", content: sistema }, { role: "user", content: usuario }],
-      max_tokens: maxTokens,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    },
-    { headers: { Authorization: `Bearer ${CONFIG.OPENAI_KEY}` }, timeout: CONFIG.TIMEOUT_OPENAI }
-  );
-  return JSON.parse(String(res.data.choices[0].message.content || "").replace(/```json|```/g, "").trim());
-}
+const pedirJson = (sistema, usuario, maxTokens) => ia.pedirJson(sistema, usuario, { maxTokens });
 
 // Lo que se sabe del paciente sin decir quién es.
 function datosDeFicha(paciente, hoy = new Date()) {

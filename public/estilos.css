@@ -304,7 +304,7 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
 .est-logro.hecho .est-logro-prog{color:var(--warning);font-weight:700;}
 /* La sentada: una tarjeta por vez. */
 .est-arriba{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.est-arriba .back{margin-bottom:8px;}
+.est-arriba .back{margin-bottom:8px;flex:none;white-space:nowrap;}
 .est-cuenta{margin:0 0 8px;font-variant-numeric:tabular-nums;}
 .est-progreso{height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-bottom:14px;}
 .est-progreso span{display:block;height:100%;background:var(--primary);transition:width .25s ease;}
@@ -351,9 +351,78 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
 .est-inicio-fila{display:flex;align-items:center;gap:14px;}
 .est-inicio-txt{font-size:13.5px;line-height:1.5;}
 .est-inicio .primary{margin-top:12px;}
+
+/* ─── Etapa 4: las pestañas de Estudiar, el paciente virtual y los simulacros
+   (public/js/pacienteVirtual.js, public/js/simulacros.js). Mismos colores y
+   piezas que el repaso: las opciones de un simulacro son .est-opcion. */
+.est-pestanas{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);}
+.est-pestana{background:none;border:none;border-radius:var(--radius-sm);padding:9px 6px;font-size:13px;font-weight:600;color:var(--text-muted);font-family:var(--font-texto);line-height:1.2;}
+.est-pestana.activa{background:rgba(var(--primary-rgb),.14);color:var(--primary);}
+.est-pestana:focus-visible{outline:2px solid var(--primary);outline-offset:1px;}
+.est-rotulo{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 0 6px;}
+.est-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.est-chip{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:999px;padding:7px 12px;font-size:13px;font-family:var(--font-texto);line-height:1.2;}
+.est-chip.activo{border-color:var(--primary);background:rgba(var(--primary-rgb),.14);color:var(--primary);font-weight:600;}
+.est-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+.est-chip:disabled{opacity:.5;}
+/* La entrevista. */
+.pv-cabecera{display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.pv-mensajes{display:flex;flex-direction:column;gap:8px;padding:12px 0;max-height:52vh;min-height:140px;overflow-y:auto;}
+.pv-mensajes-libres{max-height:none;min-height:0;}
+.pv-msj{max-width:85%;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.45;overflow-wrap:anywhere;}
+.pv-est{align-self:flex-end;background:rgba(var(--primary-rgb),.16);border:1px solid rgba(var(--primary-rgb),.35);border-bottom-right-radius:4px;}
+.pv-pac{align-self:flex-start;background:var(--bg);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.pv-sis{align-self:stretch;max-width:none;background:var(--warning-bg);border:1px dashed var(--warning);border-radius:var(--radius-sm);font-size:13.5px;}
+.pv-tipo{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:2px;}
+.pv-escribiendo{color:var(--text-muted);font-style:italic;}
+.pv-acciones{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.pv-acciones .secondary{margin-top:0;padding:10px 4px;font-size:12.5px;}
+.pv-panel{padding:12px;margin:0 0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);}
+.pv-panel .primary{margin-top:12px;}
+.pv-otro,.pv-escribir{display:flex;gap:6px;margin-top:10px;}
+.pv-otro input,.pv-escribir input{flex:1;min-width:0;}
+.pv-enviar{flex:none;background:var(--gradient-vitalis);color:var(--sobre-primary);border:none;border-radius:var(--radius-sm);padding:0 14px;font-weight:600;font-family:var(--font-texto);}
+.pv-enviar:disabled{opacity:.5;}
+.pv-mic{flex:none;width:44px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:17px;}
+.pv-mic.activo{border-color:var(--danger);background:var(--danger-bg);}
+.pv-voz{width:auto;margin:0 0 8px;font-size:12px;color:var(--text-muted);}
+/* La evaluación. */
+.pv-puntos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0;}
+.pv-puntos div{display:flex;flex-direction:column;align-items:center;padding:10px 4px;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center;}
+.pv-puntos b{font-family:var(--font-marca);font-size:20px;font-variant-numeric:tabular-nums;}
+.pv-puntos span{font-size:11px;color:var(--text-muted);line-height:1.25;margin-top:2px;}
+.pv-check{list-style:none;margin:4px 0 10px;padding:0;font-size:14px;}
+.pv-check li{display:flex;gap:8px;align-items:baseline;padding:3px 0;line-height:1.4;}
+.pv-check li.si span{color:var(--success);font-weight:700;}
+.pv-check li.no span{color:var(--danger);font-weight:700;}
+.pv-check li.ojo span{color:var(--warning);font-weight:700;}
+.pv-detalle{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;}
+.pv-detalle summary{cursor:pointer;font-weight:600;color:var(--primary);font-size:14px;}
+.pv-detalle[open] summary{margin-bottom:8px;}
+/* Los simulacros. */
+.sim-enunciado{font-size:14.5px;line-height:1.55;margin-bottom:14px;white-space:pre-line;}
+.est-caso-caja .sim-enunciado{margin-bottom:0;}
+.sim-nav{display:flex;justify-content:space-between;gap:10px;margin-top:12px;}
+.sim-nav .primary,.sim-nav .secondary{width:auto;margin-top:0;padding:11px 18px;}
+.sim-reloj{font-variant-numeric:tabular-nums;font-weight:700;color:var(--text);}
+.sim-reloj.poco{color:var(--danger);}
+.sim-barra-fila{display:grid;grid-template-columns:minmax(90px,1fr) 2fr auto;align-items:center;gap:10px;padding:6px 0;font-size:13px;}
+.sim-barra{height:8px;border-radius:4px;background:var(--border);overflow:hidden;}
+.sim-barra span{display:block;height:100%;background:var(--primary);}
+.sim-barra-dato{font-variant-numeric:tabular-nums;color:var(--text-muted);white-space:nowrap;}
+.sim-barra-dato b{color:var(--text);}
+.sim-pct{font-family:var(--font-marca);font-size:44px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums;}
+.sim-pct.alto{color:var(--success);}
+.sim-repaso{border-top:1px solid var(--border);padding:8px 0;}
+.sim-repaso summary{cursor:pointer;font-size:14px;}
+.sim-repaso.bien summary span{color:var(--success);font-weight:700;}
+.sim-repaso.mal summary span{color:var(--danger);font-weight:700;}
+.sim-repaso[open] .sim-enunciado{margin:8px 0;}
 @media (max-width:420px){
   .est-cabeza{flex-direction:column;align-items:flex-start;}
   .est-cifras{width:100%;justify-content:space-between;}
+  .sim-barra-fila{grid-template-columns:1fr auto;}
+  .sim-barra{grid-column:1 / -1;grid-row:2;}
 }
 
 /* ─── Botón de grabar: círculo con degradé de marca, "respira" suave en

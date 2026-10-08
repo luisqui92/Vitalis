@@ -47,6 +47,8 @@ const RUTAS = [
   { ruta: "equipos",       fn: "renderEquiposRayos" },
   { ruta: "ganaderia",     fn: "renderGanaderia" },
   { ruta: "estudiar",      fn: "renderEstudiar" },
+  { ruta: "paciente-virtual", fn: "renderPacienteVirtual" },
+  { ruta: "simulacros",    fn: "renderSimulacros" },
 ];
 
 const BASE = "/app";

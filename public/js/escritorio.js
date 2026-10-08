@@ -342,6 +342,9 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
 
 // Se envuelven TODAS las pantallas posibles, no las del rol de antes del login:
 // el menú de quien entre se decide recién cuando entra.
-[...ESCR_NAV_FIJOS, ESCR_NAV_CLINICA, ESCR_NAV_PAGOS, ESCR_NAV_GANADERIA, ESCR_NAV_ESTUDIAR]
+// Las otras dos pestañas de «Estudiar» (paciente virtual y simulacros)
+// marcan el mismo ítem del menú.
+[...ESCR_NAV_FIJOS, ESCR_NAV_CLINICA, ESCR_NAV_PAGOS, ESCR_NAV_GANADERIA, ESCR_NAV_ESTUDIAR,
+  { ...ESCR_NAV_ESTUDIAR, fn: "renderPacienteVirtual" }, { ...ESCR_NAV_ESTUDIAR, fn: "renderSimulacros" }]
   .filter(it => typeof window[it.fn] === "function")
   .forEach(it => envolverParaEscritorio(it.fn, it.id, it.claveLabel));

@@ -186,7 +186,7 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
       (await page.innerText(".est-racha-num")) === "0" && /4 tarjetas/.test(await page.innerText("#estEmpezar")));
     const logros = await page.$$eval(".est-logro", (xs) => xs.map((x) => x.dataset.logro).join());
     verificar(`  ...con los logros: el del primer caso, hecho, y el próximo de cada tipo (${logros})`,
-      await page.locator('.est-logro.hecho[data-logro="primerCaso"]').count() === 1 && logros === "primerCaso,casos10,aciertos5,racha3,dominadas10");
+      await page.locator('.est-logro.hecho[data-logro="primerCaso"]').count() === 1 && logros === "primerCaso,casos10,aciertos5,racha3,dominadas10,paciente1,simulacro1,simulacro80");
     verificar("  ...y su dirección propia", page.url().endsWith("/app/estudiar"));
     verificar("  ...diciendo que es para aprender y que el diagnóstico lo confirma su tutor", /lo confirma tu tutor/.test(await page.innerText(".est-aviso-ia")));
     await captura("estudio_portada.png");

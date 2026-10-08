@@ -72,7 +72,7 @@ function desconectarTiempoReal() {
 //
 // "estudiar" es la sentada de repaso de un estudiante (public/js/estudio.js):
 // repintarla en el medio le haría perder por qué tarjeta iba.
-const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle", "estudiar"]);
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle", "estudiar", "pacienteVirtual", "simulacros"]);
 
 // ═══ UN REPINTADO QUE NO PIDIÓ EL MÉDICO NO PUEDE MOVERLE LA PÁGINA ═══════
 //
@@ -189,3 +189,7 @@ envolverParaTiempoReal("renderMembrete", () => ({ tipo: "membrete", params: {} }
 // Las dos de PANTALLAS_SIN_REFRESCO de más arriba: la consulta y el repaso.
 envolverParaTiempoReal("renderDetalle", (consultaId) => ({ tipo: "consultaDetalle", params: { consultaId } }));
 envolverParaTiempoReal("renderEstudiar", () => ({ tipo: "estudiar", params: {} }));
+// Una entrevista con el paciente virtual o un simulacro con reloj: un
+// repintado en el medio le haría perder lo que estaba haciendo.
+envolverParaTiempoReal("renderPacienteVirtual", () => ({ tipo: "pacienteVirtual", params: {} }));
+envolverParaTiempoReal("renderSimulacros", () => ({ tipo: "simulacros", params: {} }));

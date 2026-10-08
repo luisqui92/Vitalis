@@ -45,7 +45,7 @@
 // cuenta cuántas y de qué tipo, sin mostrar el contenido de ningún caso).
 const crypto = require("crypto");
 const mongoose = require("mongoose");
-const { TarjetaEstudio, ConsultaMedica, Paciente, Medico } = require("../db/models");
+const { TarjetaEstudio, ConsultaMedica, Paciente, Medico, PreguntaSimulacro, SimulacionPaciente, Simulacro } = require("../db/models");
 const { zonaValida, hoyEnZona, instanteEnZona, fechaStrEnZona } = require("./zonaHoraria");
 const { ErrorHttp } = require("./httpHelpers");
 const { PALABRAS_MINIMAS } = require("./tutorClinico");
@@ -63,7 +63,10 @@ const POR_REPASO = 10;
 // En una misma sentada, el diagnóstico antes que lo demás: «¿qué estudio
 // confirma una apendicitis?» le soplaría la respuesta a «¿cuál es el
 // diagnóstico más probable?» del mismo caso.
-const ORDEN_TIPO = { dx: 0, estudio: 1, banderas: 2, faltoPreguntar: 3 };
+// Las "pregunta" son las que erró en un simulacro (services/simulacros.js).
+const ORDEN_TIPO = { dx: 0, estudio: 1, banderas: 2, faltoPreguntar: 3, pregunta: 4 };
+// Las que se contestan eligiendo una opción; las otras, «me acordaba o no».
+const DE_OPCIONES = new Set(["dx", "pregunta"]);
 const MOTIVOS_REPORTE = ["respuesta", "pregunta", "datos"];
 const REPETIDA_MS = 3000;
 
@@ -237,7 +240,8 @@ async function tarjetasDeRepaso(medicoPhone, ahora = new Date()) {
 // muestra recién cuando él la pide.
 function paraMostrar(t, azar = mezclar) {
   const base = { _id: t._id, tipo: t.tipo, consultaId: t.consultaId, caso: t.caso, sobre: t.sobre || "", caja: t.caja };
-  if (t.tipo === "dx") return { ...base, opciones: azar((t.opciones || []).map((texto, i) => ({ i, texto }))) };
+  if (t.tipo === "pregunta") Object.assign(base, { enunciado: t.enunciado || "", area: t.area || "", fecha: t.createdAt });
+  if (DE_OPCIONES.has(t.tipo)) return { ...base, opciones: azar((t.opciones || []).map((texto, i) => ({ i, texto }))) };
   return { ...base, respuesta: t.respuesta || [], perla: t.perla || "" };
 }
 
@@ -254,7 +258,7 @@ async function responder(medicoPhone, tarjetaId, respuesta, zona, ahora = new Da
   const t = await TarjetaEstudio.findOne({ _id: tarjetaId, medicoPhone }).lean();
   if (!t) throw new ErrorHttp(404, "Tarjeta no encontrada");
   let correcto, elegida = null;
-  if (t.tipo === "dx") {
+  if (DE_OPCIONES.has(t.tipo)) {
     elegida = Number(respuesta?.opcion);
     if (!Number.isInteger(elegida) || elegida < 0 || elegida >= (t.opciones || []).length) throw new ErrorHttp(400, "Elegí una de las opciones.");
     correcto = elegida === t.correcta;
@@ -290,7 +294,7 @@ async function responder(medicoPhone, tarjetaId, respuesta, zona, ahora = new Da
     proxima: set.proxima ?? t.proxima,
     respuesta: t.respuesta || [],
     perla: t.perla || "",
-    ...(t.tipo === "dx" ? {
+    ...(DE_OPCIONES.has(t.tipo) ? {
       correcta: t.correcta,
       aFavor: t.aFavor || [],
       enContraElegida: correcto ? "" : (t.enContraDe || [])[elegida] || "",
@@ -299,20 +303,45 @@ async function responder(medicoPhone, tarjetaId, respuesta, zona, ahora = new Da
   };
 }
 
+// ─── «ESTÁ MAL» EN EL BANCO COMPARTIDO ─────────────────────────────────────
+//
+// Los casos del paciente virtual y las preguntas de los simulacros son de
+// todos los estudiantes. Uno solo que marque «está mal» no lo saca —puede
+// haberse equivocado él—; dos distintos, sí.
+async function reportarEnBanco(Modelo, id, medicoPhone, motivo, campoOculto, ahora = new Date()) {
+  await Modelo.updateOne({ _id: id, "reportes.medicoPhone": { $ne: medicoPhone } },
+    { $push: { reportes: { medicoPhone, motivo, en: ahora } } });
+  const doc = await Modelo.findById(id).select("reportes").lean();
+  if (new Set((doc?.reportes || []).map(r => r.medicoPhone)).size >= 2) {
+    await Modelo.updateOne({ _id: id }, { $set: { [campoOculto]: true } });
+  }
+}
+
+async function quitarReporteDelBanco(Modelo, id, medicoPhone, campoOculto) {
+  await Modelo.updateOne({ _id: id }, { $pull: { reportes: { medicoPhone } } });
+  const doc = await Modelo.findById(id).select("reportes").lean();
+  if (new Set((doc?.reportes || []).map(r => r.medicoPhone)).size < 2) {
+    await Modelo.updateOne({ _id: id }, { $set: { [campoOculto]: false } });
+  }
+}
+
 async function reportar(medicoPhone, tarjetaId, motivo, ahora = new Date()) {
   validarId(tarjetaId);
   if (!MOTIVOS_REPORTE.includes(motivo)) throw new ErrorHttp(400, "Elegí qué está mal.");
-  const r = await TarjetaEstudio.updateOne({ _id: tarjetaId, medicoPhone },
-    { $set: { "reportada.en": ahora, "reportada.motivo": motivo } });
-  if (!r.matchedCount) throw new ErrorHttp(404, "Tarjeta no encontrada");
+  const t = await TarjetaEstudio.findOneAndUpdate({ _id: tarjetaId, medicoPhone },
+    { $set: { "reportada.en": ahora, "reportada.motivo": motivo } }, { new: true }).lean();
+  if (!t) throw new ErrorHttp(404, "Tarjeta no encontrada");
+  // La de un simulacro: la pregunta es del banco de todos.
+  if (t.preguntaId) await reportarEnBanco(PreguntaSimulacro, t.preguntaId, medicoPhone, motivo, "oculta", ahora);
 }
 
 // Por si tocó «está mal» sin querer.
 async function deshacerReporte(medicoPhone, tarjetaId) {
   validarId(tarjetaId);
-  const r = await TarjetaEstudio.updateOne({ _id: tarjetaId, medicoPhone },
-    { $set: { "reportada.en": null, "reportada.motivo": "" } });
-  if (!r.matchedCount) throw new ErrorHttp(404, "Tarjeta no encontrada");
+  const t = await TarjetaEstudio.findOneAndUpdate({ _id: tarjetaId, medicoPhone },
+    { $set: { "reportada.en": null, "reportada.motivo": "" } }, { new: true }).lean();
+  if (!t) throw new ErrorHttp(404, "Tarjeta no encontrada");
+  if (t.preguntaId) await quitarReporteDelBanco(PreguntaSimulacro, t.preguntaId, medicoPhone, "oculta");
 }
 
 // ─── LA RACHA ──────────────────────────────────────────────────────────────
@@ -361,7 +390,16 @@ const LOGROS = [
   { id: "racha30", dato: "mejorRacha", meta: 30 },
   { id: "dominadas10", dato: "dominadas", meta: 10 },
   { id: "dominadas50", dato: "dominadas", meta: 50 },
+  // Etapa 4: el paciente virtual y los simulacros.
+  { id: "paciente1", dato: "pacientesVirtuales", meta: 1 },
+  { id: "pacientes10", dato: "pacientesVirtuales", meta: 10 },
+  { id: "pacientes30", dato: "pacientesVirtuales", meta: 30 },
+  { id: "simulacro1", dato: "simulacros", meta: 1 },
+  { id: "simulacros10", dato: "simulacros", meta: 10 },
+  { id: "simulacro80", dato: "simulacrosAltos", meta: 1 },
 ];
+// Un simulacro «alto»: de 10 preguntas o más, con el 80 % o más bien.
+const SIMULACRO_ALTO = { minimo: 10, proporcion: 0.8 };
 
 // grupo: la pantalla muestra los logrados y, de cada grupo, solo el próximo.
 function logrosDe(numeros) {
@@ -389,7 +427,7 @@ async function casosPorRazonar(medicoPhone, max = 5) {
 }
 
 async function resumen(medicoPhone, zona, ahora = new Date()) {
-  const [porCaja, paraHoy, casos, acertados, medico, porRazonar] = await Promise.all([
+  const [porCaja, paraHoy, casos, acertados, medico, porRazonar, pacientesVirtuales, simulacros, simulacrosAltos] = await Promise.all([
     TarjetaEstudio.aggregate([
       { $match: vigentes(medicoPhone) },
       { $group: { _id: "$caja", n: { $sum: 1 }, aciertos: { $sum: "$aciertos" }, errores: { $sum: "$errores" } } },
@@ -399,6 +437,10 @@ async function resumen(medicoPhone, zona, ahora = new Date()) {
     ConsultaMedica.countDocuments({ medicoPhone, "razonamiento.en": { $ne: null }, "razonamiento.resultado.acertoPrincipal": true }),
     Medico.findOne({ phone: medicoPhone }).select("estudiante.racha").lean(),
     casosPorRazonar(medicoPhone),
+    SimulacionPaciente.countDocuments({ medicoPhone, estado: "terminada" }),
+    Simulacro.countDocuments({ medicoPhone, estado: "terminado" }),
+    Simulacro.countDocuments({ medicoPhone, estado: "terminado", cantidad: { $gte: SIMULACRO_ALTO.minimo },
+      $expr: { $gte: ["$aciertos", { $multiply: ["$cantidad", SIMULACRO_ALTO.proporcion] }] } }),
   ]);
   const suma = (campo, filtro = () => true) => porCaja.filter(filtro).reduce((s, x) => s + x[campo], 0);
   const dominadas = suma("n", x => x._id >= CAJA_DOMINADA);
@@ -414,13 +456,16 @@ async function resumen(medicoPhone, zona, ahora = new Date()) {
     casos,
     acertados,
     porRazonar,
-    logros: logrosDe({ casos, acertados, mejorRacha: racha.mejor, dominadas }),
+    pacientesVirtuales,
+    simulacros,
+    logros: logrosDe({ casos, acertados, mejorRacha: racha.mejor, dominadas, pacientesVirtuales, simulacros, simulacrosAltos }),
   };
 }
 
 module.exports = {
-  CAJA_MAX, CAJA_DOMINADA, DIAS_TRAS_ACIERTO, DIAS_CAJA_LLENA, POR_SESION, MOTIVOS_REPORTE, LOGROS,
+  CAJA_MAX, CAJA_DOMINADA, DIAS_TRAS_ACIERTO, DIAS_CAJA_LLENA, POR_SESION, MOTIVOS_REPORTE, LOGROS, SIMULACRO_ALTO,
   inicioDeDia, diaAnterior, zonaDe, casoDe, tarjetasDeCaso, crearTarjetasDeConsulta, asegurarTarjetas,
   tarjetasParaHoy, tarjetasDeRepaso, paraMostrar, responder, reportar, deshacerReporte,
+  reportarEnBanco, quitarReporteDelBanco,
   marcarDiaDeEstudio, rachaVisible, logrosDe, casosPorRazonar, resumen,
 };
