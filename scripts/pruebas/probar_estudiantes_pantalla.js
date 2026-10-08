@@ -105,7 +105,8 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     console.log("\n── 2. Su paciente y su nota ──");
     const pac = await M.Paciente.create({ medicoPhone: TEL, nombre: "Paciente de Ana", telefono: "59170000002" });
     const c = await M.ConsultaMedica.create({ medicoPhone: TEL, pacienteId: pac._id, pacienteNombre: pac.nombre, estado: "completado", deEstudiante: true,
-      duracionSegundos: 600, transcripcionCompleta: "le doy amoxicilina quinientos y control en siete días", notaClinicaEstado: "completado",
+      duracionSegundos: 600, notaClinicaEstado: "completado",
+      transcripcionCompleta: "Buenos días me duele la garganta hace tres días tengo fiebre y placas, le doy amoxicilina quinientos y control en siete días",
       notaClinica: { motivoConsulta: "Faringitis", medicamentosRecetados: [{ nombre: "Amoxicilina", dosis: "500 mg" }],
         reconsultaSugerida: { fechaHora: new Date(Date.now() + 7 * 86400000), textoOriginal: "en siete días", estado: "pendiente" } } });
     await page.evaluate((id) => renderPacienteDetalle(id), String(pac._id));
@@ -116,6 +117,43 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     verificar("la nota lleva la marca «Nota de estudiante: sin validez sin la firma…»", /Nota de estudiante/.test(await page.innerText(".est-marca")));
     verificar("al confirmar no se ofrece receta ni reconsulta por WhatsApp", !(await page.locator("#cfReceta").count()) && !(await page.locator("#cfReconsulta").count()));
     verificar("  ...sí cargar la medicación a su caso", await page.locator("#cfMeds .cf-med").count() === 1);
+
+    console.log("\n── 2b. ¿Cuál es tu diagnóstico? (etapa 2) ──");
+    verificar("antes de ver nada, se le pide SU diagnóstico", await page.locator("#rzPrincipal").count() === 1 && !(await page.locator(".tutor-dx").count()));
+    await page.click("#rzBtn");
+    verificar("sin escribirlo no se le muestra el análisis", /diagnóstico principal antes de comparar/.test(await page.innerText("#rzErr")));
+    let pedidoRz = null;
+    const RZ = { principal: "Faringitis viral", diferenciales: ["Resfrío"], en: new Date().toISOString(), resultado: {
+      diferenciales: [{ diagnostico: "Faringoamigdalitis estreptocócica", aFavor: ["fiebre", "placas"], enContra: ["no se preguntó por tos"], estudio: "Test rápido de estreptococo" },
+        { diagnostico: "Mononucleosis", aFavor: ["edad"], enContra: [], estudio: "Monotest" }],
+      banderasRojas: ["Absceso periamigdalino"], faltoPreguntar: ["¿Tiene tos?"], acertoPrincipal: false,
+      comentario: "Pensaste en lo viral, pero las placas con fiebre y sin tos orientan a bacteriana.",
+      noConsideraste: [{ diagnostico: "Faringoamigdalitis estreptocócica", porQue: "fiebre y placas sin tos" }], perla: "Usá los criterios de Centor." } };
+    await page.route(`**/medico/consultas/${c._id}/razonamiento`, (r) => { pedidoRz = JSON.parse(r.request().postData() || "{}"); r.fulfill({ json: { razonamiento: RZ } }); });
+    await page.fill("#rzPrincipal", "Faringitis viral");
+    await page.fill("#rzDiferenciales", "Resfrío, ");
+    await page.click("#rzBtn");
+    await page.waitForSelector(".tutor-dx", { timeout: 10000 }).catch(() => {});
+    verificar("manda lo que pensó él", pedidoRz?.principal === "Faringitis viral" && JSON.stringify(pedidoRz?.diferenciales) === '["Resfrío"]');
+    const tarjeta = await page.innerText("#razonamientoCard").catch(() => "");
+    verificar("recién ahí ve los diferenciales en orden, con a favor / en contra y cómo distinguirlos",
+      (await page.locator(".tutor-dx").count()) === 2 && /A favor: fiebre; placas/.test(tarjeta) && /Para distinguirlo: Test rápido/.test(tarjeta));
+    verificar("  ...la comparación con lo suyo y lo que no consideró", /principal más probable era otro/.test(tarjeta) && /No consideraste/.test(tarjeta) && /Pensaste en lo viral/.test(tarjeta));
+    verificar("  ...y el aviso de que es para aprender y lo confirma su tutor", /lo confirma tu tutor/.test(tarjeta));
+    if (process.env.CAPTURAS) await page.locator("#razonamientoCard").screenshot({ path: path.join(process.env.CAPTURAS, "estudiante_razonamiento.png") });
+    await M.ConsultaMedica.updateOne({ _id: c._id }, { $set: { razonamiento: { ...RZ, en: new Date() } } });
+    await page.evaluate((id) => renderDetalle(id), String(c._id));
+    await page.waitForSelector("#razonamientoCard", { timeout: 10000 });
+    verificar("al volver a abrir la consulta: su razonamiento guardado, sin formulario", !(await page.locator("#rzPrincipal").count()) && (await page.locator(".tutor-dx").count()) === 2);
+    const html = await page.evaluate(() => [
+      notaEnVivoHtml("vivo", { motivoConsulta: "Dolor" }, [], { preguntas: [{ pregunta: "¿Tiene tos?", porQue: "orienta a viral" }], banderasRojas: ["Disnea"] }),
+      notaEnVivoHtml("vivo", { motivoConsulta: "Dolor" }, [], { preguntas: [], banderasRojas: [] }),
+      notaEnVivoHtml("vivo", { motivoConsulta: "Dolor" }, [], null),
+    ]);
+    verificar("mientras graba: «Te falta preguntar» con la pregunta, por qué, y las banderas rojas",
+      /Te falta preguntar/.test(html[0]) && html[0].includes("¿Tiene tos?") && html[0].includes("orienta a viral") && /Banderas rojas/.test(html[0]) && html[0].includes("Disnea"));
+    verificar("  ...si no falta nada, lo dice", /no te falta preguntar nada/.test(html[1]));
+    verificar("  ...y sin tutor (un médico) no aparece nada de eso", !/Te falta|Banderas|no te falta/.test(html[2]));
 
     console.log("\n── 3. Grabar ──");
     await page.evaluate(([id, n]) => renderNuevaConsulta(id, n), [String(pac._id), pac.nombre]);

@@ -262,6 +262,15 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
    Mismo lenguaje que la nota de la consulta (.nota-titulo, .nota-campo). */
 .nota-vivo{margin-top:12px;padding:12px 14px;border:1px dashed var(--border);border-radius:12px;background:var(--bg);text-align:left;}
 .nota-vivo .nota-campo{font-size:13.5px;}
+/* El tutor clínico de las cuentas de estudiante (public/js/consultas.js). */
+.tutor-vivo{margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);}
+.tutor-lista{margin:4px 0 10px;padding-left:20px;font-size:14.5px;}
+.tutor-lista li{margin-bottom:6px;}
+.tutor-aviso{font-size:13px;padding:8px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--border);margin-bottom:10px;}
+.tutor-bien{color:var(--success);font-weight:600;margin:8px 0;}
+.tutor-mal{color:var(--warning);font-weight:600;margin:8px 0;}
+.tutor-favor,.tutor-contra{font-size:13.5px;margin-top:2px;}
+.tutor-perla{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--warning);}
 
 /* ─── Botón de grabar: círculo con degradé de marca, "respira" suave en
    reposo para no sentirse estático, y un pulso más marcado al grabar ──── */

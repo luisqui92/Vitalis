@@ -260,40 +260,60 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
 // siguiente turno con el texto más nuevo, en vez de encolar versiones viejas.
 const NOTA_VIVO_CADA_MS = 45000;
 
+// Lo que se ve en el recuadro de la nota en vivo. Aparte y sin estado, para
+// que se pueda probar sin grabar (scripts/pruebas/probar_estudiantes_pantalla.js).
+function notaEnVivoHtml(estado, n, noNombrados = [], tutor = null) {
+  if (estado === "corte") return `<div class="hint">${t("vivo.corte")}</div>`;
+  if (!n) {
+    return `<div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
+      <div class="hint">${t(estado === "pidiendo" ? "vivo.actualizando" : "vivo.esperando")}</div>${tutorEnVivoHtml(tutor, false)}`;
+  }
+  const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
+  // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
+  const meds = (n.medicamentosRecetados || []).map((m, i) => [m?.nombre, m?.dosis, m?.frecuencia].filter(Boolean).join(" ")
+    + (noNombrados.includes(i) ? " " + t("vivo.noNombrado") : "")).join("; ");
+  return `
+    <div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
+    <div class="hint" style="margin-bottom:8px">${t(estado === "final" ? "vivo.final" : estado === "pidiendo" ? "vivo.actualizando" : "vivo.ayuda")}</div>
+    ${campo("nota.motivo", n.motivoConsulta)}
+    ${campo("nota.sintomas", (n.sintomas || []).join(", "))}
+    ${campo("nota.antecedentes", n.antecedentesRelevantes)}
+    ${campo("nota.diagnostico", n.diagnostico)}
+    ${campo("nota.diferenciales", (n.diagnosticosDiferenciales || []).join(", "))}
+    ${campo("nota.plan", n.plan)}
+    ${campo("nota.medicamentos", meds)}
+    ${campo("nota.examenes", (n.examenesSolicitados || []).join(", "))}
+    ${tutorEnVivoHtml(tutor, true)}`;
+}
+
+// «Te falta preguntar» y las banderas rojas, para una cuenta de estudiante.
+// conNota: si ya hay de qué hablar, «no te falta nada» también es una
+// respuesta (y una buena noticia).
+function tutorEnVivoHtml(tutor, conNota) {
+  if (!tutor) return "";
+  const preguntas = Array.isArray(tutor.preguntas) ? tutor.preguntas : [];
+  const banderas = Array.isArray(tutor.banderasRojas) ? tutor.banderasRojas : [];
+  if (!preguntas.length && !banderas.length) {
+    return conNota ? `<div class="tutor-vivo"><div class="hint" style="margin:0">${t("tutor.nadaFalta")}</div></div>` : "";
+  }
+  return `<div class="tutor-vivo">
+    ${preguntas.length ? `<div class="nota-titulo">${t("tutor.faltaPreguntar")}</div>
+      <ul class="tutor-lista">${preguntas.map(p => `<li><b>${esc(p.pregunta)}</b>${p.porQue ? `<div class="hint" style="margin:2px 0 0">${esc(p.porQue)}</div>` : ""}</li>`).join("")}</ul>` : ""}
+    ${banderas.length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div>
+      <ul class="tutor-lista">${banderas.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
 function crearNotaEnVivo(pacienteId, caja, transcriptor) {
   let timer = null, enCurso = null, ultimoTexto = "", nota = null, noNombrados = [];
+  // «Te falta preguntar» de una cuenta de estudiante (services/tutorClinico.js).
+  let tutor = null;
   let completo = false, textoFinal = "", terminando = null;
   const palabras = (txt) => String(txt || "").split(/\s+/).filter(Boolean).length;
 
   function pintar(estado) {
-    if (!nota && estado !== "corte") {
-      caja.style.display = "block";
-      caja.innerHTML = `<div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
-        <div class="hint">${t(estado === "pidiendo" ? "vivo.actualizando" : "vivo.esperando")}</div>`;
-      return;
-    }
-    if (estado === "corte") {
-      caja.style.display = "block";
-      caja.innerHTML = `<div class="hint">${t("vivo.corte")}</div>`;
-      return;
-    }
-    const n = nota;
-    const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
-    // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
-    const meds = (n.medicamentosRecetados || []).map((m, i) => [m?.nombre, m?.dosis, m?.frecuencia].filter(Boolean).join(" ")
-      + (noNombrados.includes(i) ? " " + t("vivo.noNombrado") : "")).join("; ");
     caja.style.display = "block";
-    caja.innerHTML = `
-      <div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
-      <div class="hint" style="margin-bottom:8px">${t(estado === "final" ? "vivo.final" : estado === "pidiendo" ? "vivo.actualizando" : "vivo.ayuda")}</div>
-      ${campo("nota.motivo", n.motivoConsulta)}
-      ${campo("nota.sintomas", (n.sintomas || []).join(", "))}
-      ${campo("nota.antecedentes", n.antecedentesRelevantes)}
-      ${campo("nota.diagnostico", n.diagnostico)}
-      ${campo("nota.diferenciales", (n.diagnosticosDiferenciales || []).join(", "))}
-      ${campo("nota.plan", n.plan)}
-      ${campo("nota.medicamentos", meds)}
-      ${campo("nota.examenes", (n.examenesSolicitados || []).join(", "))}`;
+    caja.innerHTML = notaEnVivoHtml(estado, nota, noNombrados, tutor);
   }
 
   function pedir(texto, estadoAlTerminar) {
@@ -303,7 +323,10 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pacienteId, texto }),
     })
-      .then(r => { if (r?.nota) { nota = r.nota; noNombrados = Array.isArray(r.noNombrados) ? r.noNombrados : []; } })
+      .then(r => {
+        if (r?.nota) { nota = r.nota; noNombrados = Array.isArray(r.noNombrados) ? r.noNombrados : []; }
+        if (r?.tutor) tutor = r.tutor;
+      })
       .catch(() => { /* un borrador que no salió no frena nada */ })
       .finally(() => { enCurso = null; pintar(estadoAlTerminar); });
     return enCurso;
@@ -332,7 +355,7 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
   return {
     iniciar() {
       clearInterval(timer);
-      nota = null; noNombrados = []; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
+      nota = null; noNombrados = []; tutor = null; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
       pintar("esperando");
       timer = setInterval(turno, NOTA_VIVO_CADA_MS);
     },
@@ -519,6 +542,79 @@ function pintarChecksMedicacion() {
         <span>${t("confirmar.medicacion", { item: esc(nombre + (dosis ? " " + dosis : "")) })}</span></label>
     </div>`;
   }).join("");
+}
+
+// ─── EL RAZONAMIENTO DIAGNÓSTICO (cuentas de estudiante) ─────────────────
+//
+// Primero piensa él: escribe su diagnóstico y sus diferenciales. Recién
+// después ve el análisis (services/tutorClinico.js). El aviso de que es una
+// ayuda para aprender va siempre, arriba.
+function razonamientoTarjetaHtml(c) {
+  if (c?.razonamiento?.en) return razonamientoResultadoHtml(c.razonamiento);
+  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
+  const texto = c?.transcripcionCompleta || c?.transcripcionEnVivo || "";
+  if (!estudiante || c?.notaClinicaEstado !== "completado" || texto.split(/\s+/).filter(Boolean).length < 15) return "";
+  return `
+    <div class="card tutor-card" id="razonamientoCard">
+      <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${t("tutor.consigna")}</div>
+      <label for="rzPrincipal">${t("tutor.principal")}</label>
+      <input id="rzPrincipal" type="text" maxlength="160">
+      <label for="rzDiferenciales">${t("tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
+      <input id="rzDiferenciales" type="text" maxlength="400">
+      <div id="rzErr"></div>
+      <button class="primary" id="rzBtn">${t("tutor.ver")}</button>
+      <div class="hint" style="margin-top:8px">${t("tutor.unaVez")}</div>
+    </div>`;
+}
+
+function razonamientoResultadoHtml(rz) {
+  const r = rz.resultado || {};
+  const lista = (xs) => (xs || []).map(x => `<li>${esc(x)}</li>`).join("");
+  return `
+    <div class="card tutor-card" id="razonamientoCard">
+      <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
+      <div class="tutor-aviso">🎓 ${t("tutor.aviso")}</div>
+      <div class="nota-campo"><b>${t("tutor.tuRespuesta")}</b> ${esc(rz.principal)}${(rz.diferenciales || []).length ? ` · <span class="hint">${esc(rz.diferenciales.join(", "))}</span>` : ""}</div>
+      <div class="${r.acertoPrincipal ? "tutor-bien" : "tutor-mal"}">${r.acertoPrincipal ? "✓ " + t("tutor.acertaste") : "✗ " + t("tutor.noAcertaste")}</div>
+      ${r.comentario ? `<div class="nota-campo">${esc(r.comentario)}</div>` : ""}
+      ${(r.noConsideraste || []).length ? `<div class="nota-titulo">${t("tutor.noConsideraste")}</div>
+        <ul class="tutor-lista">${r.noConsideraste.map(x => `<li><b>${esc(x.diagnostico)}</b>${x.porQue ? ` — ${esc(x.porQue)}` : ""}</li>`).join("")}</ul>` : ""}
+      ${(r.diferenciales || []).length ? `<div class="nota-titulo">${t("tutor.diferencialesTitulo")}</div>
+        <ol class="tutor-lista">${r.diferenciales.map(d => `<li class="tutor-dx"><b>${esc(d.diagnostico)}</b>
+          ${(d.aFavor || []).length ? `<div class="tutor-favor">${t("tutor.aFavor")} ${esc(d.aFavor.join("; "))}</div>` : ""}
+          ${(d.enContra || []).length ? `<div class="tutor-contra">${t("tutor.enContra")} ${esc(d.enContra.join("; "))}</div>` : ""}
+          ${d.estudio ? `<div class="hint" style="margin:2px 0 0">${t("tutor.estudio")} ${esc(d.estudio)}</div>` : ""}</li>`).join("")}</ol>` : ""}
+      ${(r.banderasRojas || []).length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div><ul class="tutor-lista">${lista(r.banderasRojas)}</ul>` : ""}
+      ${(r.faltoPreguntar || []).length ? `<div class="nota-titulo">${t("tutor.faltoPreguntar")}</div><ul class="tutor-lista">${lista(r.faltoPreguntar)}</ul>` : ""}
+      ${r.perla ? `<div class="tutor-perla">💡 ${esc(r.perla)}</div>` : ""}
+    </div>`;
+}
+
+function engancharRazonamiento(id) {
+  const btn = document.getElementById("rzBtn");
+  if (!btn) return;
+  btn.onclick = async () => {
+    const principal = document.getElementById("rzPrincipal").value.trim();
+    const diferenciales = document.getElementById("rzDiferenciales").value.split(",").map(x => x.trim()).filter(Boolean);
+    const err = document.getElementById("rzErr");
+    err.innerHTML = "";
+    if (principal.length < 3) { err.innerHTML = `<div class="error">${t("tutor.errPrincipal")}</div>`; return; }
+    btn.disabled = true;
+    btn.textContent = t("tutor.pensando");
+    try {
+      const r = await api(`/medico/consultas/${id}/razonamiento`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ principal, diferenciales }),
+      });
+      const card = document.getElementById("razonamientoCard");
+      if (card) card.outerHTML = razonamientoResultadoHtml(r.razonamiento);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = t("tutor.ver");
+      err.innerHTML = `<div class="error">${esc((e.status && e.status < 500 && e.error) || t("tutor.errGeneral"))}</div>`;
+    }
+  };
 }
 
 // ─── LA VERIFICACIÓN DE LA NOTA EN VIVO (services/notaEnVivo.js) ────────
@@ -794,11 +890,13 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
       </div>
       ${hiloClinicoHtml(c)}
       ${notaHtml}
+      ${razonamientoTarjetaHtml(c)}
       ${confirmarHtml}
       <div style="margin-top:14px" id="cuerpoTranscripcion">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
     engancharHiloClinico();
+    engancharRazonamiento(c._id);
 
     // ── medicamentos: quitar / agregar filas en la nota editable ──
     const medsBox = document.getElementById("nfMeds");

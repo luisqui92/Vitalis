@@ -21,7 +21,8 @@ const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo")
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
-const { guardarBorrador, borradorDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
+const { guardarBorrador, borradorDe, tutorDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
+const { preguntasFaltantes, razonamientoDiagnostico, PALABRAS_MINIMAS: PALABRAS_MINIMAS_TUTOR } = require("../services/tutorClinico");
 const { estadoDe: estadoDeEstudiante } = require("../services/estudiantes");
 
 // Una cuenta de estudiante vencida o sin horas no empieza consultas nuevas
@@ -261,12 +262,18 @@ module.exports = function (app) {
     const paciente = await obtenerOFallar(Paciente, { _id: pacienteId, medicoPhone }, "Paciente no encontrado");
     if (texto.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_BORRADOR) return res.json({ nota: null });
 
+    // Una cuenta de estudiante, además, recibe «te falta preguntar»
+    // (services/tutorClinico.js). Un médico no: no le agrega nada y cuesta.
+    const esEstudiante = Boolean(req.adminUser.estudiante);
     const guardado = borradorDe(medicoPhone, pacienteId, texto);
     if (guardado) {
-      return res.json({ nota: guardado, noNombrados: medicamentosNoNombrados(guardado, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])) });
+      return res.json({ nota: guardado, noNombrados: medicamentosNoNombrados(guardado, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])),
+        ...(esEstudiante ? { tutor: tutorDe(medicoPhone, pacienteId, texto) } : {}) });
     }
     const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma").lean();
     const { contexto } = await contextoDeNota(paciente, medicoPhone);
+    // A la par de la nota, no después: el estudiante no espera el doble.
+    const tutorPromesa = esEstudiante ? preguntasFaltantes(texto, medico?.idioma, paciente) : null;
     let nota;
     try {
       nota = await generarNotaClinica(texto, contexto, medico?.idioma);
@@ -274,10 +281,12 @@ module.exports = function (app) {
       // Un borrador que no salió no es un error para el médico: sigue
       // grabando, y el próximo minuto se intenta de nuevo.
       log.warn("[NOTA_EN_VIVO] borrador:", e.message);
-      return res.json({ nota: null });
+      return res.json({ nota: null, ...(tutorPromesa ? { tutor: await tutorPromesa } : {}) });
     }
-    guardarBorrador(medicoPhone, pacienteId, texto, nota);
-    res.json({ nota, noNombrados: medicamentosNoNombrados(nota, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])) });
+    const tutor = tutorPromesa ? await tutorPromesa : null;
+    guardarBorrador(medicoPhone, pacienteId, texto, nota, tutor);
+    res.json({ nota, noNombrados: medicamentosNoNombrados(nota, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])),
+      ...(tutor ? { tutor } : {}) });
   }));
 
   // El texto en vivo de una consulta ya subida: si llegó entero (lo decide
@@ -312,6 +321,47 @@ module.exports = function (app) {
     // Si la transcripción completa ya terminó, se verifica ahora; si no, lo
     // hace ella al terminar.
     await intentarVerificar(consulta._id);
+  }));
+
+  // ─── EL RAZONAMIENTO DIAGNÓSTICO DE UN ESTUDIANTE ──────────────────────
+  //
+  // Él escribe su diagnóstico y sus diferenciales; recién entonces se arma
+  // el análisis (services/tutorClinico.js). Una vez por consulta: es un
+  // ejercicio, y volver a pedirlo hasta «acertar» no le enseña nada.
+  app.post("/medico/consultas/:id/razonamiento", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    if (!req.adminUser.estudiante) throw new ErrorHttp(403, "El razonamiento guiado es de las cuentas de estudiante.");
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    if (consulta.razonamiento?.en) throw new ErrorHttp(409, "Ya hiciste el razonamiento de esta consulta.");
+    const principal = String(req.body?.principal || "").trim().slice(0, 160);
+    const crudos = Array.isArray(req.body?.diferenciales) ? req.body.diferenciales : String(req.body?.diferenciales || "").split(/[,;\n]/);
+    const diferenciales = crudos.map(x => String(x || "").trim().slice(0, 160)).filter(Boolean).slice(0, 6);
+    if (principal.length < 3) throw new ErrorHttp(400, "Escribí tu diagnóstico principal antes de ver el razonamiento.");
+    const transcripcion = consulta.transcripcionCompleta || consulta.transcripcionEnVivo || "";
+    if (transcripcion.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_TUTOR) {
+      throw new ErrorHttp(400, "Esta consulta no tiene transcripción suficiente para razonar sobre ella.");
+    }
+    await frenarEstudianteSinAcceso(req);
+
+    const [paciente, medico] = await Promise.all([
+      Paciente.findOne({ _id: consulta.pacienteId, medicoPhone }).lean(),
+      Medico.findOne({ phone: medicoPhone }).select("idioma").lean(),
+    ]);
+    let resultado;
+    try {
+      resultado = await razonamientoDiagnostico(transcripcion, { principal, diferenciales }, medico?.idioma, paciente);
+    } catch (e) {
+      log.warn("[TUTOR] razonamiento:", e.message);
+      throw new ErrorHttp(502, "No se pudo armar el razonamiento. Probá de nuevo en un rato.");
+    }
+    const razonamiento = { principal, diferenciales, resultado, en: new Date() };
+    // Si tocó dos veces seguidas, gana el primero.
+    const r = await ConsultaMedica.updateOne(
+      { _id: consulta._id, $or: [{ razonamiento: { $exists: false } }, { "razonamiento.en": null }] },
+      { $set: { razonamiento } });
+    if (!r.modifiedCount) throw new ErrorHttp(409, "Ya hiciste el razonamiento de esta consulta.");
+    registrar({ req, medicoPhone, accion: "razonamiento_estudiante", recurso: `ConsultaMedica:${consulta._id}` });
+    res.json({ razonamiento });
   }));
 
   // ─── LISTAR CONSULTAS PROPIAS ───────────────────────────────────────────

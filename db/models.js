@@ -516,6 +516,27 @@ const consultaMedicaSchema = new mongoose.Schema({
   // firma del médico responsable» para siempre, aunque la cuenta pase a ser
   // de médico al recibirse.
   deEstudiante: { type: Boolean, default: false },
+  // El ejercicio de razonamiento diagnóstico de una cuenta de estudiante
+  // (services/tutorClinico.js): lo que propuso él, y recién después el
+  // análisis. Se hace una vez por consulta — se queda para la etapa del quiz
+  // con sus propios casos.
+  razonamiento: {
+    type: {
+      principal: { type: String, default: "" },
+      diferenciales: { type: [String], default: [] },
+      resultado: {
+        diferenciales: [{ diagnostico: String, aFavor: [String], enContra: [String], estudio: String, _id: false }],
+        banderasRojas: [String],
+        faltoPreguntar: [String],
+        acertoPrincipal: Boolean,
+        comentario: String,
+        noConsideraste: [{ diagnostico: String, porQue: String, _id: false }],
+        perla: String,
+      },
+      en: { type: Date, default: null },
+    },
+    default: undefined,
+  },
   notaFuente: { type: String, enum: ["", "vivo", "audio"], default: "" },
   transcripcionEnVivo: { type: String, default: "" },
   // Solo cuando notaFuente es "vivo". Las diferencias se MUESTRAN; la nota

@@ -55,11 +55,19 @@ function claveDe(medicoPhone, pacienteId, texto) {
   return `${medicoPhone}|${pacienteId}|${hash}`;
 }
 
-function guardarBorrador(medicoPhone, pacienteId, texto, nota) {
+// tutor: lo de «te falta preguntar» de una cuenta de estudiante
+// (services/tutorClinico.js), para el mismo texto.
+function guardarBorrador(medicoPhone, pacienteId, texto, nota, tutor = null) {
   const ahora = Date.now();
   for (const [k, v] of cache) if (ahora - v.en > DURACION_CACHE_MS) cache.delete(k);
   while (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value);
-  cache.set(claveDe(medicoPhone, pacienteId, texto), { nota, en: ahora });
+  cache.set(claveDe(medicoPhone, pacienteId, texto), { nota, tutor, en: ahora });
+}
+
+function tutorDe(medicoPhone, pacienteId, texto) {
+  const v = cache.get(claveDe(medicoPhone, pacienteId, texto));
+  if (!v?.tutor || Date.now() - v.en > DURACION_CACHE_MS) return null;
+  return JSON.parse(JSON.stringify(v.tutor));
 }
 
 // Una copia: el que la recibe la guarda en Mongo y la puede modificar.
@@ -190,4 +198,4 @@ function medicamentosNoNombrados(nota, texto, correcciones = []) {
     .filter(i => i >= 0);
 }
 
-module.exports = { guardarBorrador, borradorDe, olvidarCache, compararMedicamentos, mismoMedicamento, nombradoEnTexto, medicamentosNoNombrados };
+module.exports = { tutorDe, guardarBorrador, borradorDe, olvidarCache, compararMedicamentos, mismoMedicamento, nombradoEnTexto, medicamentosNoNombrados };
