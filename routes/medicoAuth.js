@@ -12,6 +12,7 @@ const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = requi
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
 const { esEstudiante, estadoDe: estadoDeEstudiante, normalizarCodigo } = require("../services/estudiantes");
+const { zonaPorMoneda } = require("../services/zonaHoraria");
 
 // Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
 // propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
@@ -173,13 +174,17 @@ module.exports = function (app) {
 
     const hasta = new Date(ahora);
     hasta.setMonth(hasta.getMonth() + cod.meses);
+    const moneda = cod.moneda || (idioma === "pt" ? "BRL" : "BOB");
     let medico;
     try {
       medico = await Medico.create({
         phone, nombre, idioma,
         especialidad: { estudiante: "Estudiante de medicina", interno: "Interno de medicina", residente: "Médico residente" }[cod.nivel],
         tipoEspecialidad: "medicina_general",
-        moneda: cod.moneda || (idioma === "pt" ? "BRL" : "BOB"),
+        moneda,
+        // Su «hoy»: el de la racha de estudio (services/estudio.js). Sin esto
+        // un estudiante de Brasil quedaba con la hora de Bolivia.
+        zonaHoraria: zonaPorMoneda(moneda),
         passwordHash: await hashPassword(password),
         activo: true,
         estadoCuenta: "aprobada",

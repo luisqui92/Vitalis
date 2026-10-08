@@ -199,6 +199,14 @@ const medicoSchema = new mongoose.Schema({
       horasMes: { type: Number, default: 0 },
       codigo: { type: String, default: "" },
       universidad: { type: String, default: "" },
+      // Días seguidos estudiando (services/estudio.js). ultimoDia va como
+      // "YYYY-MM-DD" en la zona de la cuenta: el «hoy» es el suyo, no el del
+      // servidor.
+      racha: {
+        actual: { type: Number, default: 0 },
+        mejor: { type: Number, default: 0 },
+        ultimoDia: { type: String, default: "" },
+      },
     },
     default: undefined,
   },
@@ -3245,6 +3253,56 @@ const codigoEstudianteSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSchema);
 
+// ─── TARJETAS DE ESTUDIO (ver services/estudio.js) ─────────────────────────
+//
+// Las preguntas de repaso de un estudiante, hechas con SUS casos: salen del
+// razonamiento que hizo de cada consulta (ConsultaMedica.razonamiento), sin
+// pedirle nada nuevo a la IA. Se repasan espaciadas: la que sabe vuelve cada
+// vez más lejos; la que no, vuelve mañana.
+const tarjetaEstudioSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true },
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", required: true },
+  tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar"], required: true },
+  // El caso, sin el nombre del paciente: lo que se lee arriba de la pregunta.
+  caso: {
+    sexo: { type: String, default: "" },
+    edad: { type: Number, default: null },        // años
+    edadMeses: { type: Number, default: null },   // solo antes de los 2 años
+    motivo: { type: String, default: "" },
+    sintomas: { type: [String], default: [] },
+    antecedentes: { type: String, default: "" },
+    fecha: { type: Date, default: null },         // la de la consulta
+  },
+  // dx: los diferenciales del caso como opciones, y cuál es el más probable.
+  // enContraDe va alineado con opciones: lo que contradice cada una, para
+  // explicarle al que eligió otra por qué no era.
+  opciones: { type: [String], default: undefined },
+  correcta: { type: Number, default: null },
+  enContraDe: { type: [String], default: undefined },
+  // El diagnóstico al que se refiere la pregunta («¿qué estudio confirma X?»).
+  sobre: { type: String, default: "" },
+  respuesta: { type: [String], default: [] },
+  // Por qué: los datos del caso a favor del diagnóstico, y la perla.
+  aFavor: { type: [String], default: [] },
+  perla: { type: String, default: "" },
+  // Repaso espaciado: caja 1 a 5 (en la 4 y la 5 cuenta como dominada).
+  caja: { type: Number, default: 1, min: 1, max: 5 },
+  proxima: { type: Date, default: Date.now },
+  vistas: { type: Number, default: 0 },
+  aciertos: { type: Number, default: 0 },
+  errores: { type: Number, default: 0 },
+  ultimaVez: { type: Date, default: null },
+  // «Esta pregunta está mal»: deja de salir. El motivo es uno de una lista
+  // (sin texto libre: no hace falta escribir datos del caso para avisar).
+  reportada: {
+    en: { type: Date, default: null },
+    motivo: { type: String, enum: ["", "respuesta", "pregunta", "datos"], default: "" },
+  },
+}, { timestamps: true });
+tarjetaEstudioSchema.index({ consultaId: 1, tipo: 1 }, { unique: true });
+tarjetaEstudioSchema.index({ medicoPhone: 1, proxima: 1 });
+const TarjetaEstudio = mongoose.model("TarjetaEstudio", tarjetaEstudioSchema);
+
 // ─── ERRORES DE LA PANTALLA (ver services/erroresCliente.js) ───────────────
 //
 // Lo que falla en el celular o la compu de un médico. Agrupado: el mismo
@@ -3268,7 +3326,7 @@ const errorClienteSchema = new mongoose.Schema({
 errorClienteSchema.index({ ultima: 1 }, { expireAfterSeconds: 30 * 86400 });
 const ErrorCliente = mongoose.model("ErrorCliente", errorClienteSchema);
 
-module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, CodigoEstudiante, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, CodigoEstudiante, TarjetaEstudio,ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

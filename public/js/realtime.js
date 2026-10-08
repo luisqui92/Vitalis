@@ -62,7 +62,17 @@ function desconectarTiempoReal() {
 // dictado vive adentro de la misma pantalla de siempre—, así que
 // ganaderia.js marca y desmarca PANTALLA_ACTUAL a mano, en vez de con
 // envolverParaTiempoReal().
-const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote"]);
+//
+// "consultaDetalle" es la pantalla de una consulta. No estaba registrada, y
+// el aviso caía sobre la anterior —la ficha del paciente— y la repintaba
+// encima: tocar «Regenerar nota», o que un estudiante mandara su
+// razonamiento, lo devolvía a la ficha a los dos segundos, sin que viera el
+// resultado. Mientras la consulta se procesa, la pantalla se refresca sola
+// con su propio sondeo; no necesita el aviso.
+//
+// "estudiar" es la sentada de repaso de un estudiante (public/js/estudio.js):
+// repintarla en el medio le haría perder por qué tarjeta iba.
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle", "estudiar"]);
 
 // ═══ UN REPINTADO QUE NO PIDIÓ EL MÉDICO NO PUEDE MOVERLE LA PÁGINA ═══════
 //
@@ -176,3 +186,6 @@ envolverParaTiempoReal("teleMedEntrar", () => ({ tipo: "salaTele", params: {} })
 // queda quieto en vez de repintarla encima del informe a medio escribir.
 envolverParaTiempoReal("renderEditorInforme", (pacienteId, informeId) => ({ tipo: "editorInforme", params: { pacienteId, informeId } }));
 envolverParaTiempoReal("renderMembrete", () => ({ tipo: "membrete", params: {} }));
+// Las dos de PANTALLAS_SIN_REFRESCO de más arriba: la consulta y el repaso.
+envolverParaTiempoReal("renderDetalle", (consultaId) => ({ tipo: "consultaDetalle", params: { consultaId } }));
+envolverParaTiempoReal("renderEstudiar", () => ({ tipo: "estudiar", params: {} }));

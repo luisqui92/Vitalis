@@ -24,6 +24,8 @@ const { verificarMedicamento } = require("../services/medicamentosOficiales");
 const { guardarBorrador, borradorDe, tutorDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
 const { preguntasFaltantes, razonamientoDiagnostico, PALABRAS_MINIMAS: PALABRAS_MINIMAS_TUTOR } = require("../services/tutorClinico");
 const { estadoDe: estadoDeEstudiante } = require("../services/estudiantes");
+const { crearTarjetasDeConsulta, marcarDiaDeEstudio } = require("../services/estudio");
+const { zonaValida } = require("../services/zonaHoraria");
 
 // Una cuenta de estudiante vencida o sin horas no empieza consultas nuevas
 // (services/estudiantes.js). Se mira al pedir el token de la vista previa
@@ -345,7 +347,7 @@ module.exports = function (app) {
 
     const [paciente, medico] = await Promise.all([
       Paciente.findOne({ _id: consulta.pacienteId, medicoPhone }).lean(),
-      Medico.findOne({ phone: medicoPhone }).select("idioma").lean(),
+      Medico.findOne({ phone: medicoPhone }).select("idioma zonaHoraria").lean(),
     ]);
     let resultado;
     try {
@@ -361,7 +363,16 @@ module.exports = function (app) {
       { $set: { razonamiento } });
     if (!r.modifiedCount) throw new ErrorHttp(409, "Ya hiciste el razonamiento de esta consulta.");
     registrar({ req, medicoPhone, accion: "razonamiento_estudiante", recurso: `ConsultaMedica:${consulta._id}` });
-    res.json({ razonamiento });
+    // De este razonamiento salen sus tarjetas de repaso, y razonar un caso
+    // cuenta como día de estudio (services/estudio.js). Si algo de eso falla,
+    // el razonamiento ya quedó guardado: las tarjetas se vuelven a intentar
+    // al abrir «Estudiar».
+    const zona = zonaValida(medico?.zonaHoraria);
+    const [tarjetas] = await Promise.all([
+      crearTarjetasDeConsulta(consulta._id).catch(e => { log.warn("[ESTUDIO] tarjetas:", e.message); return 0; }),
+      marcarDiaDeEstudio(medicoPhone, zona).catch(e => { log.warn("[ESTUDIO] racha:", e.message); }),
+    ]);
+    res.json({ razonamiento, tarjetas });
   }));
 
   // ─── LISTAR CONSULTAS PROPIAS ───────────────────────────────────────────

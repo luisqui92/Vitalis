@@ -24,8 +24,11 @@ let kardexFocoEnTabs = false;
 function pestanasPacientes(pendientes) {
   const pestanas = [
     `<button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>${t("pacientes.tab.nuevo")}</button>`,
-    // Una cuenta de estudiante no da turnos (public/js/estudiantes.js).
-    ...(typeof esCuentaEstudiante === "function" && esCuentaEstudiante() ? [] : [`<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`]),
+    // Una cuenta de estudiante no da turnos (public/js/estudiantes.js); en
+    // ese lugar va «Estudiar», el repaso con sus casos (public/js/estudio.js).
+    ...(typeof esCuentaEstudiante === "function" && esCuentaEstudiante()
+      ? [`<button class="tab" id="btnEstudiar"><span class="tab-icono">${ICONOS.birrete}</span>${t("pacientes.tab.estudiar")}</button>`]
+      : [`<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`]),
     `<button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>`,
     `<button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>`,
     `<button class="tab" id="btnConfiguracion"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.configuracion")}</button>`,
@@ -135,6 +138,7 @@ async function renderDashboard() {
     const tituloTarjeta = etiquetaArea || t("pacientes.saludo", { nombre: MEDICO_NOMBRE || "" });
 
     app.innerHTML = `
+      ${typeof huecoAvisoEstudianteHtml === "function" ? huecoAvisoEstudianteHtml() : ""}
       <button type="button" class="card no-imprimir" id="avatarHomeBox"
         style="display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer">
         <span class="avatar avatar-sm" id="avatarHomeImg" aria-hidden="true">${esc(iniciales(MEDICO_NOMBRE))}</span>
@@ -166,7 +170,8 @@ async function renderDashboard() {
       `}
     `;
     document.getElementById("avatarHomeBox").onclick = renderSeguridad;
-    // Cuenta de estudiante: cuánto audio usó y cuándo vence, arriba de todo.
+    // Cuenta de estudiante: cuánto audio usó, cuándo vence y su racha de
+    // estudio, arriba de todo.
     if (typeof pintarAvisoEstudiante === "function") pintarAvisoEstudiante();
     // Sin await, como los demás avisos del panel: si la foto tarda o no hay
     // ninguna subida, el panel se abre igual con las iniciales de siempre.
@@ -182,6 +187,8 @@ async function renderDashboard() {
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
     const btnAgenda = document.getElementById("btnAgenda");
     if (btnAgenda) btnAgenda.onclick = renderAgenda;
+    const btnEstudiar = document.getElementById("btnEstudiar");
+    if (btnEstudiar) btnEstudiar.onclick = () => renderEstudiar();
     document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
     document.getElementById("btnVincular").onclick = renderVincular;
     document.getElementById("btnConfiguracion").onclick = renderSeguridad;

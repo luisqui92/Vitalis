@@ -568,9 +568,12 @@ function razonamientoTarjetaHtml(c) {
     </div>`;
 }
 
-function razonamientoResultadoHtml(rz) {
+// tarjetasNuevas: las de repaso que se armaron recién con este razonamiento
+// (services/estudio.js). Al volver a abrir la consulta, solo el acceso.
+function razonamientoResultadoHtml(rz, tarjetasNuevas = 0) {
   const r = rz.resultado || {};
   const lista = (xs) => (xs || []).map(x => `<li>${esc(x)}</li>`).join("");
+  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante() && typeof renderEstudiar === "function";
   return `
     <div class="card tutor-card" id="razonamientoCard">
       <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
@@ -588,10 +591,20 @@ function razonamientoResultadoHtml(rz) {
       ${(r.banderasRojas || []).length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div><ul class="tutor-lista">${lista(r.banderasRojas)}</ul>` : ""}
       ${(r.faltoPreguntar || []).length ? `<div class="nota-titulo">${t("tutor.faltoPreguntar")}</div><ul class="tutor-lista">${lista(r.faltoPreguntar)}</ul>` : ""}
       ${r.perla ? `<div class="tutor-perla">💡 ${esc(r.perla)}</div>` : ""}
+      ${estudiante ? `<div class="tutor-estudiar">
+        <span class="hint" style="margin:0">${tarjetasNuevas ? t(tarjetasNuevas === 1 ? "estudio.nuevas.una" : "estudio.nuevas.varias", { n: tarjetasNuevas }) : t("estudio.nuevas.repasar")}</span>
+        <button type="button" class="secondary" id="rzIrEstudiar">${t("estudio.nuevas.ir")}</button>
+      </div>` : ""}
     </div>`;
 }
 
+function engancharIrAEstudiar() {
+  const ir = document.getElementById("rzIrEstudiar");
+  if (ir) ir.onclick = () => renderEstudiar();
+}
+
 function engancharRazonamiento(id) {
+  engancharIrAEstudiar();
   const btn = document.getElementById("rzBtn");
   if (!btn) return;
   btn.onclick = async () => {
@@ -608,7 +621,8 @@ function engancharRazonamiento(id) {
         body: JSON.stringify({ principal, diferenciales }),
       });
       const card = document.getElementById("razonamientoCard");
-      if (card) card.outerHTML = razonamientoResultadoHtml(r.razonamiento);
+      if (card) card.outerHTML = razonamientoResultadoHtml(r.razonamiento, r.tarjetas || 0);
+      engancharIrAEstudiar();
     } catch (e) {
       btn.disabled = false;
       btn.textContent = t("tutor.ver");

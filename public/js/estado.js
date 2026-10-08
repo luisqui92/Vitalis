@@ -152,6 +152,9 @@ const ICONOS = {
   campana: svgIcono(`<path d="M12 3.2a5.6 5.6 0 0 0-5.6 5.6c0 4.2-1.7 5.5-1.7 5.5h14.6s-1.7-1.3-1.7-5.5A5.6 5.6 0 0 0 12 3.2z"/><path d="M10.3 17.5a2 2 0 0 0 3.4 0"/>`),
   // Útero esquemático (cuerpo + trompas + ovarios): el mapa ginecológico.
   utero: svgIcono(`<path d="M8.5 8.4c-1 2.7-.4 6.6 3.5 7.6 3.9-1 4.5-4.9 3.5-7.6-1.3.8-5.7.8-7 0z"/><path d="M8.5 8.4C7.2 6.6 5.6 6.3 4.4 7.4"/><path d="M15.5 8.4c1.3-1.8 2.9-2.1 4.1-1"/><circle cx="3.4" cy="8.6" r="1.5"/><circle cx="20.6" cy="8.6" r="1.5"/><path d="M10.6 16v3.6h2.8V16"/>`),
+  // Las cuentas de estudiante: «Estudiar» y la racha (public/js/estudio.js).
+  birrete: svgIcono(`<path d="M2.5 9.5L12 5l9.5 4.5L12 14 2.5 9.5z"/><path d="M6.5 11.6v4c0 1.6 2.5 2.9 5.5 2.9s5.5-1.3 5.5-2.9v-4"/><path d="M21.5 9.5v5"/>`),
+  fuego: svgIcono(`<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.1 0-3.4 2.4-5.3 3.6-7.6.5 1.6 1.4 2.6 2.4 3.1.4-2.8 1.5-5.4 3.7-7.4.2 3 1.4 4.6 2.4 6.3 1 1.6 1.9 3.3 1.9 5.6 0 3.5-3.5 6.1-7.5 6.1z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.3-2.6 1.9-3.9.4.9 1 1.4 1.6 1.6.3-1.2.8-2 1.6-2.7.3 1.2.9 2 1.3 2.8.3.5.4 1.1.4 1.8 0 1.8-1.6 3.2-4 3.2z"/>`),
 };
 
 // Ícono + etiqueta corta de cada pestaña del Kardex (ver pintarKardex en

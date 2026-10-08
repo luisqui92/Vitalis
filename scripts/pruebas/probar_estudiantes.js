@@ -161,6 +161,11 @@ function textoPdf(buf) {
     P("POST", "/medico/registro-estudiante", null, REG(codResidente, "59170040022")),
   ]);
   verificar("dos personas a la vez con el mismo código → entra UNA", [a1.estado, a2.estado].sort().join() === "200,400");
+  r = await correrScript(uri, ["crear", "--nivel", "estudiante", "--meses", "1", "--moneda", "BRL"]);
+  r = await P("POST", "/medico/registro-estudiante", null, REG(codigosDe(r.salida)[0], "5511900040031", { idioma: "pt" }));
+  const bia = await M.Medico.findOne({ phone: "5511900040031" }).lean();
+  verificar("un código de Brasil → la cuenta queda con la hora de São Paulo (su «hoy», el de la racha de estudio)",
+    r.estado === 200 && bia?.moneda === "BRL" && bia.zonaHoraria === "America/Sao_Paulo" && ana.zonaHoraria === "America/La_Paz");
   const tkRes = (a1.estado === 200 ? a1 : a2).cuerpo.token;
   const telRes = a1.estado === 200 ? "59170040021" : "59170040022";
 
@@ -228,9 +233,11 @@ function textoPdf(buf) {
   verificar("el de un médico, no", r.estado === 200 && !/REGISTRO DE ESTUDIANTE/.test(textoPdf(r.buf)));
 
   console.log("\n── 9. Renovar, ver las cuentas y recibirse ──");
+  await M.Medico.updateOne({ phone: "59170040001" }, { $set: { "estudiante.racha": { actual: 4, mejor: 9, ultimoDia: "2026-01-01" } } });
   r = await correrScript(uri, ["renovar", "+59170040001", "--meses", "3"]);
   const tras = await M.Medico.findOne({ phone: "59170040001" }).lean();
   verificar("«renovar» un vencido → 3 meses desde hoy, y vuelve a grabar", r.codigo === 0 && new Date(tras.estudiante.hasta) > new Date(Date.now() + 80 * 86400000));
+  verificar("  ...sin borrarle la racha de estudio", tras.estudiante.racha?.mejor === 9 && tras.estudiante.racha.actual === 4);
   r = await P("GET", "/medico/transcripcion-token", tkEst);
   verificar("  ...el token de la vista previa ya sale", r.estado === 200);
   r = await correrScript(uri, ["cuentas"]);

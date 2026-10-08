@@ -84,16 +84,30 @@ function avisoEstudianteHtml(e) {
   </div>`;
 }
 
-// En el inicio: arriba de todo, sin frenar el resto de la pantalla.
+// ─── EN EL INICIO ──────────────────────────────────────────────────────────
+// Arriba de todo: el aviso de su acceso y, debajo, la racha y lo que tiene
+// para estudiar hoy (public/js/estudio.js). Sin frenar el resto de la
+// pantalla: el inicio deja un hueco (#estAvisoInicio) y esto lo llena cuando
+// llegan los datos. Si para entonces ya se fue a otra pantalla, el hueco no
+// existe y no se pinta nada encima de lo que esté mirando.
+//
+// Antes se agregaba al principio de #app, que en la compu es el contenedor
+// del celular y está oculto: en el escritorio el aviso no se veía nunca.
+function huecoAvisoEstudianteHtml() {
+  return esCuentaEstudiante() ? `<div id="estAvisoInicio"></div>` : "";
+}
+
 async function pintarAvisoEstudiante() {
   if (!esCuentaEstudiante()) return;
-  const e = await estadoEstudiante();
-  const app2 = document.getElementById("app");
-  if (!e || !app2 || document.getElementById("estAvisoInicio")) return;
-  const caja = document.createElement("div");
-  caja.id = "estAvisoInicio";
-  caja.innerHTML = avisoEstudianteHtml(e);
-  app2.prepend(caja);
+  const [e, estudio] = await Promise.all([
+    estadoEstudiante(),
+    typeof resumenEstudio === "function" ? resumenEstudio() : null,
+  ]);
+  const hueco = document.getElementById("estAvisoInicio");
+  if (!hueco) return;
+  hueco.innerHTML = avisoEstudianteHtml(e) + (typeof estudioInicioHtml === "function" ? estudioInicioHtml(estudio) : "");
+  const ir = document.getElementById("estIrEstudiar");
+  if (ir) ir.onclick = () => renderEstudiar();
 }
 
 // La marca que lleva cada nota grabada desde una cuenta de estudiante.
