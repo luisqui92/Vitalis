@@ -380,6 +380,13 @@ require("./services/senalizacion").iniciarSenalizacion(server);
 require("./services/video").avisarEstadoAlArrancar();
 server.listen(PORT, () => log.info(`🚀 Symphomed corriendo en puerto ${PORT}`));
 
+// Las consultas que el reinicio agarró a mitad de camino: el audio que se
+// estaba transcribiendo y la nota que se estaba escribiendo (ver
+// retomarConsultas en routes/consultaMedica.js).
+require("./routes/consultaMedica").retomarConsultas()
+  .then((r) => { if (r.transcripciones || r.sinAudio || r.notas || r.sobras) log.info("[CONSULTA_MEDICA] retomado al arrancar:", JSON.stringify(r)); })
+  .catch((e) => log.error("[CONSULTA_MEDICA] no se pudo retomar lo interrumpido:", e.message));
+
 // Copias de seguridad automáticas. Va acá, después de levantar el servidor,
 // para que un problema con los respaldos nunca impida que Symphomed atienda.
 require("./services/backup").programar();

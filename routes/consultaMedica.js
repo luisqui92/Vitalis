@@ -3,6 +3,7 @@
 // o PC) y reciben la transcripción separada por hablante + nota clínica.
 // Login/registro vive aparte en routes/medicoAuth.js.
 const express = require("express");
+const mongoose = require("mongoose");
 const { CONFIG, log } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO, Teleconsulta } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
@@ -22,6 +23,7 @@ const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpe
 const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
 const { guardarBorrador, borradorDe, extrasDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
+const audioPendiente = require("../services/audioPendiente");
 // Donde los módulos (modulos/*) suman lo suyo a una consulta: ver la lista
 // de puntos en services/extensiones.js.
 const extensiones = require("../services/extensiones");
@@ -111,7 +113,8 @@ module.exports = function (app) {
   // Con consultas de 30-45 min, esperar la transcripción entera en el mismo
   // pedido HTTP no funciona (nginx corta conexiones largas). Por eso acá solo
   // se guarda el audio y se responde al toque; la transcripción sigue sola
-  // en background y la web se fija después (polling) cuando termina.
+  // en background (transcribirEnSegundoPlano, abajo) y la web se fija
+  // después (polling) cuando termina.
   app.post("/medico/consultas", limitMedico, requireMedico, audioRaw, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const audioBuffer = req.body;
@@ -160,10 +163,28 @@ module.exports = function (app) {
     }
     const multicanal = Boolean(teleconsulta);
 
-    const consulta = await ConsultaMedica.create({
-      medicoPhone, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "procesando",
-      ...extensiones.sumar("consulta.alCrear", req),
-    });
+    // El audio va al disco ANTES de contestar: apenas recibe el 202, el
+    // teléfono borra su copia y la única que queda es esta. Si no se puede
+    // guardar, se contesta que no, y el teléfono la conserva para reintentar
+    // (services/audioPendiente.js). El id se elige antes para que el audio
+    // exista antes que la consulta: nunca hay una «procesando» sin su audio.
+    const consultaId = new mongoose.Types.ObjectId();
+    try {
+      await audioPendiente.guardar(consultaId, audioBuffer);
+    } catch (e) {
+      log.error("[CONSULTA_MEDICA] no se pudo guardar el audio en disco:", e.message);
+      throw new ErrorHttp(503, "No se pudo guardar el audio. Probá de nuevo en un rato: la grabación sigue en el teléfono.");
+    }
+    let consulta;
+    try {
+      consulta = await ConsultaMedica.create({
+        _id: consultaId, medicoPhone, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "procesando",
+        ...extensiones.sumar("consulta.alCrear", req),
+      });
+    } catch (e) {
+      await audioPendiente.borrar(consultaId).catch(() => {});
+      throw e;
+    }
 
     if (teleconsulta) {
       teleconsulta.consultaId = consulta._id;
@@ -171,74 +192,8 @@ module.exports = function (app) {
     }
 
     res.status(202).json({ ok: true, consulta });
-
-    // La especialidad afina el vocabulario; el idioma decide en qué lengua
-    // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
-    // Y lo que este médico receta seguido va primero (services/vocabularioMedico.js).
-    const medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
-    const delMedico = await medicamentosDelMedico(medicoPhone);
-
-    const inicioTranscripcion = Date.now();
-    transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico })
-      .then(async ({ transcripcionCompleta, segmentos, duracionSegundos }) => {
-        const transcripcionMs = Date.now() - inicioTranscripcion;
-        // Un update y no consulta.save(): mientras AssemblyAI trabajaba, la
-        // nota en vivo pudo haberse guardado en este mismo documento, y el
-        // objeto en memoria no la tiene.
-        await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: {
-          estado: "completado", transcripcionCompleta, segmentos, duracionSegundos, "tiempos.transcripcionMs": transcripcionMs,
-        } });
-
-        // El cobro va acá y no al subir el audio: recién ahora sabemos que la
-        // consulta salió bien. Si AssemblyAI hubiera fallado, el médico no
-        // paga nada — y con razón, porque no recibió nada.
-        //
-        // Va en su propio try: que falle el cobro no puede hacerle perder la
-        // consulta al médico. Un cobro perdido lo detecta reconciliar(); una
-        // consulta perdida no la recupera nadie.
-        try {
-          await cobrarConsulta({ medicoPhone, consultaId: consulta._id });
-        } catch (e) {
-          log.error(`[SALDO] no se pudo cobrar la consulta ${consulta._id} de ${medicoPhone}:`, e.message);
-        }
-
-        // ¿Quién escribe la nota? Si la nota en vivo ya la reclamó, a esta
-        // transcripción le toca verificarla; si no, la escribe ella, como
-        // siempre. El reclamo es atómico: nunca la escriben las dos.
-        const reclamo = await ConsultaMedica.updateOne(
-          { _id: consulta._id, notaFuente: { $in: ["", null] } }, { $set: { notaFuente: "audio" } });
-        if (!reclamo.modifiedCount) {
-          log.info(`[TIEMPOS] consulta ${consulta._id}: audio ${Math.round(duracionSegundos || 0)} s, transcripción completa ${Math.round(transcripcionMs / 1000)} s (la nota salió en vivo)`);
-          await intentarVerificar(consulta._id);
-          return;
-        }
-
-        const actual = await ConsultaMedica.findById(consulta._id);
-        const inicioNota = Date.now();
-        await producirNota(actual, paciente, medicoPhone, medicoParaVocabulario?.idioma);
-        const notaMs = Date.now() - inicioNota;
-        await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { "tiempos.notaMs": notaMs } }).catch(() => {});
-        log.info(`[TIEMPOS] consulta ${consulta._id}: audio ${Math.round(duracionSegundos || 0)} s, transcripción ${Math.round(transcripcionMs / 1000)} s, nota ${Math.round(notaMs / 1000)} s`);
-        avisarNotaLista(actual, paciente, medicoPhone);
-      })
-      .catch(async (e) => {
-        log.error("[CONSULTA_MEDICA] Error transcribiendo:", e.response?.data || e.message);
-        await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { estado: "error", error: e.response?.data?.error || e.message } })
-          .catch(e2 => log.error("[CONSULTA_MEDICA] No se pudo guardar el estado de error:", e2.message));
-        avisarCambio(medicoPhone);
-        // Si la nota salió en vivo, el médico la tiene: lo que falló es la
-        // verificación, y eso se le dice en la nota (intentarVerificar).
-        const ahora = await ConsultaMedica.findById(consulta._id).select("notaFuente").lean().catch(() => null);
-        if (ahora?.notaFuente === "vivo") return intentarVerificar(consulta._id);
-        // El caso donde el silencio cuesta más caro: el médico está esperando
-        // algo que no va a llegar nunca. Cuanto antes lo sepa, más fresco
-        // tiene lo que se habló para escribirlo a mano.
-        notificarMedico(medicoPhone, {
-          titulo: "No se pudo transcribir la consulta",
-          cuerpo: "Entrá a verla: el audio quedó guardado.",
-          url: `/?consulta=${consulta._id}`,
-        }).catch(e2 => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e2.message));
-      });
+    transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { multicanal })
+      .catch(e => log.error(`[CONSULTA_MEDICA] consulta ${consulta._id} en segundo plano:`, e.message));
   }));
 
   // ─── LA NOTA EN VIVO (ver services/notaEnVivo.js) ─────────────────────
@@ -1068,3 +1023,214 @@ async function intentarVerificar(consultaId) {
   }
 }
 
+
+// ═══ TRANSCRIBIR, Y DESPUÉS LA NOTA (en segundo plano) ══════════════════════
+//
+// Lo que pasa después del 202. Lo usan la subida y el arranque, que retoma lo
+// que un reinicio dejó a medias (retomarConsultas, abajo). Nunca tira: lo que
+// falla queda anotado en la consulta y se le avisa al médico.
+async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { multicanal }) {
+  const medicoPhone = consulta.medicoPhone;
+  let medicoParaVocabulario, duracionSegundos, transcripcionMs;
+  try {
+    // La especialidad afina el vocabulario; el idioma decide en qué lengua
+    // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
+    // Y lo que este médico receta seguido va primero (services/vocabularioMedico.js).
+    medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
+    const delMedico = await medicamentosDelMedico(medicoPhone);
+    const inicioTranscripcion = Date.now();
+    const t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico });
+    transcripcionMs = Date.now() - inicioTranscripcion;
+    duracionSegundos = t.duracionSegundos;
+    // Un update y no consulta.save(): mientras AssemblyAI trabajaba, la
+    // nota en vivo pudo haberse guardado en este mismo documento, y el
+    // objeto en memoria no la tiene.
+    await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: {
+      estado: "completado", transcripcionCompleta: t.transcripcionCompleta, segmentos: t.segmentos, duracionSegundos,
+      "tiempos.transcripcionMs": transcripcionMs,
+    } });
+  } catch (e) {
+    log.error("[CONSULTA_MEDICA] Error transcribiendo:", e.response?.data || e.message);
+    await audioPendiente.borrar(consulta._id).catch(e2 => log.error("[CONSULTA_MEDICA] no se pudo borrar el audio:", e2.message));
+    await marcarTranscripcionFallida(consulta._id, medicoPhone, e.response?.data?.error || e.message);
+    return;
+  }
+  // La transcripción ya está guardada: el audio no hace falta más.
+  await audioPendiente.borrar(consulta._id).catch(e => log.error("[CONSULTA_MEDICA] no se pudo borrar el audio:", e.message));
+
+  // El cobro va acá y no al subir el audio: recién ahora sabemos que la
+  // consulta salió bien. Si AssemblyAI hubiera fallado, el médico no
+  // paga nada — y con razón, porque no recibió nada.
+  //
+  // Va en su propio try: que falle el cobro no puede hacerle perder la
+  // consulta al médico. Un cobro perdido lo detecta reconciliar(); una
+  // consulta perdida no la recupera nadie. Retomada después de un reinicio,
+  // tampoco se cobra dos veces: el cobro es uno por consulta.
+  try {
+    await cobrarConsulta({ medicoPhone, consultaId: consulta._id });
+  } catch (e) {
+    log.error(`[SALDO] no se pudo cobrar la consulta ${consulta._id} de ${medicoPhone}:`, e.message);
+  }
+
+  try {
+    // ¿Quién escribe la nota? Si la nota en vivo ya la reclamó, a esta
+    // transcripción le toca verificarla; si no, la escribe ella, como
+    // siempre. El reclamo es atómico: nunca la escriben las dos.
+    const reclamo = await ConsultaMedica.updateOne(
+      { _id: consulta._id, notaFuente: { $in: ["", null] } }, { $set: { notaFuente: "audio" } });
+    if (!reclamo.modifiedCount) {
+      log.info(`[TIEMPOS] consulta ${consulta._id}: audio ${Math.round(duracionSegundos || 0)} s, transcripción completa ${Math.round(transcripcionMs / 1000)} s (la nota salió en vivo)`);
+      await intentarVerificar(consulta._id);
+      return;
+    }
+
+    const actual = await ConsultaMedica.findById(consulta._id);
+    const inicioNota = Date.now();
+    await producirNota(actual, paciente, medicoPhone, medicoParaVocabulario?.idioma);
+    const notaMs = Date.now() - inicioNota;
+    await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { "tiempos.notaMs": notaMs } }).catch(() => {});
+    log.info(`[TIEMPOS] consulta ${consulta._id}: audio ${Math.round(duracionSegundos || 0)} s, transcripción ${Math.round(transcripcionMs / 1000)} s, nota ${Math.round(notaMs / 1000)} s`);
+    avisarNotaLista(actual, paciente, medicoPhone);
+  } catch (e) {
+    // La transcripción está; lo que falló es lo de después. Que la nota no
+    // quede «pendiente» para siempre: con error, el médico la vuelve a
+    // generar desde la consulta.
+    log.error(`[CONSULTA_MEDICA] consulta ${consulta._id}, después de transcribir:`, e.message);
+    await ConsultaMedica.updateOne({ _id: consulta._id, notaClinicaEstado: "pendiente", notaFuente: { $ne: "vivo" } },
+      { $set: { notaClinicaEstado: "error", notaClinicaError: e.message } }).catch(() => {});
+    avisarCambio(medicoPhone);
+  }
+}
+
+// La transcripción no salió. Si la nota salió en vivo, el médico la tiene: lo
+// que falló es la verificación, y eso se le dice en la nota
+// (intentarVerificar). Si no, se le avisa: es el caso donde el silencio cuesta
+// más caro, el médico esperando algo que no va a llegar nunca. Cuanto antes
+// lo sepa, más fresco tiene lo que se habló para escribirlo a mano.
+async function marcarTranscripcionFallida(consultaId, medicoPhone, motivo, { avisar = true } = {}) {
+  await ConsultaMedica.updateOne({ _id: consultaId, estado: "procesando" }, { $set: { estado: "error", error: motivo } })
+    .catch(e => log.error("[CONSULTA_MEDICA] No se pudo guardar el estado de error:", e.message));
+  avisarCambio(medicoPhone);
+  const ahora = await ConsultaMedica.findById(consultaId).select("notaFuente").lean().catch(() => null);
+  if (ahora?.notaFuente === "vivo") return intentarVerificar(consultaId);
+  if (!avisar) return;
+  notificarMedico(medicoPhone, {
+    titulo: "No se pudo transcribir la consulta",
+    cuerpo: "Entrá a verla para ver qué pasó.",
+    url: `/?consulta=${consultaId}`,
+  }).catch(e => log.error("[CONSULTA_MEDICA] no se pudo notificar:", e.message));
+}
+
+// ═══ AL ARRANCAR: LO QUE UN REINICIO DEJÓ A MEDIAS ══════════════════════════
+//
+// Symphomed corre en un solo proceso (pm2, «vitalis»): al arrancar, lo que
+// figura en curso desde ANTES de este arranque es de un proceso que ya no
+// existe. Lo que empezó después es de este proceso y no se toca. Lo llama
+// index.js al arrancar.
+//   · Una consulta «procesando» con su audio en disco: se transcribe de nuevo.
+//     AssemblyAI cobra esa transcripción otra vez: es lo que cuesta no
+//     perderla. Si el mismo audio se corta una y otra vez (un audio que tira
+//     el servidor), a la tercera queda en error en vez de intentarlo siempre.
+//   · Una «procesando» sin audio (se subió antes de que el audio se guardara
+//     en disco): no hay con qué seguir. Queda en error, con el motivo, en vez
+//     de «procesando» para siempre.
+//   · Una nota que se estaba escribiendo: se escribe de nuevo, de la
+//     transcripción o del texto en vivo, que sí están guardados.
+//   · Un audio en disco sin consulta en curso: sobró. Se borra.
+// Lo de más de un día no se retoma solo, porque nadie lo está esperando:
+// queda en error sin avisar, y la nota se puede volver a generar.
+const ARRANQUE = new Date();
+const RETOMAR_HASTA_MS = 24 * 60 * 60 * 1000;
+const MAX_REINTENTOS_AUDIO = 2;
+const NOTA_INTERRUMPIDA = "Se interrumpió mientras se escribía (el servidor se reinició). Volvé a generarla.";
+
+async function retomarConsultas(arranque = ARRANQUE) {
+  const reciente = (c) => arranque - new Date(c.createdAt) < RETOMAR_HASTA_MS;
+  const resumen = { transcripciones: 0, sinAudio: 0, notas: 0, sobras: 0 };
+  const enDisco = new Set(await audioPendiente.guardados(arranque));
+  // Las dos listas antes de tocar nada: marcar una consulta le cambia la
+  // fecha de modificación, y la sacaría de la segunda.
+  const enCurso = await ConsultaMedica.find({ estado: "procesando", createdAt: { $lt: arranque } }).select("_id medicoPhone pacienteId createdAt").lean();
+  const notas = await ConsultaMedica.find({
+    notaClinicaEstado: "pendiente", confirmadaEn: null, updatedAt: { $lt: arranque },
+    $or: [{ estado: "completado", notaFuente: { $in: ["", null, "audio"] } }, { notaFuente: "vivo" }],
+  });
+
+  const aTranscribir = [];
+  for (const c of enCurso) {
+    const id = String(c._id);
+    const conAudio = enDisco.delete(id);
+    if (!conAudio) {
+      resumen.sinAudio++;
+      await marcarTranscripcionFallida(c._id, c.medicoPhone,
+        "El servidor se reinició mientras se transcribía esta consulta, y el audio no había quedado guardado.", { avisar: reciente(c) });
+      continue;
+    }
+    const intento = await ConsultaMedica.findOneAndUpdate({ _id: c._id, estado: "procesando" }, { $inc: { reintentosAudio: 1 } }, { new: true });
+    const paciente = intento && await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
+    if (!intento || !paciente || intento.reintentosAudio > MAX_REINTENTOS_AUDIO) {
+      await audioPendiente.borrar(id).catch(() => {});
+      if (intento) {
+        await marcarTranscripcionFallida(c._id, c.medicoPhone,
+          "No se pudo transcribir: el servidor se reinició varias veces mientras lo intentaba.", { avisar: reciente(c) });
+      }
+      continue;
+    }
+    aTranscribir.push({ consulta: intento, paciente });
+  }
+  for (const id of enDisco) {
+    await audioPendiente.borrar(id).catch(() => {});
+    resumen.sobras++;
+  }
+
+  const aEscribir = [];
+  for (const c of notas) {
+    const vivo = c.notaFuente === "vivo";
+    const texto = vivo ? c.transcripcionEnVivo : c.transcripcionCompleta;
+    const paciente = await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
+    if (!paciente || !String(texto || "").trim() || !reciente(c)) {
+      await ConsultaMedica.updateOne({ _id: c._id, notaClinicaEstado: "pendiente" },
+        { $set: { notaClinicaEstado: "error", notaClinicaError: NOTA_INTERRUMPIDA } });
+      continue;
+    }
+    aEscribir.push({ consulta: c, paciente, vivo, texto });
+  }
+
+  // De a una por vez, en dos filas: un audio de una hora pesa en memoria, y
+  // las notas no tienen por qué esperar a las transcripciones.
+  await Promise.all([
+    (async () => {
+      for (const { consulta, paciente } of aTranscribir) {
+        const audio = await audioPendiente.leer(consulta._id).catch(() => null);
+        if (!audio) {
+          await marcarTranscripcionFallida(consulta._id, consulta.medicoPhone, "No se pudo leer el audio guardado.", { avisar: reciente(consulta) });
+          continue;
+        }
+        resumen.transcripciones++;
+        log.info(`[CONSULTA_MEDICA] retomando la transcripción de ${consulta._id} (se cortó al reiniciar)`);
+        const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }));
+        await transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal })
+          .catch(e => log.error(`[CONSULTA_MEDICA] no se pudo retomar la transcripción de ${consulta._id}:`, e.message));
+      }
+    })(),
+    (async () => {
+      for (const { consulta, paciente, vivo, texto } of aEscribir) {
+        resumen.notas++;
+        log.info(`[CONSULTA_MEDICA] retomando la nota de ${consulta._id} (se cortó al reiniciar)`);
+        try {
+          if (!vivo) consulta.notaFuente = "audio";
+          const medico = await Medico.findOne({ phone: consulta.medicoPhone }).select("idioma").lean();
+          await producirNota(consulta, paciente, consulta.medicoPhone, medico?.idioma, vivo ? { texto } : {});
+          if (consulta.notaClinicaEstado === "completado") avisarNotaLista(consulta, paciente, consulta.medicoPhone);
+          else avisarCambio(consulta.medicoPhone);
+          if (vivo) await intentarVerificar(consulta._id);
+        } catch (e) {
+          log.error(`[CONSULTA_MEDICA] no se pudo retomar la nota de ${consulta._id}:`, e.message);
+        }
+      }
+    })(),
+  ]);
+  return resumen;
+}
+
+module.exports.retomarConsultas = retomarConsultas;

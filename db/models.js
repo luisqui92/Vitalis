@@ -511,6 +511,10 @@ const consultaMedicaSchema = new mongoose.Schema({
     finSeg: Number,
   }],
   error: String,
+  // Cuántas veces se retomó la transcripción porque el servidor se reinició
+  // en el medio (routes/consultaMedica.js, retomarConsultas): un audio que
+  // tira el servidor no se reintenta para siempre.
+  reintentosAudio: { type: Number, default: 0 },
   // Nota clínica estructurada, generada por IA a partir de la transcripción
   // una vez que esta termina. Es un segundo paso, independiente del de arriba.
   notaClinicaEstado: { type: String, enum: ["pendiente", "completado", "error"], default: "pendiente" },
