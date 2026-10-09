@@ -15,7 +15,7 @@
 //   node scripts/codigos_estudiante.js renovar <telefono> --meses 6 [--horas 12]
 //   node scripts/codigos_estudiante.js convertir <telefono>   (se recibió: pasa a cuenta de médico)
 //
-// Niveles: estudiante (6 h/mes), interno (12 h/mes), residente (25 h/mes).
+// Niveles: estudiante (3 h/mes), interno (6 h/mes), residente (12 h/mes).
 // --horas cambia ese tope; --precio es lo que cobraste, en bolivianos o reales,
 // para que quede anotado. Un código sin usar vence a los 60 días.
 const path = require("path");

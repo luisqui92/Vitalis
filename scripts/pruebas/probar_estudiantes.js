@@ -68,10 +68,16 @@ function textoPdf(buf) {
 
 (async () => {
   const { rutaBloqueada, gastaIA } = require(path.join(RAIZ, "modulos", "estudiantes", "restricciones"));
-  const { normalizarCodigo, generarCodigo } = require(path.join(RAIZ, "modulos", "estudiantes", "cuenta"));
+  const { normalizarCodigo, generarCodigo, NIVELES } = require(path.join(RAIZ, "modulos", "estudiantes", "cuenta"));
+  const HORAS_INTERNO = NIVELES.interno.horasMes;
   console.log("── 1. Las reglas ──");
   verificar("un código se escribe como venga: «est ab12cd» → «EST-AB12CD»", normalizarCodigo("est ab12cd") === "EST-AB12CD" && normalizarCodigo("AB12CD") === "EST-AB12CD");
   verificar("los códigos no usan letras que se confunden (0, O, 1, I, L)", Array.from({ length: 50 }, generarCodigo).every(c => /^EST-[A-HJKMNP-Z2-9]{6}$/.test(c)));
+  // Lo que se vende: si cambia, que sea a propósito (las horas salen del
+  // costo del audio, ver cuenta.js).
+  const plan = (n) => [n.horasMes, n.precio.BOB / 100, n.precio.BRL / 100].join("/");
+  verificar("los niveles: 3, 6 y 12 h de audio por mes, a Bs 49, 89 y 179 (R$ 29, 49 y 99)",
+    plan(NIVELES.estudiante) === "3/49/29" && plan(NIVELES.interno) === "6/89/49" && plan(NIVELES.residente) === "12/179/99");
   verificar("recetar está bloqueado", rutaBloqueada("POST", "/medico/pacientes/abc/recetas") && rutaBloqueada("DELETE", "/medico/recetas/x"));
   verificar("ver su agenda (vacía) no, crear un turno sí", !rutaBloqueada("GET", "/medico/citas") && rutaBloqueada("POST", "/medico/citas"));
   verificar("Memed y la teleconsulta, ni para leer", rutaBloqueada("GET", "/medico/pacientes/abc/memed/sesion") && rutaBloqueada("GET", "/medico/teleconsultas"));
@@ -149,7 +155,7 @@ function textoPdf(buf) {
   const codigos = codigosDe(r.salida);
   verificar(`«crear --nivel interno --meses 6 --cantidad 3» → 3 códigos (${codigos.join(", ")})`, r.codigo === 0 && codigos.length === 3);
   const enBase = await M.CodigoEstudiante.find({}).lean();
-  verificar("  ...de interno, 12 h por mes y Bs 89 × 6 meses, por defecto", enBase.length === 3 && enBase.every(c => c.nivel === "interno" && c.horasMes === 12 && c.precioCentavos === 8900 * 6 && c.nota === "Univalle 5to año"));
+  verificar(`  ...de interno, ${HORAS_INTERNO} h por mes y Bs 89 × 6 meses, por defecto`, enBase.length === 3 && enBase.every(c => c.nivel === "interno" && c.horasMes === HORAS_INTERNO && c.precioCentavos === 8900 * 6 && c.nota === "Univalle 5to año"));
   r = await correrScript(uri, ["crear", "--nivel", "decano", "--meses", "6"]);
   verificar("un nivel que no existe → error, nada creado", r.codigo === 1 && (await M.CodigoEstudiante.countDocuments()) === 3);
   r = await correrScript(uri, ["crear", "--nivel", "residente", "--meses", "1", "--horas", "2"]);
@@ -232,7 +238,7 @@ function textoPdf(buf) {
 
   console.log("\n── 7. Grabar: con acceso sí, vencido o sin horas no ──");
   r = await P("GET", "/medico/estudiante/estado", tkEst);
-  verificar("el estado dice nivel, horas y vencimiento", r.cuerpo?.estudiante?.nivel === "interno" && r.cuerpo.estudiante.horasMes === 12 && !r.cuerpo.estudiante.bloqueado);
+  verificar("el estado dice nivel, horas y vencimiento", r.cuerpo?.estudiante?.nivel === "interno" && r.cuerpo.estudiante.horasMes === HORAS_INTERNO && !r.cuerpo.estudiante.bloqueado);
   r = await P("POST", `/medico/consultas?pacienteId=${pac._id}`, tkEst, Buffer.from("audio"));
   verificar("con acceso, sube la grabación → 202", r.estado === 202);
   verificar("  ...y la consulta queda marcada como de estudiante", (await M.ConsultaMedica.findById(r.cuerpo.consulta._id).lean()).deEstudiante === true);
@@ -280,7 +286,7 @@ function textoPdf(buf) {
   r = await P("GET", "/medico/transcripcion-token", tkEst);
   verificar("  ...el token de la vista previa ya sale", r.estado === 200);
   r = await correrScript(uri, ["cuentas"]);
-  verificar("«cuentas» lista a los estudiantes con sus horas", /Ana Interna/.test(r.salida) && /\/12 h/.test(r.salida));
+  verificar("«cuentas» lista a los estudiantes con sus horas", /Ana Interna/.test(r.salida) && r.salida.includes(`/${HORAS_INTERNO} h`));
   r = await correrScript(uri, ["convertir", "59170040001"], "no");
   verificar("«convertir» sin escribir SI → no toca nada", /Cancelado/.test(r.salida) && !!(await M.Medico.findOne({ phone: "59170040001" }).lean()).estudiante?.nivel);
   r = await correrScript(uri, ["convertir", "59170040001"], "SI");

@@ -12,6 +12,8 @@ const fs = require("fs");
 const http = require("http");
 const { spawn, spawnSync } = require("child_process");
 const RAIZ = path.join(__dirname, "..", "..");
+// Las horas que trae un código de interno (las da el nivel: ver cuenta.js).
+const HORAS_INTERNO = require(path.join(RAIZ, "modulos", "estudiantes", "cuenta")).NIVELES.interno.horasMes;
 const PUERTO = 3958;
 const TEL = "59170050001";
 
@@ -111,7 +113,7 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     verificar("«Tengo un código de estudiante» → crea la cuenta y entra directo", true);
     await page.waitForSelector("#estAvisoInicio .est-aviso", { timeout: 10000 }).catch(() => {});
     const aviso = await page.locator("#estAvisoInicio").innerText().catch(() => "");
-    verificar(`arriba dice el nivel, el vencimiento y las horas («${aviso.replace(/\s+/g, " ").trim().slice(0, 90)}…»)`, /Interno/.test(aviso) && /vence/.test(aviso) && /0 de 12 horas/.test(aviso));
+    verificar(`arriba dice el nivel, el vencimiento y las horas («${aviso.replace(/\s+/g, " ").trim().slice(0, 90)}…»)`, /Interno/.test(aviso) && /vence/.test(aviso) && aviso.includes(`0 de ${HORAS_INTERNO} horas`));
     verificar("  ...y debajo, cómo empezar a estudiar con sus casos", /Estudiá con tus propios casos/.test(aviso) && await page.locator("#estIrEstudiar").count() === 1);
     verificar("sin la pestaña de agenda; en su lugar, «Estudiar»", !(await page.locator("#btnAgenda").count()) && await page.locator("#btnEstudiar").count() === 1);
 
@@ -191,7 +193,7 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     await page.waitForSelector("#recBtn");
     await esperar(1500);
     verificar("con horas disponibles, el botón de grabar está activo", !(await page.isDisabled("#recBtn")));
-    await M.ConsultaMedica.create({ medicoPhone: TEL, pacienteId: pac._id, estado: "completado", duracionSegundos: 12 * 3600 });
+    await M.ConsultaMedica.create({ medicoPhone: TEL, pacienteId: pac._id, estado: "completado", duracionSegundos: HORAS_INTERNO * 3600 });
     await page.evaluate(([id, n]) => renderNuevaConsulta(id, n), [String(pac._id), pac.nombre]);
     await page.waitForFunction(() => document.getElementById("recBtn")?.disabled, null, { timeout: 10000 }).catch(() => {});
     verificar("sin horas del mes: se lo dice ANTES de grabar, y no deja empezar",
@@ -286,9 +288,9 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     verificar("  ...y al recargar sigue ahí (/app/estudiar)", (await page.locator(".est-portada").count()) === 1);
     await page.click('.escr-nav-item[data-id="inicio"]');
     await page.waitForSelector("#estAvisoInicio .est-aviso", { timeout: 15000 }).catch(() => {});
-    // A esta altura ya gastó sus 12 horas (sección 3): el aviso es ese.
+    // A esta altura ya gastó todas sus horas (sección 3): el aviso es ese.
     verificar("el inicio de la compu muestra el aviso del acceso y lo de estudiar (antes no se veía)",
-      /Usaste las 12 horas/.test(await page.innerText("#estAvisoInicio").catch(() => "")) && (await page.locator("#estAvisoInicio #estIrEstudiar").count()) === 1);
+      (await page.innerText("#estAvisoInicio").catch(() => "")).includes(`Usaste las ${HORAS_INTERNO} horas`) && (await page.locator("#estAvisoInicio #estIrEstudiar").count()) === 1);
     verificar("  ...y no ofrece la agenda", !(await page.locator("#escrBtnIrAgenda").count()));
     await captura("estudio_inicio_compu.png");
     await page.evaluate(() => renderSeguridad());

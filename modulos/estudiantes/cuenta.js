@@ -37,10 +37,18 @@
 const { ConsultaMedica } = require("../../db/models");
 
 // Lo que trae cada nivel si el código no dice otra cosa.
+//
+// Las horas salen del costo. Una hora de consulta grabada cuesta unos
+// US$ 1,25 (octubre de 2026): la vista previa en vivo (AssemblyAI en tiempo
+// real con modo médico, US$ 0,60), la transcripción final (US$ 0,43) y la IA
+// de la nota, la nota en vivo y el tutor (unos US$ 0,20). Con estas horas, ni
+// el que usa todo el mes deja pérdida, aun pagando impuestos; antes eran 6,
+// 12 y 25 h, y con esas un estudiante que usaba todo costaba más de lo que
+// pagaba. El paciente virtual y los simulacros son centavos.
 const NIVELES = {
-  estudiante: { horasMes: 6, pacientesMes: 20, simulacrosMes: 30, precio: { BOB: 4900, BRL: 2900 } },
-  interno: { horasMes: 12, pacientesMes: 30, simulacrosMes: 45, precio: { BOB: 8900, BRL: 4900 } },
-  residente: { horasMes: 25, pacientesMes: 40, simulacrosMes: 60, precio: { BOB: 17900, BRL: 9900 } },
+  estudiante: { horasMes: 3, pacientesMes: 20, simulacrosMes: 30, precio: { BOB: 4900, BRL: 2900 } },
+  interno: { horasMes: 6, pacientesMes: 30, simulacrosMes: 45, precio: { BOB: 8900, BRL: 4900 } },
+  residente: { horasMes: 12, pacientesMes: 40, simulacrosMes: 60, precio: { BOB: 17900, BRL: 9900 } },
 };
 
 // Sin letras que se confunden al dictarlas o copiarlas (0/O, 1/I/L).
