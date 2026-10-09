@@ -64,6 +64,15 @@ async function esperarEstudio(ruta, campo, marca, terminados, maxMs = 5 * 60 * 1
   return { estado: "error" };
 }
 
+// La clave de un pedido que no puede pasar dos veces (empezar una práctica o
+// un simulacro, una pregunta al paciente virtual). Si se corta la conexión y
+// se repite con la misma clave, el servidor devuelve lo que ya hizo en vez
+// de gastar otra vez.
+function claveDePedido() {
+  if (window.crypto?.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+}
+
 const nombreArea = (area) => t("estudio.area." + area);
 
 // Para elegir una opción de una lista corta (área, dificultad, modo).

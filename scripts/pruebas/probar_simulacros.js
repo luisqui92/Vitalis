@@ -9,7 +9,10 @@
 //   · práctica (la respuesta enseguida) y examen (con tiempo, al final);
 //   · que las erradas pasan a sus tarjetas de repaso;
 //   · «está mal» de dos estudiantes saca la pregunta del banco;
-//   · el cupo, el acceso vencido, y que solo es de estudiantes.
+//   · el cupo, el acceso vencido, y que solo es de estudiantes;
+//   · lo del informe de QA del 9 de octubre de 2026: dos «empezar» a la vez
+//     con un solo cupo (E03), y un examen cuyo cierre falla a la mitad: el
+//     reintento completa las tarjetas sin contar dos veces (E07).
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
 const path = require("path");
@@ -123,7 +126,7 @@ axios.post = async (_url, cuerpo) => {
   const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
-  for (const modelo of [M.TarjetaEstudio, M.RachaEstudio]) await modelo.syncIndexes();
+  for (const modelo of [M.TarjetaEstudio, M.RachaEstudio, M.Candado, M.Simulacro]) await modelo.syncIndexes();
 
   console.log("\n── 2. Generar y verificar ──");
   modo.generar = "sucio";
@@ -294,6 +297,86 @@ axios.post = async (_url, cuerpo) => {
   modo.generar = "ok";
   r = await P("GET", "/medico/simulacros/no-es-un-id", tkA);
   verificar("un id inventado → 404", r.estado === 404);
+
+  console.log("\n── 9. A la vez, repetido y a medio cerrar (informe de QA del 9 de octubre de 2026) ──");
+  await est("59170095004"); await est("59170095005");
+  const [tkD, tkE] = ["59170095004", "59170095005"].map(tk);
+  // Repetir «empezar» con la misma clave: el mismo simulacro.
+  const CLAVE = "simulacro-de-prueba-0001";
+  const r1 = await P("POST", "/medico/simulacros", tkE, { area: "pediatria", cantidad: 10, modo: "practica", clave: CLAVE });
+  const r2 = await P("POST", "/medico/simulacros", tkE, { area: "pediatria", cantidad: 10, modo: "practica", clave: CLAVE });
+  verificar("repetir «empezar» con la misma clave → el mismo simulacro, un solo cupo",
+    r1.estado === 200 && r2.estado === 200 && String(r1.cuerpo.simulacro._id) === String(r2.cuerpo.simulacro._id)
+    && (await M.Simulacro.countDocuments({ medicoPhone: "59170095005" })) === 1);
+  // E03. Con 44 de 45: lo de adentro, lento a propósito.
+  await M.Simulacro.insertMany(Array.from({ length: 44 }, () => ({ medicoPhone: "59170095004", area: "clinica", cantidad: 10, estado: "terminado" })));
+  const cupoDe = sim.cupoDe;
+  sim.cupoDe = async (...a) => { await esperar(300); return cupoDe(...a); };
+  const juntos = await Promise.all([1, 2].map(() => P("POST", "/medico/simulacros", tkD, { area: "pediatria", cantidad: 10, modo: "practica" })));
+  sim.cupoDe = cupoDe;
+  const deD = await M.Simulacro.countDocuments({ medicoPhone: "59170095004" });
+  verificar(`E03: con 44 de 45 y dos «empezar» a la vez → uno empieza y el otro espera (409); quedan 45, no 46 (${deD})`,
+    juntos.filter(x => x.estado === 200).length === 1 && juntos.some(x => x.estado === 409 && /Esperá/.test(x.cuerpo?.error || "")) && deD === 45);
+
+  // E07. Un examen: acierta la primera, erra la segunda, el resto sin contestar.
+  r = await P("POST", "/medico/simulacros", tkE, { area: "pediatria", cantidad: 10, modo: "examen" });
+  s = await hastaQueEste(r.cuerpo.simulacro._id, tkE, ["listo", "error"]);
+  const okE0 = await correctaDe(s.preguntas[0].preguntaId);
+  const okE1 = await correctaDe(s.preguntas[1].preguntaId);
+  await P("POST", `/medico/simulacros/${s._id}/responder`, tkE, { indice: 0, opcion: okE0 });
+  await P("POST", `/medico/simulacros/${s._id}/responder`, tkE, { indice: 1, opcion: (okE1 + 1) % 5 });
+  const vistasAntes = new Map((await M.PreguntaSimulacro.find({ _id: { $in: s.preguntas.map(p => p.preguntaId) } }).lean()).map(p => [String(p._id), p.vistas]));
+  // La base falla al guardar la cuarta tarjeta, una sola vez.
+  const updateOne = M.TarjetaEstudio.updateOne;
+  let tarjetasGuardadas = 0;
+  M.TarjetaEstudio.updateOne = function (...a) {
+    if (++tarjetasGuardadas === 4) return Promise.reject(new Error("la base no contestó"));
+    return updateOne.apply(this, a);
+  };
+  r = await P("POST", `/medico/simulacros/${s._id}/terminar`, tkE);
+  M.TarjetaEstudio.updateOne = updateOne;
+  let guardado = await M.Simulacro.findById(s._id).lean();
+  const tarjetasE = () => M.TarjetaEstudio.countDocuments({ medicoPhone: "59170095005", tipo: "pregunta" });
+  verificar("E07: si la base falla a mitad del cierre → error, el examen queda terminado y anotado como pendiente",
+    r.estado === 500 && guardado.estado === "terminado" && guardado.cierrePendiente === true && (await tarjetasE()) === 3);
+  r = await P("POST", `/medico/simulacros/${s._id}/terminar`, tkE);
+  guardado = await M.Simulacro.findById(s._id).lean();
+  const vistasDespues = new Map((await M.PreguntaSimulacro.find({ _id: { $in: s.preguntas.map(p => p.preguntaId) } }).lean()).map(p => [String(p._id), p.vistas]));
+  const contadas = s.preguntas.map(p => vistasDespues.get(String(p.preguntaId)) - vistasAntes.get(String(p.preguntaId)));
+  verificar("  ...terminar otra vez lo completa: las 9 tarjetas (erradas y sin contestar), sin repetir ninguna",
+    r.estado === 200 && r.cuerpo.simulacro.aciertos === 1 && (await tarjetasE()) === 9 && guardado.cierrePendiente === false);
+  verificar(`  ...y las estadísticas se contaron una sola vez (las dos contestadas: +1; las otras: 0) [${contadas.join(",")}]`,
+    contadas[0] === 1 && contadas[1] === 1 && contadas.slice(2).every(x => x === 0));
+  // Otra vez, pero el estudiante no vuelve a tocar «terminar»: abre sus simulacros.
+  r = await P("POST", "/medico/simulacros", tkE, { area: "pediatria", cantidad: 10, modo: "examen" });
+  s = await hastaQueEste(r.cuerpo.simulacro._id, tkE, ["listo", "error"]);
+  const antesSegundo = await tarjetasE();
+  M.TarjetaEstudio.updateOne = () => Promise.reject(new Error("la base no contestó"));
+  r = await P("POST", `/medico/simulacros/${s._id}/terminar`, tkE);
+  M.TarjetaEstudio.updateOne = updateOne;
+  verificar("  ...un segundo examen que falla al cerrar no crea ninguna tarjeta todavía", r.estado === 500 && (await tarjetasE()) === antesSegundo);
+  r = await P("GET", "/medico/simulacros", tkE);
+  verificar("  ...y abrir la lista de simulacros completa lo pendiente: sus 10 tarjetas", r.estado === 200
+    && (await tarjetasE()) === antesSegundo + 10 && (await M.Simulacro.findById(s._id).lean()).cierrePendiente === false);
+  r = await P("POST", "/medico/simulacros", tkE, { area: "pediatria", cantidad: 10, modo: "examen" });
+  s = await hastaQueEste(r.cuerpo.simulacro._id, tkE, ["listo", "error"]);
+  const antesTercero = await tarjetasE();
+  M.TarjetaEstudio.updateOne = () => Promise.reject(new Error("la base no contestó"));
+  await P("POST", `/medico/simulacros/${s._id}/terminar`, tkE);
+  M.TarjetaEstudio.updateOne = updateOne;
+  r = await P("GET", `/medico/simulacros/${s._id}`, tkE);
+  verificar("  ...lo mismo al abrir ese examen", r.estado === 200 && r.cuerpo.simulacro.estado === "terminado"
+    && (await tarjetasE()) === antesTercero + 10 && (await M.Simulacro.findById(s._id).lean()).cierrePendiente === false);
+  // Un examen terminado antes de este cambio no tiene la marca: no hay nada que completar.
+  const yaEnTarjetas = await M.TarjetaEstudio.distinct("preguntaId", { medicoPhone: "59170095005" });
+  const otra = await M.PreguntaSimulacro.findOne({ _id: { $nin: yaEnTarjetas } }).lean();
+  const viejo = await M.Simulacro.collection.insertOne({ medicoPhone: "59170095005", area: otra.area, modo: "examen", cantidad: 1, estado: "terminado",
+    preguntas: [{ preguntaId: otra._id, elegida: null, acerto: null }], createdAt: new Date(), updatedAt: new Date() });
+  const antesViejo = await tarjetasE();
+  r = await P("GET", "/medico/simulacros", tkE);
+  r = await P("GET", `/medico/simulacros/${viejo.insertedId}`, tkE);
+  verificar("un examen de antes de esto (sin la marca) no se toca al abrirlo", r.estado === 200 && (await tarjetasE()) === antesViejo
+    && !("cierrePendiente" in await M.Simulacro.collection.findOne({ _id: viejo.insertedId })));
 
   servidor.close();
   await mongoose.disconnect();

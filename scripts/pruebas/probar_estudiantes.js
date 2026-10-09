@@ -67,12 +67,12 @@ function textoPdf(buf) {
 }
 
 (async () => {
-  const { rutaBloqueada } = require(path.join(RAIZ, "modulos", "estudiantes", "restricciones"));
+  const { rutaBloqueada, gastaIA } = require(path.join(RAIZ, "modulos", "estudiantes", "restricciones"));
   const { normalizarCodigo, generarCodigo } = require(path.join(RAIZ, "modulos", "estudiantes", "cuenta"));
   console.log("── 1. Las reglas ──");
   verificar("un código se escribe como venga: «est ab12cd» → «EST-AB12CD»", normalizarCodigo("est ab12cd") === "EST-AB12CD" && normalizarCodigo("AB12CD") === "EST-AB12CD");
   verificar("los códigos no usan letras que se confunden (0, O, 1, I, L)", Array.from({ length: 50 }, generarCodigo).every(c => /^EST-[A-HJKMNP-Z2-9]{6}$/.test(c)));
-  verificar("recetar está bloqueado", rutaBloqueada("POST", "/medico/pacientes/abc/recetas") && rutaBloqueada("POST", "/medico/recetas/x/enviar"));
+  verificar("recetar está bloqueado", rutaBloqueada("POST", "/medico/pacientes/abc/recetas") && rutaBloqueada("DELETE", "/medico/recetas/x"));
   verificar("ver su agenda (vacía) no, crear un turno sí", !rutaBloqueada("GET", "/medico/citas") && rutaBloqueada("POST", "/medico/citas"));
   verificar("Memed y la teleconsulta, ni para leer", rutaBloqueada("GET", "/medico/pacientes/abc/memed/sesion") && rutaBloqueada("GET", "/medico/teleconsultas"));
   verificar("reconsulta por WhatsApp, llave del paciente, informes enviados: bloqueados",
@@ -80,6 +80,32 @@ function textoPdf(buf) {
   verificar("grabar, sus pacientes y su nota: abiertos",
     !rutaBloqueada("POST", "/medico/consultas") && !rutaBloqueada("POST", "/medico/pacientes") && !rutaBloqueada("POST", "/medico/consultas/x/confirmar")
     && !rutaBloqueada("GET", "/medico/pacientes/x/kardex.pdf") && !rutaBloqueada("POST", "/medico/pacientes/x/medicamentos"));
+  // Informe de QA del 9 de octubre de 2026 (E01): Express no distingue
+  // mayúsculas y acepta una barra al final; el freno tiene que comparar igual.
+  const variantes = [["POST", "/MEDICO/pacientes/p/recetas"], ["POST", "/medico/PACIENTES/p/RECETAS"], ["POST", "/Medico/citas"],
+    ["POST", "/medico/citas/"], ["POST", "/medico/informes/i/enviar/"], ["POST", "/medico/informes-familia/i/enviar/"], ["POST", "/MEDICO/HORARIO"]];
+  verificar("con mayúsculas o con una barra al final, igual de bloqueado", variantes.every(([m, r]) => rutaBloqueada(m, r)));
+  // E02: firmar un informe genera su enlace público; el membrete es el
+  // nombre y la matrícula que salen impresos.
+  verificar("firmar, crear o editar un informe, y el membrete: bloqueados",
+    rutaBloqueada("POST", "/medico/informes/i/firmar") && rutaBloqueada("POST", "/medico/pacientes/p/informes") && rutaBloqueada("PATCH", "/medico/informes/i")
+    && rutaBloqueada("PATCH", "/medico/membrete") && rutaBloqueada("POST", "/medico/pacientes/p/informes-familia"));
+  verificar("compartir con otra cuenta o el inventario de la clínica: bloqueados",
+    rutaBloqueada("POST", "/medico/pacientes/p/persona") && rutaBloqueada("PATCH", "/medico/personas/x/alergias") && rutaBloqueada("POST", "/medico/pacientes/p/equipo")
+    && rutaBloqueada("POST", "/medico/insumos/x/movimientos") && rutaBloqueada("POST", "/medico/catalogo-tratamientos"));
+  verificar("una ruta que no existe hoy nace cerrada para escribir", rutaBloqueada("POST", "/medico/algo-nuevo") && rutaBloqueada("DELETE", "/medico/pacientes/p"));
+  verificar("lo suyo sí: su cuenta, sus fichas y lo de estudiar",
+    !rutaBloqueada("PATCH", "/medico/idioma") && !rutaBloqueada("POST", "/medico/perfil/foto") && !rutaBloqueada("POST", "/medico/push/suscribir")
+    && !rutaBloqueada("POST", "/medico/vinculacion/comando") && !rutaBloqueada("PATCH", "/medico/pacientes/p")
+    && !rutaBloqueada("POST", "/medico/pacientes-virtuales/x/mensajes") && !rutaBloqueada("POST", "/MEDICO/Simulacros/x/responder/"));
+  // E05: lo que gasta IA va marcado, y con el acceso vencido no pasa.
+  verificar("gastan IA: la ayuda, preguntarle a la historia, grabar, el razonamiento, el paciente virtual y empezar un simulacro",
+    [["POST", "/medico/asistente"], ["POST", "/medico/pacientes/x/preguntar"], ["POST", "/medico/consultas"], ["POST", "/medico/consultas/nota-en-vivo"],
+      ["POST", "/medico/consultas/x/razonamiento"], ["POST", "/medico/pacientes-virtuales"], ["POST", "/MEDICO/pacientes-virtuales/x/mensajes/"],
+      ["POST", "/medico/pacientes-virtuales/x/terminar"], ["POST", "/medico/simulacros"]].every(([m, r]) => gastaIA(m, r)));
+  verificar("  ...no: leer, confirmar la nota, contestar un simulacro, reportar",
+    [["GET", "/medico/pacientes-virtuales/x"], ["POST", "/medico/consultas/x/confirmar"], ["POST", "/medico/consultas/x/nota/regenerar"],
+      ["POST", "/medico/simulacros/x/responder"], ["POST", "/medico/simulacros/x/terminar"], ["POST", "/medico/pacientes-virtuales/x/reportar"]].every(([m, r]) => !gastaIA(m, r)));
 
   let MongoMemoryServer;
   for (const m of ["mongodb-memory-server", path.join(RAIZ, "node_modules", "mongodb-memory-server")]) {
@@ -224,6 +250,16 @@ function textoPdf(buf) {
   verificar("acceso vencido → no graba, y le dice que pida la renovación", r.estado === 402 && /venció/.test(r.cuerpo?.error || ""));
   r = await P("GET", "/medico/consultas", tkEst);
   verificar("  ...pero sus casos los sigue viendo", r.estado === 200);
+  // E05: tampoco le pregunta nada a la IA (estas rutas ni están montadas
+  // acá: el freno va antes que cualquier ruta).
+  const conIA = [["POST", "/medico/asistente"], ["POST", `/medico/pacientes/${pac._id}/preguntar`], ["POST", "/medico/consultas/nota-en-vivo"]];
+  const vencidas = await Promise.all(conIA.map(([m, ruta]) => P(m, ruta, tkEst, {})));
+  verificar("  ...ni le pregunta a la IA: la ayuda, la historia de un paciente, la nota en vivo → 402, «venció»",
+    vencidas.every(x => x.estado === 402 && x.cuerpo?.vencido === true && /venció/.test(x.cuerpo.error)));
+  r = await P("POST", `/medico/consultas/${c1._id}/confirmar`, tkEst, { nota: { motivoConsulta: "Faringitis" } });
+  verificar("  ...lo que ya subió lo termina: confirmar su nota no es 402", r.estado !== 402);
+  r = await P("POST", "/medico/asistente", tkMed, {});
+  verificar("  ...y a un médico no lo mira (pasa derecho)", r.estado !== 402 && r.estado !== 403);
   r = await P("POST", "/medico/login", null, { phone: "59170040001", password: "Prueba123." });
   verificar("  ...y puede entrar", r.estado === 200);
 

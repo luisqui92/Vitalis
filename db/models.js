@@ -357,6 +357,18 @@ const medicoSchema = new mongoose.Schema({
     secretoPendiente: { type: String, default: "" },
   },
 }, { timestamps: true });
+// Una cuenta que viaja como JSON (una respuesta, un log) nunca lleva la
+// contraseña cifrada ni el secreto del segundo factor. Pasó: guardar el
+// horario devolvía la cuenta entera al navegador (informe de QA del 9 de
+// octubre de 2026). Esto es la red: cada ruta igual tiene que elegir qué
+// devuelve. No toca lo que se guarda ni lo que lee el código.
+medicoSchema.set("toJSON", {
+  transform(_doc, ret) {
+    delete ret.passwordHash;
+    if (ret.dosFA) { delete ret.dosFA.secreto; delete ret.dosFA.secretoPendiente; }
+    return ret;
+  },
+});
 const Medico = mongoose.model("Medico", medicoSchema);
 
 // Paciente: la entidad central del Kardex. Todo lo demás (consultas,

@@ -365,6 +365,31 @@ async function cupoDe(medico, ahora = new Date()) {
   return { usados, limite, quedan: Math.max(0, limite - usados) };
 }
 
+// ─── LOS TURNOS DE LA CONVERSACIÓN ─────────────────────────────────────────
+
+// Cuántos mensajes mandó el estudiante (el tope es MAX_MENSAJES).
+const preguntasDe = (sim) => (sim.mensajes || []).filter(m => m.rol === "estudiante").length;
+
+// Para guardar un turno solo si todavía hay lugar: el mismo tope, mirado por
+// la base en el momento de escribir.
+function filtroConLugar() {
+  return { $expr: { $lt: [
+    { $size: { $filter: { input: { $ifNull: ["$mensajes", []] }, cond: { $eq: ["$$this.rol", "estudiante"] } } } },
+    MAX_MENSAJES,
+  ] } };
+}
+
+// El turno que ya se guardó con esta clave (lo que preguntó y lo que le
+// contestaron), o null.
+function turnoGuardado(sim, clave) {
+  const mensajes = sim.mensajes || [];
+  const i = mensajes.findIndex(m => m.rol === "estudiante" && m.clave === clave);
+  return i >= 0 && mensajes[i + 1] ? [mensajes[i], mensajes[i + 1]] : null;
+}
+
+// La clave es del servidor: la pantalla no la necesita de vuelta.
+const sinClave = ({ clave, ...m }) => m;
+
 // Lo que se puede mostrar. Mientras dura, nada del guion más que quién es el
 // paciente: el resto se ve al terminar.
 function vista(sim) {
@@ -373,8 +398,8 @@ function vista(sim) {
     _id: sim._id, estado: sim.estado, area: sim.area, dificultad: sim.dificultad,
     createdAt: sim.createdAt, terminadaEn: sim.terminadaEn || null,
     paciente: g.paciente || null, quienHabla: g.quienHabla || "", lugar: g.lugar || "",
-    mensajes: sim.mensajes || [],
-    preguntasHechas: (sim.mensajes || []).filter(m => m.rol === "estudiante").length,
+    mensajes: (sim.mensajes || []).map(sinClave),
+    preguntasHechas: preguntasDe(sim),
     maxMensajes: MAX_MENSAJES, minPreguntas: MIN_PREGUNTAS,
   };
   if (sim.estado !== "terminada") return base;
@@ -423,5 +448,5 @@ module.exports = {
   AREAS, DIFICULTADES, MAX_MENSAJES, MAX_TEXTO, MIN_PREGUNTAS, MAX_CASOS_NUEVOS_DIA,
   sanearGuion, guionDelPaciente, casoSinRespuesta, resolverAciegas, generarCaso, tomarDelBanco, prepararSimulacion,
   promptPaciente, responderComoPaciente, pedirHallazgo, sanearEvaluacion, evaluar,
-  cupoDe, vista, obtener, resumenDe, normalizar,
+  cupoDe, preguntasDe, filtroConLugar, turnoGuardado, sinClave, vista, obtener, resumenDe, normalizar,
 };

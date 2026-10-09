@@ -11,6 +11,7 @@ const SIM_MODOS = ["practica", "examen"];
 // El simulacro abierto: la vista que mandó el servidor y por qué pregunta va.
 let SIM = null;
 let SIM_ELECCION = { area: "mixto", cantidad: 20, modo: "practica" };
+let SIM_CLAVE = null;   // como PV_CLAVE (estudiantesPacienteVirtual.js)
 
 // ─── EL INICIO ─────────────────────────────────────────────────────────────
 
@@ -59,10 +60,12 @@ function pintarInicioSim(d) {
     <div class="hint est-aviso-ia">📝 ${t("sim.aviso")}</div>`;
   engancharVolverEstudio();
   engancharPestanasEstudio();
-  engancharChips("simAreas", v => { SIM_ELECCION.area = v; });
-  engancharChips("simCantidades", v => { SIM_ELECCION.cantidad = Number(v); });
+  SIM_CLAVE = claveDePedido();
+  engancharChips("simAreas", v => { SIM_ELECCION.area = v; SIM_CLAVE = claveDePedido(); });
+  engancharChips("simCantidades", v => { SIM_ELECCION.cantidad = Number(v); SIM_CLAVE = claveDePedido(); });
   engancharChips("simModos", v => {
     SIM_ELECCION.modo = v;
+    SIM_CLAVE = claveDePedido();
     document.getElementById("simModoAyuda").textContent = t("sim.modoAyuda." + v);
   });
   if (abierto) document.getElementById("simSeguir").onclick = () => abrirSimulacro(String(abierto._id));
@@ -103,7 +106,7 @@ async function empezarSim() {
   btn.disabled = true;
   try {
     const d = await api("/medico/simulacros", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(SIM_ELECCION),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...SIM_ELECCION, clave: SIM_CLAVE }),
     });
     seguirSimulacro(d.simulacro);
   } catch (e) {

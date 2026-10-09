@@ -165,6 +165,13 @@ Extensiones.agregar("consulta.nota", (c) => (c?.deEstudiante ? marcaNotaEstudian
 Extensiones.agregar("panel.aviso", () => (esCuentaEstudiante()
   ? { html: huecoAvisoEstudianteHtml(), alPintar: pintarAvisoEstudiante } : ""));
 
+// La ficha del paciente, sin Recetas ni Informes: no receta, y no firma ni
+// emite informes (el servidor lo frena igual).
+const PESTANAS_SIN_ESTUDIANTE = ["recetas", "informes"];
+Extensiones.agregar("kardex.pestanas", (pestanas) => (esCuentaEstudiante()
+  ? Object.fromEntries(Object.entries(pestanas).filter(([clave]) => !PESTANAS_SIN_ESTUDIANTE.includes(clave)))
+  : pestanas));
+
 // El menú de la compu: sus casos, grabar, estudiar y su configuración.
 // Agenda, indicaciones, estudios, reportes y finanzas son de un consultorio.
 const MENU_ESTUDIANTE = ["inicio", "pacientes", "voz", "estudiar", "configuracion"];

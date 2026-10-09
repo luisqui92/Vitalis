@@ -54,6 +54,8 @@ const Extensiones = (() => {
     "grabar": "revision",
     // Los ítems del menú de la compu (escritorio.js).
     "escritorio.menu": "filtro",
+    // Las pestañas de la ficha del paciente (pacientes.js).
+    "kardex.pestanas": "filtro",
   };
   const PERMISOS = [
     "agenda",            // dar turnos

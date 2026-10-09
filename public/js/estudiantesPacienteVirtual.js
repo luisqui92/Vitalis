@@ -19,6 +19,9 @@ const PV_MOTIVOS_REPORTE = ["incoherente", "paciente", "evaluacion"];
 let PV = null;
 let PV_DICTADO = null;
 let PV_ELECCION = { area: "cualquiera", dificultad: "intermedio" };
+// La clave de «empezar» (claveDePedido): la misma mientras no cambie lo que
+// eligió, para que tocar otra vez después de un corte no gaste otro cupo.
+let PV_CLAVE = null;
 
 const pvVozActiva = () => { try { return localStorage.getItem("pv_voz") === "1"; } catch { return false; } };
 function pvFijarVoz(si) { try { localStorage.setItem("pv_voz", si ? "1" : "0"); } catch { /* sin almacenamiento */ } }
@@ -74,9 +77,11 @@ function pintarInicioPV(d) {
     <div class="hint est-aviso-ia">🎓 ${t("pv.aviso")}</div>`;
   engancharVolverEstudio();
   engancharPestanasEstudio();
-  engancharChips("pvAreas", v => { PV_ELECCION.area = v; });
+  PV_CLAVE = claveDePedido();
+  engancharChips("pvAreas", v => { PV_ELECCION.area = v; PV_CLAVE = claveDePedido(); });
   engancharChips("pvDificultades", v => {
     PV_ELECCION.dificultad = v;
+    PV_CLAVE = claveDePedido();
     document.getElementById("pvDificultadAyuda").textContent = t("pv.dificultadAyuda." + v);
   });
   if (abierta) document.getElementById("pvSeguir").onclick = () => abrirPracticaPV(String(abierta._id));
@@ -103,7 +108,7 @@ async function empezarPV() {
   try {
     const d = await api("/medico/pacientes-virtuales", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(PV_ELECCION),
+      body: JSON.stringify({ ...PV_ELECCION, clave: PV_CLAVE }),
     });
     seguirPracticaPV(d.simulacion);
   } catch (e) {
@@ -165,7 +170,8 @@ function burbujaPV(m) {
 const pvDictadoDisponible = () => Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 function pintarChatPV(sim) {
-  PV = { sim, enviando: false };
+  // fallida: el último pedido que no llegó, para reintentarlo con su clave.
+  PV = { sim, enviando: false, fallida: null };
   const p = sim.paciente || {};
   const quienHabla = /madre|padre|m[aã]e|pai/i.test(sim.quienHabla || "") ? sim.quienHabla : "";
   app.innerHTML = `
@@ -238,11 +244,16 @@ async function enviarPV(tipo, texto, input) {
   pvAlFinal();
   const botones = document.querySelectorAll("#pvChat button, #pvTexto");
   botones.forEach(b => { b.disabled = true; });
+  // Lo mismo que no llegó recién va con la misma clave: si el servidor ya lo
+  // había contestado, devuelve esa respuesta y no se pregunta dos veces.
+  const fallida = PV.fallida;
+  const clave = fallida && fallida.tipo === tipo && fallida.texto === texto ? fallida.clave : claveDePedido();
   try {
     const r = await api(`/medico/pacientes-virtuales/${PV.sim._id}/mensajes`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo, texto }),
+      body: JSON.stringify({ tipo, texto, clave }),
     });
+    if (PV) PV.fallida = null;
     if (!document.getElementById("pvMensajes")) return;
     nodos[1].outerHTML = burbujaPV(r.mensajes[1]);
     PV.sim.mensajes.push(...r.mensajes);
@@ -253,6 +264,7 @@ async function enviarPV(tipo, texto, input) {
     pvAlFinal();
   } catch (e) {
     if (e.status === 401) return logout();
+    if (PV) PV.fallida = { tipo, texto, clave };
     nodos.forEach(n => n.remove());
     if (input && tipo === "pregunta") input.value = texto;   // para reintentar sin volver a escribir
     if (document.getElementById("pvErr")) document.getElementById("pvErr").innerHTML = `<div class="error">${esc(e.error || t("pv.error"))}</div>`;

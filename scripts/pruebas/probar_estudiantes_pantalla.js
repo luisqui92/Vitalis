@@ -88,6 +88,15 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     const page = await ctx.newPage();
     const errores = [];
     page.on("pageerror", (e) => errores.push(e.message));
+    // Ninguna pantalla del estudiante puede chocar con el freno de estudiantes:
+    // si choca, es un botón que se le muestra y no puede usar, o una ruta que
+    // falta en la lista de lo permitido (modulos/estudiantes/restricciones.js).
+    const frenados = [];
+    page.on("response", async (r) => {
+      if (r.status() !== 403) return;
+      const cuerpo = await r.json().catch(() => null);
+      if (cuerpo?.estudiante) frenados.push(r.request().method() + " " + new URL(r.url()).pathname);
+    });
 
     console.log("── 1. Entrar con el código, desde el login ──");
     await page.goto(`http://127.0.0.1:${PUERTO}/app`);
@@ -116,6 +125,15 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     await page.evaluate((id) => renderPacienteDetalle(id), String(pac._id));
     await page.waitForSelector("#btnNuevaConsulta", { timeout: 15000 });
     verificar("la ficha del paciente, sin teleconsulta ni compartir con el paciente", !(await page.locator(".kardex-mas").count()));
+    // Recetas e Informes no están: no receta, y no firma ni emite informes.
+    const pestanas = await page.$$eval("[data-tab]", (xs) => xs.map(x => x.getAttribute("data-tab")));
+    verificar(`la ficha sin Recetas ni Informes (${pestanas.join(", ")})`, !pestanas.includes("recetas") && !pestanas.includes("informes") && pestanas.includes("consultas"));
+    // Y todas las que sí tiene se abren (cada una pide lo suyo al servidor).
+    for (const tab of pestanas) {
+      await page.click(`[data-tab="${tab}"]`);
+      await esperar(400);
+    }
+    verificar("  ...y cada una de las demás se abre", (await page.locator("#tabContent").count()) === 1);
     await page.evaluate((id) => renderDetalle(id), String(c._id));
     await page.waitForSelector("#btnConfirmarConsulta", { timeout: 15000 });
     verificar("la nota lleva la marca «Nota de estudiante: sin validez sin la firma…»", /Nota de estudiante/.test(await page.innerText(".est-marca")));
@@ -281,6 +299,7 @@ const correr = (raiz, args, env) => new Promise((resolve) => {
     await page.evaluate(() => logout());
     verificar("se borra la marca de estudiante del navegador", await page.evaluate(() => localStorage.getItem("salud_estudiante") === null && !esCuentaEstudiante()));
 
+    verificar(`ninguna pantalla del estudiante chocó con el freno de estudiantes${frenados.length ? `: ${frenados.join(", ")}` : ""}`, !frenados.length);
     verificar("sin errores de JavaScript", !errores.length);
     if (errores.length) console.log(errores.join("\n"));
   } catch (e) {

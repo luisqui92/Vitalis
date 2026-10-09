@@ -11,6 +11,7 @@ const { asyncRoute, ErrorHttp } = require("../../../services/httpHelpers");
 const { sinCambios } = require("../../../services/realtime");
 const { estadoDe: estadoDeEstudiante } = require("../cuenta");
 const { zonaDe, MOTIVOS_REPORTE } = require("../estudio");
+const { conCandado, claveDelPedido } = require("../candado");
 const sim = require("../simulacros");
 const { log } = require("../../../config");
 
@@ -31,6 +32,9 @@ module.exports = function (app) {
   // El cupo, cómo le va por área, el que tenga abierto y los últimos.
   app.get("/medico/simulacros", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = soloEstudiantes(req);
+    // Un examen que quedó a medio cerrar se completa acá (simulacros.js).
+    await sim.completarCierresPendientes(medicoPhone, await zonaDe(medicoPhone))
+      .catch(e => log.warn("[SIMULACROS] cierre pendiente:", e.message));
     const medico = await Medico.findOne({ phone: medicoPhone }).select("phone estudiante").lean();
     const [cupo, progreso, abiertos, terminados] = await Promise.all([
       sim.cupoDe(medico),
@@ -47,6 +51,10 @@ module.exports = function (app) {
     });
   }));
 
+  // De a uno por estudiante (candado.js): con dos «empezar» juntos y un solo
+  // cupo, el segundo se entera de que ya hay uno en camino en vez de crear
+  // otro (E03 del informe de QA). Con la clave de la pantalla, repetir el
+  // pedido devuelve el mismo simulacro.
   app.post("/medico/simulacros", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = escritura(req, res);
     const area = String(req.body?.area || "");
@@ -55,24 +63,35 @@ module.exports = function (app) {
     if (area !== "mixto" && !sim.AREAS.includes(area)) throw new ErrorHttp(400, "Elegí un área.");
     if (!sim.CANTIDADES.includes(cantidad)) throw new ErrorHttp(400, "Elegí cuántas preguntas.");
     if (!sim.MODOS.includes(modo)) throw new ErrorHttp(400, "Elegí el modo.");
-    const medico = await Medico.findOne({ phone: medicoPhone }).select("phone idioma estudiante").lean();
-    const estado = await estadoDeEstudiante(medico);
-    if (estado?.vencido) throw new ErrorHttp(402, estado.motivo);
-    const cupo = await sim.cupoDe(medico);
-    if (!cupo.quedan) throw new ErrorHttp(402, `Ya hiciste los ${cupo.limite} simulacros de este mes. El mes que viene se renuevan.`);
-    // Uno abierto a la vez: el que estaba a medias se da por terminado.
-    const viejos = await Simulacro.find({ medicoPhone, estado: "listo" }).select("_id").lean();
-    const zona = await zonaDe(medicoPhone);
-    for (const v of viejos) await sim.terminar(medicoPhone, String(v._id), zona).catch(() => {});
-    await Simulacro.updateMany({ medicoPhone, estado: "preparando" }, { $set: { estado: "error" } });
-    const nuevo = await Simulacro.create({ medicoPhone, idioma: medico.idioma || "es", area, cantidad, modo });
-    sim.prepararSimulacro(nuevo._id).catch(e => log.warn("[SIMULACROS]", e.message));
-    res.json({ simulacro: await sim.vista(nuevo.toObject()) });
+    const clave = claveDelPedido(req);
+    const simulacro = await conCandado(`simulacro:${medicoPhone}`, "Ya estás empezando un simulacro. Esperá un momento.", async () => {
+      const repetido = clave ? await Simulacro.findOne({ medicoPhone, clave }).lean() : null;
+      if (repetido) return repetido;
+      const medico = await Medico.findOne({ phone: medicoPhone }).select("phone idioma estudiante").lean();
+      const estado = await estadoDeEstudiante(medico);
+      if (estado?.vencido) throw new ErrorHttp(402, estado.motivo);
+      const cupo = await sim.cupoDe(medico);
+      if (!cupo.quedan) throw new ErrorHttp(402, `Ya hiciste los ${cupo.limite} simulacros de este mes. El mes que viene se renuevan.`);
+      // Uno abierto a la vez: el que estaba a medias se da por terminado.
+      const viejos = await Simulacro.find({ medicoPhone, estado: "listo" }).select("_id").lean();
+      const zona = await zonaDe(medicoPhone);
+      for (const v of viejos) await sim.terminar(medicoPhone, String(v._id), zona).catch(() => {});
+      await Simulacro.updateMany({ medicoPhone, estado: "preparando" }, { $set: { estado: "error" } });
+      const nuevo = await Simulacro.create({ medicoPhone, idioma: medico.idioma || "es", area, cantidad, modo, ...(clave ? { clave } : {}) });
+      sim.prepararSimulacro(nuevo._id).catch(e => log.warn("[SIMULACROS]", e.message));
+      return nuevo.toObject();
+    });
+    res.json({ simulacro: await sim.vista(simulacro) });
   }));
 
   app.get("/medico/simulacros/:id", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = soloEstudiantes(req);
-    res.json({ simulacro: await sim.vista(await sim.obtener(medicoPhone, req.params.id)) });
+    const s = await sim.obtener(medicoPhone, req.params.id);
+    if (s.cierrePendiente) {
+      await sim.completarCierre(medicoPhone, s._id, await zonaDe(medicoPhone))
+        .catch(e => log.warn("[SIMULACROS] cierre pendiente:", e.message));
+    }
+    res.json({ simulacro: await sim.vista(s) });
   }));
 
   app.post("/medico/simulacros/:id/responder", limitMedico, requireMedico, asyncRoute(async (req, res) => {

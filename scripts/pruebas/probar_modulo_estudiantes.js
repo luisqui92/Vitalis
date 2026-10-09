@@ -107,6 +107,36 @@ console.log("── 1. El servidor: el núcleo no conoce al módulo ──");
   verificar(`  ...y no hay puntos declarados que el núcleo no llame${sinUso.length ? ` (${sinUso.join(", ")})` : ""}`, sinUso.length === 0);
 }
 
+console.log("\n── 1b. Lo que puede un estudiante, ruta por ruta ──");
+{
+  // Las rutas de verdad, leídas del código (routes/, modulos/ e index.js).
+  const fuentes = [...archivosJs("routes"), ...archivosJs("modulos"), "index.js"];
+  const rutas = [];
+  for (const f of fuentes) {
+    for (const m of leer(f).matchAll(/app\.(get|post|put|patch|delete)\(\s*"(\/medico\/[^"]+)"/g)) rutas.push({ metodo: m[1].toUpperCase(), ruta: m[2], f });
+  }
+  const { rutaPermitida, ESCRITURA_PERMITIDA } = require(path.join(RAIZ, "modulos", "estudiantes", "restricciones"));
+  const ejemplo = (r) => r.replace(/:[A-Za-z]+/g, "a1b2c3");
+  const escrituras = rutas.filter(r => r.metodo !== "GET");
+  verificar(`se leyeron ${rutas.length} rutas de médico (${escrituras.length} que escriben)`, rutas.length > 250 && escrituras.length > 150);
+  const abiertas = escrituras.filter(r => rutaPermitida(r.metodo, ejemplo(r.ruta)));
+  const muertas = ESCRITURA_PERMITIDA.filter(([metodos, re]) => !escrituras.some(r => metodos.split(" ").includes(r.metodo) && re.test(ejemplo(r.ruta).toLowerCase())));
+  verificar(`cada entrada de la lista de lo permitido es una ruta que existe${muertas.length ? ` (sobran: ${muertas.map(([m, re]) => m + " " + re).join(", ")})` : ""}`, muertas.length === 0);
+  // Lo que un estudiante no hace nunca, aunque mañana alguien agrande la lista.
+  const NUNCA = /\/(recetas|recetas-opticas|memed|reconsulta|tratamientos-sugeridos|tratamientos|catalogo-tratamientos|insumos|informes|informes-familia|membrete|llave|resumenes|citas|horario|teleconsulta|teleconsultas|recargas|whatsapp|dicom|rayos|equipos|equipo|captura|persona|personas|backups|operador|solicitudes-cuenta|registro)(\/|$)/;
+  const sensibles = abiertas.filter(r => NUNCA.test(r.ruta));
+  verificar(`ninguna escritura sensible abierta (recetas, informes, membrete, turnos, cobros, compartir…)${sensibles.length ? `: ${sensibles.map(r => r.metodo + " " + r.ruta).join(", ")}` : ""}`, sensibles.length === 0);
+  verificar(`  ...y lo abierto es lo de siempre: ${abiertas.length} de ${escrituras.length} escrituras`, abiertas.length >= 70 && abiertas.length <= 100);
+  // E01: con mayúsculas o una barra al final, Express encuentra la misma
+  // ruta; el freno tiene que decidir lo mismo.
+  const distinto = rutas.filter(r => {
+    const base = ejemplo(r.ruta);
+    const dice = rutaPermitida(r.metodo, base);
+    return [base.toUpperCase(), base + "/", base.replace("/medico/", "/Medico/") + "/"].some(v => rutaPermitida(r.metodo, v) !== dice);
+  });
+  verificar(`en las ${rutas.length} rutas, mayúsculas o barra final no cambian la decisión${distinto.length ? `: ${distinto.slice(0, 3).map(r => r.metodo + " " + r.ruta).join(", ")}` : ""}`, distinto.length === 0);
+}
+
 console.log("\n── 2. La pantalla: las del núcleo no conocen al módulo ──");
 {
   const delModulo = archivosJs(path.join("public", "js"), n => n.startsWith("estudiantes"));

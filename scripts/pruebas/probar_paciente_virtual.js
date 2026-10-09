@@ -8,7 +8,11 @@
 //   · que la evaluación se recorta y queda alineada con el guion;
 //   · el banco: un caso bueno lo usa el siguiente estudiante sin gastar, y
 //     nadie ve dos veces el mismo; con dos reportes sale del banco;
-//   · el cupo del mes, el acceso vencido, y que solo es de estudiantes.
+//   · el cupo del mes, el acceso vencido, y que solo es de estudiantes;
+//   · lo del informe de QA del 9 de octubre de 2026: dos «empezar» a la vez
+//     con un solo cupo (E03), dos preguntas a la vez con un solo mensaje
+//     (E04), repetir un pedido con su clave, y la práctica abierta cuando
+//     el acceso vence (E05).
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
 const path = require("path");
@@ -64,7 +68,7 @@ const CASO = {
 const axios = require(path.join(RAIZ, "node_modules", "axios"));
 const llamadas = { caso: 0, resolver: 0, paciente: 0, examen: 0, estudio: 0, evaluar: 0 };
 const pedidos = { paciente: [], examen: [], evaluar: [] };
-const modo = { resolver: "bien", caso: "ok", evaluar: "ok" };
+const modo = { resolver: "bien", caso: "ok", evaluar: "ok", paciente: "ok", demoraPaciente: 0 };
 axios.post = async (_url, cuerpo) => {
   const sistema = cuerpo.messages[0].content;
   const ultimo = cuerpo.messages[cuerpo.messages.length - 1]?.content || "";
@@ -83,6 +87,8 @@ axios.post = async (_url, cuerpo) => {
   }
   if (/Esto es una práctica de entrevista clínica/.test(sistema)) {
     llamadas.paciente++; pedidos.paciente.push(cuerpo);
+    if (modo.demoraPaciente) await esperar(modo.demoraPaciente);
+    if (modo.paciente === "falla") throw new Error("la IA no contestó");
     return textoPlano(`"Sí doctor, ${ultimo.length > 10 ? "me duele" : "no"}."`);
   }
   if (/el estudiante examina al paciente/.test(sistema)) {
@@ -135,7 +141,9 @@ axios.post = async (_url, cuerpo) => {
   const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
-  await M.RachaEstudio.syncIndexes();
+  // Después de vaciar la base, los índices que importan acá: el del candado
+  // es el candado mismo.
+  for (const modelo of [M.RachaEstudio, M.Candado, M.SimulacionPaciente]) await modelo.syncIndexes();
 
   const enSeisMeses = new Date(Date.now() + 180 * 86400000);
   const est = (phone) => M.Medico.create({ phone, nombre: "Est " + phone, passwordHash: "x", activo: true, idioma: "es",
@@ -295,6 +303,96 @@ axios.post = async (_url, cuerpo) => {
   r = await P("POST", "/medico/pacientes-virtuales", tkA, { area: "gineco", dificultad: "avanzado" });
   s = await hastaQueEste(r.cuerpo.simulacion._id, tkA, ["en_curso", "error"]);
   verificar(`con ${pv.MAX_CASOS_NUEVOS_DIA} casos nuevos en el día (entre todos) no se generan más: tope de gasto`, s?.estado === "error" && llamadas.caso === antesTope);
+
+  console.log("\n── 9. A la vez, repetido y vencido (informe de QA del 9 de octubre de 2026) ──");
+  await est("59170090004"); await est("59170090005");
+  const [tkD, tkE] = ["59170090004", "59170090005"].map(tk);
+  // Repetir «empezar» con la misma clave (se cortó la conexión): la misma práctica.
+  const CLAVE_EMPEZAR = "empezar-de-prueba-0001";
+  const r1 = await P("POST", "/medico/pacientes-virtuales", tkE, { area: "clinica", dificultad: "basico", clave: CLAVE_EMPEZAR });
+  const r2 = await P("POST", "/medico/pacientes-virtuales", tkE, { area: "clinica", dificultad: "basico", clave: CLAVE_EMPEZAR });
+  const deE = await M.SimulacionPaciente.find({ medicoPhone: "59170090005" }).lean();
+  verificar("repetir «empezar» con la misma clave → la misma práctica: un solo cupo, y no se abandona a sí misma",
+    r1.estado === 200 && r2.estado === 200 && String(r2.cuerpo.simulacion._id) === String(r1.cuerpo.simulacion._id)
+    && deE.length === 1 && deE[0].estado !== "abandonada");
+  // El candado: uno tomado frena; uno vencido (el servidor se cayó con él puesto) se toma.
+  await M.Candado.updateOne({ clave: "pv:59170090005" }, { $set: { hasta: new Date(Date.now() + 60000), dueno: "otro pedido" } }, { upsert: true });
+  r = await P("POST", "/medico/pacientes-virtuales", tkE, { area: "clinica", dificultad: "basico" });
+  verificar("con otro «empezar» en curso → 409, «esperá un momento»", r.estado === 409 && /Esperá/.test(r.cuerpo?.error || ""));
+  await M.Candado.updateOne({ clave: "pv:59170090005" }, { $set: { hasta: new Date(Date.now() - 1000) } });
+  r = await P("POST", "/medico/pacientes-virtuales", tkE, { area: "clinica", dificultad: "basico" });
+  verificar("  ...y si ese quedó colgado (venció su candado) → se puede empezar", r.estado === 200);
+
+  // E03. Con 29 de 30: lo de adentro se hace lento a propósito, para que los
+  // dos pedidos se crucen seguro.
+  await M.SimulacionPaciente.insertMany(Array.from({ length: 29 }, () => ({ medicoPhone: "59170090004", area: "clinica", dificultad: "basico", estado: "terminada" })));
+  const cupoDe = pv.cupoDe;
+  pv.cupoDe = async (...a) => { await esperar(300); return cupoDe(...a); };
+  const juntos = await Promise.all([1, 2].map(() => P("POST", "/medico/pacientes-virtuales", tkD, { area: "cirugia", dificultad: "intermedio" })));
+  pv.cupoDe = cupoDe;
+  // Todas, aunque la nueva no llegue a prepararse: lo que se mide es cuántas se crearon.
+  const usadosD = await M.SimulacionPaciente.countDocuments({ medicoPhone: "59170090004" });
+  verificar(`E03: con 29 de 30 y dos «empezar» a la vez → uno empieza y el otro espera (409); quedan 30, no 31 (${usadosD})`,
+    juntos.filter(x => x.estado === 200).length === 1 && juntos.some(x => x.estado === 409) && usadosD === 30);
+
+  // E04. Con 79 de 80: el paciente tarda en contestar, a propósito.
+  const charla = [];
+  for (let i = 0; i < 79; i++) charla.push({ rol: "estudiante", tipo: "pregunta", texto: `Pregunta ${i}`, en: new Date() }, { rol: "paciente", tipo: "pregunta", texto: "Sí.", en: new Date() });
+  const llena = await M.SimulacionPaciente.create({ medicoPhone: "59170090004", area: "cirugia", dificultad: "intermedio", estado: "en_curso", guion: g, mensajes: charla });
+  modo.demoraPaciente = 300;
+  const antesDos = llamadas.paciente;
+  const dos = await Promise.all(["¿Fuma?", "¿Toma alcohol?"].map(q => P("POST", `/medico/pacientes-virtuales/${llena._id}/mensajes`, tkD, { tipo: "pregunta", texto: q })));
+  modo.demoraPaciente = 0;
+  const trasDos = await M.SimulacionPaciente.findById(llena._id).lean();
+  verificar("E04: con 79 de 80 y dos preguntas a la vez → una sola llega a la IA y se guarda; la otra espera su turno (409)",
+    dos.filter(x => x.estado === 200).length === 1 && dos.some(x => x.estado === 409 && /Esperá/.test(x.cuerpo?.error || ""))
+    && llamadas.paciente === antesDos + 1 && pv.preguntasDe(trasDos) === 80);
+  r = await P("POST", `/medico/pacientes-virtuales/${llena._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Algo más?" });
+  verificar("  ...y la siguiente → 409, «llegaste a 80», sin gastar IA", r.estado === 409 && /80 mensajes/.test(r.cuerpo?.error || "") && llamadas.paciente === antesDos + 1);
+  // Terminar mientras el paciente contesta: espera esa respuesta.
+  const tresPreguntas = [];
+  for (const q of ["¿Desde cuándo?", "¿Dónde?", "¿Fiebre?"]) tresPreguntas.push({ rol: "estudiante", tipo: "pregunta", texto: q, en: new Date() }, { rol: "paciente", tipo: "pregunta", texto: "Sí.", en: new Date() });
+  const corta = await M.SimulacionPaciente.create({ medicoPhone: "59170090004", area: "cirugia", dificultad: "intermedio", estado: "en_curso", guion: g,
+    mensajes: [{ rol: "paciente", tipo: "inicio", texto: CASO.motivo, en: new Date() }, ...tresPreguntas] });
+  modo.demoraPaciente = 300;
+  const enVuelo = P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Vomitó?" });
+  await esperar(100);
+  r = await P("POST", `/medico/pacientes-virtuales/${corta._id}/terminar`, tkD, { principal: "Apendicitis aguda" });
+  verificar("terminar mientras el paciente contesta → 409, «esperá la respuesta»; la pregunta en camino se guarda",
+    r.estado === 409 && /Esperá/.test(r.cuerpo?.error || "") && (await enVuelo).estado === 200);
+  modo.demoraPaciente = 0;
+
+  // Repetir una pregunta con su clave: la respuesta que ya se guardó.
+  const CLAVE_PREGUNTA = "pregunta-de-prueba-0001";
+  const antesRep = llamadas.paciente;
+  const p1 = await P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Le duele al caminar?", clave: CLAVE_PREGUNTA });
+  const p2 = await P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Le duele al caminar?", clave: CLAVE_PREGUNTA });
+  const trasRep = await M.SimulacionPaciente.findById(corta._id).lean();
+  verificar("repetir una pregunta con su clave (se cortó la conexión) → la misma respuesta, sin volver a la IA ni duplicar la charla",
+    p1.estado === 200 && p2.estado === 200 && p2.cuerpo.mensajes[1].texto === p1.cuerpo.mensajes[1].texto
+    && llamadas.paciente === antesRep + 1 && pv.preguntasDe(trasRep) === 5);
+  r = await P("GET", `/medico/pacientes-virtuales/${corta._id}`, tkD);
+  verificar("  ...y la clave no viaja a la pantalla", !("clave" in p1.cuerpo.mensajes[0]) && !r.texto.includes(CLAVE_PREGUNTA));
+  modo.paciente = "falla";
+  r = await P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Y la fiebre?" });
+  modo.paciente = "ok";
+  const trasFalla = await P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Y la fiebre?" });
+  verificar("si la IA falla → 502, y el turno se libera: la siguiente pasa", r.estado === 502 && trasFalla.estado === 200);
+
+  // E05. Vence en el medio de la práctica.
+  await M.Medico.updateOne({ phone: "59170090004" }, { $set: { "estudiante.hasta": new Date(Date.now() - 1000) } });
+  const antesVenc = { ...llamadas };
+  r = await P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "pregunta", texto: "¿Algo más?" });
+  verificar("E05: con el acceso vencido, la práctica abierta no le pregunta más a la IA → 402, y dice que venció",
+    r.estado === 402 && /venció/.test(r.cuerpo?.error || "") && llamadas.paciente === antesVenc.paciente);
+  r = await P("POST", `/medico/pacientes-virtuales/${corta._id}/mensajes`, tkD, { tipo: "examen", texto: "Abdomen" });
+  verificar("  ...ni examina ni pide estudios → 402", r.estado === 402 && llamadas.examen === antesVenc.examen);
+  r = await P("POST", `/medico/pacientes-virtuales/${corta._id}/terminar`, tkD, { principal: "Apendicitis aguda" });
+  verificar("  ...ni la evalúa → 402", r.estado === 402 && llamadas.evaluar === antesVenc.evaluar);
+  r = await P("GET", `/medico/pacientes-virtuales/${corta._id}`, tkD);
+  verificar("  ...pero la puede mirar, y lo espera en curso para cuando renueve", r.estado === 200 && r.cuerpo.simulacion.estado === "en_curso");
+  r = await P("GET", "/medico/pacientes-virtuales", tkD);
+  verificar("  ...igual que la lista de sus prácticas", r.estado === 200 && Array.isArray(r.cuerpo.historial));
 
   servidor.close();
   await mongoose.disconnect();

@@ -295,25 +295,57 @@ async function responder(medicoPhone, id, indice, opcion, zona, ahora = new Date
   return { acerto, correcta: p.correcta, explicacion: p.explicacion, porOpcion: p.porOpcion, racha };
 }
 
+// El reloj y el botón pueden llegar a la vez, y un cierre que falló a medias
+// se reintenta: terminar dos veces da lo mismo que una.
 async function terminar(medicoPhone, id, zona, ahora = new Date()) {
   const s = await obtener(medicoPhone, id, ahora);
-  if (s.estado === "terminado") return s;   // el reloj y el botón a la vez
-  if (s.estado !== "listo") throw new ErrorHttp(409, "Este simulacro no está en curso.");
-  const aciertos = s.preguntas.filter(p => p.acerto === true).length;
-  const r = await Simulacro.updateOne({ _id: s._id, estado: "listo" }, { $set: { estado: "terminado", aciertos, terminadoEn: ahora } });
-  if (r.modifiedCount && s.modo === "examen") {
-    // En examen, recién ahora: las estadísticas de cada pregunta y las
-    // tarjetas de las que erró o no llegó a contestar.
-    const docs = await PreguntaSimulacro.find({ _id: { $in: s.preguntas.map(p => p.preguntaId) } }).lean();
-    const porId = new Map(docs.map(d => [String(d._id), d]));
-    for (const item of s.preguntas) {
-      const p = porId.get(String(item.preguntaId));
-      if (!p) continue;
-      if (item.elegida != null) await PreguntaSimulacro.updateOne({ _id: p._id }, { $inc: { vistas: 1, aciertos: item.acerto ? 1 : 0 } });
-      if (item.acerto !== true) await tarjetaDeError(medicoPhone, p, zona, ahora);
-    }
+  if (s.estado !== "terminado") {
+    if (s.estado !== "listo") throw new ErrorHttp(409, "Este simulacro no está en curso.");
+    const aciertos = s.preguntas.filter(p => p.acerto === true).length;
+    await Simulacro.updateOne({ _id: s._id, estado: "listo" }, {
+      $set: { estado: "terminado", aciertos, terminadoEn: ahora, ...(s.modo === "examen" ? { cierrePendiente: true } : {}) },
+    });
   }
+  await completarCierre(medicoPhone, s._id, zona, ahora);
   return Simulacro.findById(s._id).lean();
+}
+
+// En examen, recién al cerrar: las estadísticas de cada pregunta y las
+// tarjetas de las que erró o no llegó a contestar.
+//
+// Antes se hacía después de marcarlo terminado y sin dejar nada anotado: si
+// fallaba una tarjeta, el examen quedaba terminado y reintentar no la creaba
+// nunca (informe de QA del 9 de octubre de 2026, E07). Ahora el cierre deja
+// «cierrePendiente» en el mismo cambio, cada paso se puede repetir sin
+// duplicar, y la marca se borra al final. Lo completa el próximo que pase:
+// terminar otra vez, abrirlo o abrir la lista de simulacros.
+//   · Las tarjetas: una por pregunta (índice único), se crean si faltan.
+//   · Las estadísticas: las suma el que pone la fecha (estadisticasEn), una
+//     sola vez. Si la base fallara justo entre la fecha y la suma, ese
+//     conteo se pierde: mejor perder uno que contarlo dos veces (sirven para
+//     ver qué preguntas son difíciles, no son la nota de nadie).
+async function completarCierre(medicoPhone, id, zona, ahora = new Date()) {
+  const s = await Simulacro.findOne({ _id: id, medicoPhone, estado: "terminado", cierrePendiente: true }).lean();
+  if (!s) return;
+  const docs = await PreguntaSimulacro.find({ _id: { $in: s.preguntas.map(p => p.preguntaId) } }).lean();
+  const porId = new Map(docs.map(d => [String(d._id), d]));
+  const marca = await Simulacro.updateOne({ _id: s._id, estadisticasEn: null }, { $set: { estadisticasEn: ahora } });
+  if (marca.modifiedCount) {
+    const sumas = s.preguntas.filter(item => item.elegida != null && porId.has(String(item.preguntaId)))
+      .map(item => ({ updateOne: { filter: { _id: item.preguntaId }, update: { $inc: { vistas: 1, aciertos: item.acerto ? 1 : 0 } } } }));
+    if (sumas.length) await PreguntaSimulacro.bulkWrite(sumas, { ordered: false });
+  }
+  for (const item of s.preguntas) {
+    const p = porId.get(String(item.preguntaId));
+    if (p && item.acerto !== true) await tarjetaDeError(medicoPhone, p, zona, ahora);
+  }
+  await Simulacro.updateOne({ _id: s._id, cierrePendiente: true }, { $set: { cierrePendiente: false } });
+}
+
+// Los que quedaron a medio cerrar, de este estudiante.
+async function completarCierresPendientes(medicoPhone, zona, ahora = new Date()) {
+  const pendientes = await Simulacro.find({ medicoPhone, estado: "terminado", cierrePendiente: true }).select("_id").lean();
+  for (const p of pendientes) await completarCierre(medicoPhone, p._id, zona, ahora);
 }
 
 // ─── LO QUE SE MUESTRA ─────────────────────────────────────────────────────
@@ -370,5 +402,5 @@ async function reportarPregunta(medicoPhone, preguntaId, motivo, ahora = new Dat
 module.exports = {
   AREAS, CANTIDADES, MODOS, SEGUNDOS_POR_PREGUNTA, MAX_PREGUNTAS_NUEVAS_DIA,
   sanearPregunta, mezclarOpciones, generarLote, verificarLote, generarPreguntas, elegirPreguntas, prepararSimulacro,
-  responder, terminar, vista, obtener, cupoDe, progreso, reportarPregunta, normalizar,
+  responder, terminar, completarCierre, completarCierresPendientes, vista, obtener, cupoDe, progreso, reportarPregunta, normalizar,
 };

@@ -55,6 +55,13 @@ function pestanasPacientes(pendientes, extra = Extensiones.lugar("panel.pestanas
   return pestanas;
 }
 
+// Las pestañas de la ficha de esta cuenta: las de su especialidad, menos las
+// que un módulo saque (el filtro «kardex.pestanas» de public/js/extensiones.js;
+// por ejemplo, recetas para quien no receta).
+function pestanasDeLaFicha() {
+  return Extensiones.filtrar("kardex.pestanas", tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD));
+}
+
 function tabsPacientesHtml(pendientes, extra) {
   const pestanas = pestanasPacientes(pendientes, extra);
   return `
@@ -342,7 +349,7 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
     // pintado llega tarde y le taparía lo que está haciendo.
     if (!seriePantallaVigente(serie)) return;
     const tabPorDefecto = MEDICO_TIPO_ESPECIALIDAD === "odontologia" ? "odontograma" : MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? "ojos" : MEDICO_TIPO_ESPECIALIDAD === "ginecologia" ? "embarazo" : "consultas";
-    const tabsDisponibles = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
+    const tabsDisponibles = pestanasDeLaFicha();
     const tabSegura = tabInicial && tabsDisponibles[tabInicial] ? tabInicial : tabPorDefecto;
     pintarKardex(data.paciente, data.consultas || [], data.medicamentos || [], data.vacunas || [], data.mediciones || [], data.estudios || [], data.recetas || [], tabSegura);
   } catch (e) {
@@ -510,7 +517,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         <div class="fecha">${fechaCorta(v.fecha)}</div>
       </div>`).join("")}`;
 
-  const tabsKardex = tabsKardexPara(MEDICO_TIPO_ESPECIALIDAD);
+  const tabsKardex = pestanasDeLaFicha();
   const tabs = { paciente: tabPaciente, consultas: tabConsultas, odontograma: `<div id="odontogramaBox"></div>`, ojos: `<div id="examenOcularBox"></div>`, mapaGineco: `<div id="mapaGinecoBox"></div>`, mapaCorporal: `<div id="mapaCorporalBox"></div>`, perfilNeuro: `<div id="perfilNeuroBox"></div>`, objetivos: MEDICO_TIPO_ESPECIALIDAD === "fisioterapia" ? `<div id="objetivosFisioBox"></div>` : `<div id="objetivosNeuroBox"></div>`, evaluacion: `<div id="fisioEvaluacionBox"></div>`, movilidad: `<div id="fisioMovilidadBox"></div>`, salud: `<div id="vigilanciaBox"></div>`, familia: `<div id="informesFamiliaBox"></div>`, instrumentos: `<div id="instrumentosBox"></div>`, informes: `<div id="informesBox"></div>`, plan: `<div id="planBox"></div>`, embarazo: `<div id="embarazoBox"></div>`, medicamentos: tabMedicamentos, antecedentes: tabAntecedentes, vacunas: tabVacunas, evolucion: tabEvolucionHtml(mediciones), crecimiento: tabCrecimientoHtml(p, mediciones), estudios: tabEstudiosHtml(estudios), recetas: tabRecetasHtml(recetas) };
 
   app.innerHTML = `

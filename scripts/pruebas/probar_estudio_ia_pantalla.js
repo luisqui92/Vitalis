@@ -170,6 +170,15 @@ const servidorIa = http.createServer((req, res) => {
     const page = await ctx.newPage();
     const errores = [];
     page.on("pageerror", (e) => errores.push(e.message));
+    // Ninguna pantalla del estudiante puede chocar con el freno de estudiantes:
+    // si choca, es un botón que se le muestra y no puede usar, o una ruta que
+    // falta en la lista de lo permitido (modulos/estudiantes/restricciones.js).
+    const frenados = [];
+    page.on("response", async (r) => {
+      if (r.status() !== 403) return;
+      const cuerpo = await r.json().catch(() => null);
+      if (cuerpo?.estudiante) frenados.push(r.request().method() + " " + new URL(r.url()).pathname);
+    });
     page.on("dialog", (d) => d.accept());
     const captura = async (nombre) => { if (process.env.CAPTURAS) await page.screenshot({ path: path.join(process.env.CAPTURAS, nombre), fullPage: true }); };
 
@@ -305,6 +314,7 @@ const servidorIa = http.createServer((req, res) => {
       (await page.getAttribute(".escr-nav-item.activo", "data-id")) === "estudiar" && (await page.locator(".sim-barra-fila").count()) >= 1);
     await captura("sim_compu.png");
 
+    verificar(`ninguna pantalla del estudiante chocó con el freno de estudiantes${frenados.length ? `: ${frenados.join(", ")}` : ""}`, !frenados.length);
     verificar("sin errores de JavaScript", !errores.length);
     if (errores.length) console.log(errores.join("\n"));
   } catch (e) {

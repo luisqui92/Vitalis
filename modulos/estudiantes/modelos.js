@@ -127,6 +127,9 @@ const CasoVirtual = mongoose.model("CasoVirtual", casoVirtualSchema);
 // examinar y los estudios, su diagnóstico y la evaluación.
 const simulacionPacienteSchema = new mongoose.Schema({
   medicoPhone: { type: String, required: true },
+  // La que manda la pantalla al empezar: el mismo pedido repetido (se cortó
+  // la conexión antes de la respuesta) devuelve esta práctica, no otra.
+  clave: { type: String, default: undefined },
   idioma: { type: String, default: "es" },
   area: { type: String, required: true },
   dificultad: { type: String, required: true },
@@ -140,6 +143,9 @@ const simulacionPacienteSchema = new mongoose.Schema({
       tipo: { type: String, enum: ["inicio", "pregunta", "examen", "estudio"] },
       texto: String,
       en: Date,
+      // En lo que pregunta el estudiante: la clave del pedido, para no
+      // contestar (ni pagar) dos veces la misma pregunta repetida.
+      clave: { type: String, default: undefined },
       _id: false,
     }],
     default: [],
@@ -157,6 +163,7 @@ const simulacionPacienteSchema = new mongoose.Schema({
   terminadaEn: { type: Date, default: null },
 }, { timestamps: true });
 simulacionPacienteSchema.index({ medicoPhone: 1, createdAt: -1 });
+simulacionPacienteSchema.index({ medicoPhone: 1, clave: 1 }, { unique: true, partialFilterExpression: { clave: { $type: "string" } } });
 const SimulacionPaciente = mongoose.model("SimulacionPaciente", simulacionPacienteSchema);
 
 // ─── SIMULACROS (ver simulacros.js) ────────────────────────────────────────
@@ -185,6 +192,7 @@ const PreguntaSimulacro = mongoose.model("PreguntaSimulacro", preguntaSimulacroS
 // Un intento: qué preguntas le tocaron y qué contestó.
 const simulacroSchema = new mongoose.Schema({
   medicoPhone: { type: String, required: true },
+  clave: { type: String, default: undefined },   // como en la práctica, arriba
   idioma: { type: String, default: "es" },
   area: { type: String, required: true },
   // práctica: ve la respuesta en cada pregunta. examen: con tiempo, al final.
@@ -205,8 +213,15 @@ const simulacroSchema = new mongoose.Schema({
   limiteSegundos: { type: Number, default: 0 },   // solo en modo examen
   empezadoEn: { type: Date, default: null },
   terminadoEn: { type: Date, default: null },
+  // Un examen que se cierra deja anotado lo que falta hacer —las
+  // estadísticas de cada pregunta y las tarjetas de las que erró— en el
+  // mismo cambio que lo cierra, y se borra al terminarlo. Si algo falla en
+  // el medio, el próximo pedido lo completa (simulacros.js, completarCierre).
+  cierrePendiente: { type: Boolean, default: undefined },
+  estadisticasEn: { type: Date, default: undefined },   // ya se sumaron: no se suman otra vez
 }, { timestamps: true });
 simulacroSchema.index({ medicoPhone: 1, createdAt: -1 });
+simulacroSchema.index({ medicoPhone: 1, clave: 1 }, { unique: true, partialFilterExpression: { clave: { $type: "string" } } });
 const Simulacro = mongoose.model("Simulacro", simulacroSchema);
 
 // ─── EL RAZONAMIENTO DIAGNÓSTICO (ver tutor.js) ───────────────────────────
@@ -247,7 +262,20 @@ const rachaEstudioSchema = new mongoose.Schema({
 }, { timestamps: true });
 const RachaEstudio = mongoose.model("RachaEstudio", rachaEstudioSchema);
 
+// ─── LOS CANDADOS (ver candado.js) ─────────────────────────────────────────
+//
+// Uno por cosa que no puede pasar dos veces a la vez («empezar una práctica
+// de este estudiante», «el turno de esta conversación»). Los vencidos se
+// borran solos una hora después: que no estén es lo mismo que estar libres.
+const candadoSchema = new mongoose.Schema({
+  clave: { type: String, required: true, unique: true },
+  hasta: { type: Date, required: true },
+  dueno: { type: String, default: "" },
+});
+candadoSchema.index({ hasta: 1 }, { expireAfterSeconds: 3600 });
+const Candado = mongoose.model("CandadoEstudiante", candadoSchema);
+
 module.exports = {
   CodigoEstudiante, RazonamientoDiagnostico, RachaEstudio, TarjetaEstudio,
-  CasoVirtual, SimulacionPaciente, PreguntaSimulacro, Simulacro,
+  CasoVirtual, SimulacionPaciente, PreguntaSimulacro, Simulacro, Candado,
 };

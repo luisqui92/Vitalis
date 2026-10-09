@@ -49,7 +49,10 @@ module.exports = function (app) {
       medico.infoConsultorio = String(req.body.infoConsultorio).trim();
     }
     await medico.save();
-    res.json({ ok: true, horario: medico });
+    // Lo del horario, como el GET de arriba: el documento entero traía la
+    // contraseña cifrada y el secreto del segundo factor.
+    const { horarioAtencion, duracionConsultaMinutos, googleCalendarId, infoConsultorio } = medico.toObject();
+    res.json({ ok: true, horario: { horarioAtencion, duracionConsultaMinutos, googleCalendarId, infoConsultorio } });
   }));
 
   // ─── HORARIOS DISPONIBLES (para armar una cita a mano desde la web) ─────
