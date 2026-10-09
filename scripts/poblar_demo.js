@@ -64,7 +64,9 @@ async function conectar() {
   await new Promise((resolve, reject) => {
     mongoose.connection.once("open", resolve);
     mongoose.connection.once("error", reject);
-    setTimeout(() => reject(new Error("MongoDB no respondió en 30 segundos")), 30000);
+    // unref: si la base ya contestó, este reloj no deja la terminal abierta
+    // 30 segundos más después de terminar.
+    setTimeout(() => reject(new Error("MongoDB no respondió en 30 segundos")), 30000).unref();
   });
 }
 
