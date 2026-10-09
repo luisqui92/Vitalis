@@ -1,13 +1,13 @@
-// Symphomed — Estudiar con los casos propios (ver services/estudio.js).
+// Symphomed — Estudiar con los casos propios (ver ../estudio.js).
 //
 // Solo para cuentas de estudiante. No cuesta nada (no hay IA acá: las
 // tarjetas salen del razonamiento ya guardado), así que se puede estudiar
 // aunque el acceso esté vencido o sin horas: lo que se frena es grabar.
-const { requireAuth } = require("../services/auth");
-const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { sinCambios } = require("../services/realtime");
-const estudio = require("../services/estudio");
+const { requireAuth } = require("../../../services/auth");
+const { limitMedico } = require("../../../services/ratelimit");
+const { asyncRoute, ErrorHttp } = require("../../../services/httpHelpers");
+const { sinCambios } = require("../../../services/realtime");
+const estudio = require("../estudio");
 
 const requireMedico = requireAuth(["medico"]);
 

@@ -1,6 +1,6 @@
 // Symphomed — Estudiar con los casos propios (cuentas de estudiante, etapa 3).
 //
-// Las tarjetas salen del razonamiento de cada caso (services/estudio.js):
+// Las tarjetas salen del razonamiento de cada caso (modulos/estudiantes/estudio.js):
 // «¿cuál es el diagnóstico más probable?», qué estudio lo confirma, las
 // banderas rojas y qué faltó preguntar. Van de a una. La de diagnóstico se
 // contesta tocando una opción y la corrige el servidor; las otras se piensan,
@@ -10,7 +10,8 @@
 // razonamiento de ese caso, y el diagnóstico lo confirma su tutor.
 //
 // Etapa 4: arriba, tres pestañas — sus casos (esto), el paciente virtual
-// (public/js/pacienteVirtual.js) y los simulacros (public/js/simulacros.js).
+// (public/js/estudiantesPacienteVirtual.js) y los simulacros
+// (public/js/estudiantesSimulacros.js).
 // Las preguntas que erra en un simulacro vuelven acá, como tarjetas.
 
 // La sentada en curso: las tarjetas, por cuál va y cómo le va.
@@ -119,7 +120,7 @@ function engancharVolverEstudio() {
 function rachaHtml(racha, grande = false) {
   const n = racha?.actual || 0;
   return `<div class="est-racha${n ? " viva" : ""}${grande ? " grande" : ""}">
-    <span class="est-racha-icono" aria-hidden="true">${ICONOS.fuego}</span>
+    <span class="est-racha-icono" aria-hidden="true">${ICONOS_ESTUDIANTE.fuego}</span>
     <span class="est-racha-num">${n}</span>
     <span class="est-racha-txt">${t(n === 1 ? "estudio.racha.dia" : "estudio.racha.dias")}</span>
   </div>`;

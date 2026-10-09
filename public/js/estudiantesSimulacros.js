@@ -1,6 +1,6 @@
 // Symphomed — Simulacros por especialidad (cuentas de estudiante, etapa 4).
 //
-// Preguntas tipo examen de residencia (services/simulacros.js). En práctica,
+// Preguntas tipo examen de residencia (modulos/estudiantes/simulacros.js). En práctica,
 // la respuesta y la explicación aparecen al contestar cada una; en examen,
 // con reloj y recién al final. Las que erra pasan a sus tarjetas de repaso.
 

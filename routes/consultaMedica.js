@@ -21,21 +21,10 @@ const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo")
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
-const { guardarBorrador, borradorDe, tutorDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
-const { preguntasFaltantes, razonamientoDiagnostico, PALABRAS_MINIMAS: PALABRAS_MINIMAS_TUTOR } = require("../services/tutorClinico");
-const { estadoDe: estadoDeEstudiante } = require("../services/estudiantes");
-const { crearTarjetasDeConsulta, marcarDiaDeEstudio } = require("../services/estudio");
-const { zonaValida } = require("../services/zonaHoraria");
-
-// Una cuenta de estudiante vencida o sin horas no empieza consultas nuevas
-// (services/estudiantes.js). Se mira al pedir el token de la vista previa
-// —que es cuando empieza a grabar— y al subir.
-async function frenarEstudianteSinAcceso(req) {
-  if (!req.adminUser?.estudiante) return;
-  const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("phone estudiante").lean();
-  const estado = await estadoDeEstudiante(medico);
-  if (estado?.bloqueado) throw new ErrorHttp(402, estado.motivo);
-}
+const { guardarBorrador, borradorDe, extrasDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
+// Donde los módulos (modulos/*) suman lo suyo a una consulta: ver la lista
+// de puntos en services/extensiones.js.
+const extensiones = require("../services/extensiones");
 
 // Lo más largo que se acepta como texto en vivo: una consulta de 70 minutos
 // son unas 10.000 palabras, unos 70.000 caracteres. El doble, de margen.
@@ -76,7 +65,9 @@ module.exports = function (app) {
   // ─── TOKEN PARA VISTA PREVIA EN VIVO (el navegador se conecta directo
   // al WebSocket de AssemblyAI mientras graba; nunca se manda la API key) ──
   app.get("/medico/transcripcion-token", requireMedico, asyncRoute(async (req, res) => {
-    await frenarEstudianteSinAcceso(req);
+    // Pedir el token es empezar a grabar: lo último que se puede frenar
+    // antes de que la consulta exista.
+    await extensiones.revisar("consulta.antesDeGrabar", req);
     try {
       const token = await crearTokenStreaming();
       // El vocabulario viaja junto al token para que la vista previa en vivo
@@ -135,11 +126,11 @@ module.exports = function (app) {
     // Por eso solo se corta pasado el piso de negativo —cinco consultas de
     // margen— y no en cero. El aviso de "te queda poco" va en la pantalla,
     // ANTES de grabar, que es donde todavía se puede hacer algo.
-    // Un estudiante sin acceso no llega hasta acá desde la app: la pantalla
-    // de grabar ya le avisó y no lo dejó empezar. Si igual llega (una
-    // grabación vieja del respaldo del teléfono), queda guardada en el
-    // celular y se sube cuando renueve.
-    await frenarEstudianteSinAcceso(req);
+    // Lo mismo que al pedir el token: una cuenta que no puede grabar no
+    // llega hasta acá desde la app, porque la pantalla ya le avisó antes de
+    // empezar. Si igual llega (una grabación vieja del respaldo del
+    // teléfono), queda guardada en el celular y se sube cuando pueda.
+    await extensiones.revisar("consulta.antesDeGrabar", req);
     const saldo = await estadoDe(medicoPhone);
     if (saldo.bloqueado) {
       throw new ErrorHttp(402, `Tu saldo llegó al límite (Bs ${saldo.saldoBs}). Cargá saldo para seguir transcribiendo consultas.`);
@@ -171,7 +162,7 @@ module.exports = function (app) {
 
     const consulta = await ConsultaMedica.create({
       medicoPhone, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "procesando",
-      deEstudiante: Boolean(req.adminUser.estudiante),
+      ...extensiones.sumar("consulta.alCrear", req),
     });
 
     if (teleconsulta) {
@@ -260,22 +251,21 @@ module.exports = function (app) {
     const texto = String(req.body?.texto || "").slice(0, MAX_TEXTO_EN_VIVO);
     const pacienteId = String(req.body?.pacienteId || "").trim();
     if (!pacienteId) throw new ErrorHttp(400, "Falta pacienteId");
-    await frenarEstudianteSinAcceso(req);
+    await extensiones.revisar("consulta.antesDeGrabar", req);
     const paciente = await obtenerOFallar(Paciente, { _id: pacienteId, medicoPhone }, "Paciente no encontrado");
     if (texto.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_BORRADOR) return res.json({ nota: null });
 
-    // Una cuenta de estudiante, además, recibe «te falta preguntar»
-    // (services/tutorClinico.js). Un médico no: no le agrega nada y cuesta.
-    const esEstudiante = Boolean(req.adminUser.estudiante);
+    // Lo que los módulos suman al borrador viaja aparte, en «extras»: la
+    // nota es del núcleo y no cambia de forma según quién esté grabando.
     const guardado = borradorDe(medicoPhone, pacienteId, texto);
     if (guardado) {
       return res.json({ nota: guardado, noNombrados: medicamentosNoNombrados(guardado, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])),
-        ...(esEstudiante ? { tutor: tutorDe(medicoPhone, pacienteId, texto) } : {}) });
+        extras: extrasDe(medicoPhone, pacienteId, texto) });
     }
     const medico = await Medico.findOne({ phone: medicoPhone }).select("idioma").lean();
     const { contexto } = await contextoDeNota(paciente, medicoPhone);
-    // A la par de la nota, no después: el estudiante no espera el doble.
-    const tutorPromesa = esEstudiante ? preguntasFaltantes(texto, medico?.idioma, paciente) : null;
+    // A la par de la nota, no después: nadie espera el doble.
+    const extrasPromesa = extensiones.extras("notaEnVivo.extras", { req, texto, idioma: medico?.idioma, paciente });
     let nota;
     try {
       nota = await generarNotaClinica(texto, contexto, medico?.idioma);
@@ -283,12 +273,12 @@ module.exports = function (app) {
       // Un borrador que no salió no es un error para el médico: sigue
       // grabando, y el próximo minuto se intenta de nuevo.
       log.warn("[NOTA_EN_VIVO] borrador:", e.message);
-      return res.json({ nota: null, ...(tutorPromesa ? { tutor: await tutorPromesa } : {}) });
+      return res.json({ nota: null, extras: await extrasPromesa });
     }
-    const tutor = tutorPromesa ? await tutorPromesa : null;
-    guardarBorrador(medicoPhone, pacienteId, texto, nota, tutor);
+    const extras = await extrasPromesa;
+    guardarBorrador(medicoPhone, pacienteId, texto, nota, extras);
     res.json({ nota, noNombrados: medicamentosNoNombrados(nota, texto, await correccionesDelMedico(medicoPhone, 300).catch(() => [])),
-      ...(tutor ? { tutor } : {}) });
+      extras });
   }));
 
   // El texto en vivo de una consulta ya subida: si llegó entero (lo decide
@@ -323,56 +313,6 @@ module.exports = function (app) {
     // Si la transcripción completa ya terminó, se verifica ahora; si no, lo
     // hace ella al terminar.
     await intentarVerificar(consulta._id);
-  }));
-
-  // ─── EL RAZONAMIENTO DIAGNÓSTICO DE UN ESTUDIANTE ──────────────────────
-  //
-  // Él escribe su diagnóstico y sus diferenciales; recién entonces se arma
-  // el análisis (services/tutorClinico.js). Una vez por consulta: es un
-  // ejercicio, y volver a pedirlo hasta «acertar» no le enseña nada.
-  app.post("/medico/consultas/:id/razonamiento", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    if (!req.adminUser.estudiante) throw new ErrorHttp(403, "El razonamiento guiado es de las cuentas de estudiante.");
-    const medicoPhone = req.adminUser.usuario;
-    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
-    if (consulta.razonamiento?.en) throw new ErrorHttp(409, "Ya hiciste el razonamiento de esta consulta.");
-    const principal = String(req.body?.principal || "").trim().slice(0, 160);
-    const crudos = Array.isArray(req.body?.diferenciales) ? req.body.diferenciales : String(req.body?.diferenciales || "").split(/[,;\n]/);
-    const diferenciales = crudos.map(x => String(x || "").trim().slice(0, 160)).filter(Boolean).slice(0, 6);
-    if (principal.length < 3) throw new ErrorHttp(400, "Escribí tu diagnóstico principal antes de ver el razonamiento.");
-    const transcripcion = consulta.transcripcionCompleta || consulta.transcripcionEnVivo || "";
-    if (transcripcion.split(/\s+/).filter(Boolean).length < PALABRAS_MINIMAS_TUTOR) {
-      throw new ErrorHttp(400, "Esta consulta no tiene transcripción suficiente para razonar sobre ella.");
-    }
-    await frenarEstudianteSinAcceso(req);
-
-    const [paciente, medico] = await Promise.all([
-      Paciente.findOne({ _id: consulta.pacienteId, medicoPhone }).lean(),
-      Medico.findOne({ phone: medicoPhone }).select("idioma zonaHoraria").lean(),
-    ]);
-    let resultado;
-    try {
-      resultado = await razonamientoDiagnostico(transcripcion, { principal, diferenciales }, medico?.idioma, paciente);
-    } catch (e) {
-      log.warn("[TUTOR] razonamiento:", e.message);
-      throw new ErrorHttp(502, "No se pudo armar el razonamiento. Probá de nuevo en un rato.");
-    }
-    const razonamiento = { principal, diferenciales, resultado, en: new Date() };
-    // Si tocó dos veces seguidas, gana el primero.
-    const r = await ConsultaMedica.updateOne(
-      { _id: consulta._id, $or: [{ razonamiento: { $exists: false } }, { "razonamiento.en": null }] },
-      { $set: { razonamiento } });
-    if (!r.modifiedCount) throw new ErrorHttp(409, "Ya hiciste el razonamiento de esta consulta.");
-    registrar({ req, medicoPhone, accion: "razonamiento_estudiante", recurso: `ConsultaMedica:${consulta._id}` });
-    // De este razonamiento salen sus tarjetas de repaso, y razonar un caso
-    // cuenta como día de estudio (services/estudio.js). Si algo de eso falla,
-    // el razonamiento ya quedó guardado: las tarjetas se vuelven a intentar
-    // al abrir «Estudiar».
-    const zona = zonaValida(medico?.zonaHoraria);
-    const [tarjetas] = await Promise.all([
-      crearTarjetasDeConsulta(consulta._id).catch(e => { log.warn("[ESTUDIO] tarjetas:", e.message); return 0; }),
-      marcarDiaDeEstudio(medicoPhone, zona).catch(e => { log.warn("[ESTUDIO] racha:", e.message); }),
-    ]);
-    res.json({ razonamiento, tarjetas });
   }));
 
   // ─── LISTAR CONSULTAS PROPIAS ───────────────────────────────────────────
@@ -426,6 +366,10 @@ module.exports = function (app) {
         }
       }
     }
+
+    // Lo que los módulos suman a esta consulta para esta cuenta (por ejemplo,
+    // un ejercicio hecho sobre ella). Si uno falla, la consulta se abre igual.
+    consultaObj.extras = await extensiones.extras("consulta.detalle", { req, consulta: consultaObj });
 
     res.json({ consulta: consultaObj });
   }));
@@ -506,15 +450,9 @@ module.exports = function (app) {
     }
 
     const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
-    const aplicar = { ...(req.body?.aplicar || {}) };
-    // Un estudiante no receta, no agenda reconsultas por WhatsApp ni arma
-    // presupuestos (services/estudiantes.js): de lo que pida, eso no se
-    // aplica. La nota, la medicación y los antecedentes sí: es su caso.
-    if (req.adminUser.estudiante) {
-      aplicar.receta = false;
-      aplicar.reconsulta = null;
-      aplicar.tratamientos = [];
-    }
+    // Lo que esta cuenta no puede aplicar lo fuerza un módulo, sin importar
+    // lo que haya mandado la pantalla (el punto «consulta.alConfirmar»).
+    const aplicar = { ...(req.body?.aplicar || {}), ...extensiones.sumar("consulta.alConfirmar", req) };
     const aplicado = [];
     const fallado = [];
 

@@ -37,10 +37,6 @@ module.exports = {
     tutor: "Tutor",
   },
 
-  estudiante: {
-    titulo: "REGISTRO DE ESTUDIANTE",
-    texto: "Escrito desde una cuenta de estudiante. Sin la firma del médico responsable no tiene validez como historia clínica.",
-  },
   alergias: {
     titulo: "ALERGIAS",
     // Se dice siempre: un hueco se lee como «no tiene».

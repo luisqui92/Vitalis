@@ -54,7 +54,7 @@ const { log } = require("../config");
 //
 // Una cuenta con rol "admin" es exactamente lo contrario: es la cuenta
 // administrativa que ya existe en Symphomed y que las 30 rutas clínicas
-// rechazan solas (ver el comentario de tokenDeMedico en medicoAuth.js). No
+// rechazan solas (ver el comentario de tokenDeMedico en services/sesionMedico.js). No
 // tiene pacientes, no puede abrir una ficha, no consume saldo. Es la cuenta
 // correcta para esto.
 //

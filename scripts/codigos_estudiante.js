@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Symphomed — Códigos de invitación para estudiantes, internos y residentes.
 //
-// Un código, una persona (ver services/estudiantes.js). Se lo pasás por
+// Un código, una persona (ver modulos/estudiantes/cuenta.js). Se lo pasás por
 // WhatsApp; entra a Symphomed, toca «Tengo un código de estudiante» y crea su
 // cuenta. El código queda usado y anotado a su nombre.
 //
@@ -23,8 +23,9 @@ const readline = require("readline");
 try { require("dotenv").config({ path: path.join(__dirname, "..", ".env") }); } catch { /* opcional */ }
 
 const mongoose = require("mongoose");
-const { Medico, CodigoEstudiante, AuditLog } = require("../db/models");
-const { NIVELES, generarCodigo, normalizarCodigo, estadoDe } = require("../services/estudiantes");
+const { Medico, AuditLog } = require("../db/models");
+const { CodigoEstudiante } = require("../modulos/estudiantes/modelos");
+const { NIVELES, generarCodigo, normalizarCodigo, estadoDe } = require("../modulos/estudiantes/cuenta");
 const { buscarPorTelefono } = require("../services/telefono");
 
 const VENCE_SIN_USAR_DIAS = 60;

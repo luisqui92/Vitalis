@@ -33,6 +33,7 @@ const { CONFIG, log } = require("../config");
 const { esCuentaBrasil } = require("./idiomas");
 const { Medicamento, Paciente, Medico } = require("../db/models");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("./metaWhatsapp");
+const extensiones = require("./extensiones");
 
 // ─── DETECCIÓN ──────────────────────────────────────────────────────────────
 //
@@ -136,11 +137,12 @@ async function procesarRecordatoriosVencidos() {
     try {
       const [paciente, medico] = await Promise.all([
         Paciente.findById(medicamento.pacienteId).select("nombre telefono").lean(),
-        Medico.findOne({ phone: medicamento.medicoPhone }).select("nombre idioma moneda estudiante").lean(),
+        Medico.findOne({ phone: medicamento.medicoPhone }).select("nombre idioma moneda").lean(),
       ]);
-      // Una cuenta de estudiante no le escribe a pacientes
-      // (services/estudiantes.js): el recordatorio se apaga en vez de salir.
-      if (medico?.estudiante?.nivel) {
+      // Una cuenta que no le escribe a sus pacientes (lo decide un módulo,
+      // por el punto «paciente.mensajes» de services/extensiones.js): el
+      // recordatorio se apaga en vez de salir.
+      if (!(await extensiones.permite("paciente.mensajes", { medicoPhone: medicamento.medicoPhone }))) {
         await Medicamento.updateOne({ _id: medicamento._id }, { $set: { "recordatorio.activo": false } });
         continue;
       }

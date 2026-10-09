@@ -21,14 +21,14 @@ let kardexFocoEnTabs = false;
 //     cómo cambiar de idioma en el celular — y era el dueño del producto.
 //     La vista de escritorio ya llamaba "Configuración" a esta misma
 //     pantalla: el nombre engañoso era el del celular.
-function pestanasPacientes(pendientes) {
+// extra: las pestañas que agregan los módulos (el lugar «panel.pestanas» de
+// public/js/extensiones.js), una por pedazo.
+function pestanasPacientes(pendientes, extra = Extensiones.lugar("panel.pestanas")) {
   const pestanas = [
     `<button class="tab" id="btnNuevoPaciente"><span class="tab-icono">${ICONOS.mas}</span>${t("pacientes.tab.nuevo")}</button>`,
-    // Una cuenta de estudiante no da turnos (public/js/estudiantes.js); en
-    // ese lugar va «Estudiar», el repaso con sus casos (public/js/estudio.js).
-    ...(typeof esCuentaEstudiante === "function" && esCuentaEstudiante()
-      ? [`<button class="tab" id="btnEstudiar"><span class="tab-icono">${ICONOS.birrete}</span>${t("pacientes.tab.estudiar")}</button>`]
-      : [`<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`]),
+    // La agenda, para quien da turnos; ahí mismo van las de los módulos.
+    ...(puede("agenda") ? [`<button class="tab" id="btnAgenda"><span class="tab-icono">${ICONOS.calendario}</span>${t("pacientes.tab.agenda")}</button>`] : []),
+    ...extra.partes,
     `<button class="tab" id="btnRecordatorios"><span class="tab-icono">${ICONOS.campana}${pendientes ? `<b class="tab-globo">${pendientes}</b>` : ""}</span>${t("pacientes.tab.recordatorios")}</button>`,
     `<button class="tab" id="btnVincular"><span class="tab-icono">${ICONOS.mic}</span>${t("pacientes.tab.vincular")}</button>`,
     `<button class="tab" id="btnConfiguracion"><span class="tab-icono">${ICONOS.escudo}</span>${t("pacientes.tab.configuracion")}</button>`,
@@ -55,8 +55,8 @@ function pestanasPacientes(pendientes) {
   return pestanas;
 }
 
-function tabsPacientesHtml(pendientes) {
-  const pestanas = pestanasPacientes(pendientes);
+function tabsPacientesHtml(pendientes, extra) {
+  const pestanas = pestanasPacientes(pendientes, extra);
   return `
     <div class="tabs tabs-inicio" style="--n:${pestanas.length};margin-bottom:16px">
       ${pestanas.join("")}
@@ -137,8 +137,13 @@ async function renderDashboard() {
     const etiquetaArea = t(claveArea) === claveArea ? "" : t(claveArea);
     const tituloTarjeta = etiquetaArea || t("pacientes.saludo", { nombre: MEDICO_NOMBRE || "" });
 
+    // Lo que los módulos ponen en el panel (public/js/extensiones.js): un
+    // aviso arriba de todo y alguna pestaña.
+    const aviso = Extensiones.lugar("panel.aviso");
+    const pestanasExtra = Extensiones.lugar("panel.pestanas");
+
     app.innerHTML = `
-      ${typeof huecoAvisoEstudianteHtml === "function" ? huecoAvisoEstudianteHtml() : ""}
+      ${aviso.html}
       <button type="button" class="card no-imprimir" id="avatarHomeBox"
         style="display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer">
         <span class="avatar avatar-sm" id="avatarHomeImg" aria-hidden="true">${esc(iniciales(MEDICO_NOMBRE))}</span>
@@ -160,7 +165,7 @@ async function renderDashboard() {
             <span style="color:var(--primary);font-weight:600">${t("pacientes.bandeja.ver")}</span>
           </div>
         </div>` : ""}
-      ${tabsPacientesHtml(pendientes)}
+      ${tabsPacientesHtml(pendientes, pestanasExtra)}
       ${items.length === 0 ? `<div class="empty">${t("pacientes.vacio")}</div>` : `
         <input id="buscarPaciente" type="text" placeholder="${t("pacientes.buscar")}" style="margin:16px 0 12px">
         <div id="listaPacientes">
@@ -170,9 +175,9 @@ async function renderDashboard() {
       `}
     `;
     document.getElementById("avatarHomeBox").onclick = renderSeguridad;
-    // Cuenta de estudiante: cuánto audio usó, cuándo vence y su racha de
-    // estudio, arriba de todo.
-    if (typeof pintarAvisoEstudiante === "function") pintarAvisoEstudiante();
+    // Lo que los módulos pusieron arriba y en las pestañas, ya pintado.
+    aviso.alPintar();
+    pestanasExtra.alPintar();
     // Sin await, como los demás avisos del panel: si la foto tarda o no hay
     // ninguna subida, el panel se abre igual con las iniciales de siempre.
     pintarAvatarHome();
@@ -187,8 +192,6 @@ async function renderDashboard() {
     document.getElementById("btnNuevoPaciente").onclick = renderNuevoPaciente;
     const btnAgenda = document.getElementById("btnAgenda");
     if (btnAgenda) btnAgenda.onclick = renderAgenda;
-    const btnEstudiar = document.getElementById("btnEstudiar");
-    if (btnEstudiar) btnEstudiar.onclick = () => renderEstudiar();
     document.getElementById("btnRecordatorios").onclick = renderRecordatorios;
     document.getElementById("btnVincular").onclick = renderVincular;
     document.getElementById("btnConfiguracion").onclick = renderSeguridad;
@@ -527,7 +530,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
     </div>
     <div id="tabContent" role="tabpanel" aria-labelledby="tab-${tabActiva}" tabindex="0">${tabs[tabActiva] || tabConsultas}</div>
 
-    ${typeof esCuentaEstudiante === "function" && esCuentaEstudiante() ? "" : `<details class="kardex-mas">
+    ${!puede("compartirPaciente") ? "" : `<details class="kardex-mas">
       <summary>${esc(t("kardex.masAcciones"))}</summary>
       <div class="kardex-mas-cuerpo">
         ${typeof bloquePersonaAccionesHtml === "function" ? bloquePersonaAccionesHtml() : ""}
@@ -551,13 +554,13 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
   };
   // Aparte y sin await: si el proveedor de video tarda en contestar, la
   // ficha del paciente tiene que estar en pantalla igual.
-  // Teleconsulta y resumen compartido le llegan al paciente: no en una cuenta
-  // de estudiante (public/js/estudiantes.js).
-  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
-  if (!estudiante && typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
+  // Teleconsulta y resumen compartido le llegan al paciente: solo si esta
+  // cuenta puede (public/js/extensiones.js → puede).
+  const compartir = puede("compartirPaciente");
+  if (compartir && typeof teleMedPintar === "function") teleMedPintar(p._id, p.telefono);
   // Mismo criterio: pide la lista de lo ya compartido, y si tarda o falla la
   // ficha se abre igual.
-  if (!estudiante && typeof compartirResumenPintar === "function") compartirResumenPintar(p._id);
+  if (compartir && typeof compartirResumenPintar === "function") compartirResumenPintar(p._id);
   if (typeof memedCablearCpf === "function") memedCablearCpf(p);
   // Sin await: si la consulta de la clínica tarda o falla, la ficha se abre
   // igual. El bloque aparece cuando llega.

@@ -27,9 +27,9 @@
 //   pantalla lo dice siempre.
 // · A la IA no le llega el nombre del paciente: edad, sexo, antecedentes y
 //   alergias alcanzan para razonar.
-const { log } = require("../config");
-const { perfil } = require("./idiomas");
-const ia = require("./ia");
+const { log } = require("../../config");
+const { perfil } = require("../../services/idiomas");
+const ia = require("../../services/ia");
 
 const MAX_TEXTO = 80000;            // una consulta de 70 minutos entra con margen
 const PALABRAS_MINIMAS = 15;
@@ -154,4 +154,12 @@ async function razonamientoDiagnostico(transcripcion, respuesta, idioma, pacient
   return saneado;
 }
 
-module.exports = { preguntasFaltantes, razonamientoDiagnostico, sanearRazonamiento, datosDeFicha, PALABRAS_MINIMAS };
+// «Te falta preguntar» viaja con cada borrador de la nota en vivo de una
+// cuenta de estudiante (el punto «notaEnVivo.extras» del núcleo), pedido a
+// la par de la nota. Un médico no lo recibe: no le agrega nada y cuesta.
+async function extrasDelBorrador({ req, texto, idioma, paciente }) {
+  if (!req.adminUser?.estudiante) return {};
+  return { tutor: await preguntasFaltantes(texto, idioma, paciente) };
+}
+
+module.exports = { preguntasFaltantes, razonamientoDiagnostico, sanearRazonamiento, datosDeFicha, extrasDelBorrador, PALABRAS_MINIMAS };

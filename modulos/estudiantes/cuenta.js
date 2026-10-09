@@ -1,4 +1,4 @@
-// Symphomed — Cuentas de estudiante: estudiantes, internos y residentes.
+// Symphomed — La cuenta de estudiante: estudiantes, internos y residentes.
 //
 // ═══ QUÉ ES ═══════════════════════════════════════════════════════════════
 //
@@ -8,18 +8,8 @@
 // invitación que da Symphomed (scripts/codigos_estudiante.js): uno por
 // persona, con su vencimiento y sus horas de audio por mes.
 //
-// ═══ LO QUE UN ESTUDIANTE NO HACE, Y POR QUÉ LO BLOQUEA EL SERVIDOR ═══════
-//
-// No receta, no le escribe a pacientes (WhatsApp, recordatorios, resúmenes,
-// informes), no da turnos ni hace teleconsulta, no cobra. Una nota de
-// estudiante no tiene validez sin la firma del médico responsable, y nada
-// de lo que hace puede llegarle a un paciente como si viniera de un médico.
-//
-// Esconder los botones no alcanza: el que conoce la ruta la llama igual.
-// Por eso hay una lista de rutas bloqueadas (abajo) que se revisa en cada
-// pedido, antes de cualquier ruta, mirando una marca del token de sesión.
-// Lo que sale solo, sin que nadie toque una ruta —el recordatorio de
-// medicamento al paciente—, se frena donde se envía.
+// Lo que un estudiante NO hace (recetar, escribirle a pacientes, cobrar) y
+// cómo lo frena el servidor está en restricciones.js.
 //
 // ═══ LO QUE CUESTA ═════════════════════════════════════════════════════════
 //
@@ -30,7 +20,7 @@
 // El paciente virtual y los simulacros (etapa 4) también usan IA, mucho más
 // barata que el audio (centavos de dólar por práctica), pero con su tope por
 // mes para que nadie la use sin límite.
-const { ConsultaMedica } = require("../db/models");
+const { ConsultaMedica } = require("../../db/models");
 
 // Lo que trae cada nivel si el código no dice otra cosa.
 const NIVELES = {
@@ -93,52 +83,4 @@ async function estadoDe(medico, ahora = new Date()) {
   };
 }
 
-// ─── Las rutas que un estudiante no puede usar ─────────────────────────────
-//
-// [métodos, ruta]. «escritura» bloquea todo lo que no sea GET: ver su propia
-// agenda vacía o la lista de sus recetas (ninguna) no le hace daño a nadie, y
-// pantallas como el inicio del escritorio las piden. «todo» bloquea también
-// la lectura, porque ahí leer ya hace algo (abrir una sesión de Memed, una
-// sala de video) o porque no tiene nada que ver con un estudiante.
-const RUTAS_BLOQUEADAS = [
-  ["escritura", /^\/medico\/recetas(-opticas)?(\/|$)/],
-  ["escritura", /^\/medico\/pacientes\/[^/]+\/recetas(-opticas)?(\/|$)/],
-  ["todo", /^\/medico\/(pacientes\/[^/]+\/)?memed(\/|$)/],
-  // Reconsulta: agenda y le escribe al paciente por WhatsApp.
-  ["todo", /^\/medico\/consultas\/[^/]+\/reconsulta(\/|$)/],
-  // Presupuesto: es cobrar.
-  ["todo", /^\/medico\/consultas\/[^/]+\/tratamientos-sugeridos(\/|$)/],
-  // Lo que le llega al paciente: su llave, resúmenes, informes enviados.
-  ["todo", /^\/medico\/pacientes\/[^/]+\/llave(\/|$)/],
-  ["escritura", /^\/medico\/pacientes\/[^/]+\/resumenes(\/|$)/],
-  ["escritura", /^\/medico\/resumenes(\/|$)/],
-  ["todo", /^\/medico\/informes(-familia)?\/[^/]+\/enviar$/],
-  // Turnos, horario de reservas, teleconsulta.
-  ["escritura", /^\/medico\/(citas|horario)(\/|$)/],
-  ["todo", /^\/medico\/(teleconsulta|teleconsultas)(\/|$)/],
-  ["todo", /^\/medico\/pacientes\/[^/]+\/teleconsulta(\/|$)/],
-  // Plata: cobros, presupuestos, insumos, recargas.
-  ["escritura", /^\/medico\/(finanzas|tratamientos|catalogo-tratamientos|insumos)(\/|$)/],
-  ["escritura", /^\/medico\/pacientes\/[^/]+\/tratamientos(\/|$)/],
-  ["todo", /^\/medico\/recargas(\/|$)/],
-  // WhatsApp del consultorio y equipos de la clínica (la Caja DICOM).
-  ["todo", /^\/medico\/(whatsapp|dicom|equipos|rayos)(\/|$)/],
-];
-
-function rutaBloqueada(metodo, ruta) {
-  const esLectura = metodo === "GET" || metodo === "HEAD";
-  return RUTAS_BLOQUEADAS.some(([alcance, re]) => re.test(ruta) && (alcance === "todo" || !esLectura));
-}
-
-// Va antes de todas las rutas (index.js). Solo mira el token: la marca
-// «estudiante» la pone el login (routes/medicoAuth.js → tokenDeMedico).
-function middlewareEstudiantes(req, res, next) {
-  if (!req.path.startsWith("/medico/")) return next();
-  const { verificarToken } = require("./auth");
-  const token = req.headers.authorization?.replace("Bearer ", "") || req.query?.token;
-  const payload = token ? verificarToken(token) : null;
-  if (!payload?.estudiante || !rutaBloqueada(req.method, req.path)) return next();
-  return res.status(403).json({ error: "Esto no está disponible en una cuenta de estudiante.", estudiante: true });
-}
-
-module.exports = { NIVELES, generarCodigo, normalizarCodigo, esEstudiante, estadoDe, rutaBloqueada, middlewareEstudiantes, inicioDelMes };
+module.exports = { NIVELES, generarCodigo, normalizarCodigo, esEstudiante, estadoDe, inicioDelMes };

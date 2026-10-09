@@ -1,4 +1,4 @@
-// Symphomed — Português · o paciente virtual e os simulados (public/js/pacienteVirtual.js, public/js/simulacros.js).
+// Symphomed — Português · o paciente virtual e os simulados (public/js/estudiantesPacienteVirtual.js, public/js/estudiantesSimulacros.js).
 Object.assign(I18N.pt, {
   // ─── Paciente virtual ──────────────────────────────────────────────────
   "pv.cargando": "Abrindo o paciente virtual…",

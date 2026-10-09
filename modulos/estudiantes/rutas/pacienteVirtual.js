@@ -1,17 +1,18 @@
-// Symphomed — El paciente virtual (ver services/pacienteVirtual.js).
+// Symphomed — El paciente virtual (ver ../pacienteVirtual.js).
 //
 // Solo cuentas de estudiante, con acceso vigente (usa IA) y con su cupo del
 // mes. Armar un caso nuevo tarda: se prepara en segundo plano y la pantalla
 // pregunta cada pocos segundos hasta que está listo.
-const { Medico, SimulacionPaciente, CasoVirtual } = require("../db/models");
-const { requireAuth } = require("../services/auth");
-const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { sinCambios } = require("../services/realtime");
-const { estadoDe: estadoDeEstudiante } = require("../services/estudiantes");
-const { marcarDiaDeEstudio, zonaDe, reportarEnBanco } = require("../services/estudio");
-const pv = require("../services/pacienteVirtual");
-const { log } = require("../config");
+const { Medico } = require("../../../db/models");
+const { SimulacionPaciente, CasoVirtual } = require("../modelos");
+const { requireAuth } = require("../../../services/auth");
+const { limitMedico } = require("../../../services/ratelimit");
+const { asyncRoute, ErrorHttp } = require("../../../services/httpHelpers");
+const { sinCambios } = require("../../../services/realtime");
+const { estadoDe: estadoDeEstudiante } = require("../cuenta");
+const { marcarDiaDeEstudio, zonaDe, reportarEnBanco } = require("../estudio");
+const pv = require("../pacienteVirtual");
+const { log } = require("../../../config");
 
 const requireMedico = requireAuth(["medico"]);
 const MOTIVOS_REPORTE_CASO = ["incoherente", "paciente", "evaluacion"];

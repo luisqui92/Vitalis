@@ -27,6 +27,10 @@ function correr(codigoAuth, idioma) {
     setTimeout: () => {},
   };
   vm.createContext(sandbox);
+  // Los puntos de extensión (public/js/extensiones.js) son del núcleo, como
+  // i18n.js. Sin ningún módulo cargado, cada lugar queda vacío y cada permiso
+  // dice que sí: la pantalla de siempre.
+  vm.runInContext(fs.readFileSync(`${RAIZ}/public/js/extensiones.js`, "utf8"), sandbox);
   if (idioma) {
     vm.runInContext(
       fs.readFileSync(`${RAIZ}/public/js/i18n.js`, "utf8") + "\n" +
@@ -62,8 +66,9 @@ const sinSelector = (html) => html.replace(/\n\s*<div style="text-align:center;m
 // el resto del login no cambió: sigue valiendo la pena comprobar que un
 // cambio de i18n no le mueve una coma al resto de la pantalla, y esto es lo
 // único que hay que descontar para poder seguir haciendo esa comprobación.
-// Lo mismo con «Tengo un código de estudiante» (public/js/estudiantes.js):
-// otro enlace agregado a propósito, que no cambia nada del resto.
+// Lo mismo con «Tengo un código de estudiante» (public/js/estudiantes.js,
+// por el lugar «login» de public/js/extensiones.js): otro enlace agregado a
+// propósito, que no cambia nada del resto.
 const sinOlvide = (html) => html
   .replace(/\n\s*<button class="link" id="lGoOlvide"[^>]*>[\s\S]*?<\/button>/g, "")
   .replace(/\n\s*<button class="link" id="lGoEstudiante"[^>]*>[\s\S]*?<\/button>/g, "");

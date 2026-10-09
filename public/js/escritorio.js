@@ -65,17 +65,10 @@ const ESCR_NAV_PAGOS = { id: "pagos", claveLabel: "op.nav.pagos", icono: ICONOS.
 // solo ensuciaría un menú que ya no le sirve.
 const ESCR_NAV_GANADERIA = { id: "ganaderia", claveLabel: "escr.nav.ganaderia", icono: ICONOS.pata, fn: "renderGanaderia" };
 
-// Lo que ve una cuenta de estudiante (public/js/estudiantes.js): sus casos,
-// grabar, estudiar con esos casos (public/js/estudio.js) y su configuración.
-// Agenda, indicaciones, estudios, reportes y finanzas son de un consultorio.
-const ESCR_NAV_ESTUDIAR = { id: "estudiar", claveLabel: "escr.nav.estudiar", icono: ICONOS.birrete, fn: "renderEstudiar" };
-const ESCR_NAV_ESTUDIANTE = ["inicio", "pacientes", "voz", "estudiar", "configuracion"];
-
+// Al final, los módulos pueden cambiar el menú de esta cuenta (el filtro
+// «escritorio.menu» de public/js/extensiones.js): sumar su ítem, o dejar solo
+// lo que a esa cuenta le sirve.
 function escrNavItems() {
-  if (typeof esCuentaEstudiante === "function" && esCuentaEstudiante()) {
-    return [...ESCR_NAV_FIJOS, ESCR_NAV_ESTUDIAR].filter(i => ESCR_NAV_ESTUDIANTE.includes(i.id))
-      .sort((a, b) => ESCR_NAV_ESTUDIANTE.indexOf(a.id) - ESCR_NAV_ESTUDIANTE.indexOf(b.id));
-  }
   const items = ESCR_NAV_FIJOS.slice();
   if (typeof MEDICO_TIPO_ESPECIALIDAD !== "undefined" && MEDICO_TIPO_ESPECIALIDAD === "veterinaria") {
     const idx = items.findIndex(i => i.id === "configuracion");
@@ -83,7 +76,7 @@ function escrNavItems() {
   }
   if (typeof esAdministrador === "function" && esAdministrador()) items.unshift(ESCR_NAV_CLINICA);
   if (typeof ES_OPERADOR !== "undefined" && ES_OPERADOR) items.unshift(ESCR_NAV_PAGOS);
-  return items;
+  return Extensiones.filtrar("escritorio.menu", items);
 }
 
 function escritorioShellActivo() {
@@ -239,20 +232,21 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
   const notasConError = consultas.filter(c => c.notaClinicaEstado === "error").slice(0, 5);
 
   const esVet = MEDICO_TIPO_ESPECIALIDAD === "veterinaria";
-  // Una cuenta de estudiante no tiene agenda: en su lugar, el aviso de su
-  // acceso y lo que tiene para estudiar hoy (public/js/estudiantes.js).
-  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
+  // Quien no da turnos no ve la agenda de hoy; en su lugar va lo que los
+  // módulos pongan arriba del panel (public/js/extensiones.js).
+  const agenda = puede("agenda");
+  const aviso = Extensiones.lugar("panel.aviso");
 
   app.innerHTML = `
-    <div class="escr-stats"${estudiante ? ` style="grid-template-columns:repeat(3,1fr)"` : ""}>
+    <div class="escr-stats"${agenda ? "" : ` style="grid-template-columns:repeat(3,1fr)"`}>
       ${escrStatCardHtml(pacientes.length, t(esVet ? "escr.stat.mascotas" : "escr.stat.pacientes"))}
-      ${estudiante ? "" : escrStatCardHtml(citasHoy.length, t("escr.stat.citasHoy"))}
+      ${agenda ? escrStatCardHtml(citasHoy.length, t("escr.stat.citasHoy")) : ""}
       ${escrStatCardHtml(consultasEsteMes, t("escr.stat.consultasMes"))}
       ${escrStatCardHtml(recordatorios.length, t("escr.stat.recordatorios"))}
     </div>
 
     <div class="escr-grid-2">
-      ${estudiante ? huecoAvisoEstudianteHtml() : `<div class="card">
+      ${aviso.html}${!agenda ? "" : `<div class="card">
         <div class="seccion-titulo" style="margin-top:0">${t("escr.agendaHoy")}</div>
         ${citasHoy.length === 0 ? `<div class="hint">${t("escr.sinCitasHoy")}</div>` : `
           <div class="escr-lista">
@@ -271,7 +265,7 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
         <div class="seccion-titulo" style="margin-top:0">${t("escr.acciones")}</div>
         <div class="escr-acciones">
           <button class="secondary" id="escrBtnNuevoPaciente">${t(esVet ? "escr.nuevoPacienteVet" : "escr.nuevoPaciente")}</button>
-          ${estudiante ? "" : `<button class="secondary" id="escrBtnIrAgenda">${t("escr.irAgenda")}</button>`}
+          ${agenda ? `<button class="secondary" id="escrBtnIrAgenda">${t("escr.irAgenda")}</button>` : ""}
           <button class="secondary" id="escrBtnIrConfig">${t("escr.irConfig")}</button>
         </div>
       </div>
@@ -337,14 +331,13 @@ function pintarInicioEscritorio(pacientes, citas, recordatorios, consultas) {
   document.querySelectorAll("[data-consulta-id]").forEach(el => {
     el.onclick = () => renderDetalle(el.dataset.consultaId);
   });
-  if (estudiante) pintarAvisoEstudiante();
+  aviso.alPintar();
 }
 
 // Se envuelven TODAS las pantallas posibles, no las del rol de antes del login:
-// el menú de quien entre se decide recién cuando entra.
-// Las otras dos pestañas de «Estudiar» (paciente virtual y simulacros)
-// marcan el mismo ítem del menú.
-[...ESCR_NAV_FIJOS, ESCR_NAV_CLINICA, ESCR_NAV_PAGOS, ESCR_NAV_GANADERIA, ESCR_NAV_ESTUDIAR,
-  { ...ESCR_NAV_ESTUDIAR, fn: "renderPacienteVirtual" }, { ...ESCR_NAV_ESTUDIAR, fn: "renderSimulacros" }]
+// el menú de quien entre se decide recién cuando entra. También las de los
+// módulos que marcan un ítem del menú (Extensiones.pantalla → menu).
+[...ESCR_NAV_FIJOS, ESCR_NAV_CLINICA, ESCR_NAV_PAGOS, ESCR_NAV_GANADERIA,
+  ...Extensiones.pantallas().filter(p => p.menu).map(p => ({ fn: p.fn, id: p.menu.id, claveLabel: p.menu.claveLabel }))]
   .filter(it => typeof window[it.fn] === "function")
   .forEach(it => envolverParaEscritorio(it.fn, it.id, it.claveLabel));

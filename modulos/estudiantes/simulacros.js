@@ -7,7 +7,7 @@
 // ginecología-obstetricia, cirugía, salud pública) o todas mezcladas. En modo
 // práctica ve la respuesta y la explicación en cada pregunta; en modo examen,
 // con tiempo, recién al final. Las que erra pasan a sus tarjetas de repaso
-// (services/estudio.js) y vuelven espaciadas hasta que las sabe.
+// (estudio.js) y vuelven espaciadas hasta que las sabe.
 //
 // ═══ DE DÓNDE SALEN LAS PREGUNTAS ═════════════════════════════════════════
 //
@@ -29,12 +29,12 @@
 // un error no gaste sin límite. scripts/banco_estudio.js precarga el banco.
 const crypto = require("crypto");
 const mongoose = require("mongoose");
-const { PreguntaSimulacro, Simulacro, TarjetaEstudio } = require("../db/models");
-const { log } = require("../config");
-const { perfil } = require("./idiomas");
-const ia = require("./ia");
-const { NIVELES, inicioDelMes } = require("./estudiantes");
-const { ErrorHttp } = require("./httpHelpers");
+const { PreguntaSimulacro, Simulacro, TarjetaEstudio } = require("./modelos");
+const { log } = require("../../config");
+const { perfil } = require("../../services/idiomas");
+const ia = require("../../services/ia");
+const { NIVELES, inicioDelMes } = require("./cuenta");
+const { ErrorHttp } = require("../../services/httpHelpers");
 const { marcarDiaDeEstudio, inicioDeDia, reportarEnBanco } = require("./estudio");
 
 const AREAS = ["clinica", "pediatria", "gineco", "cirugia", "salud_publica"];

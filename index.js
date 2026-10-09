@@ -135,10 +135,24 @@ app.use(express.json({
 const { iniciarServidorTiempoReal, middlewareAvisarCambios } = require("./services/realtime");
 app.use(middlewareAvisarCambios);
 
-// ─── CUENTAS DE ESTUDIANTE ───────────────────────────────────────────────
-// Lo que un estudiante no puede hacer (recetar, escribirle a pacientes,
-// cobrar) se corta acá, antes de cualquier ruta. Ver services/estudiantes.js.
-app.use(require("./services/estudiantes").middlewareEstudiantes);
+// ─── MÓDULOS ─────────────────────────────────────────────────────────────
+// Lo que se engancha al núcleo sin que el núcleo lo conozca: cada módulo
+// entra por los puntos de services/extensiones.js y monta sus propias rutas
+// (ver el encabezado de modulos/<nombre>/index.js). Van antes de las rutas
+// del núcleo porque algunos frenan pedidos: lo que un estudiante no puede
+// hacer (recetar, escribirle a pacientes, cobrar) se corta acá, antes de
+// cualquier ruta.
+const MODULOS = [require("./modulos/estudiantes")];
+for (const modulo of MODULOS) modulo.montar(app);
+
+// Qué módulos están prendidos en este servidor, para la pantalla (index.html
+// lo carga antes que sus scripts). Un módulo apagado sigue cargando su JS,
+// pero solo deja activas las reglas de las cuentas, igual que el servidor.
+app.get("/modulos.js", (_req, res) => {
+  const prendidos = Object.fromEntries(MODULOS.map(m => [m.nombre, m.activo()]));
+  res.type("application/javascript").set("Cache-Control", "no-cache");
+  res.send(`window.MODULOS = ${JSON.stringify(prendidos)};\n`);
+});
 
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
@@ -156,11 +170,6 @@ require("./routes/perfilFoto")(app);
 // así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);
 require("./routes/consultaMedica")(app);
-// Cuentas de estudiante: repasar sus propios casos (services/estudio.js),
-// practicar con un paciente virtual y rendir simulacros.
-require("./routes/estudio")(app);
-require("./routes/pacienteVirtual")(app);
-require("./routes/simulacros")(app);
 require("./routes/pacientes")(app);
 require("./routes/medicamentos")(app);
 require("./routes/vacunas")(app);

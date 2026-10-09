@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Symphomed — Cómo vienen estudiando los estudiantes (services/estudio.js).
+// Symphomed — Cómo vienen estudiando los estudiantes (modulos/estudiantes/estudio.js).
 //
 // Por cuenta: tarjetas, cuántas domina, cuántas respondió y acertó, la racha,
 // y cuántas marcó «esta pregunta está mal» (y por qué: la respuesta, la
@@ -14,8 +14,9 @@
 const path = require("path");
 try { require("dotenv").config({ path: path.join(__dirname, "..", ".env") }); } catch { /* opcional */ }
 const mongoose = require("mongoose");
-const { TarjetaEstudio, Medico } = require("../db/models");
-const { rachaVisible } = require("../services/estudio");
+const { Medico } = require("../db/models");
+const { TarjetaEstudio, RachaEstudio } = require("../modulos/estudiantes/modelos");
+const { rachaVisible } = require("../modulos/estudiantes/estudio");
 const { zonaValida } = require("../services/zonaHoraria");
 
 const ROJO = (t) => `\x1b[31m${t}\x1b[0m`;
@@ -34,7 +35,7 @@ const MOTIVOS = { respuesta: "la respuesta", pregunta: "la pregunta", datos: "lo
 
 async function main() {
   await conectar();
-  const [porCuenta, reportes, cuentas] = await Promise.all([
+  const [porCuenta, reportes, cuentas, rachasGuardadas] = await Promise.all([
     TarjetaEstudio.aggregate([
       { $group: {
         _id: "$medicoPhone",
@@ -52,14 +53,16 @@ async function main() {
       { $sort: { n: -1 } },
     ]),
     Medico.find({ "estudiante.nivel": { $exists: true } }).select("phone nombre zonaHoraria estudiante").lean(),
+    RachaEstudio.find({}).lean(),
   ]);
   if (!cuentas.length) return console.log("\n  No hay cuentas de estudiante.\n");
 
   const datos = new Map(porCuenta.map(x => [x._id, x]));
+  const rachas = new Map(rachasGuardadas.map(r => [r.medicoPhone, r]));
   console.log(`\n  Estudio — ${cuentas.length} cuenta(s) de estudiante:\n`);
   for (const m of cuentas) {
     const d = datos.get(m.phone);
-    const racha = rachaVisible(m.estudiante?.racha, zonaValida(m.zonaHoraria));
+    const racha = rachaVisible(rachas.get(m.phone), zonaValida(m.zonaHoraria));
     console.log(`  ● ${m.nombre} (${m.phone}) · ${m.estudiante.nivel}`);
     if (!d) { console.log(GRIS("    Todavía sin tarjetas: no razonó ningún caso.\n")); continue; }
     const respuestas = d.aciertos + d.errores;

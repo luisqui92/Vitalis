@@ -1,17 +1,18 @@
-// Symphomed — Simulacros por especialidad (ver services/simulacros.js).
+// Symphomed — Simulacros por especialidad (ver ../simulacros.js).
 //
 // Solo cuentas de estudiante, con acceso vigente y con su cupo del mes. Si
 // faltan preguntas en el banco se generan en segundo plano, y la pantalla
 // pregunta cada pocos segundos hasta que está listo.
-const { Medico, Simulacro } = require("../db/models");
-const { requireAuth } = require("../services/auth");
-const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { sinCambios } = require("../services/realtime");
-const { estadoDe: estadoDeEstudiante } = require("../services/estudiantes");
-const { zonaDe, MOTIVOS_REPORTE } = require("../services/estudio");
-const sim = require("../services/simulacros");
-const { log } = require("../config");
+const { Medico } = require("../../../db/models");
+const { Simulacro } = require("../modelos");
+const { requireAuth } = require("../../../services/auth");
+const { limitMedico } = require("../../../services/ratelimit");
+const { asyncRoute, ErrorHttp } = require("../../../services/httpHelpers");
+const { sinCambios } = require("../../../services/realtime");
+const { estadoDe: estadoDeEstudiante } = require("../cuenta");
+const { zonaDe, MOTIVOS_REPORTE } = require("../estudio");
+const sim = require("../simulacros");
+const { log } = require("../../../config");
 
 const requireMedico = requireAuth(["medico"]);
 

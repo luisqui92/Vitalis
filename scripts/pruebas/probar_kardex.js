@@ -97,6 +97,10 @@ function entorno(idioma) {
     vincularPersonaElegidaEnAlta: async () => {},
   };
   vm.createContext(s);
+  // Los puntos de extensión (public/js/extensiones.js) son del núcleo, como
+  // i18n.js. Sin ningún módulo cargado, cada lugar queda vacío y cada permiso
+  // dice que sí: la pantalla de siempre.
+  vm.runInContext(fs.readFileSync(`${RAIZ}/public/js/extensiones.js`, "utf8"), s);
   if (idioma) {
     for (const f of ["public/js/i18n.js", "public/i18n/es.js", "public/i18n/pt.js"]) {
       vm.runInContext(fs.readFileSync(`${RAIZ}/${f}`, "utf8"), s);

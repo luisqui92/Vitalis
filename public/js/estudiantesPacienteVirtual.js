@@ -1,6 +1,6 @@
 // Symphomed — El paciente virtual (cuentas de estudiante, etapa 4).
 //
-// Practicar la entrevista con un paciente simulado (services/pacienteVirtual.js):
+// Practicar la entrevista con un paciente simulado (modulos/estudiantes/pacienteVirtual.js):
 // le pregunta como en una consulta, lo examina, pide estudios y al final da
 // su diagnóstico. El guion no llega a la pantalla hasta que termina: lo único
 // que se ve es lo que contestó el paciente.

@@ -46,9 +46,8 @@ const RUTAS = [
   { ruta: "vincular",      fn: "renderVincular" },
   { ruta: "equipos",       fn: "renderEquiposRayos" },
   { ruta: "ganaderia",     fn: "renderGanaderia" },
-  { ruta: "estudiar",      fn: "renderEstudiar" },
-  { ruta: "paciente-virtual", fn: "renderPacienteVirtual" },
-  { ruta: "simulacros",    fn: "renderSimulacros" },
+  // Y las de los módulos que tienen dirección propia (public/js/extensiones.js).
+  ...Extensiones.pantallas().filter(p => p.ruta).map(p => ({ ruta: p.ruta, fn: p.fn })),
 ];
 
 const BASE = "/app";

@@ -71,7 +71,7 @@ axios.post = async (url, cuerpo) => {
 const TEXTO = "Buenos días doctor me duele la garganta hace tres días tengo fiebre y me cuesta tragar la comida desde ayer";
 
 (async () => {
-  const { sanearRazonamiento } = require(path.join(RAIZ, "services", "tutorClinico"));
+  const { sanearRazonamiento } = require(path.join(RAIZ, "modulos", "estudiantes", "tutor"));
   console.log("── 1. Lo que vuelve de la IA se recorta ──");
   const s = sanearRazonamiento({ diferenciales: Array.from({ length: 9 }, (_, i) => ({ diagnostico: "D" + i })), comparacion: { acertoPrincipal: "true", comentario: "y".repeat(5000) } });
   verificar("máximo 5 diferenciales", s.diferenciales.length === 5);
@@ -86,9 +86,10 @@ const TEXTO = "Buenos días doctor me duele la garganta hace tres días tengo fi
   require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = process.env.MONGODB_URI;
   const mongoose = require("mongoose");
   await mongoose.connect(process.env.MONGODB_URI);
-  const M = require(path.join(RAIZ, "db", "models"));
+  const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
+  for (const modelo of [M.TarjetaEstudio, M.RazonamientoDiagnostico, M.RachaEstudio]) await modelo.syncIndexes();
 
   const enSeisMeses = new Date(Date.now() + 180 * 86400000);
   const est = (phone, idioma, extra = {}) => M.Medico.create({ phone, nombre: "Est " + phone, passwordHash: "x", activo: true, idioma,
@@ -107,7 +108,8 @@ const TEXTO = "Buenos días doctor me duele la garganta hace tres días tengo fi
   const express = require("express");
   const app = express();
   app.use(express.json());
-  app.use(require(path.join(RAIZ, "services", "estudiantes")).middlewareEstudiantes);
+  // El módulo, montado igual que en index.js: antes de las rutas del núcleo.
+  require(path.join(RAIZ, "modulos", "estudiantes")).montar(app);
   require(path.join(RAIZ, "routes", "consultaMedica"))(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
@@ -116,20 +118,21 @@ const TEXTO = "Buenos días doctor me duele la garganta hace tres días tengo fi
 
   console.log("\n── 2. «Te falta preguntar», mientras graba ──");
   let r = await P("POST", "/medico/consultas/nota-en-vivo", tkEst, { pacienteId: String(pac._id), texto: TEXTO });
-  verificar("el estudiante recibe la nota y, al lado, lo que le falta preguntar", r.estado === 200 && r.cuerpo.nota?.diagnostico === "Faringitis" && r.cuerpo.tutor?.preguntas?.length > 0);
-  verificar("  ...como mucho 5 preguntas y 3 banderas rojas, sin filas vacías", r.cuerpo.tutor.preguntas.length === 5 && r.cuerpo.tutor.banderasRojas.length === 3 && r.cuerpo.tutor.preguntas.every(p => p.pregunta));
+  verificar("el estudiante recibe la nota y, al lado (en «extras»), lo que le falta preguntar", r.estado === 200 && r.cuerpo.nota?.diagnostico === "Faringitis" && r.cuerpo.extras?.tutor?.preguntas?.length > 0);
+  const tutor = r.cuerpo.extras.tutor;
+  verificar("  ...como mucho 5 preguntas y 3 banderas rojas, sin filas vacías", tutor.preguntas.length === 5 && tutor.banderasRojas.length === 3 && tutor.preguntas.every(p => p.pregunta));
   verificar("  ...una llamada para la nota y otra para el tutor, a la par", llamadas.nota === 1 && llamadas.falta === 1);
   const pf = pedidos.falta[0];
   verificar("a la IA le llega lo que se habló, la edad y los antecedentes", pf.usuario.includes("me duele la garganta") && /Edad: 2[23] años/.test(pf.usuario) && /Asma/.test(pf.usuario) && /Penicilina/.test(pf.usuario));
   verificar("  ...pero NUNCA el nombre del paciente", !/Juana|Secreta|Mamani/.test(pf.usuario + pf.sistema));
   verificar("  ...y la regla de no dar diagnósticos mientras entrevista", /NO DES DIAGNÓSTICOS/.test(pf.sistema));
   r = await P("POST", "/medico/consultas/nota-en-vivo", tkEst, { pacienteId: String(pac._id), texto: TEXTO });
-  verificar("el mismo texto otra vez (al terminar) → se reusa, sin llamar de nuevo", r.cuerpo.tutor?.preguntas?.length === 5 && llamadas.nota === 1 && llamadas.falta === 1);
+  verificar("el mismo texto otra vez (al terminar) → se reusa, sin llamar de nuevo", r.cuerpo.extras?.tutor?.preguntas?.length === 5 && llamadas.nota === 1 && llamadas.falta === 1);
   r = await P("POST", "/medico/consultas/nota-en-vivo", tkMed, { pacienteId: String(pacMed._id), texto: TEXTO });
-  verificar("un médico recibe su nota, sin tutor y sin una llamada de más", r.estado === 200 && !("tutor" in r.cuerpo) && llamadas.nota === 2 && llamadas.falta === 1);
+  verificar("un médico recibe su nota, sin tutor y sin una llamada de más", r.estado === 200 && r.cuerpo.nota && !("tutor" in r.cuerpo) && !("tutor" in (r.cuerpo.extras || {})) && llamadas.nota === 2 && llamadas.falta === 1);
   modo.falta = "falla";
   r = await P("POST", "/medico/consultas/nota-en-vivo", tkEst, { pacienteId: String(pac._id), texto: TEXTO + " y tos" });
-  verificar("si el tutor falla, la nota en vivo sale igual", r.estado === 200 && r.cuerpo.nota?.diagnostico === "Faringitis" && r.cuerpo.tutor?.preguntas?.length === 0);
+  verificar("si el tutor falla, la nota en vivo sale igual", r.estado === 200 && r.cuerpo.nota?.diagnostico === "Faringitis" && r.cuerpo.extras?.tutor?.preguntas?.length === 0);
   modo.falta = "ok";
   await P("POST", "/medico/consultas/nota-en-vivo", tkEstPt, { pacienteId: String(pacPt._id), texto: TEXTO + " ok" });
   verificar("en una cuenta en portugués, el tutor escribe en portugués", /portugués de Brasil/.test(pedidos.falta.at(-1).sistema));
@@ -153,20 +156,30 @@ const TEXTO = "Buenos días doctor me duele la garganta hace tres días tengo fi
   verificar("a la IA le llega lo que propuso el estudiante, y la transcripción", /Diagnóstico principal: Faringitis bacteriana/.test(pr.usuario) && /Faringitis viral; Mononucleosis/.test(pr.usuario) && pr.usuario.includes("me duele la garganta"));
   verificar("  ...con las reglas: solo datos de la consulta, sin porcentajes", /USÁ SOLO DATOS/.test(pr.sistema) && /NADA DE PORCENTAJES/.test(pr.sistema));
   verificar("  ...y sin el nombre del paciente", !/Juana|Secreta|Mamani/.test(pr.usuario));
-  const guardada = await M.ConsultaMedica.findById(c1._id).lean();
-  verificar("queda guardado en la consulta: lo que pensó él y el análisis, recortado",
-    guardada.razonamiento.principal === "Faringitis bacteriana" && guardada.razonamiento.diferenciales.length === 2
-    && guardada.razonamiento.resultado.diferenciales.length === 5 && guardada.razonamiento.resultado.comentario.length === 600
-    && guardada.razonamiento.resultado.acertoPrincipal === false && guardada.razonamiento.resultado.perla.includes("Centor"));
+  const guardada = await M.RazonamientoDiagnostico.findOne({ consultaId: c1._id }).lean();
+  verificar("queda guardado (en su colección, no en la consulta): lo que pensó él y el análisis, recortado",
+    guardada.medicoPhone === "59170060001" && guardada.principal === "Faringitis bacteriana" && guardada.diferenciales.length === 2
+    && guardada.resultado.diferenciales.length === 5 && guardada.resultado.comentario.length === 600
+    && guardada.resultado.acertoPrincipal === false && guardada.resultado.perla.includes("Centor")
+    && !("razonamiento" in (await M.ConsultaMedica.collection.findOne({ _id: c1._id }))));
   r = await P("POST", ruta, tkEst, { principal: "Otra cosa" });
   verificar("una segunda vez → 409, sin llamar a la IA: es un ejercicio, no un «probar hasta acertar»", r.estado === 409 && llamadas.razonamiento === 1);
   r = await P("GET", `/medico/consultas/${c1._id}`, tkEst);
-  verificar("al abrir la consulta, el razonamiento viene con ella", r.cuerpo?.consulta?.razonamiento?.resultado?.perla?.includes("Centor"));
+  verificar("al abrir la consulta, el razonamiento viene con ella (consulta.extras)", r.cuerpo?.consulta?.extras?.razonamiento?.resultado?.perla?.includes("Centor"));
+  r = await P("GET", `/medico/consultas/${cMed._id}`, tkMed);
+  verificar("  ...y a un médico la consulta le llega sin nada de eso", r.estado === 200 && JSON.stringify(r.cuerpo.consulta.extras) === "{}");
   modo.razonamiento = "vacio";
   const c2 = await consulta("59170060001", pac._id);
   r = await P("POST", `/medico/consultas/${c2._id}/razonamiento`, tkEst, { principal: "Faringitis" });
-  verificar("si la IA no devuelve diferenciales → 502, y no se guarda nada a medias", r.estado === 502 && !(await M.ConsultaMedica.findById(c2._id).lean()).razonamiento);
+  verificar("si la IA no devuelve diferenciales → 502, y no se guarda nada a medias", r.estado === 502 && !(await M.RazonamientoDiagnostico.exists({ consultaId: c2._id })));
   modo.razonamiento = "ok";
+  // Un doble toque de verdad: los dos pedidos pasan juntos el «¿ya lo hizo?»
+  // y llegan a guardar a la vez. Lo que deja uno solo es la base (un índice
+  // único por consulta), no el código.
+  const cDoble = await consulta("59170060001", pac._id);
+  const dobles = await Promise.all([1, 2].map(() => P("POST", `/medico/consultas/${cDoble._id}/razonamiento`, tkEst, { principal: "Faringitis" })));
+  verificar("dos toques a la vez → uno guarda (200) y el otro no (409), y queda UNO",
+    dobles.map(x => x.estado).sort().join() === "200,409" && (await M.RazonamientoDiagnostico.countDocuments({ consultaId: cDoble._id })) === 1);
   const cOtro = await consulta("5511900060002", pacPt._id);
   r = await P("POST", `/medico/consultas/${cOtro._id}/razonamiento`, tkEst, { principal: "Faringitis" });
   verificar("la consulta de otro estudiante → 404", r.estado === 404);

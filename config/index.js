@@ -20,6 +20,14 @@ const CONFIG = {
   MONGODB_URI: process.env.MONGODB_URI,
   APP_URL: process.env.APP_URL || "",
 
+  // Los módulos (modulos/*) se apagan sin tocar código: MODULO_ESTUDIANTES=
+  // apagado en el .env y reiniciar. Apagado, el de estudiantes deja de
+  // ofrecer lo suyo (entrar con código, el tutor, Estudiar, el paciente
+  // virtual, los simulacros), pero las reglas de las cuentas de estudiante
+  // que ya existen siguen: no recetan ni le escriben a pacientes. Ver
+  // modulos/estudiantes/index.js.
+  MODULO_ESTUDIANTES: process.env.MODULO_ESTUDIANTES || "prendido",
+
   TIMEOUT_OPENAI: 45000,
   // La nota de una consulta de 70 minutos es una transcripción de más de
   // 10.000 palabras y una respuesta larga: 45 s no alcanzan. Corre en

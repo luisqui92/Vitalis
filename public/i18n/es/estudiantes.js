@@ -16,7 +16,7 @@ Object.assign(I18N.es, {
   "est.aviso.venceProntoEl": "⚠️ tu acceso vence el {fecha} (en {dias} días): pedí la renovación a Symphomed",
   "est.aviso.horas": "Este mes usaste {usadas} de {total} horas de audio.",
   "est.marcaNota": "Nota de estudiante: sin validez sin la firma del médico responsable.",
-  // ─── Etapa 2: el tutor clínico (services/tutorClinico.js) ──────────────
+  // ─── Etapa 2: el tutor clínico (public/js/estudiantesTutor.js) ─────────
   "tutor.faltaPreguntar": "🎓 Te falta preguntar",
   "tutor.banderasRojas": "⚠️ Banderas rojas a descartar",
   "tutor.nadaFalta": "🎓 ✓ Por ahora no te falta preguntar nada importante.",

@@ -155,7 +155,7 @@ const servidorIa = http.createServer((req, res) => {
     require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = uri;
     mongoose = require("mongoose");
     await mongoose.connect(uri);
-    const M = require(path.join(RAIZ, "db", "models"));
+    const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
     const { hashPassword } = require(path.join(RAIZ, "services", "auth"));
     await M.Medico.create({ phone: TEL, nombre: "Ana Interna", passwordHash: await hashPassword("Prueba123."), activo: true, idioma: "es",
       estudiante: { nivel: "interno", hasta: new Date(Date.now() + 180 * 86400000), horasMes: 12 } });
@@ -163,7 +163,10 @@ const servidorIa = http.createServer((req, res) => {
     servidor = spawn(process.execPath, [path.join(raiz, "index.js")], { cwd: raiz, env, stdio: "ignore" });
     for (let i = 0; i < 80; i++) { try { if (await traer("/health") === 200) break; } catch { /* todavía no */ } await esperar(500); }
     browser = await pw.chromium.launch({ executablePath: navegador() });
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    // En la hora de la cuenta (La Paz), como el celular de un estudiante de
+    // verdad: «vuelve mañana» se calcula con el día de la cuenta, y con el
+    // navegador en UTC la prueba fallaba entre las 00:00 y las 04:00.
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: "America/La_Paz" });
     const page = await ctx.newPage();
     const errores = [];
     page.on("pageerror", (e) => errores.push(e.message));

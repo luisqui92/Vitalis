@@ -111,7 +111,7 @@ axios.post = async (_url, cuerpo) => {
 };
 
 (async () => {
-  const pv = require(path.join(RAIZ, "services", "pacienteVirtual"));
+  const pv = require(path.join(RAIZ, "modulos", "estudiantes", "pacienteVirtual"));
 
   console.log("── 1. El guion (sin base) ──");
   const g = pv.sanearGuion(CASO);
@@ -132,9 +132,10 @@ axios.post = async (_url, cuerpo) => {
   require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = process.env.MONGODB_URI;
   const mongoose = require("mongoose");
   await mongoose.connect(process.env.MONGODB_URI);
-  const M = require(path.join(RAIZ, "db", "models"));
+  const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
+  await M.RachaEstudio.syncIndexes();
 
   const enSeisMeses = new Date(Date.now() + 180 * 86400000);
   const est = (phone) => M.Medico.create({ phone, nombre: "Est " + phone, passwordHash: "x", activo: true, idioma: "es",
@@ -148,9 +149,8 @@ axios.post = async (_url, cuerpo) => {
   const express = require("express");
   const app = express();
   app.use(express.json());
-  app.use(require(path.join(RAIZ, "services", "estudiantes")).middlewareEstudiantes);
-  require(path.join(RAIZ, "routes", "estudio"))(app);
-  require(path.join(RAIZ, "routes", "pacienteVirtual"))(app);
+  // El módulo, montado igual que en index.js.
+  require(path.join(RAIZ, "modulos", "estudiantes")).montar(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
@@ -223,8 +223,8 @@ axios.post = async (_url, cuerpo) => {
   verificar("terminar otra vez → 409", r.estado === 409 && llamadas.evaluar === 2);
   r = await P("POST", `/medico/pacientes-virtuales/${idA}/mensajes`, tkA, { tipo: "pregunta", texto: "¿y ahora?" });
   verificar("preguntar después de terminar → 409", r.estado === 409);
-  const yo = await M.Medico.findOne({ phone: "59170090001" }).lean();
-  verificar("terminar cuenta como día de estudio (racha 1)", yo.estudiante.racha?.actual === 1);
+  const racha = await M.RachaEstudio.findOne({ medicoPhone: "59170090001" }).lean();
+  verificar("terminar cuenta como día de estudio (racha 1)", racha?.actual === 1);
   r = await P("GET", "/medico/estudio/resumen", tkA);
   verificar("  ...y el logro del primer paciente virtual", r.cuerpo.resumen.logros.find(l => l.id === "paciente1")?.hecho === true && r.cuerpo.resumen.pacientesVirtuales === 1);
   r = await P("GET", "/medico/pacientes-virtuales", tkA);

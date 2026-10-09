@@ -17,6 +17,7 @@ const { leerKardex } = require("../services/kardexDatos");
 const { armarContenido, normalizarSecciones } = require("../services/resumenCompartido");
 const { armarKardexPdf, nombreArchivo } = require("../services/kardexPdf");
 const { idiomaDeCuenta } = require("../services/idiomas");
+const extensiones = require("../services/extensiones");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -30,7 +31,7 @@ module.exports = function (app) {
 
     const [datos, medico, membrete, recetas, consultasSinConfirmar] = await Promise.all([
       leerKardex(paciente),
-      Medico.findOne({ phone: medicoPhone }).select("nombre especialidad matricula conselho idioma estudiante").lean(),
+      Medico.findOne({ phone: medicoPhone }).select("nombre especialidad matricula conselho idioma").lean(),
       Membrete.findOne({ medicoPhone }).lean(),
       Receta.find({ pacienteId: paciente._id, medicoPhone }).sort({ fecha: -1 }).lean(),
       // Las que tienen nota pero el médico no confirmó: no salen, pero el PDF
@@ -42,12 +43,10 @@ module.exports = function (app) {
     const generadoEn = new Date();
     const zonaHoraria = typeof req.query.tz === "string" ? req.query.tz : "";
     const contenido = armarContenido(datos, { alcance: "completo", secciones: normalizarSecciones(null, "completo") });
-    // Lo escribió un estudiante: la cuenta lo es hoy, o alguna consulta de
-    // este paciente se grabó cuando lo era (la marca queda aunque se reciba).
-    const deEstudiante = Boolean(medico?.estudiante?.nivel)
-      || Boolean(await ConsultaMedica.exists({ pacienteId: paciente._id, medicoPhone, deEstudiante: true }));
+    // Lo que los módulos necesitan que se lea primero (services/extensiones.js).
+    const alertas = await extensiones.lista("kardex.alertas", { medicoPhone, paciente, idioma });
     const pdf = armarKardexPdf({
-      contenido, paciente, recetas, consultasSinConfirmar, medico, membrete, idioma, zonaHoraria, generadoEn, deEstudiante,
+      contenido, paciente, recetas, consultasSinConfirmar, medico, membrete, idioma, zonaHoraria, generadoEn, alertas,
     });
     const nombre = nombreArchivo({ idioma, paciente, generadoEn, zonaHoraria });
 

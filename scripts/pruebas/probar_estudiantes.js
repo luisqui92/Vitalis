@@ -1,4 +1,4 @@
-// Symphomed — Cuentas de estudiante (services/estudiantes.js).
+// Symphomed — Cuentas de estudiante (modulos/estudiantes).
 //
 // Se prueba lo que un estudiante PUEDE (entrar con su código, grabar, tener
 // sus casos) y lo que NO (recetar, escribirle a pacientes, dar turnos,
@@ -67,7 +67,8 @@ function textoPdf(buf) {
 }
 
 (async () => {
-  const { rutaBloqueada, normalizarCodigo, generarCodigo } = require(path.join(RAIZ, "services", "estudiantes"));
+  const { rutaBloqueada } = require(path.join(RAIZ, "modulos", "estudiantes", "restricciones"));
+  const { normalizarCodigo, generarCodigo } = require(path.join(RAIZ, "modulos", "estudiantes", "cuenta"));
   console.log("── 1. Las reglas ──");
   verificar("un código se escribe como venga: «est ab12cd» → «EST-AB12CD»", normalizarCodigo("est ab12cd") === "EST-AB12CD" && normalizarCodigo("AB12CD") === "EST-AB12CD");
   verificar("los códigos no usan letras que se confunden (0, O, 1, I, L)", Array.from({ length: 50 }, generarCodigo).every(c => /^EST-[A-HJKMNP-Z2-9]{6}$/.test(c)));
@@ -91,7 +92,7 @@ function textoPdf(buf) {
   require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = uri;
   const mongoose = require("mongoose");
   await mongoose.connect(uri);
-  const M = require(path.join(RAIZ, "db", "models"));
+  const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { hashPassword, generarToken, verificarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
   await M.CodigoEstudiante.syncIndexes();
@@ -108,7 +109,8 @@ function textoPdf(buf) {
   const express = require("express");
   const app = express();
   app.use(express.json());
-  app.use(require(path.join(RAIZ, "services", "estudiantes")).middlewareEstudiantes);
+  // El módulo, montado igual que en index.js: antes de las rutas del núcleo.
+  require(path.join(RAIZ, "modulos", "estudiantes")).montar(app);
   for (const r of ["medicoAuth", "consultaMedica", "kardexPdf"]) require(path.join(RAIZ, "routes", r))(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
@@ -233,11 +235,12 @@ function textoPdf(buf) {
   verificar("el de un médico, no", r.estado === 200 && !/REGISTRO DE ESTUDIANTE/.test(textoPdf(r.buf)));
 
   console.log("\n── 9. Renovar, ver las cuentas y recibirse ──");
-  await M.Medico.updateOne({ phone: "59170040001" }, { $set: { "estudiante.racha": { actual: 4, mejor: 9, ultimoDia: "2026-01-01" } } });
+  await M.RachaEstudio.create({ medicoPhone: "59170040001", actual: 4, mejor: 9, ultimoDia: "2026-01-01" });
   r = await correrScript(uri, ["renovar", "+59170040001", "--meses", "3"]);
   const tras = await M.Medico.findOne({ phone: "59170040001" }).lean();
   verificar("«renovar» un vencido → 3 meses desde hoy, y vuelve a grabar", r.codigo === 0 && new Date(tras.estudiante.hasta) > new Date(Date.now() + 80 * 86400000));
-  verificar("  ...sin borrarle la racha de estudio", tras.estudiante.racha?.mejor === 9 && tras.estudiante.racha.actual === 4);
+  const rachaTras = await M.RachaEstudio.findOne({ medicoPhone: "59170040001" }).lean();
+  verificar("  ...sin borrarle la racha de estudio", rachaTras?.mejor === 9 && rachaTras.actual === 4);
   r = await P("GET", "/medico/transcripcion-token", tkEst);
   verificar("  ...el token de la vista previa ya sale", r.estado === 200);
   r = await correrScript(uri, ["cuentas"]);

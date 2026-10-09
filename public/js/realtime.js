@@ -65,14 +65,15 @@ function desconectarTiempoReal() {
 //
 // "consultaDetalle" es la pantalla de una consulta. No estaba registrada, y
 // el aviso caía sobre la anterior —la ficha del paciente— y la repintaba
-// encima: tocar «Regenerar nota», o que un estudiante mandara su
-// razonamiento, lo devolvía a la ficha a los dos segundos, sin que viera el
+// encima: tocar «Regenerar nota», o mandar algo desde la consulta (un
+// razonamiento, por ejemplo), lo devolvía a la ficha a los dos segundos, sin que viera el
 // resultado. Mientras la consulta se procesa, la pantalla se refresca sola
 // con su propio sondeo; no necesita el aviso.
 //
-// "estudiar" es la sentada de repaso de un estudiante (public/js/estudio.js):
-// repintarla en el medio le haría perder por qué tarjeta iba.
-const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle", "estudiar", "pacienteVirtual", "simulacros"]);
+// Las pantallas de los módulos (Extensiones.pantalla, más abajo) se suman a
+// esta lista al cargar: una sentada de repaso o un simulacro con reloj
+// repintados en el medio perderían por dónde iban.
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle"]);
 
 // ═══ UN REPINTADO QUE NO PIDIÓ EL MÉDICO NO PUEDE MOVERLE LA PÁGINA ═══════
 //
@@ -186,10 +187,12 @@ envolverParaTiempoReal("teleMedEntrar", () => ({ tipo: "salaTele", params: {} })
 // queda quieto en vez de repintarla encima del informe a medio escribir.
 envolverParaTiempoReal("renderEditorInforme", (pacienteId, informeId) => ({ tipo: "editorInforme", params: { pacienteId, informeId } }));
 envolverParaTiempoReal("renderMembrete", () => ({ tipo: "membrete", params: {} }));
-// Las dos de PANTALLAS_SIN_REFRESCO de más arriba: la consulta y el repaso.
+// La de PANTALLAS_SIN_REFRESCO de más arriba: la consulta.
 envolverParaTiempoReal("renderDetalle", (consultaId) => ({ tipo: "consultaDetalle", params: { consultaId } }));
-envolverParaTiempoReal("renderEstudiar", () => ({ tipo: "estudiar", params: {} }));
-// Una entrevista con el paciente virtual o un simulacro con reloj: un
-// repintado en el medio le haría perder lo que estaba haciendo.
-envolverParaTiempoReal("renderPacienteVirtual", () => ({ tipo: "pacienteVirtual", params: {} }));
-envolverParaTiempoReal("renderSimulacros", () => ({ tipo: "simulacros", params: {} }));
+// Las de los módulos (public/js/extensiones.js): registradas, para que el
+// aviso sepa que el médico ya no está en la pantalla anterior, y sin
+// repintarse solas.
+for (const p of Extensiones.pantallas()) {
+  envolverParaTiempoReal(p.fn, () => ({ tipo: p.tipo, params: {} }));
+  PANTALLAS_SIN_REFRESCO.add(p.tipo);
+}

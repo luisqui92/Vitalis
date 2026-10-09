@@ -55,19 +55,20 @@ function claveDe(medicoPhone, pacienteId, texto) {
   return `${medicoPhone}|${pacienteId}|${hash}`;
 }
 
-// tutor: lo de «te falta preguntar» de una cuenta de estudiante
-// (services/tutorClinico.js), para el mismo texto.
-function guardarBorrador(medicoPhone, pacienteId, texto, nota, tutor = null) {
+// extras: lo que los módulos sumaron a este borrador (el punto
+// «notaEnVivo.extras» de services/extensiones.js), para el mismo texto: si
+// se vuelve a pedir, viaja igual sin pedírselo de nuevo a nadie.
+function guardarBorrador(medicoPhone, pacienteId, texto, nota, extras = {}) {
   const ahora = Date.now();
   for (const [k, v] of cache) if (ahora - v.en > DURACION_CACHE_MS) cache.delete(k);
   while (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value);
-  cache.set(claveDe(medicoPhone, pacienteId, texto), { nota, tutor, en: ahora });
+  cache.set(claveDe(medicoPhone, pacienteId, texto), { nota, extras, en: ahora });
 }
 
-function tutorDe(medicoPhone, pacienteId, texto) {
+function extrasDe(medicoPhone, pacienteId, texto) {
   const v = cache.get(claveDe(medicoPhone, pacienteId, texto));
-  if (!v?.tutor || Date.now() - v.en > DURACION_CACHE_MS) return null;
-  return JSON.parse(JSON.stringify(v.tutor));
+  if (!v || Date.now() - v.en > DURACION_CACHE_MS) return {};
+  return JSON.parse(JSON.stringify(v.extras || {}));
 }
 
 // Una copia: el que la recibe la guarda en Mongo y la puede modificar.
@@ -198,4 +199,4 @@ function medicamentosNoNombrados(nota, texto, correcciones = []) {
     .filter(i => i >= 0);
 }
 
-module.exports = { tutorDe, guardarBorrador, borradorDe, olvidarCache, compararMedicamentos, mismoMedicamento, nombradoEnTexto, medicamentosNoNombrados };
+module.exports = { extrasDe, guardarBorrador, borradorDe, olvidarCache, compararMedicamentos, mismoMedicamento, nombradoEnTexto, medicamentosNoNombrados };

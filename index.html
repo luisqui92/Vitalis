@@ -16,6 +16,8 @@
 <link rel="preload" href="/fonts/fraunces-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/estilos.css">
+<!-- Los del módulo de estudiantes, después: ver el encabezado del archivo. -->
+<link rel="stylesheet" href="/estudiantes.css">
 <!-- Solo para los addons de Three.js (GLTFLoader/OrbitControls importan
      "three" así) — el módulo en sí (odontograma3d.js) se carga bajo demanda,
      recién cuando el odontólogo abre la vista 3D, nunca de arranque. -->
@@ -76,12 +78,12 @@
 <script src="/js/i18n.js"></script>
 <script src="/i18n/es.js"></script>
 <script src="/i18n/pt.js"></script>
+<!-- Qué módulos están prendidos en este servidor (lo arma index.js de la
+     raíz), y los puntos donde se enganchan: antes de cualquier pantalla. -->
+<script src="/modulos.js"></script>
+<script src="/js/extensiones.js"></script>
 <script src="/js/estado.js"></script>
 <script src="/js/audio.js"></script>
-<script src="/js/estudiantes.js"></script>
-<script src="/js/estudio.js"></script>
-<script src="/js/pacienteVirtual.js"></script>
-<script src="/js/simulacros.js"></script>
 <script src="/js/auth.js"></script>
 <script src="/js/personas.js"></script>
 <script src="/js/pacientes.js"></script>
@@ -134,6 +136,14 @@
 <script src="/js/vinculacion.js"></script>
 <script src="/js/escritorioExtra.js"></script>
 <script src="/js/clinica.js"></script>
+<!-- Los módulos (modulos/<nombre> en el servidor), después del núcleo: no
+     lo tocan, se enganchan en public/js/extensiones.js. Antes de
+     escritorio.js, realtime.js y rutas.js, que toman de ahí sus pantallas. -->
+<script src="/js/estudiantes.js"></script>
+<script src="/js/estudiantesTutor.js"></script>
+<script src="/js/estudiantesEstudio.js"></script>
+<script src="/js/estudiantesPacienteVirtual.js"></script>
+<script src="/js/estudiantesSimulacros.js"></script>
 <script src="/js/escritorio.js"></script>
 <script src="/js/realtime.js"></script>
 <!-- Las rutas van ANTES de main.js y DESPUÉS de todas las pantallas:

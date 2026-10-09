@@ -1,9 +1,20 @@
-// Symphomed — Cuentas de estudiante, del lado de la pantalla.
+// ═══════════════════════════════════════════════════════════════════════════
+// Symphomed — Módulo de estudiantes, del lado de la pantalla
+// ═══════════════════════════════════════════════════════════════════════════
 //
 // Un Symphomed más simple: sus casos, grabar la consulta y la nota. Lo que no
 // le corresponde (recetar, escribirle a pacientes, turnos, cobros) no se
-// dibuja — pero el que decide es el servidor (services/estudiantes.js): esto
+// dibuja — pero el que decide es el servidor (modulos/estudiantes): esto
 // solo evita mostrar botones que contestarían «no disponible».
+//
+// Este archivo es la entrada del módulo en la pantalla: la cuenta, entrar
+// con un código, el aviso de su acceso y, al final, TODO lo que el módulo
+// engancha en las pantallas del núcleo (public/js/extensiones.js). Ninguna
+// pantalla del núcleo llama a nada de acá. El resto del módulo:
+//   estudiantesTutor.js            «te falta preguntar» y el razonamiento
+//   estudiantesEstudio.js          Estudiar: tarjetas, racha, logros
+//   estudiantesPacienteVirtual.js  el paciente virtual
+//   estudiantesSimulacros.js       los simulacros
 
 // { nivel, hasta, horasMes } o null. Llega con el login, como el rol.
 let ES_ESTUDIANTE = (() => {
@@ -19,6 +30,17 @@ function fijarEstudiante(datos) {
 }
 
 const esCuentaEstudiante = () => Boolean(ES_ESTUDIANTE && ES_ESTUDIANTE.nivel);
+
+// Si el módulo está prendido en este servidor (/modulos.js). Apagado, quedan
+// las reglas de las cuentas que ya existen y no se ofrece nada de estudio:
+// lo mismo que hace el servidor (modulos/estudiantes/index.js).
+const ESTUDIANTES_PRENDIDO = Extensiones.moduloPrendido("estudiantes");
+
+// Los íconos del módulo: «Estudiar» y la racha.
+const ICONOS_ESTUDIANTE = {
+  birrete: svgIcono(`<path d="M2.5 9.5L12 5l9.5 4.5L12 14 2.5 9.5z"/><path d="M6.5 11.6v4c0 1.6 2.5 2.9 5.5 2.9s5.5-1.3 5.5-2.9v-4"/><path d="M21.5 9.5v5"/>`),
+  fuego: svgIcono(`<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.1 0-3.4 2.4-5.3 3.6-7.6.5 1.6 1.4 2.6 2.4 3.1.4-2.8 1.5-5.4 3.7-7.4.2 3 1.4 4.6 2.4 6.3 1 1.6 1.9 3.3 1.9 5.6 0 3.5-3.5 6.1-7.5 6.1z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.3-2.6 1.9-3.9.4.9 1 1.4 1.6 1.6.3-1.2.8-2 1.6-2.7.3 1.2.9 2 1.3 2.8.3.5.4 1.1.4 1.8 0 1.8-1.6 3.2-4 3.2z"/>`),
+};
 
 // ─── ENTRAR CON UN CÓDIGO ──────────────────────────────────────────────────
 function renderRegistroEstudiante() {
@@ -86,7 +108,7 @@ function avisoEstudianteHtml(e) {
 
 // ─── EN EL INICIO ──────────────────────────────────────────────────────────
 // Arriba de todo: el aviso de su acceso y, debajo, la racha y lo que tiene
-// para estudiar hoy (public/js/estudio.js). Sin frenar el resto de la
+// para estudiar hoy (public/js/estudiantesEstudio.js). Sin frenar el resto de la
 // pantalla: el inicio deja un hueco (#estAvisoInicio) y esto lo llena cuando
 // llegan los datos. Si para entonces ya se fue a otra pantalla, el hueco no
 // existe y no se pinta nada encima de lo que esté mirando.
@@ -101,11 +123,11 @@ async function pintarAvisoEstudiante() {
   if (!esCuentaEstudiante()) return;
   const [e, estudio] = await Promise.all([
     estadoEstudiante(),
-    typeof resumenEstudio === "function" ? resumenEstudio() : null,
+    ESTUDIANTES_PRENDIDO ? resumenEstudio() : null,
   ]);
   const hueco = document.getElementById("estAvisoInicio");
   if (!hueco) return;
-  hueco.innerHTML = avisoEstudianteHtml(e) + (typeof estudioInicioHtml === "function" ? estudioInicioHtml(estudio) : "");
+  hueco.innerHTML = avisoEstudianteHtml(e) + (ESTUDIANTES_PRENDIDO ? estudioInicioHtml(estudio) : "");
   const ir = document.getElementById("estIrEstudiar");
   if (ir) ir.onclick = () => renderEstudiar();
 }
@@ -113,4 +135,70 @@ async function pintarAvisoEstudiante() {
 // La marca que lleva cada nota grabada desde una cuenta de estudiante.
 function marcaNotaEstudianteHtml() {
   return `<div class="error est-marca" style="margin-top:0">🎓 ${t("est.marcaNota")}</div>`;
+}
+
+// ═══ LO QUE ENGANCHA EN EL NÚCLEO (public/js/extensiones.js) ═══════════════
+//
+// Primero, las reglas de la cuenta: van siempre, aunque el módulo esté
+// apagado en el servidor.
+
+Extensiones.agregar("sesion.entrar", (datos) => fijarEstudiante(datos.estudiante));
+Extensiones.agregar("sesion.salir", () => fijarEstudiante(null));
+
+// Lo que una cuenta de estudiante no hace no se dibuja (el servidor lo frena
+// igual: modulos/estudiantes/restricciones.js).
+const NO_PUEDE_ESTUDIANTE = ["agenda", "recetar", "reconsulta", "presupuestos", "saldo", "compartirPaciente"];
+Extensiones.negar(() => (esCuentaEstudiante() ? NO_PUEDE_ESTUDIANTE : []));
+
+// Vencida o sin horas del mes: se dice ANTES de grabar.
+Extensiones.agregar("grabar", async () => {
+  if (!esCuentaEstudiante()) return "";
+  const e = await estadoEstudiante();
+  return e?.bloqueado ? e.motivo : "";
+});
+
+// La marca de cada nota grabada desde una cuenta de estudiante: queda aunque
+// después se reciba.
+Extensiones.agregar("consulta.nota", (c) => (c?.deEstudiante ? marcaNotaEstudianteHtml() : ""));
+
+// Arriba del panel: cómo está su acceso (y, prendido, su racha).
+Extensiones.agregar("panel.aviso", () => (esCuentaEstudiante()
+  ? { html: huecoAvisoEstudianteHtml(), alPintar: pintarAvisoEstudiante } : ""));
+
+// El menú de la compu: sus casos, grabar, estudiar y su configuración.
+// Agenda, indicaciones, estudios, reportes y finanzas son de un consultorio.
+const MENU_ESTUDIANTE = ["inicio", "pacientes", "voz", "estudiar", "configuracion"];
+const MENU_ESTUDIAR = { id: "estudiar", claveLabel: "escr.nav.estudiar", icono: ICONOS_ESTUDIANTE.birrete, fn: "renderEstudiar" };
+Extensiones.agregar("escritorio.menu", (items) => {
+  if (!esCuentaEstudiante()) return items;
+  return (ESTUDIANTES_PRENDIDO ? [...items, MENU_ESTUDIAR] : items)
+    .filter(i => MENU_ESTUDIANTE.includes(i.id))
+    .sort((a, b) => MENU_ESTUDIANTE.indexOf(a.id) - MENU_ESTUDIANTE.indexOf(b.id));
+});
+
+// Y lo que el estudiante hace: solo con el módulo prendido.
+if (ESTUDIANTES_PRENDIDO) {
+  // «Tengo un código de estudiante», debajo del login.
+  Extensiones.agregar("login", () => ({
+    html: `
+      <button class="link" id="lGoEstudiante" style="font-size:13px">${t("est.irRegistro")}</button>`,
+    alPintar: () => { document.getElementById("lGoEstudiante").onclick = renderRegistroEstudiante; },
+  }));
+
+  // «Estudiar» en el panel del celular, donde un médico tiene la agenda.
+  Extensiones.agregar("panel.pestanas", () => (esCuentaEstudiante() ? {
+    html: `<button class="tab" id="btnEstudiar"><span class="tab-icono">${ICONOS_ESTUDIANTE.birrete}</span>${t("pacientes.tab.estudiar")}</button>`,
+    alPintar: () => { const b = document.getElementById("btnEstudiar"); if (b) b.onclick = () => renderEstudiar(); },
+  } : ""));
+
+  // El tutor (public/js/estudiantesTutor.js): mientras graba, y en la consulta.
+  Extensiones.agregar("notaEnVivo", ({ conNota, extras }) => tutorEnVivoHtml(extras?.tutor, conNota));
+  Extensiones.agregar("consulta.despues", (c) => ({ html: razonamientoTarjetaHtml(c), alPintar: () => engancharRazonamiento(c._id) }));
+
+  // Sus pantallas: con dirección propia, sin repintarse solas, y las tres
+  // marcan «Estudiar» en el menú de la compu.
+  const marcaEstudiar = { id: "estudiar", claveLabel: "escr.nav.estudiar" };
+  Extensiones.pantalla({ fn: "renderEstudiar", tipo: "estudiar", ruta: "estudiar", menu: marcaEstudiar });
+  Extensiones.pantalla({ fn: "renderPacienteVirtual", tipo: "pacienteVirtual", ruta: "paciente-virtual", menu: marcaEstudiar });
+  Extensiones.pantalla({ fn: "renderSimulacros", tipo: "simulacros", ruta: "simulacros", menu: marcaEstudiar });
 }

@@ -1,4 +1,4 @@
-// Symphomed — Español · estudiar con los casos propios (public/js/estudio.js).
+// Symphomed — Español · estudiar con los casos propios (public/js/estudiantesEstudio.js).
 Object.assign(I18N.es, {
   "escr.nav.estudiar": "Estudiar",
   "pacientes.tab.estudiar": "Estudiar",

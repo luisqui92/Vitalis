@@ -4,8 +4,7 @@
 // ═══ DE DÓNDE SALEN LAS PREGUNTAS ══════════════════════════════════════════
 //
 // De sus consultas. Cada vez que un estudiante hace el razonamiento de un
-// caso (services/tutorClinico.js), ese análisis se convierte en tarjetas de
-// repaso:
+// caso (tutor.js), ese análisis se convierte en tarjetas de repaso:
 //
 //   · «¿Cuál es el diagnóstico más probable?» — de opción múltiple: el caso
 //     (sexo, edad, motivo, síntomas; nunca el nombre) y los diferenciales de
@@ -45,10 +44,11 @@
 // cuenta cuántas y de qué tipo, sin mostrar el contenido de ningún caso).
 const crypto = require("crypto");
 const mongoose = require("mongoose");
-const { TarjetaEstudio, ConsultaMedica, Paciente, Medico, PreguntaSimulacro, SimulacionPaciente, Simulacro } = require("../db/models");
-const { zonaValida, hoyEnZona, instanteEnZona, fechaStrEnZona } = require("./zonaHoraria");
-const { ErrorHttp } = require("./httpHelpers");
-const { PALABRAS_MINIMAS } = require("./tutorClinico");
+const { ConsultaMedica, Paciente, Medico } = require("../../db/models");
+const { TarjetaEstudio, RazonamientoDiagnostico, RachaEstudio, PreguntaSimulacro, SimulacionPaciente, Simulacro } = require("./modelos");
+const { zonaValida, hoyEnZona, instanteEnZona, fechaStrEnZona } = require("../../services/zonaHoraria");
+const { ErrorHttp } = require("../../services/httpHelpers");
+const { PALABRAS_MINIMAS } = require("./tutor");
 
 const CAJA_MAX = 5;
 const CAJA_DOMINADA = 4;
@@ -63,7 +63,7 @@ const POR_REPASO = 10;
 // En una misma sentada, el diagnóstico antes que lo demás: «¿qué estudio
 // confirma una apendicitis?» le soplaría la respuesta a «¿cuál es el
 // diagnóstico más probable?» del mismo caso.
-// Las "pregunta" son las que erró en un simulacro (services/simulacros.js).
+// Las "pregunta" son las que erró en un simulacro (simulacros.js).
 const ORDEN_TIPO = { dx: 0, estudio: 1, banderas: 2, faltoPreguntar: 3, pregunta: 4 };
 // Las que se contestan eligiendo una opción; las otras, «me acordaba o no».
 const DE_OPCIONES = new Set(["dx", "pregunta"]);
@@ -181,14 +181,17 @@ function tarjetasDeCaso(consulta, paciente, azar = mezclar) {
 // Crea las que falten de una consulta. Se puede llamar las veces que sea: la
 // base no deja dos del mismo tipo para la misma consulta.
 async function crearTarjetasDeConsulta(consultaId, ahora = new Date()) {
-  const consulta = await ConsultaMedica.findById(consultaId)
-    .select("medicoPhone pacienteId createdAt notaClinica.motivoConsulta notaClinica.sintomas notaClinica.antecedentesRelevantes razonamiento")
-    .lean();
-  if (!consulta?.razonamiento?.en) return 0;
+  const [consulta, razonamiento] = await Promise.all([
+    ConsultaMedica.findById(consultaId)
+      .select("medicoPhone pacienteId createdAt notaClinica.motivoConsulta notaClinica.sintomas notaClinica.antecedentesRelevantes")
+      .lean(),
+    RazonamientoDiagnostico.findOne({ consultaId }).lean(),
+  ]);
+  if (!consulta || !razonamiento?.en || razonamiento.medicoPhone !== consulta.medicoPhone) return 0;
   const paciente = await Paciente.findOne({ _id: consulta.pacienteId, medicoPhone: consulta.medicoPhone })
     .select("sexo fechaNacimiento").lean();
   let creadas = 0;
-  for (const { tipo, ...resto } of tarjetasDeCaso(consulta, paciente)) {
+  for (const { tipo, ...resto } of tarjetasDeCaso({ ...consulta, razonamiento }, paciente)) {
     try {
       const r = await TarjetaEstudio.updateOne(
         { consultaId: consulta._id, tipo },
@@ -205,14 +208,14 @@ async function crearTarjetasDeConsulta(consultaId, ahora = new Date()) {
 // Las de los razonamientos que todavía no tienen tarjetas: los que se
 // hicieron antes de que esto existiera, o si crearlas falló en el momento.
 async function asegurarTarjetas(medicoPhone, ahora = new Date()) {
-  const [conRazonamiento, conTarjetas] = await Promise.all([
-    ConsultaMedica.find({ medicoPhone, "razonamiento.en": { $ne: null } }).select("_id").lean(),
+  const [razonadas, conTarjetas] = await Promise.all([
+    RazonamientoDiagnostico.distinct("consultaId", { medicoPhone }),
     TarjetaEstudio.distinct("consultaId", { medicoPhone }),
   ]);
   const tienen = new Set(conTarjetas.map(String));
   let creadas = 0;
-  for (const c of conRazonamiento.filter(x => !tienen.has(String(x._id))).slice(0, 20)) {
-    creadas += await crearTarjetasDeConsulta(c._id, ahora);
+  for (const consultaId of razonadas.filter(id => !tienen.has(String(id))).slice(0, 20)) {
+    creadas += await crearTarjetasDeConsulta(consultaId, ahora);
   }
   return creadas;
 }
@@ -350,18 +353,25 @@ async function deshacerReporte(medicoPhone, tarjetaId) {
 // ya encuentra el día anotado (el update solo pasa si nadie lo cambió).
 async function marcarDiaDeEstudio(medicoPhone, zona, ahora = new Date()) {
   const hoy = fechaStrEnZona(zona, ahora);
+  // Solo las cuentas de estudiante tienen racha.
+  if (!(await Medico.exists({ phone: medicoPhone, "estudiante.nivel": { $exists: true } }))) return null;
   for (let intento = 0; intento < 3; intento++) {
-    const m = await Medico.findOne({ phone: medicoPhone }).select("estudiante").lean();
-    if (!m?.estudiante?.nivel) return null;
-    const r = m.estudiante.racha || {};
-    const previo = r.ultimoDia || "";
+    const r = await RachaEstudio.findOne({ medicoPhone }).lean();
+    const previo = r?.ultimoDia || "";
     if (previo === hoy) return { actual: r.actual || 0, mejor: r.mejor || 0, hoyHecho: true, subio: false };
     const actual = previo && previo === diaAnterior(hoy) ? (r.actual || 0) + 1 : 1;
-    const mejor = Math.max(r.mejor || 0, actual);
-    const res = await Medico.updateOne(
-      { phone: medicoPhone, "estudiante.racha.ultimoDia": previo || { $in: [null, ""] } },
-      { $set: { "estudiante.racha": { actual, mejor, ultimoDia: hoy } } });
-    if (res.modifiedCount) return { actual, mejor, hoyHecho: true, subio: true };
+    const mejor = Math.max(r?.mejor || 0, actual);
+    try {
+      // La primera vez se crea; después, solo si nadie la cambió desde que se
+      // leyó. Si dos llegan juntas, la segunda no encuentra el día de antes
+      // (o choca con la que ya se creó) y vuelve a leer.
+      const res = r
+        ? await RachaEstudio.updateOne({ medicoPhone, ultimoDia: previo }, { $set: { actual, mejor, ultimoDia: hoy } })
+        : await RachaEstudio.create({ medicoPhone, actual, mejor, ultimoDia: hoy }).then(() => ({ modifiedCount: 1 }));
+      if (res.modifiedCount) return { actual, mejor, hoyHecho: true, subio: true };
+    } catch (e) {
+      if (e?.code !== 11000) throw e;
+    }
   }
   return null;
 }
@@ -412,11 +422,12 @@ function logrosDe(numeros) {
 // ─── EL RESUMEN ────────────────────────────────────────────────────────────
 
 // Las consultas que todavía puede razonar: con la nota lista y con algo que
-// leer — el mismo criterio que la tarjeta de public/js/consultas.js.
+// leer — el mismo criterio que la tarjeta de public/js/estudiantesTutor.js.
 async function casosPorRazonar(medicoPhone, max = 5) {
   const palabras = (campo) => ({ $size: { $split: [{ $ifNull: [campo, ""] }, " "] } });
+  const razonadas = await RazonamientoDiagnostico.distinct("consultaId", { medicoPhone });
   const xs = await ConsultaMedica.aggregate([
-    { $match: { medicoPhone, notaClinicaEstado: "completado", "razonamiento.en": null } },
+    { $match: { medicoPhone, notaClinicaEstado: "completado", _id: { $nin: razonadas } } },
     { $sort: { createdAt: -1 } },
     { $limit: 50 },
     { $project: { createdAt: 1, motivo: "$notaClinica.motivoConsulta",
@@ -427,15 +438,15 @@ async function casosPorRazonar(medicoPhone, max = 5) {
 }
 
 async function resumen(medicoPhone, zona, ahora = new Date()) {
-  const [porCaja, paraHoy, casos, acertados, medico, porRazonar, pacientesVirtuales, simulacros, simulacrosAltos] = await Promise.all([
+  const [porCaja, paraHoy, casos, acertados, rachaGuardada, porRazonar, pacientesVirtuales, simulacros, simulacrosAltos] = await Promise.all([
     TarjetaEstudio.aggregate([
       { $match: vigentes(medicoPhone) },
       { $group: { _id: "$caja", n: { $sum: 1 }, aciertos: { $sum: "$aciertos" }, errores: { $sum: "$errores" } } },
     ]),
     TarjetaEstudio.countDocuments({ ...vigentes(medicoPhone), proxima: { $lte: ahora } }),
-    ConsultaMedica.countDocuments({ medicoPhone, "razonamiento.en": { $ne: null } }),
-    ConsultaMedica.countDocuments({ medicoPhone, "razonamiento.en": { $ne: null }, "razonamiento.resultado.acertoPrincipal": true }),
-    Medico.findOne({ phone: medicoPhone }).select("estudiante.racha").lean(),
+    RazonamientoDiagnostico.countDocuments({ medicoPhone }),
+    RazonamientoDiagnostico.countDocuments({ medicoPhone, "resultado.acertoPrincipal": true }),
+    RachaEstudio.findOne({ medicoPhone }).lean(),
     casosPorRazonar(medicoPhone),
     SimulacionPaciente.countDocuments({ medicoPhone, estado: "terminada" }),
     Simulacro.countDocuments({ medicoPhone, estado: "terminado" }),
@@ -446,7 +457,7 @@ async function resumen(medicoPhone, zona, ahora = new Date()) {
   const dominadas = suma("n", x => x._id >= CAJA_DOMINADA);
   const aciertos = suma("aciertos");
   const respuestas = aciertos + suma("errores");
-  const racha = rachaVisible(medico?.estudiante?.racha, zona, ahora);
+  const racha = rachaVisible(rachaGuardada, zona, ahora);
   return {
     racha,
     paraHoy,

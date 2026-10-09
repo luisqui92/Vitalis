@@ -26,15 +26,16 @@ async function renderSeguridad() {
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
     pintarFotoPerfil();
-    // Un estudiante no carga saldo: su acceso es el código (public/js/estudiantes.js).
-    if (!(typeof esCuentaEstudiante === "function" && esCuentaEstudiante())) pintarSaldo();
+    // Solo si esta cuenta maneja saldo (public/js/extensiones.js → puede):
+    // una cuenta de estudiante, por ejemplo, entra con un código.
+    if (puede("saldo")) pintarSaldo();
     // Sin await, como los demás: si Memed no contesta, Configuración se abre
     // igual. Y en cuentas que no recetan por Memed no dibuja nada.
     if (typeof memedPintarConsejo === "function") memedPintarConsejo();
     // Mismo corte que ya usa el servidor para esta puerta (requireAuth de
     // /medico/baja/solicitar): un director es "medico" para el token igual
-    // que un médico de a pie — ver el comentario de tokenDeMedico en routes/
-    // medicoAuth.js. Solo el personal administrativo (rol "admin") no tiene
+    // que un médico de a pie — ver el comentario de tokenDeMedico en
+    // services/sesionMedico.js. Solo el personal administrativo (rol "admin") no tiene
     // este botón, porque esa cuenta no la creó por su cuenta: la dio de alta
     // el director de la clínica, así que no es sobre ella que rige 5.1.1(v).
     if (typeof MEDICO_ROL === "undefined" || MEDICO_ROL !== "admin") pintarCerrarCuenta();

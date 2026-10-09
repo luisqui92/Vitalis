@@ -104,16 +104,14 @@ function renderNuevaConsulta(pacienteId, pacienteNombre) {
   // se detiene sin pintar nada (la pantalla ya no está).
   let salioDeLaPantalla = false;
 
-  // Cuenta de estudiante sin acceso (vencida o sin horas del mes): se dice
-  // ANTES de grabar, que es cuando todavía se puede hacer algo
-  // (public/js/estudiantes.js). El servidor frena igual si llegara.
-  if (typeof esCuentaEstudiante === "function" && esCuentaEstudiante()) {
-    estadoEstudiante().then((e) => {
-      if (!e?.bloqueado || !document.body.contains(recBtn)) return;
-      recBtn.disabled = true;
-      recStatus.innerHTML = `<div class="error" style="margin-top:0">⚠️ ${esc(e.motivo)}</div>`;
-    });
-  }
+  // Si esta cuenta no puede grabar ahora (lo dice un módulo: el punto
+  // «grabar» de public/js/extensiones.js), se dice ANTES de empezar, que es
+  // cuando todavía se puede hacer algo. El servidor frena igual si llegara.
+  Extensiones.revisar("grabar").then((motivo) => {
+    if (!motivo || !document.body.contains(recBtn)) return;
+    recBtn.disabled = true;
+    recStatus.innerHTML = `<div class="error" style="margin-top:0">⚠️ ${esc(motivo)}</div>`;
+  });
 
   // Una grabación que quedó sin subir (la página se cerró, se salió a mitad):
   // se ofrece subirla antes de grabar otra.
@@ -262,11 +260,13 @@ const NOTA_VIVO_CADA_MS = 45000;
 
 // Lo que se ve en el recuadro de la nota en vivo. Aparte y sin estado, para
 // que se pueda probar sin grabar (scripts/pruebas/probar_estudiantes_pantalla.js).
-function notaEnVivoHtml(estado, n, noNombrados = [], tutor = null) {
+// extras: lo que los módulos sumaron al borrador en el servidor; lo pinta
+// cada uno en el lugar «notaEnVivo» (public/js/extensiones.js).
+function notaEnVivoHtml(estado, n, noNombrados = [], extras = {}) {
   if (estado === "corte") return `<div class="hint">${t("vivo.corte")}</div>`;
   if (!n) {
     return `<div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
-      <div class="hint">${t(estado === "pidiendo" ? "vivo.actualizando" : "vivo.esperando")}</div>${tutorEnVivoHtml(tutor, false)}`;
+      <div class="hint">${t(estado === "pidiendo" ? "vivo.actualizando" : "vivo.esperando")}</div>${Extensiones.lugar("notaEnVivo", { conNota: false, extras }).html}`;
   }
   const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
   // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
@@ -283,37 +283,19 @@ function notaEnVivoHtml(estado, n, noNombrados = [], tutor = null) {
     ${campo("nota.plan", n.plan)}
     ${campo("nota.medicamentos", meds)}
     ${campo("nota.examenes", (n.examenesSolicitados || []).join(", "))}
-    ${tutorEnVivoHtml(tutor, true)}`;
-}
-
-// «Te falta preguntar» y las banderas rojas, para una cuenta de estudiante.
-// conNota: si ya hay de qué hablar, «no te falta nada» también es una
-// respuesta (y una buena noticia).
-function tutorEnVivoHtml(tutor, conNota) {
-  if (!tutor) return "";
-  const preguntas = Array.isArray(tutor.preguntas) ? tutor.preguntas : [];
-  const banderas = Array.isArray(tutor.banderasRojas) ? tutor.banderasRojas : [];
-  if (!preguntas.length && !banderas.length) {
-    return conNota ? `<div class="tutor-vivo"><div class="hint" style="margin:0">${t("tutor.nadaFalta")}</div></div>` : "";
-  }
-  return `<div class="tutor-vivo">
-    ${preguntas.length ? `<div class="nota-titulo">${t("tutor.faltaPreguntar")}</div>
-      <ul class="tutor-lista">${preguntas.map(p => `<li><b>${esc(p.pregunta)}</b>${p.porQue ? `<div class="hint" style="margin:2px 0 0">${esc(p.porQue)}</div>` : ""}</li>`).join("")}</ul>` : ""}
-    ${banderas.length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div>
-      <ul class="tutor-lista">${banderas.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
-  </div>`;
+    ${Extensiones.lugar("notaEnVivo", { conNota: true, extras }).html}`;
 }
 
 function crearNotaEnVivo(pacienteId, caja, transcriptor) {
   let timer = null, enCurso = null, ultimoTexto = "", nota = null, noNombrados = [];
-  // «Te falta preguntar» de una cuenta de estudiante (services/tutorClinico.js).
-  let tutor = null;
+  // Lo que los módulos suman al borrador (llega en r.extras).
+  let extras = {};
   let completo = false, textoFinal = "", terminando = null;
   const palabras = (txt) => String(txt || "").split(/\s+/).filter(Boolean).length;
 
   function pintar(estado) {
     caja.style.display = "block";
-    caja.innerHTML = notaEnVivoHtml(estado, nota, noNombrados, tutor);
+    caja.innerHTML = notaEnVivoHtml(estado, nota, noNombrados, extras);
   }
 
   function pedir(texto, estadoAlTerminar) {
@@ -325,7 +307,7 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
     })
       .then(r => {
         if (r?.nota) { nota = r.nota; noNombrados = Array.isArray(r.noNombrados) ? r.noNombrados : []; }
-        if (r?.tutor) tutor = r.tutor;
+        if (r?.extras && Object.keys(r.extras).length) extras = r.extras;
       })
       .catch(() => { /* un borrador que no salió no frena nada */ })
       .finally(() => { enCurso = null; pintar(estadoAlTerminar); });
@@ -355,7 +337,7 @@ function crearNotaEnVivo(pacienteId, caja, transcriptor) {
   return {
     iniciar() {
       clearInterval(timer);
-      nota = null; noNombrados = []; tutor = null; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
+      nota = null; noNombrados = []; extras = {}; ultimoTexto = ""; completo = false; textoFinal = ""; enCurso = null;
       pintar("esperando");
       timer = setInterval(turno, NOTA_VIVO_CADA_MS);
     },
@@ -544,93 +526,6 @@ function pintarChecksMedicacion() {
   }).join("");
 }
 
-// ─── EL RAZONAMIENTO DIAGNÓSTICO (cuentas de estudiante) ─────────────────
-//
-// Primero piensa él: escribe su diagnóstico y sus diferenciales. Recién
-// después ve el análisis (services/tutorClinico.js). El aviso de que es una
-// ayuda para aprender va siempre, arriba.
-function razonamientoTarjetaHtml(c) {
-  if (c?.razonamiento?.en) return razonamientoResultadoHtml(c.razonamiento);
-  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
-  const texto = c?.transcripcionCompleta || c?.transcripcionEnVivo || "";
-  if (!estudiante || c?.notaClinicaEstado !== "completado" || texto.split(/\s+/).filter(Boolean).length < 15) return "";
-  return `
-    <div class="card tutor-card" id="razonamientoCard">
-      <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
-      <div class="hint" style="margin-bottom:10px">${t("tutor.consigna")}</div>
-      <label for="rzPrincipal">${t("tutor.principal")}</label>
-      <input id="rzPrincipal" type="text" maxlength="160">
-      <label for="rzDiferenciales">${t("tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
-      <input id="rzDiferenciales" type="text" maxlength="400">
-      <div id="rzErr"></div>
-      <button class="primary" id="rzBtn">${t("tutor.ver")}</button>
-      <div class="hint" style="margin-top:8px">${t("tutor.unaVez")}</div>
-    </div>`;
-}
-
-// tarjetasNuevas: las de repaso que se armaron recién con este razonamiento
-// (services/estudio.js). Al volver a abrir la consulta, solo el acceso.
-function razonamientoResultadoHtml(rz, tarjetasNuevas = 0) {
-  const r = rz.resultado || {};
-  const lista = (xs) => (xs || []).map(x => `<li>${esc(x)}</li>`).join("");
-  const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante() && typeof renderEstudiar === "function";
-  return `
-    <div class="card tutor-card" id="razonamientoCard">
-      <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
-      <div class="tutor-aviso">🎓 ${t("tutor.aviso")}</div>
-      <div class="nota-campo"><b>${t("tutor.tuRespuesta")}</b> ${esc(rz.principal)}${(rz.diferenciales || []).length ? ` · <span class="hint">${esc(rz.diferenciales.join(", "))}</span>` : ""}</div>
-      <div class="${r.acertoPrincipal ? "tutor-bien" : "tutor-mal"}">${r.acertoPrincipal ? "✓ " + t("tutor.acertaste") : "✗ " + t("tutor.noAcertaste")}</div>
-      ${r.comentario ? `<div class="nota-campo">${esc(r.comentario)}</div>` : ""}
-      ${(r.noConsideraste || []).length ? `<div class="nota-titulo">${t("tutor.noConsideraste")}</div>
-        <ul class="tutor-lista">${r.noConsideraste.map(x => `<li><b>${esc(x.diagnostico)}</b>${x.porQue ? ` — ${esc(x.porQue)}` : ""}</li>`).join("")}</ul>` : ""}
-      ${(r.diferenciales || []).length ? `<div class="nota-titulo">${t("tutor.diferencialesTitulo")}</div>
-        <ol class="tutor-lista">${r.diferenciales.map(d => `<li class="tutor-dx"><b>${esc(d.diagnostico)}</b>
-          ${(d.aFavor || []).length ? `<div class="tutor-favor">${t("tutor.aFavor")} ${esc(d.aFavor.join("; "))}</div>` : ""}
-          ${(d.enContra || []).length ? `<div class="tutor-contra">${t("tutor.enContra")} ${esc(d.enContra.join("; "))}</div>` : ""}
-          ${d.estudio ? `<div class="hint" style="margin:2px 0 0">${t("tutor.estudio")} ${esc(d.estudio)}</div>` : ""}</li>`).join("")}</ol>` : ""}
-      ${(r.banderasRojas || []).length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div><ul class="tutor-lista">${lista(r.banderasRojas)}</ul>` : ""}
-      ${(r.faltoPreguntar || []).length ? `<div class="nota-titulo">${t("tutor.faltoPreguntar")}</div><ul class="tutor-lista">${lista(r.faltoPreguntar)}</ul>` : ""}
-      ${r.perla ? `<div class="tutor-perla">💡 ${esc(r.perla)}</div>` : ""}
-      ${estudiante ? `<div class="tutor-estudiar">
-        <span class="hint" style="margin:0">${tarjetasNuevas ? t(tarjetasNuevas === 1 ? "estudio.nuevas.una" : "estudio.nuevas.varias", { n: tarjetasNuevas }) : t("estudio.nuevas.repasar")}</span>
-        <button type="button" class="secondary" id="rzIrEstudiar">${t("estudio.nuevas.ir")}</button>
-      </div>` : ""}
-    </div>`;
-}
-
-function engancharIrAEstudiar() {
-  const ir = document.getElementById("rzIrEstudiar");
-  if (ir) ir.onclick = () => renderEstudiar();
-}
-
-function engancharRazonamiento(id) {
-  engancharIrAEstudiar();
-  const btn = document.getElementById("rzBtn");
-  if (!btn) return;
-  btn.onclick = async () => {
-    const principal = document.getElementById("rzPrincipal").value.trim();
-    const diferenciales = document.getElementById("rzDiferenciales").value.split(",").map(x => x.trim()).filter(Boolean);
-    const err = document.getElementById("rzErr");
-    err.innerHTML = "";
-    if (principal.length < 3) { err.innerHTML = `<div class="error">${t("tutor.errPrincipal")}</div>`; return; }
-    btn.disabled = true;
-    btn.textContent = t("tutor.pensando");
-    try {
-      const r = await api(`/medico/consultas/${id}/razonamiento`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ principal, diferenciales }),
-      });
-      const card = document.getElementById("razonamientoCard");
-      if (card) card.outerHTML = razonamientoResultadoHtml(r.razonamiento, r.tarjetas || 0);
-      engancharIrAEstudiar();
-    } catch (e) {
-      btn.disabled = false;
-      btn.textContent = t("tutor.ver");
-      err.innerHTML = `<div class="error">${esc((e.status && e.status < 500 && e.error) || t("tutor.errGeneral"))}</div>`;
-    }
-  };
-}
-
 // ─── LA VERIFICACIÓN DE LA NOTA EN VIVO (services/notaEnVivo.js) ────────
 //
 // La nota se escribió con el texto en vivo; la transcripción completa la
@@ -721,6 +616,10 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
     const enVivo = c.notaFuente === "vivo";
     const hayNota = (c.estado === "completado" || enVivo) && c.notaClinicaEstado === "completado" && n;
     const esperandoVerif = enVivo && !yaConfirmada && ["pendiente", "verificando"].includes(c.verificacion?.estado);
+    // Lo que los módulos ponen en la consulta (public/js/extensiones.js): una
+    // marca dentro de la nota, y algo debajo de ella.
+    const marcaNota = Extensiones.lugar("consulta.nota", c);
+    const despues = Extensiones.lugar("consulta.despues", c);
 
     // ── NOTA CLÍNICA ──
     // Antes de confirmar es un formulario: la IA se equivoca (nombres de
@@ -740,7 +639,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
         notaHtml = `
           <div class="card">
             <div class="nota-titulo">${t("nota.titulo")}${c.notaEditadaPorMedico ? t("nota.corregida") : ""}</div>
-            ${c.deEstudiante && typeof marcaNotaEstudianteHtml === "function" ? marcaNotaEstudianteHtml() : ""}
+            ${marcaNota.html}
             <div class="hint" style="color:var(--success);margin-bottom:10px">${t("nota.confirmada", { fecha: new Date(c.confirmadaEn).toLocaleString(localeActual()) })}</div>
             ${n.motivoConsulta ? `<div class="nota-campo"><b>${t("nota.motivo")}</b> ${esc(n.motivoConsulta)}</div>` : ""}
             ${(n.sintomas||[]).length ? `<div class="nota-campo"><b>${t("nota.sintomas")}</b> ${esc(n.sintomas.join(", "))}</div>` : ""}
@@ -756,7 +655,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
         notaHtml = `
           <div class="card">
             <div class="nota-titulo">${t("nota.tituloIA")}</div>
-            ${c.deEstudiante && typeof marcaNotaEstudianteHtml === "function" ? marcaNotaEstudianteHtml() : ""}
+            ${marcaNota.html}
             ${enVivo ? `<div id="verifBox">${verificacionHtml(c.verificacion)}</div>` : ""}
             ${notaClinicaVaciaCliente(n) ? `<div class="error" style="margin-top:0">${t("nota.vacia")}</div>${botonRegenerarNotaHtml()}` : ""}
             <div class="hint" style="margin-bottom:12px">${t("nota.revisar")}</div>
@@ -800,12 +699,11 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
     if (hayNota && !yaConfirmada) {
       const filas = [];
 
-      // Una cuenta de estudiante no receta, no agenda reconsultas por WhatsApp
-      // ni arma presupuestos: esas filas no se ofrecen (el servidor tampoco
-      // las aplicaría — routes/consultaMedica.js, confirmar).
-      const estudiante = typeof esCuentaEstudiante === "function" && esCuentaEstudiante();
+      // Lo que esta cuenta no puede hacer (public/js/extensiones.js →
+      // puede) no se ofrece: el servidor tampoco lo aplicaría
+      // (routes/consultaMedica.js, confirmar).
       const reconsulta = n.reconsultaSugerida;
-      if (!estudiante && reconsulta?.fechaHora && reconsulta.estado === "pendiente") {
+      if (puede("reconsulta") && reconsulta?.fechaHora && reconsulta.estado === "pendiente") {
         // datetime-local necesita "YYYY-MM-DDTHH:mm" en hora local, no UTC.
         const f = new Date(reconsulta.fechaHora);
         const valorInput = new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -820,7 +718,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
 
       // El parámetro se llama "trat" y no "t": dentro de este bloque "t" es
       // la función de traducción, y usarla de nombre de variable la taparía.
-      (estudiante ? [] : (n.tratamientosSugeridos || [])).filter(trat => trat.estado === "pendiente").forEach(trat => {
+      (puede("presupuestos") ? (n.tratamientosSugeridos || []) : []).filter(trat => trat.estado === "pendiente").forEach(trat => {
         filas.push(`
           <div class="conf-fila" data-tratsug="${trat._id}">
             <label class="conf-check"><input type="checkbox" class="cf-trat" checked>
@@ -836,7 +734,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
           </div>`);
       });
 
-      if (!estudiante && (n.medicamentosRecetados || []).length) {
+      if (puede("recetar") && (n.medicamentosRecetados || []).length) {
         filas.push(`
           <div class="conf-fila">
             <label class="conf-check"><input type="checkbox" id="cfReceta" checked>
@@ -904,13 +802,13 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
       </div>
       ${hiloClinicoHtml(c)}
       ${notaHtml}
-      ${razonamientoTarjetaHtml(c)}
+      ${despues.html}
       ${confirmarHtml}
       <div style="margin-top:14px" id="cuerpoTranscripcion">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
     engancharHiloClinico();
-    engancharRazonamiento(c._id);
+    despues.alPintar();
 
     // ── medicamentos: quitar / agregar filas en la nota editable ──
     const medsBox = document.getElementById("nfMeds");

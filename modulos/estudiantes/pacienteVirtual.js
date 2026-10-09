@@ -33,12 +33,12 @@
 // · Es práctica: la evaluación la hace una IA, y la pantalla lo dice.
 const crypto = require("crypto");
 const mongoose = require("mongoose");
-const { CasoVirtual, SimulacionPaciente } = require("../db/models");
-const { log } = require("../config");
-const { perfil } = require("./idiomas");
-const ia = require("./ia");
-const { NIVELES, inicioDelMes } = require("./estudiantes");
-const { ErrorHttp } = require("./httpHelpers");
+const { CasoVirtual, SimulacionPaciente } = require("./modelos");
+const { log } = require("../../config");
+const { perfil } = require("../../services/idiomas");
+const ia = require("../../services/ia");
+const { NIVELES, inicioDelMes } = require("./cuenta");
+const { ErrorHttp } = require("../../services/httpHelpers");
 
 const AREAS = ["clinica", "pediatria", "gineco", "cirugia", "emergencias"];
 const DIFICULTADES = ["basico", "intermedio", "avanzado"];

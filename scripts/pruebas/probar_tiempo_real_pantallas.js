@@ -81,6 +81,10 @@ function montarFrontend() {
   ctx.window = ctx;
   ctx.doc = doc;
   vm.createContext(ctx);
+  // Los puntos de extensión (public/js/extensiones.js) son del núcleo, como
+  // i18n.js. Sin ningún módulo cargado, cada lugar queda vacío y cada permiso
+  // dice que sí: la pantalla de siempre.
+  vm.runInContext(fs.readFileSync(path.join(RAIZ, "public", "js", "extensiones.js"), "utf8"), ctx);
   vm.runInContext(fs.readFileSync(path.join(RAIZ, "public", "js", "realtime.js"), "utf8"), ctx);
   return { ctx, llamadas };
 }

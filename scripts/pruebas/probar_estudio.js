@@ -1,4 +1,4 @@
-// Symphomed — Estudiar con los casos propios (services/estudio.js, etapa 3).
+// Symphomed — Estudiar con los casos propios (modulos/estudiantes/estudio.js, etapa 3).
 //
 // Lo que se prueba:
 //   · que las tarjetas salen del razonamiento guardado, sin llamar a la IA,
@@ -63,7 +63,7 @@ axios.post = async (_url, cuerpo) => {
 const TEXTO = "Buenas tardes me duele la panza desde ayer primero alrededor del ombligo y ahora abajo a la derecha tengo fiebre y vomité dos veces";
 
 (async () => {
-  const estudio = require(path.join(RAIZ, "services", "estudio"));
+  const estudio = require(path.join(RAIZ, "modulos", "estudiantes", "estudio"));
   const { tarjetasDeCaso, paraMostrar, inicioDeDia, diaAnterior, rachaVisible, logrosDe } = estudio;
 
   console.log("── 1. De un razonamiento, las tarjetas (sin base) ──");
@@ -146,10 +146,10 @@ const TEXTO = "Buenas tardes me duele la panza desde ayer primero alrededor del 
   require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = process.env.MONGODB_URI;
   const mongoose = require("mongoose");
   await mongoose.connect(process.env.MONGODB_URI);
-  const M = require(path.join(RAIZ, "db", "models"));
+  const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
-  await M.TarjetaEstudio.syncIndexes();
+  for (const modelo of [M.TarjetaEstudio, M.RazonamientoDiagnostico, M.RachaEstudio]) await modelo.syncIndexes();
 
   const enSeisMeses = new Date(Date.now() + 180 * 86400000);
   const est = (phone, zonaHoraria) => M.Medico.create({ phone, nombre: "Est " + phone, passwordHash: "x", activo: true, zonaHoraria,
@@ -167,9 +167,9 @@ const TEXTO = "Buenas tardes me duele la panza desde ayer primero alrededor del 
   const express = require("express");
   const app = express();
   app.use(express.json());
-  app.use(require(path.join(RAIZ, "services", "estudiantes")).middlewareEstudiantes);
+  // El módulo, montado igual que en index.js: antes de las rutas del núcleo.
+  require(path.join(RAIZ, "modulos", "estudiantes")).montar(app);
   require(path.join(RAIZ, "routes", "consultaMedica"))(app);
-  require(path.join(RAIZ, "routes", "estudio"))(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
@@ -180,13 +180,17 @@ const TEXTO = "Buenas tardes me duele la panza desde ayer primero alrededor del 
   let r = await P("POST", `/medico/consultas/${c1._id}/razonamiento`, tkEst, { principal: "Apendicitis", diferenciales: "Gastroenteritis" });
   verificar("razonar → 200, y avisa que se armaron 4 tarjetas", r.estado === 200 && r.cuerpo.tarjetas === 4);
   verificar("  ...guardadas, en la caja 1, para ya", (await M.TarjetaEstudio.countDocuments({ consultaId: c1._id, caja: 1, proxima: { $lte: new Date() } })) === 4);
-  let yo = await M.Medico.findOne({ phone: "59170070001" }).lean();
-  verificar("  ...y razonar cuenta como día de estudio: racha 1", yo.estudiante.racha?.actual === 1 && yo.estudiante.racha.mejor === 1);
+  const racha1 = await M.RachaEstudio.findOne({ medicoPhone: "59170070001" }).lean();
+  verificar("  ...y razonar cuenta como día de estudio: racha 1", racha1?.actual === 1 && racha1.mejor === 1);
+  verificar("  ...el razonamiento queda en su colección, no en la consulta",
+    (await M.RazonamientoDiagnostico.countDocuments({ consultaId: c1._id, medicoPhone: "59170070001" })) === 1
+    && !("razonamiento" in (await M.ConsultaMedica.collection.findOne({ _id: c1._id }))));
   verificar("crearlas otra vez no duplica nada", (await estudio.crearTarjetasDeConsulta(c1._id)) === 0 && (await M.TarjetaEstudio.countDocuments()) === 4);
   const llamadasAntes = llamadas.razonamiento + llamadas.otras;
 
   // Otra consulta razonada «antes de que esto existiera»: con razonamiento y sin tarjetas.
-  const c2 = await consulta({ razonamiento: { ...consultaBase.razonamiento, en: new Date() } });
+  const c2 = await consulta();
+  await M.RazonamientoDiagnostico.create({ medicoPhone: "59170070001", consultaId: c2._id, ...consultaBase.razonamiento, en: new Date() });
   // Por razonar: una lista, otra sin nota todavía, otra casi sin texto.
   const c3 = await consulta({ notaClinica: { motivoConsulta: "Tos de una semana" } });
   await consulta({ notaClinicaEstado: "pendiente" });
@@ -278,9 +282,16 @@ const TEXTO = "Buenas tardes me duele la panza desde ayer primero alrededor del 
   x = await estudio.marcarDiaDeEstudio(telR, SP, dia("2026-10-09T12:00:00Z"));
   verificar("saltearse un día → vuelve a 1, y la mejor queda en 3", x.actual === 1 && x.mejor === 3);
   const juntas = await Promise.all([1, 2, 3].map(() => estudio.marcarDiaDeEstudio(telR, SP, dia("2026-10-10T12:00:00Z"))));
-  const rr = (await M.Medico.findOne({ phone: telR }).lean()).estudiante.racha;
+  const rr = await M.RachaEstudio.findOne({ medicoPhone: telR }).lean();
   verificar("tres respuestas juntas el mismo día → suma UNA", rr.actual === 2 && rr.ultimoDia === "2026-10-10" && juntas.filter(j => j?.subio).length === 1);
   verificar("un médico (sin cuenta de estudiante) no tiene racha", (await estudio.marcarDiaDeEstudio("70070009", LP)) === null);
+  // La primera vez se CREA la racha: tres juntas no pueden crear tres, ni
+  // sumar tres. Lo frena el índice único por cuenta.
+  await est("59170070003", LP);
+  const primeras = await Promise.all([1, 2, 3].map(() => estudio.marcarDiaDeEstudio("59170070003", LP, dia("2026-10-10T12:00:00Z"))));
+  const nueva = await M.RachaEstudio.find({ medicoPhone: "59170070003" }).lean();
+  verificar("tres juntas el primer día de una cuenta → una sola racha, en 1, y suma UNA",
+    nueva.length === 1 && nueva[0].actual === 1 && primeras.filter(j => j?.subio).length === 1 && primeras.every(j => j?.actual === 1));
 
   console.log("\n── 8. «Esta pregunta está mal» ──");
   const tRep = await M.TarjetaEstudio.findOne({ consultaId: c2._id, tipo: "estudio" }).lean();

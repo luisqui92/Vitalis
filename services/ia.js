@@ -1,7 +1,7 @@
 // Symphomed — Los pedidos a la IA de texto, en un solo lugar.
 //
-// Lo usan el tutor clínico, el paciente virtual y los simulacros de las
-// cuentas de estudiante. La dirección sale de CONFIG.OPENAI_URL (ver
+// Lo usan los módulos que le piden texto a la IA (hoy, modulos/estudiantes:
+// el tutor, el paciente virtual y los simulacros). La dirección sale de CONFIG.OPENAI_URL (ver
 // config/index.js): así las pruebas de pantalla la pueden apuntar a una IA de
 // mentira y probar todo el camino, del navegador a la base.
 const axios = require("axios");

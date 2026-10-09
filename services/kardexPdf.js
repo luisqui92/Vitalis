@@ -173,14 +173,15 @@ function crearPie({ membrete, T }) {
 }
 
 // ─── El cuerpo ─────────────────────────────────────────────────────────────
-function bloquesDelKardex({ contenido: c, paciente, recetas, consultasSinConfirmar, T, f, locale, hoy, firma, deEstudiante = false }) {
+function bloquesDelKardex({ contenido: c, paciente, recetas, consultasSinConfirmar, T, f, locale, hoy, firma, alertas = [] }) {
   const B = [];
   const S = T.secciones;
 
-  // 0. Si lo escribió un estudiante, lo primero que se lee
-  // (services/estudiantes.js): sin la firma del médico responsable, esto no
-  // es una historia clínica válida.
-  if (deEstudiante) B.push({ tipo: "alerta", nivel: "peligro", titulo: T.estudiante.titulo, texto: T.estudiante.texto });
+  // 0. Lo que tiene que leerse antes que nada. Llega ya escrito en el idioma
+  // de la cuenta, de los módulos (el punto «kardex.alertas» de
+  // services/extensiones.js): por ejemplo, que sin la firma del médico
+  // responsable esto no es una historia clínica válida.
+  for (const a of alertas) B.push({ tipo: "alerta", nivel: a.nivel || "peligro", titulo: a.titulo, texto: a.texto });
 
   // 1. Quién es.
   B.push({ tipo: "seccion", texto: S.paciente });
@@ -312,8 +313,9 @@ function bloquesDelKardex({ contenido: c, paciente, recetas, consultasSinConfirm
 }
 
 // armarKardexPdf({ contenido, paciente, recetas, consultasSinConfirmar,
-//                  medico, membrete, idioma, zonaHoraria, generadoEn }) → Buffer
-function armarKardexPdf({ contenido, paciente, recetas = [], consultasSinConfirmar = 0, medico, membrete, idioma, zonaHoraria, generadoEn = new Date(), deEstudiante = false }) {
+//                  medico, membrete, idioma, zonaHoraria, generadoEn,
+//                  alertas: [{ titulo, texto, nivel? }] }) → Buffer
+function armarKardexPdf({ contenido, paciente, recetas = [], consultasSinConfirmar = 0, medico, membrete, idioma, zonaHoraria, generadoEn = new Date(), alertas = [] }) {
   const p = perfil(idioma);
   const T = p.kardex;
   const zona = zonaValida(zonaHoraria, p.zonaHoraria);
@@ -323,7 +325,7 @@ function armarKardexPdf({ contenido, paciente, recetas = [], consultasSinConfirm
     registro: registroDe(medico, membrete),
   };
   return generarPdf({
-    bloques: bloquesDelKardex({ contenido, paciente, recetas, consultasSinConfirmar, T, f, locale: p.locale, hoy: generadoEn, firma, deEstudiante }),
+    bloques: bloquesDelKardex({ contenido, paciente, recetas, consultasSinConfirmar, T, f, locale: p.locale, hoy: generadoEn, firma, alertas }),
     encabezado: crearEncabezado({ medico, membrete, paciente, T, generado: f.momento(generadoEn) }),
     pie: crearPie({ membrete, T }),
     imagenes: membrete?.logo ? { logo: membrete.logo } : {},

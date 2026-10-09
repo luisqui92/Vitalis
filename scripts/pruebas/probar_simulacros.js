@@ -95,7 +95,7 @@ axios.post = async (_url, cuerpo) => {
 };
 
 (async () => {
-  const sim = require(path.join(RAIZ, "services", "simulacros"));
+  const sim = require(path.join(RAIZ, "modulos", "estudiantes", "simulacros"));
 
   console.log("── 1. Una pregunta bien armada (sin base) ──");
   const buena = pregunta("asma");
@@ -120,10 +120,10 @@ axios.post = async (_url, cuerpo) => {
   require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = process.env.MONGODB_URI;
   const mongoose = require("mongoose");
   await mongoose.connect(process.env.MONGODB_URI);
-  const M = require(path.join(RAIZ, "db", "models"));
+  const M = { ...require(path.join(RAIZ, "db", "models")), ...require(path.join(RAIZ, "modulos", "estudiantes", "modelos")) };
   const { generarToken } = require(path.join(RAIZ, "services", "auth"));
   await mongoose.connection.dropDatabase();
-  await M.TarjetaEstudio.syncIndexes();
+  for (const modelo of [M.TarjetaEstudio, M.RachaEstudio]) await modelo.syncIndexes();
 
   console.log("\n── 2. Generar y verificar ──");
   modo.generar = "sucio";
@@ -152,9 +152,8 @@ axios.post = async (_url, cuerpo) => {
   const express = require("express");
   const app = express();
   app.use(express.json());
-  app.use(require(path.join(RAIZ, "services", "estudiantes")).middlewareEstudiantes);
-  require(path.join(RAIZ, "routes", "estudio"))(app);
-  require(path.join(RAIZ, "routes", "simulacros"))(app);
+  // El módulo, montado igual que en index.js.
+  require(path.join(RAIZ, "modulos", "estudiantes")).montar(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
@@ -281,7 +280,7 @@ axios.post = async (_url, cuerpo) => {
   r = await P("GET", "/medico/estudio/resumen", tkC);
   const logros = Object.fromEntries(r.cuerpo.resumen.logros.map(l => [l.id, l.hecho]));
   verificar("los logros: primer simulacro, y uno con el 80 % o más", logros.simulacro1 === true && logros.simulacro80 === true);
-  verificar("  ...y responder cuenta como día de estudio", (await M.Medico.findOne({ phone: "59170095003" }).lean()).estudiante.racha?.actual === 1);
+  verificar("  ...y responder cuenta como día de estudio", (await M.RachaEstudio.findOne({ medicoPhone: "59170095003" }).lean())?.actual === 1);
   await M.Simulacro.insertMany(Array.from({ length: 45 }, () => ({ medicoPhone: "59170095003", area: "clinica", cantidad: 10, estado: "terminado" })));
   r = await P("POST", "/medico/simulacros", tkC, { area: "clinica", cantidad: 10, modo: "practica" });
   verificar("con el cupo del mes usado (45 en interno) → 402, y lo dice", r.estado === 402 && /45 simulacros/.test(r.cuerpo.error));

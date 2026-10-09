@@ -179,12 +179,18 @@ const medicoSchema = new mongoose.Schema({
   // ya hubo alguien que respondió por esa persona, que es justamente lo que
   // esta fila busca.
   estadoCuenta: { type: String, enum: ["pendiente", "aprobada", "rechazada"], default: "aprobada", index: true },
-  // ─── Cuenta de estudiante (ver services/estudiantes.js) ─────────────────
+  // ─── Cuenta de estudiante (la maneja modulos/estudiantes) ───────────────
   //
   // Estudiantes, internos y residentes entran con un código de invitación
   // que da Symphomed, uno por persona. Ven un Symphomed más simple: graban,
   // tienen sus casos y su nota, pero no recetan, no le escriben a pacientes
   // ni cobran — eso lo bloquea el servidor, no solo la pantalla.
+  //
+  // Está acá y no en las colecciones del módulo porque es de la cuenta: el
+  // núcleo no lo lee nunca, pero vive en el mismo documento que el resto de
+  // lo que es la cuenta. Lo que el estudiante hace (sus tarjetas, su racha,
+  // sus prácticas) sí está en las colecciones del módulo
+  // (modulos/estudiantes/modelos.js).
   //
   // Vacío en las cuentas de médico. Al recibirse se borra este bloque
   // (scripts/codigos_estudiante.js convertir) y la cuenta pasa a ser de
@@ -199,14 +205,6 @@ const medicoSchema = new mongoose.Schema({
       horasMes: { type: Number, default: 0 },
       codigo: { type: String, default: "" },
       universidad: { type: String, default: "" },
-      // Días seguidos estudiando (services/estudio.js). ultimoDia va como
-      // "YYYY-MM-DD" en la zona de la cuenta: el «hoy» es el suyo, no el del
-      // servidor.
-      racha: {
-        actual: { type: Number, default: 0 },
-        mejor: { type: Number, default: 0 },
-        ultimoDia: { type: String, default: "" },
-      },
     },
     default: undefined,
   },
@@ -522,29 +520,9 @@ const consultaMedicaSchema = new mongoose.Schema({
   //               con un update atómico: nunca escriben la nota los dos.
   // La grabó una cuenta de estudiante: la nota lleva la marca «sin validez sin
   // firma del médico responsable» para siempre, aunque la cuenta pase a ser
-  // de médico al recibirse.
+  // de médico al recibirse. La pone y la lee modulos/estudiantes (por los
+  // puntos de extensión «consulta.alCrear» y «kardex.alertas»).
   deEstudiante: { type: Boolean, default: false },
-  // El ejercicio de razonamiento diagnóstico de una cuenta de estudiante
-  // (services/tutorClinico.js): lo que propuso él, y recién después el
-  // análisis. Se hace una vez por consulta — se queda para la etapa del quiz
-  // con sus propios casos.
-  razonamiento: {
-    type: {
-      principal: { type: String, default: "" },
-      diferenciales: { type: [String], default: [] },
-      resultado: {
-        diferenciales: [{ diagnostico: String, aFavor: [String], enContra: [String], estudio: String, _id: false }],
-        banderasRojas: [String],
-        faltoPreguntar: [String],
-        acertoPrincipal: Boolean,
-        comentario: String,
-        noConsideraste: [{ diagnostico: String, porQue: String, _id: false }],
-        perla: String,
-      },
-      en: { type: Date, default: null },
-    },
-    default: undefined,
-  },
   notaFuente: { type: String, enum: ["", "vivo", "audio"], default: "" },
   transcripcionEnVivo: { type: String, default: "" },
   // Solo cuando notaFuente es "vivo". Las diferencias se MUESTRAN; la nota
@@ -3228,199 +3206,6 @@ solicitudReseteoSchema.index({ tipo: 1, telefono: 1 },
   { unique: true, partialFilterExpression: { estado: { $in: ["pendiente", "aprobada"] } } });
 const SolicitudReseteo = mongoose.model("SolicitudReseteo", solicitudReseteoSchema);
 
-// ─── CÓDIGOS DE INVITACIÓN PARA ESTUDIANTES ────────────────────────────────
-//
-// Un código, una persona: el primero que lo usa se queda con él, y queda
-// anotado quién. Así Symphomed decide quién entra como estudiante, por
-// cuánto tiempo y con cuántas horas de audio. Los crea y los anula
-// scripts/codigos_estudiante.js.
-const codigoEstudianteSchema = new mongoose.Schema({
-  codigo: { type: String, required: true, unique: true },
-  nivel: { type: String, enum: ["estudiante", "interno", "residente"], required: true },
-  meses: { type: Number, required: true, min: 1, max: 24 },
-  horasMes: { type: Number, required: true, min: 1 },
-  // Lo que se cobró por este acceso, para saber qué paga cada uno.
-  precioCentavos: { type: Number, default: 0 },
-  moneda: { type: String, default: "BOB" },
-  nota: { type: String, default: "" },        // «Univalle, 5to año», «grupo de Juan»
-  // Un código que nadie usó no vale para siempre: si se pierde en un chat,
-  // que no sirva dentro de un año.
-  vence: { type: Date, required: true },
-  anulado: { type: Boolean, default: false },
-  usadoPor: { type: String, default: null, index: true },
-  usadoEn: { type: Date, default: null },
-  creadoPor: { type: String, default: "" },
-}, { timestamps: true });
-const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSchema);
-
-// ─── TARJETAS DE ESTUDIO (ver services/estudio.js) ─────────────────────────
-//
-// Las preguntas de repaso de un estudiante, hechas con SUS casos: salen del
-// razonamiento que hizo de cada consulta (ConsultaMedica.razonamiento), sin
-// pedirle nada nuevo a la IA. Se repasan espaciadas: la que sabe vuelve cada
-// vez más lejos; la que no, vuelve mañana.
-//
-// Las de tipo "pregunta" son las que erró en un simulacro (PreguntaSimulacro,
-// más abajo): no tienen consulta, tienen la pregunta.
-const tarjetaEstudioSchema = new mongoose.Schema({
-  medicoPhone: { type: String, required: true },
-  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null,
-    required() { return this.tipo !== "pregunta"; } },
-  tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar", "pregunta"], required: true },
-  preguntaId: { type: mongoose.Schema.Types.ObjectId, ref: "PreguntaSimulacro", default: null },
-  area: { type: String, default: "" },        // la del simulacro
-  enunciado: { type: String, default: "" },   // la viñeta y la pregunta del simulacro
-  // El caso, sin el nombre del paciente: lo que se lee arriba de la pregunta.
-  caso: {
-    sexo: { type: String, default: "" },
-    edad: { type: Number, default: null },        // años
-    edadMeses: { type: Number, default: null },   // solo antes de los 2 años
-    motivo: { type: String, default: "" },
-    sintomas: { type: [String], default: [] },
-    antecedentes: { type: String, default: "" },
-    fecha: { type: Date, default: null },         // la de la consulta
-  },
-  // dx: los diferenciales del caso como opciones, y cuál es el más probable.
-  // enContraDe va alineado con opciones: lo que contradice cada una, para
-  // explicarle al que eligió otra por qué no era.
-  opciones: { type: [String], default: undefined },
-  correcta: { type: Number, default: null },
-  enContraDe: { type: [String], default: undefined },
-  // El diagnóstico al que se refiere la pregunta («¿qué estudio confirma X?»).
-  sobre: { type: String, default: "" },
-  respuesta: { type: [String], default: [] },
-  // Por qué: los datos del caso a favor del diagnóstico, y la perla.
-  aFavor: { type: [String], default: [] },
-  perla: { type: String, default: "" },
-  // Repaso espaciado: caja 1 a 5 (en la 4 y la 5 cuenta como dominada).
-  caja: { type: Number, default: 1, min: 1, max: 5 },
-  proxima: { type: Date, default: Date.now },
-  vistas: { type: Number, default: 0 },
-  aciertos: { type: Number, default: 0 },
-  errores: { type: Number, default: 0 },
-  ultimaVez: { type: Date, default: null },
-  // «Esta pregunta está mal»: deja de salir. El motivo es uno de una lista
-  // (sin texto libre: no hace falta escribir datos del caso para avisar).
-  reportada: {
-    en: { type: Date, default: null },
-    motivo: { type: String, enum: ["", "respuesta", "pregunta", "datos"], default: "" },
-  },
-}, { timestamps: true });
-tarjetaEstudioSchema.index({ consultaId: 1, tipo: 1 }, { unique: true, partialFilterExpression: { consultaId: { $type: "objectId" } } });
-tarjetaEstudioSchema.index({ medicoPhone: 1, preguntaId: 1 }, { unique: true, partialFilterExpression: { preguntaId: { $type: "objectId" } } });
-tarjetaEstudioSchema.index({ medicoPhone: 1, proxima: 1 });
-const TarjetaEstudio = mongoose.model("TarjetaEstudio", tarjetaEstudioSchema);
-
-// Lo que un estudiante marcó como «está mal» en algo del banco compartido (un
-// caso del paciente virtual, una pregunta de simulacro). Con dos estudiantes
-// distintos, sale del banco.
-const reporteBancoSchema = { type: [{ medicoPhone: String, motivo: String, en: Date, _id: false }], default: [] };
-
-// ─── PACIENTE VIRTUAL (ver services/pacienteVirtual.js) ────────────────────
-//
-// Casos inventados para practicar la entrevista: ningún dato es de un
-// paciente real. El guion (lo que el paciente sabe y cuenta, el examen, los
-// estudios y el diagnóstico) lo arma una IA y otra lo resuelve a ciegas antes
-// de guardarlo. Se reusan entre estudiantes, como las estaciones de un examen
-// práctico: cada uno ve cada caso una sola vez.
-const casoVirtualSchema = new mongoose.Schema({
-  idioma: { type: String, required: true },
-  area: { type: String, required: true },
-  dificultad: { type: String, enum: ["basico", "intermedio", "avanzado"], required: true },
-  guion: { type: mongoose.Schema.Types.Mixed, required: true },
-  usos: { type: Number, default: 0 },
-  reportes: reporteBancoSchema,
-  oculto: { type: Boolean, default: false },
-}, { timestamps: true });
-casoVirtualSchema.index({ idioma: 1, area: 1, dificultad: 1, oculto: 1, usos: 1 });
-const CasoVirtual = mongoose.model("CasoVirtual", casoVirtualSchema);
-
-// Una práctica con un paciente virtual: la conversación, lo que pidió
-// examinar y los estudios, su diagnóstico y la evaluación.
-const simulacionPacienteSchema = new mongoose.Schema({
-  medicoPhone: { type: String, required: true },
-  idioma: { type: String, default: "es" },
-  area: { type: String, required: true },
-  dificultad: { type: String, required: true },
-  estado: { type: String, enum: ["preparando", "en_curso", "evaluando", "terminada", "error", "abandonada"], default: "preparando" },
-  casoId: { type: mongoose.Schema.Types.ObjectId, ref: "CasoVirtual", default: null },
-  // Una copia del guion: el banco puede cambiar; su práctica, no.
-  guion: { type: mongoose.Schema.Types.Mixed, default: null },
-  mensajes: {
-    type: [{
-      rol: { type: String, enum: ["estudiante", "paciente", "sistema"] },
-      tipo: { type: String, enum: ["inicio", "pregunta", "examen", "estudio"] },
-      texto: String,
-      en: Date,
-      _id: false,
-    }],
-    default: [],
-  },
-  // Lo que ya se contestó de examen y de estudios: pedir dos veces lo mismo
-  // da lo mismo, aunque no estuviera en el guion.
-  hallazgos: { type: [{ tipo: String, clave: String, texto: String, _id: false }], default: [] },
-  respuesta: {
-    principal: { type: String, default: "" },
-    diferenciales: { type: [String], default: [] },
-    plan: { type: String, default: "" },
-    en: { type: Date, default: null },
-  },
-  evaluacion: { type: mongoose.Schema.Types.Mixed, default: null },
-  terminadaEn: { type: Date, default: null },
-}, { timestamps: true });
-simulacionPacienteSchema.index({ medicoPhone: 1, createdAt: -1 });
-const SimulacionPaciente = mongoose.model("SimulacionPaciente", simulacionPacienteSchema);
-
-// ─── SIMULACROS (ver services/simulacros.js) ───────────────────────────────
-//
-// Preguntas tipo examen de residencia, por área. Las escribe una IA y otra
-// las responde a ciegas: solo se guardan las que las dos contestan igual y
-// sin dudar. El banco es compartido entre los estudiantes de un idioma; cada
-// uno ve cada pregunta una sola vez.
-const preguntaSimulacroSchema = new mongoose.Schema({
-  idioma: { type: String, required: true },
-  area: { type: String, required: true },
-  tema: { type: String, default: "" },
-  enunciado: { type: String, required: true },
-  opciones: { type: [String], required: true },
-  correcta: { type: Number, required: true },
-  explicacion: { type: String, default: "" },
-  porOpcion: { type: [String], default: [] },   // por qué cada opción es o no es
-  vistas: { type: Number, default: 0 },
-  aciertos: { type: Number, default: 0 },
-  reportes: reporteBancoSchema,
-  oculta: { type: Boolean, default: false },
-}, { timestamps: true });
-preguntaSimulacroSchema.index({ idioma: 1, area: 1, oculta: 1 });
-const PreguntaSimulacro = mongoose.model("PreguntaSimulacro", preguntaSimulacroSchema);
-
-// Un intento: qué preguntas le tocaron y qué contestó.
-const simulacroSchema = new mongoose.Schema({
-  medicoPhone: { type: String, required: true },
-  idioma: { type: String, default: "es" },
-  area: { type: String, required: true },
-  // práctica: ve la respuesta en cada pregunta. examen: con tiempo, al final.
-  modo: { type: String, enum: ["practica", "examen"], default: "practica" },
-  cantidad: { type: Number, required: true },
-  estado: { type: String, enum: ["preparando", "listo", "terminado", "error"], default: "preparando" },
-  preguntas: {
-    type: [{
-      preguntaId: { type: mongoose.Schema.Types.ObjectId, ref: "PreguntaSimulacro" },
-      elegida: { type: Number, default: null },
-      acerto: { type: Boolean, default: null },
-      en: { type: Date, default: null },
-      _id: false,
-    }],
-    default: [],
-  },
-  aciertos: { type: Number, default: 0 },
-  limiteSegundos: { type: Number, default: 0 },   // solo en modo examen
-  empezadoEn: { type: Date, default: null },
-  terminadoEn: { type: Date, default: null },
-}, { timestamps: true });
-simulacroSchema.index({ medicoPhone: 1, createdAt: -1 });
-const Simulacro = mongoose.model("Simulacro", simulacroSchema);
-
 // ─── ERRORES DE LA PANTALLA (ver services/erroresCliente.js) ───────────────
 //
 // Lo que falla en el celular o la compu de un médico. Agrupado: el mismo
@@ -3444,7 +3229,7 @@ const errorClienteSchema = new mongoose.Schema({
 errorClienteSchema.index({ ultima: 1 }, { expireAfterSeconds: 30 * 86400 });
 const ErrorCliente = mongoose.model("ErrorCliente", errorClienteSchema);
 
-module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, CodigoEstudiante, TarjetaEstudio, CasoVirtual, SimulacionPaciente, PreguntaSimulacro, Simulacro, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
+module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,

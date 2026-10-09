@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Symphomed — Los bancos de estudio: casos del paciente virtual y preguntas
-// de simulacro (services/pacienteVirtual.js, services/simulacros.js).
+// de simulacro (modulos/estudiantes/pacienteVirtual.js y simulacros.js).
 //
 // Se llenan solos cuando un estudiante pide algo que no hay, pero eso lo hace
 // esperar. Precargarlos una vez evita la espera de los primeros. Todo lo que
@@ -19,9 +19,9 @@
 const path = require("path");
 try { require("dotenv").config({ path: path.join(__dirname, "..", ".env") }); } catch { /* opcional */ }
 const mongoose = require("mongoose");
-const { PreguntaSimulacro, CasoVirtual } = require("../db/models");
-const simulacros = require("../services/simulacros");
-const pv = require("../services/pacienteVirtual");
+const { PreguntaSimulacro, CasoVirtual } = require("../modulos/estudiantes/modelos");
+const simulacros = require("../modulos/estudiantes/simulacros");
+const pv = require("../modulos/estudiantes/pacienteVirtual");
 
 const VERDE = (t) => `\x1b[32m${t}\x1b[0m`;
 const ROJO = (t) => `\x1b[31m${t}\x1b[0m`;
