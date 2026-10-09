@@ -2249,6 +2249,28 @@ const membreteSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Membrete = mongoose.model("Membrete", membreteSchema);
 
+// El membrete como estaba el día que se firmó un informe (routes/informes.js).
+// Se guarda una vez por versión: los informes firmados con el mismo membrete
+// apuntan a la misma copia —el logo y la firma pesan—, y cambiar el membrete
+// crea otra. La huella es de todo lo impreso: dos membretes con la misma
+// huella son el mismo.
+const membreteEmitidoSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true },
+  huella: { type: String, required: true },
+  nombreCentro: { type: String, default: "" },
+  direccion: { type: String, default: "" },
+  telefono: { type: String, default: "" },
+  ciudad: { type: String, default: "" },
+  profesionalNombre: { type: String, default: "" },
+  profesionalTitulo: { type: String, default: "" },
+  profesionalRegistro: { type: String, default: "" },
+  piePagina: { type: String, default: "" },
+  logo: { type: String, default: "" },
+  firma: { type: String, default: "" },
+}, { timestamps: true });
+membreteEmitidoSchema.index({ medicoPhone: 1, huella: 1 }, { unique: true });
+const MembreteEmitido = mongoose.model("MembreteEmitido", membreteEmitidoSchema);
+
 const informeSchema = new mongoose.Schema({
   pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
   medicoPhone: { type: String, index: true, required: true },
@@ -2285,6 +2307,16 @@ const informeSchema = new mongoose.Schema({
   compartidoEn: { type: Date, default: null },
   vistoEn: { type: Date, default: null },
   vistas: { type: Number, default: 0 },
+
+  // Lo impreso, congelado al firmar: el membrete de ese día y el paciente
+  // como estaba. Si después el médico cambia de matrícula o de logo, o el
+  // paciente de nombre, el informe firmado sigue diciendo lo que decía. Un
+  // borrador no tiene esto: se ve con lo de hoy.
+  membreteEmitido: { type: mongoose.Schema.Types.ObjectId, ref: "MembreteEmitido", default: null },
+  pacienteEmitido: {
+    type: new mongoose.Schema({ nombre: String, codigo: String, sexo: String, edad: Number }, { _id: false }),
+    default: null,
+  },
 }, { timestamps: true });
 informeSchema.index({ medicoPhone: 1, codigo: 1 }, { unique: true });
 const Informe = mongoose.model("Informe", informeSchema);
@@ -3249,7 +3281,7 @@ module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, ResumenCompartido, LlavePaci
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
-  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, Informe,
+  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, MembreteEmitido, Informe,
   CALIFICACIONES_INSTRUMENTO,
   InformeFamilia, EquipoNeuro,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,

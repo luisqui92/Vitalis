@@ -386,6 +386,11 @@ server.listen(PORT, () => log.info(`🚀 Symphomed corriendo en puerto ${PORT}`)
 require("./routes/consultaMedica").retomarConsultas()
   .then((r) => { if (r.transcripciones || r.sinAudio || r.notas || r.sobras) log.info("[CONSULTA_MEDICA] retomado al arrancar:", JSON.stringify(r)); })
   .catch((e) => log.error("[CONSULTA_MEDICA] no se pudo retomar lo interrumpido:", e.message));
+// Los informes firmados antes de que lo impreso se congelara (ver
+// routes/informes.js): una sola vez, después no encuentra ninguno.
+require("./routes/informes").congelarInformesFirmados()
+  .then((n) => { if (n) log.info(`[INFORMES] ${n} informe(s) firmado(s) congelado(s) con su membrete`); })
+  .catch((e) => log.error("[INFORMES] no se pudieron congelar los firmados:", e.message));
 
 // Copias de seguridad automáticas. Va acá, después de levantar el servidor,
 // para que un problema con los respaldos nunca impida que Symphomed atienda.

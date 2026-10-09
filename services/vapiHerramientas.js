@@ -6,6 +6,7 @@
 // conversación es el LLM de Vapi, no nosotros: cada función es una acción
 // atómica que el asistente llama cuando la necesita, en el orden que él
 // decide.
+const mongoose = require("mongoose");
 const { Medico, Cita } = require("../db/models");
 const { obtenerHorariosDisponibles } = require("./agenda");
 const { crearCitaConfirmada } = require("./crearCita");
@@ -146,9 +147,15 @@ async function consultarMisCitas(medicoPhoneFijo, { pacienteTelefono, especialid
 async function cancelarCita(medicoPhoneFijo, { citaId, pacienteTelefono, especialidad } = {}) {
   let cita = null;
   if (citaId) {
-    // Con citaId alcanza — ya identifica el consultorio por sí solo (viene
-    // de una consulta_mis_citas anterior en esta misma llamada).
-    cita = await Cita.findOne({ _id: citaId, estado: "confirmada" });
+    // El id viene de un consultar_mis_citas anterior en esta misma llamada,
+    // pero se busca solo entre las citas de los consultorios que atiende
+    // este número: el de la URL, o los del súper número. El secreto del
+    // webhook es uno para todos los consultorios, y con el id solo se
+    // cancelaba la cita de cualquiera (informe de QA del 9 de octubre de 2026).
+    const alcance = medicoPhoneFijo ? [medicoPhoneFijo] : CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS;
+    if (mongoose.isValidObjectId(citaId)) {
+      cita = await Cita.findOne({ _id: citaId, medicoPhone: { $in: alcance }, estado: "confirmada" });
+    }
   } else if (pacienteTelefono) {
     const medicoPhones = await resolverMedicoPhones(medicoPhoneFijo, especialidad);
     if (!medicoPhones.length) return "No pude identificar el consultorio — preguntale qué especialidad busca, o pedile el citaId si ya lo consultaste antes.";
