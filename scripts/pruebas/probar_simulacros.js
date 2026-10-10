@@ -12,7 +12,9 @@
 //   · el cupo, el acceso vencido, y que solo es de estudiantes;
 //   · lo del informe de QA del 9 de octubre de 2026: dos «empezar» a la vez
 //     con un solo cupo (E03), y un examen cuyo cierre falla a la mitad: el
-//     reintento completa las tarjetas sin contar dos veces (E07).
+//     reintento completa las tarjetas sin contar dos veces (E07);
+//   · y de la segunda revisión (R01): una respuesta que llega justo cuando se
+//     cierra el examen, en los dos órdenes posibles.
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
 const path = require("path");
@@ -377,6 +379,44 @@ axios.post = async (_url, cuerpo) => {
   r = await P("GET", `/medico/simulacros/${viejo.insertedId}`, tkE);
   verificar("un examen de antes de esto (sin la marca) no se toca al abrirlo", r.estado === 200 && (await tarjetasE()) === antesViejo
     && !("cierrePendiente" in await M.Simulacro.collection.findOne({ _id: viejo.insertedId })));
+
+  console.log("\n── 10. Responder y cerrar a la vez (segunda revisión de QA, R01) ──");
+  await est("59170095006");
+  const tkF = tk("59170095006");
+  const updateOneSim = M.Simulacro.updateOne;
+  // Un intercalado a mano: «antes» corre justo antes de que se guarde el
+  // cambio que cumple «cuando», una sola vez.
+  const intercalar = (cuando, antes) => {
+    M.Simulacro.updateOne = function (filtro, cambio, ...resto) {
+      if (!cuando(cambio)) return updateOneSim.call(this, filtro, cambio, ...resto);
+      M.Simulacro.updateOne = updateOneSim;
+      return antes(filtro._id).then(() => updateOneSim.call(this, filtro, cambio, ...resto));
+    };
+  };
+  const esCierre = (cambio) => Array.isArray(cambio) || cambio?.$set?.estado === "terminado";
+  const esRespuesta = (cambio) => Object.keys(cambio?.$set || {}).some(k => /^preguntas\.\d+\.elegida$/.test(k));
+  r = await P("POST", "/medico/simulacros", tkF, { area: "pediatria", cantidad: 10, modo: "examen" });
+  s = await hastaQueEste(r.cuerpo.simulacro._id, tkF, ["listo", "error"]);
+  const okF0 = await correctaDe(s.preguntas[0].preguntaId);
+  // A. Mientras se cierra, entra una respuesta correcta a la primera.
+  intercalar(esCierre, (id) => M.Simulacro.collection.updateOne({ _id: id }, { $set: { "preguntas.0.elegida": okF0, "preguntas.0.acerto": true } }));
+  r = await P("POST", `/medico/simulacros/${s._id}/terminar`, tkF);
+  M.Simulacro.updateOne = updateOneSim;
+  let cerrado = await M.Simulacro.findById(s._id).lean();
+  verificar("A. una respuesta que entra mientras se cierra: queda guardada y cuenta en la nota (1 de 10, no 0)",
+    r.estado === 200 && cerrado.preguntas[0].acerto === true && cerrado.aciertos === 1 && r.cuerpo.simulacro.aciertos === 1);
+  // B. Mientras viaja una respuesta, el reloj cierra el examen.
+  r = await P("POST", "/medico/simulacros", tkF, { area: "pediatria", cantidad: 10, modo: "examen" });
+  s = await hastaQueEste(r.cuerpo.simulacro._id, tkF, ["listo", "error"]);
+  const okF1 = await correctaDe(s.preguntas[0].preguntaId);
+  intercalar(esRespuesta, (id) => M.Simulacro.collection.updateOne({ _id: id }, { $set: { estado: "terminado", terminadoEn: new Date() } }));
+  r = await P("POST", `/medico/simulacros/${s._id}/responder`, tkF, { indice: 0, opcion: okF1 });
+  M.Simulacro.updateOne = updateOneSim;
+  cerrado = await M.Simulacro.findById(s._id).lean();
+  verificar("B. una respuesta que llega con el examen ya cerrado → 409, «no se tomó en cuenta» (antes contestaba ok), y no se guarda",
+    r.estado === 409 && /no se tomó en cuenta/.test(r.cuerpo?.error || "") && cerrado.preguntas[0].elegida == null);
+  r = await P("POST", `/medico/simulacros/${s._id}/responder`, tkF, { indice: 1, opcion: 0 });
+  verificar("  ...y una que llega después, igual: 409", r.estado === 409);
 
   servidor.close();
   await mongoose.disconnect();

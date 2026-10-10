@@ -250,7 +250,9 @@ async function responderSim(k) {
     pintarPreguntaSim();
   } catch (e) {
     if (e.status === 401) return logout();
-    if (e.status === 409 && /tiempo/i.test(e.error || "")) return terminarSim();
+    // Se terminó el tiempo, o el simulacro se cerró mientras viajaba la
+    // respuesta: se va al resultado, que dice lo que quedó guardado.
+    if (e.status === 409 && /tiempo|terminó/i.test(e.error || "")) return terminarSim();
     botones.forEach(b => { b.disabled = false; });
     const err = document.getElementById("simErr");
     if (err) err.innerHTML = `<div class="error">${esc(e.error || t("sim.error"))}</div>`;

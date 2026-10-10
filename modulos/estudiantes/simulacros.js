@@ -287,7 +287,16 @@ async function responder(medicoPhone, id, indice, opcion, zona, ahora = new Date
   // cuenta como null: el filtro dejaba pasar siempre la segunda respuesta.
   const filtro = { _id: s._id, estado: "listo", ...(s.modo === "practica" ? { [`${campo}.elegida`]: { $type: "null" } } : {}) };
   const r = await Simulacro.updateOne(filtro, { $set: { [`${campo}.elegida`]: elegida, [`${campo}.acerto`]: acerto, [`${campo}.en`]: ahora } });
-  if (!r.modifiedCount && s.modo === "practica") throw new ErrorHttp(409, "Ya respondiste esta pregunta.");
+  // Si no se guardó, se dice por qué, y nunca «ok». Antes, en examen, una
+  // respuesta que llegaba justo cuando el reloj cerraba el simulacro no se
+  // guardaba y el estudiante recibía «ok» igual (segunda revisión de QA del
+  // 9 de octubre de 2026, R01). Es matchedCount y no modifiedCount: en
+  // examen, volver a elegir la misma opción no cambia nada y está bien.
+  if (!r.matchedCount) {
+    const actual = await Simulacro.findById(s._id).select("estado").lean();
+    if (actual?.estado !== "listo") throw new ErrorHttp(409, "El simulacro terminó antes de guardar esta respuesta: no se tomó en cuenta.");
+    throw new ErrorHttp(409, "Ya respondiste esta pregunta.");
+  }
   const racha = await marcarDiaDeEstudio(medicoPhone, zona, ahora);
   if (s.modo === "examen") return { ok: true, racha };
   await PreguntaSimulacro.updateOne({ _id: p._id }, { $inc: { vistas: 1, aciertos: acerto ? 1 : 0 } });
@@ -301,10 +310,17 @@ async function terminar(medicoPhone, id, zona, ahora = new Date()) {
   const s = await obtener(medicoPhone, id, ahora);
   if (s.estado !== "terminado") {
     if (s.estado !== "listo") throw new ErrorHttp(409, "Este simulacro no está en curso.");
-    const aciertos = s.preguntas.filter(p => p.acerto === true).length;
-    await Simulacro.updateOne({ _id: s._id, estado: "listo" }, {
-      $set: { estado: "terminado", aciertos, terminadoEn: ahora, ...(s.modo === "examen" ? { cierrePendiente: true } : {}) },
-    });
+    // El total se cuenta en el mismo cambio que lo cierra, de las respuestas
+    // que hay guardadas en ese momento. Antes se contaba con lo leído un
+    // instante antes: una respuesta que entraba en el medio quedaba guardada
+    // como correcta y fuera de la nota (R01 de la misma revisión).
+    await Simulacro.updateOne({ _id: s._id, estado: "listo" }, [{
+      $set: {
+        estado: "terminado", terminadoEn: ahora,
+        aciertos: { $size: { $filter: { input: "$preguntas", cond: { $eq: ["$$this.acerto", true] } } } },
+        ...(s.modo === "examen" ? { cierrePendiente: true } : {}),
+      },
+    }]);
   }
   await completarCierre(medicoPhone, s._id, zona, ahora);
   return Simulacro.findById(s._id).lean();
