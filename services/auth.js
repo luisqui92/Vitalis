@@ -85,9 +85,36 @@ function verificarToken(token) {
   }
 }
 
+// ═══ UNA SESIÓN VALE MIENTRAS VALGA SU CUENTA ════════════════════════════
+//
+// Un token dura 8 horas, y la firma solo dice que lo emitimos nosotros, no
+// que la cuenta siga en pie. Antes, dar de baja una cuenta, cambiarle la
+// contraseña o los permisos no cortaba las sesiones que ya tenía abiertas:
+// seguían entrando, y pidiéndole cosas a la IA, hasta que vencía el token
+// (segunda revisión de QA del 9 de octubre de 2026, R02).
+//
+// Ahora, en cada pedido de una sesión de médico o de administrativo, se mira
+// la cuenta: que exista, que no esté desactivada, y que la sesión no sea de
+// antes de «sesionesDesde» (se pone al cambiar la contraseña, dar de baja o
+// cambiar los permisos: db/models.js). Es una lectura chica por pedido, por
+// el teléfono, que tiene índice.
+//
+// Las cuentas viejas no tienen «activo» ni «sesionesDesde» (y con lean() no
+// hay valores por defecto): por eso «activo === false» y no «!activo».
+const ROLES_DE_CUENTA = ["medico", "admin"];
+const SESION_CORTADA = "Tu sesión ya no es válida. Volvé a iniciar sesión.";
+
+async function sesionVigente(payload) {
+  if (!ROLES_DE_CUENTA.includes(payload.rol)) return true;
+  const { Medico } = require("../db/models");
+  const cuenta = await Medico.findOne({ phone: payload.usuario }).select("activo sesionesDesde").lean();
+  if (!cuenta || cuenta.activo === false) return false;
+  return !(cuenta.sesionesDesde && Number(payload.iat) < new Date(cuenta.sesionesDesde).getTime());
+}
+
 // Middleware para proteger endpoints de médico
 function requireAuth(rolesPermitidos = ["medico"]) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const token = req.headers["authorization"]?.replace("Bearer ", "") ||
                   req.query.token;
     const payload = verificarToken(token);
@@ -96,6 +123,11 @@ function requireAuth(rolesPermitidos = ["medico"]) {
     }
     if (!rolesPermitidos.includes(payload.rol)) {
       return res.status(403).json({ error: "No tenés permiso para esta acción" });
+    }
+    try {
+      if (!(await sesionVigente(payload))) return res.status(401).json({ error: SESION_CORTADA });
+    } catch (e) {
+      return next(e);
     }
     req.adminUser = payload;
     next();
@@ -109,12 +141,17 @@ function requireAuth(rolesPermitidos = ["medico"]) {
 // req.clinicaId queda listo para que cada ruta filtre por ahí. Ninguna ruta
 // /admin debe aceptar un clinicaId que venga del cliente: sale del token o
 // no sale.
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
   const payload = verificarToken(token);
   if (!payload) return res.status(401).json({ error: "No autorizado — iniciá sesión" });
   if (!payload.admin) return res.status(403).json({ error: "No tenés permiso para esta acción" });
   if (!payload.clinicaId) return res.status(403).json({ error: "Tu cuenta no está asociada a ninguna clínica" });
+  try {
+    if (!(await sesionVigente(payload))) return res.status(401).json({ error: SESION_CORTADA });
+  } catch (e) {
+    return next(e);
+  }
   req.adminUser = payload;
   req.clinicaId = payload.clinicaId;
   next();
@@ -148,4 +185,4 @@ function requireSocio(req, res, next) {
   next();
 }
 
-module.exports = { hashPassword, verificarPassword, generarToken, verificarToken, requireAuth, requireAdmin, requireSocio };
+module.exports = { hashPassword, verificarPassword, generarToken, verificarToken, sesionVigente, requireAuth, requireAdmin, requireSocio };

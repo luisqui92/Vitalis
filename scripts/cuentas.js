@@ -173,7 +173,8 @@ async function main() {
 
   // Mismo motivo que en --activar: updateOne toca solo este campo, en vez
   // de revalidar el documento entero contra el esquema de hoy.
-  await Medico.updateOne({ phone }, { $set: { passwordHash: await hashPassword(clave) } });
+  // Con la clave nueva se cortan las sesiones abiertas (services/auth.js).
+  await Medico.updateOne({ phone }, { $set: { passwordHash: await hashPassword(clave), sesionesDesde: new Date() } });
   console.log(`\n✅ Contraseña nueva para +${phone}:\n`);
   console.log(`      ${clave}\n`);
   console.log("Se muestra UNA sola vez. Anotala ahora.");

@@ -120,6 +120,9 @@ module.exports = function (app) {
     // un hash al azar que nadie puede reproducir: si algún día se reactiva
     // la cuenta a pedido, entra por un reseteo nuevo, no con la vieja.
     medico.activo = false;
+    // Y las sesiones abiertas se cortan ahora, no cuando venzan
+    // (services/auth.js, sesionVigente).
+    medico.sesionesDesde = new Date();
     medico.passwordHash = await hashPassword(crypto.randomBytes(24).toString("hex"));
     medico.dosFA = { activo: false, secreto: "", secretoPendiente: "" };
     await medico.save();

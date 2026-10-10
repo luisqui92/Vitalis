@@ -159,6 +159,11 @@ const medicoSchema = new mongoose.Schema({
 
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
+  // Las sesiones abiertas antes de esta fecha ya no valen (services/auth.js,
+  // sesionVigente). Se pone al cambiar la contraseña, dar de baja la cuenta o
+  // cambiarle los permisos: quien tenía la sesión abierta vuelve a entrar,
+  // ya con lo nuevo.
+  sesionesDesde: { type: Date, default: null },
 
   // ─── Cómo entró esta cuenta ───────────────────────────────────────────
   //

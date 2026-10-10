@@ -164,7 +164,9 @@ async function convertir(argv) {
   console.log(`\n  ${m.nombre} (${m.phone}) pasa a ser una cuenta de MÉDICO: va a poder recetar, escribirle a pacientes y cobrar.`);
   console.log("  Sus pacientes y consultas siguen. Las notas que grabó como estudiante conservan la marca.");
   if (await preguntar("  Escribí SI para confirmar: ") !== "SI") return console.log("  Cancelado. No se tocó nada.\n");
-  await Medico.updateOne({ _id: m._id }, { $unset: { estudiante: 1 }, $set: { especialidad: "Medicina general" } });
+  // La marca de estudiante viaja en el token: la sesión abierta se corta y
+  // vuelve a entrar como médico (services/auth.js, sesionVigente).
+  await Medico.updateOne({ _id: m._id }, { $unset: { estudiante: 1 }, $set: { especialidad: "Medicina general", sesionesDesde: new Date() } });
   await AuditLog.create({ medicoPhone: "script", accion: "convertir_estudiante_a_medico", recurso: `Medico:${m.phone}` }).catch(() => {});
   console.log(VERDE("\n  ✅ Listo. Que cierre sesión y vuelva a entrar para ver el Symphomed completo.\n"));
 }

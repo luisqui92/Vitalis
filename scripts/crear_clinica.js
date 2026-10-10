@@ -54,6 +54,9 @@ async function main() {
     // puede estar usando ahora mismo.
     admin.rol = rolPedido;
     admin.clinicaId = clinica._id;
+    // El rol y la clínica viajan en el token: la sesión abierta se corta y,
+    // al volver a entrar, ya tiene los permisos nuevos (services/auth.js).
+    admin.sesionesDesde = new Date();
     await admin.save();
     console.log(`ℹ️  La cuenta +${phone} ya existía — ahora es ${rolPedido} de "${nombre}" (contraseña sin cambios).`);
   }

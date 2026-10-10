@@ -361,8 +361,20 @@ async function main() {
   verificar("otra clínica NO puede llevárselo", robo.estado === 409);
   const bajaAdmin = await POST(`/admin/medicos/${diego.phone}/desvincular`, tk.carla, {});
   verificar("no se puede desvincular a quien administra", bajaAdmin.estado === 409);
+  const anaSigue = await GET("/medico/personas/buscar?q=maria", tk.ana);
+  verificar("cambiarle el consultorio o el vínculo no le corta la sesión", anaSigue.estado === 200);
+  // La sesión con la que entró después de sumarse a la clínica.
+  await new Promise(r => setTimeout(r, 5));
+  const soloEnLaClinica = generarToken(solo.phone, "medico", 36e5, { clinicaId: String(clinicaA._id) });
+  verificar("con la sesión de cuando estaba en la clínica, entra", (await GET("/medico/personas/buscar?q=maria", soloEnLaClinica)).estado === 200);
+  await new Promise(r => setTimeout(r, 5));
   const bajaOk = await POST(`/admin/medicos/${solo.phone}/desvincular`, tk.carla, {});
   verificar("sí se puede desvincular a un médico común", bajaOk.estado === 200);
+  // Su sesión llevaba la clínica en el token (segunda revisión de QA del 9
+  // de octubre de 2026, R02): se corta, y al volver a entrar ya no la tiene.
+  verificar("  ...y esa sesión, que llevaba la clínica, se corta (401)", (await GET("/medico/personas/buscar?q=maria", soloEnLaClinica)).estado === 401);
+  verificar("  ...mientras que una nueva, sin la clínica, entra",
+    (await GET("/medico/personas/buscar?q=maria", generarToken(solo.phone, "medico", 36e5))).estado === 200);
   const pacientesDelSacado = await Paciente.countDocuments({ medicoPhone: solo.phone });
   verificar("  ...y no se le tocó una sola ficha", pacientesDelSacado === (await Paciente.countDocuments({ medicoPhone: solo.phone })));
 

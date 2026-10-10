@@ -108,7 +108,8 @@ async function main() {
 
   const hash = await hashPassword(clave);
   for (const m of cuentas) {
-    await Medico.updateOne({ phone: m.phone }, { $set: { passwordHash: hash } });
+    // Con la clave nueva se cortan las sesiones abiertas (services/auth.js).
+    await Medico.updateOne({ phone: m.phone }, { $set: { passwordHash: hash, sesionesDesde: new Date() } });
     // Esperado: perder una línea de auditoría no frena el cambio, pero acá se
     // espera para que el proceso no termine antes de que se escriba.
     await AuditLog.create({ medicoPhone: "script", accion: "poner_clave_script", recurso: `Medico:${m.phone}`, detalle: "contraseña nueva por script" })

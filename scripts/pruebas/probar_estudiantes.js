@@ -292,6 +292,10 @@ function textoPdf(buf) {
   r = await correrScript(uri, ["convertir", "59170040001"], "SI");
   const medicoYa = await M.Medico.findOne({ phone: "59170040001" }).lean();
   verificar("«convertir» con SI → cuenta de médico, con sus casos", r.codigo === 0 && !medicoYa.estudiante?.nivel && (await M.Paciente.countDocuments({ medicoPhone: "59170040001" })) === 1);
+  // La marca de estudiante viaja en el token: la sesión de estudiante que
+  // tenía abierta se corta (segunda revisión de QA, R02).
+  r = await P("GET", "/medico/consultas", tkEst);
+  verificar("  ...y su sesión de estudiante, abierta de antes, se corta (401)", r.estado === 401);
   r = await P("POST", "/medico/login", null, { phone: "59170040001", password: "Prueba123." });
   verificar("  ...al volver a entrar, el token ya no es de estudiante", r.estado === 200 && !verificarToken(r.cuerpo.token)?.estudiante && !r.cuerpo.estudiante);
   r = await P("GET", `/medico/pacientes/${pac._id}/kardex.pdf`, r.cuerpo.token, undefined, true);

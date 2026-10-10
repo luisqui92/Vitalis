@@ -139,16 +139,19 @@ function verificar(descripcion, condicion) {
   const aprobarDeNuevo = await pedir(`/medico/operador/bajas/${pedidoCola._id}/aprobar`, tkAprobador, "POST", {});
   verificar("aprobar un pedido que ya no está pendiente se rechaza", aprobarDeNuevo.estado === 404);
 
-  // ═══ 6. LA CUENTA CERRADA NO PUEDE VOLVER A PEDIR SU PROPIO CIERRE ═══════
+  // ═══ 6. LA CUENTA CERRADA YA NO ENTRA ═══════════════════════════════════
   //
-  // requireAuth ya la rechaza con el token viejo, pero lo que importa
-  // probar es la ruta en sí: si alguien reactivara la cuenta a mano y
-  // reusara un token viejo, la ruta tiene que decir «ya está cerrada», no
-  // crear un segundo pedido sobre una cuenta ya inactiva.
-  console.log("\n── 6. Una cuenta ya cerrada no genera un pedido nuevo sobre sí misma ──");
-  const tkMedicoViejo = generarToken("71000001", "medico", 3600000);
-  const pedirDeNuevo = await pedir("/medico/baja/solicitar", tkMedicoViejo, "POST", { motivo: "" });
-  verificar("la ruta contesta 409: la cuenta ya está cerrada", pedirDeNuevo.estado === 409);
+  // Ni con la sesión que tenía abierta (se corta al aprobar la baja) ni con
+  // una nueva: requireAuth mira la cuenta en cada pedido (segunda revisión
+  // de QA del 9 de octubre de 2026, R02). Antes la sesión abierta seguía
+  // entrando hasta que vencía el token.
+  console.log("\n── 6. Una cuenta ya cerrada no entra, ni genera un pedido nuevo sobre sí misma ──");
+  const pedidosAntes = await SolicitudBaja.countDocuments({ telefono: "71000001" });
+  const conLaAbierta = await pedir("/medico/baja/solicitar", tkMedico, "POST", { motivo: "" });
+  verificar("la sesión que estaba abierta → 401: se cortó con la baja", conLaAbierta.estado === 401);
+  const conUnaNueva = await pedir("/medico/baja/solicitar", generarToken("71000001", "medico", 3600000), "POST", { motivo: "" });
+  verificar("  ...y una sesión nueva tampoco entra (401): la cuenta está apagada", conUnaNueva.estado === 401);
+  verificar("  ...sin crear otro pedido", (await SolicitudBaja.countDocuments({ telefono: "71000001" })) === pedidosAntes);
 
   // ═══ 7. RECHAZAR NO TOCA LA CUENTA ═══════════════════════════════════════
   console.log("\n── 7. Rechazar deja la cuenta como estaba ──");

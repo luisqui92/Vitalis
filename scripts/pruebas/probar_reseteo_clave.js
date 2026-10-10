@@ -44,6 +44,9 @@ function verificar(descripcion, condicion) {
   const app = express();
   app.use(express.json());
   require(path.join(RAIZ, "routes", "reseteoClave"))(app);
+  // Una ruta de médico cualquiera, para ver si una sesión sigue valiendo.
+  const { requireAuth } = require(path.join(RAIZ, "services", "auth"));
+  app.get("/medico/prueba-sesion", requireAuth(["medico"]), (_req, res) => res.json({ ok: true }));
   app.use((err, _q, res, _n) => res.status(err.status || 500).json({ error: err.message }));
 
   const { Medico, Socio, SolicitudReseteo, AuditLog } = require(path.join(RAIZ, "db", "models"));
@@ -179,8 +182,16 @@ function verificar(descripcion, condicion) {
   verificar("  ...sin tocar la contraseña vieja",
     (await verificarPassword("ClaveVieja1234!", (await Medico.findById(medico._id)).passwordHash)).ok);
 
+  // La sesión que alguien tenía abierta con la contraseña vieja.
+  const sesionVieja = generarToken("71000001", "medico", 3600000);
+  verificar("antes de cambiarla, la sesión abierta entra", (await pedir("/medico/prueba-sesion", sesionVieja)).estado === 200);
+  await new Promise(r => setTimeout(r, 5));
   const cambiada = await pedir(`/restablecer-clave/${token}`, null, "POST", { password: "ClaveNueva1234!" });
   verificar("una contraseña válida se acepta", cambiada.estado === 200);
+  // Segunda revisión de QA del 9 de octubre de 2026 (R02).
+  verificar("  ...y la sesión que estaba abierta se corta (401): si alguien entró con la vieja, queda afuera",
+    (await pedir("/medico/prueba-sesion", sesionVieja)).estado === 401);
+  verificar("  ...mientras que una sesión nueva entra", (await pedir("/medico/prueba-sesion", generarToken("71000001", "medico", 3600000))).estado === 200);
   const medicoActualizado = await Medico.findById(medico._id);
   verificar("  ...y la contraseña nueva funciona de verdad",
     (await verificarPassword("ClaveNueva1234!", medicoActualizado.passwordHash)).ok);

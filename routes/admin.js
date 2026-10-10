@@ -331,6 +331,10 @@ module.exports = function (app) {
       throw new ErrorHttp(409, "Esa cuenta ya pertenece a otra clínica");
     }
     const vinculo = ["empleado", "alquila"].includes(req.body?.vinculo) ? req.body.vinculo : "empleado";
+    // La clínica viaja en el token: si recién entra a la clínica, la sesión
+    // abierta se corta y al volver a entrar ya la tiene. Cambiarle el
+    // consultorio o el vínculo no toca el token: no lo saca.
+    if (String(medico.clinicaId || "") !== String(req.clinicaId)) medico.sesionesDesde = new Date();
     medico.clinicaId = new mongoose.Types.ObjectId(String(req.clinicaId));
     medico.vinculo = vinculo;
     medico.consultorio = String(req.body?.consultorio || "").trim().slice(0, 60);
@@ -352,6 +356,9 @@ module.exports = function (app) {
     }
     medico.clinicaId = null;
     medico.consultorio = "";
+    // Su sesión llevaba la clínica en el token: se corta, y al volver a
+    // entrar ya no la tiene (services/auth.js, sesionVigente).
+    medico.sesionesDesde = new Date();
     await medico.save();
     registrar({ req, medicoPhone: req.adminUser.usuario, accion: "admin_desvincular_medico", recurso: `Medico:${medico.phone}` });
     res.json({ ok: true });

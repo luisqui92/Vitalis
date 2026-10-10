@@ -170,7 +170,10 @@ async function middlewareEstudiantes(req, res, next) {
   if (!regla) return res.status(403).json({ error: "Esto no está disponible en una cuenta de estudiante.", estudiante: true });
   if (!regla.ia) return next();
   try {
-    const medico = await Medico.findOne({ phone: payload.usuario }).select("phone estudiante").lean();
+    const medico = await Medico.findOne({ phone: payload.usuario }).select("phone estudiante activo").lean();
+    // Sin cuenta, o dada de baja: no hay a quién cobrarle la IA. La ruta igual
+    // lo frenaría (services/auth.js), pero esto no puede depender de eso.
+    if (!medico || medico.activo === false) return res.status(401).json({ error: "Tu sesión ya no es válida. Volvé a iniciar sesión." });
     if (accesoVencido(medico)) return res.status(402).json({ error: MOTIVO_VENCIDO, vencido: true });
   } catch (e) {
     return next(e);

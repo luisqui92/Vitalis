@@ -27,16 +27,22 @@ function verificar(descripcion, condicion) {
 }
 
 // Simula el paso por un middleware de Express y devuelve qué pasó.
-function pasarPor(middleware, token) {
+async function pasarPor(middleware, token) {
   const req = { headers: token ? { authorization: "Bearer " + token } : {}, query: {} };
   let estado = null, cuerpo = null, siguio = false;
   const res = {
     status(c) { estado = c; return this; },
     json(o) { cuerpo = o; return this; },
   };
-  middleware(req, res, () => { siguio = true; });
+  await middleware(req, res, () => { siguio = true; });
   return { siguio, estado, cuerpo, req };
 }
+
+// La puerta mira además que la cuenta exista y esté activa (services/auth.js,
+// sesionVigente). Esta prueba corre sin base: acá todas las cuentas existen
+// y están activas. Lo de las cuentas lo prueba probar_sesiones.js.
+const { Medico } = require(path.join(RAIZ, "db", "models"));
+Medico.findOne = () => ({ select: () => ({ lean: async () => ({ activo: true }) }) });
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -47,28 +53,29 @@ const tokenDirector = generarToken("70000003", "medico", 3600e3, { admin: true, 
 const tokenAdminSinClinica = generarToken("70000004", "admin", 3600e3, { admin: true });
 const tokenOtraClinica = generarToken("70000005", "admin", 3600e3, { admin: true, clinicaId: "clinica-2" });
 
+(async () => {
 console.log("── 1. El administrativo NO entra a lo clínico ──");
-const a1 = pasarPor(requireMedico, tokenAdmin);
+const a1 = await pasarPor(requireMedico, tokenAdmin);
 verificar("un administrativo es rechazado por las rutas de médico", !a1.siguio && a1.estado === 403);
 verificar("  ...y el motivo es permiso, no sesión vencida", a1.cuerpo?.error?.includes("permiso"));
 
 console.log("\n── 2. El médico NO entra al panel de clínica ──");
-const m1 = pasarPor(requireAdmin, tokenMedico);
+const m1 = await pasarPor(requireAdmin, tokenMedico);
 verificar("un médico común es rechazado por /admin", !m1.siguio && m1.estado === 403);
 
 console.log("\n── 3. El director pasa por las dos puertas ──");
-verificar("el director entra a las rutas de médico", pasarPor(requireMedico, tokenDirector).siguio);
-verificar("el director entra al panel de clínica", pasarPor(requireAdmin, tokenDirector).siguio);
+verificar("el director entra a las rutas de médico", (await pasarPor(requireMedico, tokenDirector)).siguio);
+verificar("el director entra al panel de clínica", (await pasarPor(requireAdmin, tokenDirector)).siguio);
 
 console.log("\n── 4. Sin clínica no se administra nada ──");
-const s1 = pasarPor(requireAdmin, tokenAdminSinClinica);
+const s1 = await pasarPor(requireAdmin, tokenAdminSinClinica);
 verificar("un admin sin clínica es rechazado", !s1.siguio && s1.estado === 403);
 verificar("  ...diciéndole que no está asociado a ninguna", s1.cuerpo?.error?.includes("clínica"));
 
 console.log("\n── 5. La clínica sale del token, nunca del cliente ──");
-const ok = pasarPor(requireAdmin, tokenAdmin);
+const ok = await pasarPor(requireAdmin, tokenAdmin);
 verificar("requireAdmin deja req.clinicaId listo para filtrar", ok.req.clinicaId === "clinica-1");
-const otra = pasarPor(requireAdmin, tokenOtraClinica);
+const otra = await pasarPor(requireAdmin, tokenOtraClinica);
 verificar("otro admin trae SU clínica, no la primera", otra.req.clinicaId === "clinica-2");
 
 // Que ninguna ruta lea el clinicaId del pedido: si lo hiciera, un admin
@@ -197,3 +204,4 @@ verificar("la agenda pide a la base solo los campos que muestra",
 
 console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
 process.exit(fallos === 0 ? 0 : 1);
+})().catch((e) => { console.error(e); process.exit(1); });
