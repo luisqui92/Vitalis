@@ -235,7 +235,10 @@ async function crearTokenStreaming() {
     throw new Error("ASSEMBLYAI_API_KEY no configurado");
   }
   const res = await axios.get("https://streaming.assemblyai.com/v3/token", {
-    params: { expires_in_seconds: 60 },
+    // Lo que tiene el navegador para abrir la conexión: con un mismo token
+    // se pueden abrir varias mientras no venza, así que dura lo justo. La
+    // pantalla lo usa apenas lo recibe.
+    params: { expires_in_seconds: 30 },
     headers: { Authorization: CONFIG.ASSEMBLYAI_API_KEY },
     timeout: CONFIG.TIMEOUT_ASSEMBLYAI,
   });

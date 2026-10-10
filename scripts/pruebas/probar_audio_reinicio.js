@@ -213,6 +213,17 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   verificar("  ...y termina como cualquiera", (await leer(idNueva)).estado === "completado" && !hayAudio(idNueva));
   r = (await aTiempo(rutas.retomarConsultas(new Date()))) || {};
   verificar("arrancar otra vez sin nada pendiente no hace nada", r.transcripciones === 0 && r.sinAudio === 0 && r.notas === 0 && r.sobras === 0);
+
+  console.log("\n── El permiso para la vista previa en vivo (segunda revisión de QA, E06) ──");
+  // Cada permiso abre una conexión con AssemblyAI que se cobra mientras está
+  // abierta; la pantalla pide uno por grabación.
+  const permisos = [];
+  for (let i = 0; i < 21; i++) permisos.push((await pedir(puerto, "GET", "/medico/transcripcion-token", tk)).estado);
+  verificar("20 permisos en diez minutos, sí; el 21 → 429 (la grabación sigue, sin vista previa)",
+    permisos.slice(0, 20).every(x => x === 200) && permisos[20] === 429);
+  await M.Medico.create({ phone: "70097002", nombre: "Dr. Otro", passwordHash: "x", activo: true });
+  verificar("  ...y es por cuenta: otro médico sigue pidiendo el suyo",
+    (await pedir(puerto, "GET", "/medico/transcripcion-token", generarToken("70097002", "medico", 36e5))).estado === 200);
   servidor.close();
 
   console.log("\n── 3. De verdad: el servidor, matado a mitad de una transcripción ──");

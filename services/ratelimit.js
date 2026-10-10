@@ -103,6 +103,18 @@ const limitMedico = rateLimitPorClave(
   claveDeMedico
 );
 
+// El permiso para la vista previa en vivo: cada uno abre una conexión con
+// AssemblyAI que se cobra por el tiempo que queda abierta, y la pantalla
+// pide uno solo por grabación. Veinte cada diez minutos sobra para
+// cualquiera que esté atendiendo, y frena a quien los pida en cantidad
+// (segunda revisión de QA del 9 de octubre de 2026, E06). Si se pasa, la
+// pantalla graba igual, sin vista previa.
+const limitVistaPrevia = rateLimitPorClave(
+  "vistaPrevia", 20, 10 * 60 * 1000,
+  "Demasiados pedidos de vista previa. Esperá unos minutos: la grabación sigue sin ella.",
+  claveDeMedico
+);
+
 // Login/registro/2FA necesitan un límite mucho más estricto que el resto de
 // la API: 60/min (limitMedico) es razonable para uso normal, pero deja
 // margen de sobra para adivinar contraseñas o códigos de 2FA por fuerza
@@ -177,4 +189,4 @@ const limit2faPorSesion = rateLimitPorClave(
   }
 );
 
-module.exports = { rateLimit, rateLimitPorClave, claveDeMedico, limitMedico, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };
+module.exports = { rateLimit, rateLimitPorClave, claveDeMedico, limitMedico, limitVistaPrevia, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };

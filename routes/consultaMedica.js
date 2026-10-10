@@ -7,7 +7,7 @@ const mongoose = require("mongoose");
 const { CONFIG, log } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO, Teleconsulta } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
-const { limitMedico } = require("../services/ratelimit");
+const { limitMedico, limitVistaPrevia } = require("../services/ratelimit");
 const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("../services/assemblyai");
 const { generarNotaClinica, notaVacia } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
@@ -66,7 +66,7 @@ module.exports = function (app) {
 
   // ─── TOKEN PARA VISTA PREVIA EN VIVO (el navegador se conecta directo
   // al WebSocket de AssemblyAI mientras graba; nunca se manda la API key) ──
-  app.get("/medico/transcripcion-token", requireMedico, asyncRoute(async (req, res) => {
+  app.get("/medico/transcripcion-token", limitVistaPrevia, requireMedico, asyncRoute(async (req, res) => {
     // Pedir el token es empezar a grabar: lo último que se puede frenar
     // antes de que la consulta exista.
     await extensiones.revisar("consulta.antesDeGrabar", req);
