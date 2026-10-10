@@ -75,7 +75,6 @@ axios.post = async (url, cuerpo) => {
 // ─── AssemblyAI de mentira: cada transcripción termina cuando la prueba dice
 let pendientes = [];
 assemblyai.transcribirConsultaMedica = () => new Promise((resolve, reject) => pendientes.push({ resolve, reject }));
-assemblyai.crearTokenStreaming = async () => "token-de-prueba";
 async function terminarTranscripcion(texto, { falla = false } = {}) {
   await hasta(() => pendientes.length > 0);
   const p = pendientes.shift();

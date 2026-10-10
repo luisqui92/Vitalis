@@ -17,6 +17,9 @@ const CONFIG = {
   // de punta a punta sin gastar ni depender de internet.
   OPENAI_URL: process.env.OPENAI_URL || "https://api.openai.com/v1/chat/completions",
   ASSEMBLYAI_API_KEY: process.env.ASSEMBLYAI_API_KEY,
+  // La vista previa en vivo (services/vistaPrevia.js): el servidor se conecta
+  // acá y le pasa el audio. Las pruebas levantan uno de mentira y apuntan acá.
+  ASSEMBLYAI_STREAMING_URL: process.env.ASSEMBLYAI_STREAMING_URL || "wss://streaming.assemblyai.com/v3/ws",
   MONGODB_URI: process.env.MONGODB_URI,
   APP_URL: process.env.APP_URL || "",
 

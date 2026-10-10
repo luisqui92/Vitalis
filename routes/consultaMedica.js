@@ -8,7 +8,7 @@ const { CONFIG, log } = require("../config");
 const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoTratamiento, TratamientoPlan, ExamenOcular, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO, Teleconsulta } = require("../db/models");
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico, limitVistaPrevia } = require("../services/ratelimit");
-const { transcribirConsultaMedica, crearTokenStreaming, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("../services/assemblyai");
+const { transcribirConsultaMedica, idiomaSoportado } = require("../services/assemblyai");
 const { generarNotaClinica, notaVacia } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
@@ -24,6 +24,7 @@ const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulari
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
 const { guardarBorrador, borradorDe, extrasDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
 const audioPendiente = require("../services/audioPendiente");
+const vistaPrevia = require("../services/vistaPrevia");
 // Donde los módulos (modulos/*) suman lo suyo a una consulta: ver la lista
 // de puntos en services/extensiones.js.
 const extensiones = require("../services/extensiones");
@@ -64,36 +65,21 @@ async function verificarLista(medicoPhone, nombres) {
 
 module.exports = function (app) {
 
-  // ─── TOKEN PARA VISTA PREVIA EN VIVO (el navegador se conecta directo
-  // al WebSocket de AssemblyAI mientras graba; nunca se manda la API key) ──
+  // ─── PASE PARA LA VISTA PREVIA EN VIVO ─────────────────────────────────
+  // El navegador se conecta a Symphomed y Symphomed a AssemblyAI: así se
+  // mide y se corta el tiempo que se paga (services/vistaPrevia.js). El
+  // pase vale para una sola conexión; el idioma y el vocabulario los pone
+  // el servidor, sacados de la cuenta, igual que en la transcripción final.
   app.get("/medico/transcripcion-token", limitVistaPrevia, requireMedico, asyncRoute(async (req, res) => {
-    // Pedir el token es empezar a grabar: lo último que se puede frenar
+    // Pedir el pase es empezar a grabar: lo último que se puede frenar
     // antes de que la consulta exista.
     await extensiones.revisar("consulta.antesDeGrabar", req);
-    try {
-      const token = await crearTokenStreaming();
-      // El vocabulario viaja junto al token para que la vista previa en vivo
-      // reconozca exactamente los mismos términos que la transcripción final
-      // (una sola fuente de verdad, en services/assemblyai.js).
-      // El idioma y el vocabulario salen los dos de la cuenta del médico y
-      // viajan juntos: si el navegador eligiera el idioma por su cuenta,
-      // la vista previa en vivo y la transcripción final podrían terminar
-      // en idiomas distintos para la misma consulta.
-      const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("tipoEspecialidad idioma").lean();
-      const idioma = idiomaSoportado(medico?.idioma);
-      const delMedico = await medicamentosDelMedico(req.adminUser.usuario);
-      res.json({
-        token, idioma,
-        // Si este idioma tiene Medical Mode lo decide el servidor: una copia
-        // de la lista en el navegador es una segunda fuente de verdad que
-        // algún día no va a coincidir con ésta.
-        medicalMode: IDIOMAS_CON_MEDICAL_MODE.includes(idioma),
-        keyterms: keytermsPara(medico?.tipoEspecialidad, idioma, delMedico),
-      });
-    } catch (e) {
-      log.error("[TRANSCRIPCION_TOKEN]", e.response?.data || e.message);
-      throw new ErrorHttp(502, "No se pudo generar el token de transcripción en vivo");
+    // Una cuenta que ya no puede subir consultas tampoco abre la vista previa.
+    const saldo = await estadoDe(req.adminUser.usuario);
+    if (saldo.bloqueado) {
+      throw new ErrorHttp(402, `Tu saldo llegó al límite (Bs ${saldo.saldoBs}). Cargá saldo para seguir transcribiendo consultas.`);
     }
+    res.json({ pase: await vistaPrevia.emitirPase(req.adminUser), ruta: vistaPrevia.RUTA });
   }));
 
   // ─── SALDO PREPAGO ─────────────────────────────────────────────────────
@@ -133,6 +119,12 @@ module.exports = function (app) {
     // llega hasta acá desde la app, porque la pantalla ya le avisó antes de
     // empezar. Si igual llega (una grabación vieja del respaldo del
     // teléfono), queda guardada en el celular y se sube cuando pueda.
+    //
+    // La vista previa de esta misma grabación, si tuvo, va en req.vistaPrevia:
+    // la grabación y su vista previa son la misma hora de consulta, y el
+    // tiempo de la vista previa ya se contó mientras se grababa
+    // (services/vistaPrevia.js).
+    req.vistaPrevia = await vistaPrevia.deEstaGrabacion(medicoPhone);
     await extensiones.revisar("consulta.antesDeGrabar", req);
     const saldo = await estadoDe(medicoPhone);
     if (saldo.bloqueado) {
@@ -185,6 +177,8 @@ module.exports = function (app) {
       await audioPendiente.borrar(consultaId).catch(() => {});
       throw e;
     }
+    await vistaPrevia.vincular(req.vistaPrevia, consulta._id)
+      .catch((e) => log.warn(`[VISTA_PREVIA] no se pudo enganchar a la consulta ${consulta._id}:`, e.message));
 
     if (teleconsulta) {
       teleconsulta.consultaId = consulta._id;

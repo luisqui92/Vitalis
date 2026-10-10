@@ -68,7 +68,6 @@ async function transcripcionDe(audio, vez = 1, ms = 8000) {
   await hasta(() => transcripciones.filter(t => t.audio === audio).length >= vez, ms);
   return transcripciones.filter(t => t.audio === audio)[vez - 1] || null;
 }
-assemblyai.crearTokenStreaming = async () => "token-de-prueba";
 const terminar = (t, texto) => t.resolve({ transcripcionCompleta: texto, segmentos: [{ hablante: "A", texto }], duracionSegundos: 300 });
 // La IA de la nota.
 const axios = require(path.join(RAIZ, "node_modules", "axios"));
@@ -214,12 +213,12 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   r = (await aTiempo(rutas.retomarConsultas(new Date()))) || {};
   verificar("arrancar otra vez sin nada pendiente no hace nada", r.transcripciones === 0 && r.sinAudio === 0 && r.notas === 0 && r.sobras === 0);
 
-  console.log("\n── El permiso para la vista previa en vivo (segunda revisión de QA, E06) ──");
-  // Cada permiso abre una conexión con AssemblyAI que se cobra mientras está
-  // abierta; la pantalla pide uno por grabación.
+  console.log("\n── El pase para la vista previa en vivo (segunda revisión de QA, E06) ──");
+  // Cada pase abre una conexión con AssemblyAI, que se cobra mientras está
+  // abierta (services/vistaPrevia.js); la pantalla pide uno por grabación.
   const permisos = [];
   for (let i = 0; i < 21; i++) permisos.push((await pedir(puerto, "GET", "/medico/transcripcion-token", tk)).estado);
-  verificar("20 permisos en diez minutos, sí; el 21 → 429 (la grabación sigue, sin vista previa)",
+  verificar("20 pases en diez minutos, sí; el 21 → 429 (la grabación sigue, sin vista previa)",
     permisos.slice(0, 20).every(x => x === 200) && permisos[20] === 429);
   await M.Medico.create({ phone: "70097002", nombre: "Dr. Otro", passwordHash: "x", activo: true });
   verificar("  ...y es por cuenta: otro médico sigue pidiendo el suyo",
@@ -233,7 +232,6 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   fs.writeFileSync(stub, `
 const path = require("path");
 const assemblyai = require(path.join(${JSON.stringify(RAIZ)}, "services", "assemblyai"));
-assemblyai.crearTokenStreaming = async () => "token";
 assemblyai.transcribirConsultaMedica = (buf) => process.env.MODO_TRANSCRIPCION === "colgada"
   ? new Promise(() => {})
   : Promise.resolve({ transcripcionCompleta: "Retomada de " + buf.toString(), segmentos: [], duracionSegundos: 60 });

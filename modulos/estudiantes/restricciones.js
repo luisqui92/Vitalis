@@ -183,13 +183,17 @@ async function middlewareEstudiantes(req, res, next) {
 
 // ─── Vencida o sin horas, no graba ─────────────────────────────────────────
 //
-// Se mira al pedir el token de la vista previa —que es cuando empieza a
-// grabar—, al pedir la nota en vivo y al subir. Lo usa también el
-// razonamiento (rutas/razonamiento.js), que gasta IA.
+// Se mira al pedir el pase de la vista previa —que es cuando empieza a
+// grabar—, mientras la vista previa está abierta (la corta en el tope), al
+// pedir la nota en vivo y al subir. Lo usa también el razonamiento
+// (rutas/razonamiento.js), que gasta IA.
+//
+// Al subir, la vista previa de esa misma grabación (req.vistaPrevia) no
+// cuenta: la grabación que empezó con horas se sube (ver cuenta.js).
 async function frenarSinAcceso(req) {
   if (!req.adminUser?.estudiante) return;
   const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("phone estudiante").lean();
-  const estado = await estadoDe(medico);
+  const estado = await estadoDe(medico, new Date(), { sinVistaPrevia: req.vistaPrevia?._id });
   if (estado?.bloqueado) throw new ErrorHttp(402, estado.motivo);
 }
 
@@ -246,6 +250,7 @@ function montar(app) {
   extensiones.enganchar("sesion.token", marcaDelToken);
   extensiones.enganchar("sesion.datos", datosDeLaSesion);
   extensiones.enganchar("consulta.antesDeGrabar", frenarSinAcceso);
+  extensiones.enganchar("vistaPrevia.durante", frenarSinAcceso);
   extensiones.enganchar("consulta.alCrear", marcarConsulta);
   extensiones.enganchar("consulta.alConfirmar", recortarAlConfirmar);
   extensiones.enganchar("paciente.mensajes", puedeEscribirle);

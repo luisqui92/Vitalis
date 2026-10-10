@@ -16,14 +16,18 @@
 // Lo caro es la transcripción. Cada nivel trae sus horas de audio por mes;
 // pasado el tope no se empiezan consultas nuevas hasta el mes siguiente.
 //
-// El tope de horas es blando, a propósito: suma lo que ya se transcribió
-// (la duración la da el servicio de transcripción, no el navegador), y lo
-// que se está transcribiendo todavía no cuenta. Con varios audios subiendo
-// juntos justo en el borde (los que el celular guardó sin señal, por
-// ejemplo), se pasa del tope por esas consultas; la siguiente ya se frena.
-// Reservar antes obligaría a creerle al navegador cuánto dura el audio, que
-// es justo lo que no hay que hacer (informe de QA del 9 de octubre de 2026,
-// E06).
+// Cuentan las dos cosas que se pagan: lo que se transcribió (la duración la
+// da el servicio de transcripción, no el navegador) y el tiempo que estuvo
+// abierta la vista previa en vivo (lo mide el servidor, que es por donde
+// pasa: services/vistaPrevia.js). Una grabación y su vista previa son la
+// misma hora de consulta: se cuenta la más larga de las dos, no la suma.
+// Una vista previa sin grabación subida cuenta entera.
+//
+// La vista previa se corta en el tope, en el momento (segunda revisión de QA
+// del 9 de octubre de 2026, E06). La grabación no: la que se empezó con
+// horas se sube aunque la vista previa la haya pasado del tope, y recién la
+// siguiente se frena. Cortar la grabación le tiraría a la basura una
+// consulta con el paciente adelante.
 //
 // Vencido el acceso, entra y ve sus casos, pero no gasta IA: no graba, no
 // le pregunta nada al paciente virtual, a la historia de un paciente ni a la
@@ -34,7 +38,7 @@
 // El paciente virtual y los simulacros (etapa 4) también usan IA, mucho más
 // barata que el audio (centavos de dólar por práctica), pero con su tope por
 // mes para que nadie la use sin límite.
-const { ConsultaMedica } = require("../../db/models");
+const { ConsultaMedica, VistaPrevia } = require("../../db/models");
 
 // Lo que trae cada nivel si el código no dice otra cosa.
 //
@@ -83,16 +87,31 @@ function accesoVencido(medico, ahora = new Date()) {
   return !hasta || hasta <= ahora;
 }
 
+// Los segundos de audio que usó este mes. Cada vista previa suma lo que dura
+// más que su grabación (si la grabación ya tiene duración), o entera.
+// sinVistaPrevia: la de la grabación que se está subiendo, que no cuenta
+// para decidir si se puede subir (ver arriba).
+async function segundosDelMes(medicoPhone, ahora, sinVistaPrevia) {
+  const desde = inicioDelMes(ahora);
+  const [consultas, vistas] = await Promise.all([
+    ConsultaMedica.find({ medicoPhone, createdAt: { $gte: desde } }).select("duracionSegundos").lean(),
+    VistaPrevia.find({ medicoPhone, inicio: { $gte: desde } }).select("segundos consultaId").lean(),
+  ]);
+  const duracion = new Map(consultas.map(c => [String(c._id), Number(c.duracionSegundos) || 0]));
+  let segundos = [...duracion.values()].reduce((a, b) => a + b, 0);
+  for (const v of vistas) {
+    if (sinVistaPrevia && String(v._id) === String(sinVistaPrevia)) continue;
+    segundos += Math.max(0, (Number(v.segundos) || 0) - (duracion.get(String(v.consultaId)) || 0));
+  }
+  return segundos;
+}
+
 // Cómo está la cuenta: cuánto audio usó este mes, cuándo vence y si puede
 // grabar. Lo usan la pantalla (para avisar antes) y el servidor (para frenar).
-async function estadoDe(medico, ahora = new Date()) {
+async function estadoDe(medico, ahora = new Date(), { sinVistaPrevia = null } = {}) {
   if (!esEstudiante(medico)) return null;
   const e = medico.estudiante;
-  const [suma] = await ConsultaMedica.aggregate([
-    { $match: { medicoPhone: medico.phone, createdAt: { $gte: inicioDelMes(ahora) } } },
-    { $group: { _id: null, segundos: { $sum: { $ifNull: ["$duracionSegundos", 0] } } } },
-  ]);
-  const segundosUsados = Math.round(suma?.segundos || 0);
+  const segundosUsados = Math.round(await segundosDelMes(medico.phone, ahora, sinVistaPrevia));
   const horasMes = Number(e.horasMes) || NIVELES[e.nivel]?.horasMes || 0;
   const hasta = e.hasta ? new Date(e.hasta) : null;
   const vencido = accesoVencido(medico, ahora);

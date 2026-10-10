@@ -132,7 +132,6 @@ function textoPdf(buf) {
   // Nada sale de verdad: ni AssemblyAI ni WhatsApp.
   const assemblyai = require(path.join(RAIZ, "services", "assemblyai"));
   assemblyai.transcribirConsultaMedica = () => new Promise(() => {});
-  assemblyai.crearTokenStreaming = async () => "token-de-prueba";
   const meta = require(path.join(RAIZ, "services", "metaWhatsapp"));
   const enviados = [];
   meta.enviarTextoOPlantilla = async (...a) => { enviados.push(a); return { ok: true }; };
@@ -284,7 +283,7 @@ function textoPdf(buf) {
   const rachaTras = await M.RachaEstudio.findOne({ medicoPhone: "59170040001" }).lean();
   verificar("  ...sin borrarle la racha de estudio", rachaTras?.mejor === 9 && rachaTras.actual === 4);
   r = await P("GET", "/medico/transcripcion-token", tkEst);
-  verificar("  ...el token de la vista previa ya sale", r.estado === 200);
+  verificar("  ...el pase de la vista previa ya sale", r.estado === 200 && !!r.cuerpo?.pase);
   r = await correrScript(uri, ["cuentas"]);
   verificar("«cuentas» lista a los estudiantes con sus horas", /Ana Interna/.test(r.salida) && r.salida.includes(`/${HORAS_INTERNO} h`));
   r = await correrScript(uri, ["convertir", "59170040001"], "no");

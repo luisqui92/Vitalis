@@ -8,8 +8,15 @@
 // señalización, y ese es justo el caso que funciona. El error aparecía
 // únicamente con los dos montados a la vez — o sea, solo en producción.
 //
-// Por eso esta prueba monta LOS DOS, como index.js, y recién ahí pregunta.
+// Por eso esta prueba monta TODOS, como index.js, y recién ahí pregunta. Hoy
+// son tres: el tercero es la vista previa en vivo (/ws-vista-previa,
+// services/vistaPrevia.js).
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
+// La vista previa carga los modelos, que se conectan solos al cargarse. Acá
+// no hace falta la base (sin pase no se llega a usarla): una dirección a la
+// que nadie contesta, para que no quede un error en el log de una prueba
+// que anda bien.
+process.env.MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:1/ws-rutas";
 
 const path = require("path");
 const http = require("http");
@@ -18,6 +25,7 @@ const RAIZ = path.join(__dirname, "..", "..");
 
 const { iniciarSenalizacion } = require(path.join(RAIZ, "services", "senalizacion"));
 const { iniciarServidorTiempoReal } = require(path.join(RAIZ, "services", "realtime"));
+const { iniciarVistaPrevia } = require(path.join(RAIZ, "services", "vistaPrevia"));
 const { tokenDeSenal } = require(path.join(RAIZ, "services", "video"));
 const { generarToken } = require(path.join(RAIZ, "services", "auth"));
 
@@ -57,11 +65,12 @@ function tocarPuerta(url, msEspera = 2500) {
   // primero en montarse era el que mataba al segundo.
   iniciarServidorTiempoReal(servidor);
   iniciarSenalizacion(servidor);
+  iniciarVistaPrevia(servidor);
 
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
   const base = `ws://127.0.0.1:${servidor.address().port}`;
 
-  console.log("── Con los dos montados, los dos tienen que andar ──");
+  console.log("── Con los tres montados, los tres tienen que andar ──");
 
   const tele = await tocarPuerta(
     `${base}/ws-tele?token=${encodeURIComponent(tokenDeSenal("vit-prueba", "medico"))}`);
@@ -76,6 +85,11 @@ function tocarPuerta(url, msEspera = 2500) {
   // ya era WebSocket ("Invalid WebSocket frame: RSV1 must be clear").
   verificar("/ws conecta y la conexión NO se corrompe", real.que === "abierto");
   if (real.que !== "abierto") console.log(`   (llegó: ${JSON.stringify(real)})`);
+
+  // Sin pase, la vista previa contesta ella misma (4001): que llegue a su
+  // dueño y no la mate otro.
+  const vista = await tocarPuerta(`${base}/ws-vista-previa`);
+  verificar("/ws-vista-previa llega a su dueño: sin pase cierra con 4001", vista.que === "cerrado" && vista.codigo === 4001);
 
   console.log("\n── Lo que no es de nadie no entra ──");
   const inventada = await tocarPuerta(`${base}/ws-inventado`);

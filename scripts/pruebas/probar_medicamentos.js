@@ -130,7 +130,6 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
     llamadaTranscripcion = { esp, idioma, opciones };
     return { transcripcionCompleta: "", segmentos: [], duracionSegundos: 60 };
   };
-  assemblyai.crearTokenStreaming = async () => "token-de-prueba";
 
   const hash = await hashPassword("Prueba123.");
   const MED = "5511900000009";
@@ -198,8 +197,11 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
   const deOtro = await pedir(puerto, "GET", `/medico/medicamentos/verificar?nombre=Rivotril`, tkB);
   verificar("  ...el historial de un médico no le sirve a otro", deOtro.cuerpo.estado !== "ok");
 
-  const tok = await pedir(puerto, "GET", "/medico/transcripcion-token", tk);
-  verificar("la vista previa en vivo recibe el vocabulario del médico primero", tok.cuerpo?.keyterms?.[0] === "Rivotril");
+  // La vista previa en vivo pasa por el servidor, que se conecta con estos
+  // parámetros (services/vistaPrevia.js).
+  const { parametrosDeConexion } = require(path.join(RAIZ, "services", "vistaPrevia"));
+  const terminosVivo = async () => JSON.parse((await parametrosDeConexion(MED)).get("keyterms_prompt") || "[]");
+  verificar("la vista previa en vivo recibe el vocabulario del médico primero", (await terminosVivo())[0] === "Rivotril");
 
   const sub = await pedir(puerto, "POST", `/medico/consultas?pacienteId=${paciente._id}`, tk, Buffer.from("audio"), "audio/ogg");
   for (let i = 0; i < 50 && !llamadaTranscripcion; i++) await new Promise((r) => setTimeout(r, 50));
@@ -262,8 +264,7 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
   await pedir(serv2.address().port, "POST", `/medico/pacientes/${paciente._id}/medicamentos`, tk, JSON.stringify({ nombre: "Jardiance 25 mg" }));
   const despuesKardex = await pedir(puerto, "GET", "/medico/medicamentos/verificar?nombre=Jardiance", tk);
   verificar("cargar «Jardiance» en el Kardex → deja de marcarse al instante", antesKardex.cuerpo.estado !== "ok" && despuesKardex.cuerpo.estado === "ok");
-  const tok2 = await pedir(puerto, "GET", "/medico/transcripcion-token", tk);
-  verificar("  ...y ya va en el vocabulario del transcriptor", tok2.cuerpo.keyterms.includes("Jardiance"));
+  verificar("  ...y ya va en el vocabulario del transcriptor", (await terminosVivo()).includes("Jardiance"));
   serv2.close();
 
   // La IA de la nota recibe su vocabulario y sus correcciones.

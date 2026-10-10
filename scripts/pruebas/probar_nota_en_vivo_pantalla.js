@@ -108,14 +108,14 @@ const NOTA_VIVO = {
 
     // ─── Lo que contesta la prueba en lugar de AssemblyAI y la IA ────────
     let modo = "entero";   // o "corte": la vista previa se cae a mitad
-    await page.routeWebSocket(/streaming\.assemblyai\.com/, (ws) => {
+    await page.routeWebSocket(/\/ws-vista-previa/, (ws) => {
       ws.onMessage(() => { /* el audio que manda el navegador: se ignora */ });
       TURNOS.forEach((texto, i) => setTimeout(() => {
         try { ws.send(JSON.stringify({ transcript: texto, end_of_turn: true })); } catch { /* ya cerrado */ }
       }, 800 * (i + 1)));
       if (modo === "corte") setTimeout(() => { try { ws.close({ code: 1011, reason: "se cayó" }); } catch { /* ya cerrado */ } }, 800 * TURNOS.length + 500);
     });
-    await page.route("**/medico/transcripcion-token", (r) => r.fulfill({ json: { token: "t", idioma: "es", medicalMode: true, keyterms: [] } }));
+    await page.route("**/medico/transcripcion-token", (r) => r.fulfill({ json: { pase: "p", ruta: "/ws-vista-previa" } }));
     const borradores = [];
     await page.route("**/medico/consultas/nota-en-vivo", async (r) => {
       borradores.push(JSON.parse(r.request().postData() || "{}"));

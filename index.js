@@ -66,7 +66,9 @@ app.use(helmet({
       // reparte las salas entre varios subdominios que no se pueden listar
       // uno por uno (por eso el wss: general, como recomienda la propia
       // guía de CSP de Daily).
-      connectSrc: ["'self'", "https://streaming.assemblyai.com", "wss://streaming.assemblyai.com", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:", ...DOMINIOS_MEMED],
+      // AssemblyAI no está: la vista previa en vivo pasa por el servidor
+      // (services/vistaPrevia.js) y el navegador ya no se conecta con ellos.
+      connectSrc: ["'self'", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:", ...DOMINIOS_MEMED],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       // El decoder Draco (vista 3D del odontograma) corre en un Web Worker
@@ -377,6 +379,9 @@ iniciarServidorTiempoReal(server);
 // los dos navegadores. El audio y el video NO pasan por acá — ver el
 // encabezado de services/senalizacion.js.
 require("./services/senalizacion").iniciarSenalizacion(server);
+// La vista previa en vivo: el audio pasa por acá hacia AssemblyAI, para
+// medir y cortar el tiempo que se paga (services/vistaPrevia.js).
+require("./services/vistaPrevia").iniciarVistaPrevia(server);
 require("./services/video").avisarEstadoAlArrancar();
 server.listen(PORT, () => log.info(`🚀 Symphomed corriendo en puerto ${PORT}`));
 

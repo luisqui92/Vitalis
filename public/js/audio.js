@@ -496,10 +496,11 @@ async function subirConsulta(pacienteId, blob, mimeType, { teleconsultaId } = {}
 }
 
 // Vista previa en vivo: mientras se graba (para el archivo real, que es lo
-// que se guarda), en paralelo se manda el audio en crudo (PCM 16kHz) al
-// WebSocket de AssemblyAI para mostrar el texto apareciendo mientras se
-// habla. Si esto falla por lo que sea, no afecta la grabación real: el
-// archivo se sube igual al terminar.
+// que se guarda), en paralelo se manda el audio en crudo (PCM 16kHz) para
+// mostrar el texto apareciendo mientras se habla. Va a Symphomed, que se lo
+// pasa a AssemblyAI y mide el tiempo (services/vistaPrevia.js): el idioma y
+// el vocabulario los pone el servidor. Si esto falla por lo que sea, no
+// afecta la grabación real: el archivo se sube igual al terminar.
 //
 // Con ese texto también se escribe la nota en vivo (services/notaEnVivo.js),
 // pero SOLO si llegó entero. Para eso se lleva la cuenta de cuántos segundos
@@ -552,38 +553,12 @@ function crearTranscriptorEnVivo(onTexto) {
   async function iniciar(stream) {
     detenidoManualmente = false;
     textoAcumulado = ""; parcial = ""; muestrasEnviadas = 0; huboCorte = false;
+    let avisoDelServidor = "";
     try {
-      const { token, keyterms, idioma, medicalMode } = await api("/medico/transcripcion-token");
-      // Mismo criterio que la transcripción final (services/assemblyai.js):
-      // Medical Mode + vocabulario de la especialidad, para que lo que se ve
-      // mientras se habla se parezca a lo que después queda guardado.
-      // Los parámetros de lista (language_codes, keyterms_prompt) van como
-      // array JSON codificado en la URL — probado contra la API: mandarlos
-      // como parámetros repetidos devuelve "Invalid JSON array".
-      //
-      // El idioma lo manda el servidor, sacado de la cuenta del médico, y no
-      // se toma de MEDICO_IDIOMA: si el navegador lo eligiera por su cuenta,
-      // la vista previa y la transcripción final podrían quedar en idiomas
-      // distintos para la misma consulta. Si el servidor no lo mandara —una
-      // versión vieja—, español, que es como estaba antes.
-      const lang = idioma || "es";
-      const params = new URLSearchParams({
-        sample_rate: "16000",
-        encoding: "pcm_s16le",
-        speech_model: "universal-3-5-pro",
-        mode: "balanced",
-        language_codes: JSON.stringify([lang]),
-        token,
-      });
-      // Medical Mode no existe para portugués: la API ignora el parámetro.
-      // Quién lo tiene y quién no lo decide el servidor y viaja en la
-      // respuesta — tener acá una copia de la lista de idiomas es tener dos
-      // fuentes de verdad que algún día no van a coincidir.
-      if (medicalMode) params.set("domain", "medical-v1");
-      if (Array.isArray(keyterms) && keyterms.length) {
-        params.set("keyterms_prompt", JSON.stringify(keyterms));
-      }
-      ws = new WebSocket("wss://streaming.assemblyai.com/v3/ws?" + params.toString());
+      // El pase vale para una sola conexión y por unos segundos: se usa ya.
+      const { pase, ruta } = await api("/medico/transcripcion-token");
+      const protocolo = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${protocolo}//${location.host}${ruta || "/ws-vista-previa"}?pase=${encodeURIComponent(pase)}`);
 
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const blobUrl = URL.createObjectURL(new Blob([CODIGO_WORKLET], { type: "application/javascript" }));
@@ -601,13 +576,13 @@ function crearTranscriptorEnVivo(onTexto) {
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);
-          // Antes de cerrar el socket, AssemblyAI manda el motivo real en un
-          // mensaje aparte (type:"Error") — se ignoraba porque no tiene
-          // "transcript", y por eso el cierre (código 3007 y similares)
-          // quedaba sin explicación visible.
+          // Antes de cerrar, el servidor (o AssemblyAI) manda el motivo en un
+          // mensaje aparte (type:"Error"): se terminaron las horas, no llegaba
+          // audio, se abrió en otra pantalla. Es lo que queda a la vista.
           if (msg.error || msg.type === "Error") {
             huboCorte = true;
-            onTexto("⚠️ Vista previa en vivo: " + (msg.error || msg.message || JSON.stringify(msg)));
+            avisoDelServidor = msg.error || msg.message || JSON.stringify(msg);
+            onTexto("⚠️ Vista previa en vivo: " + avisoDelServidor);
             return;
           }
           if (!msg.transcript) return;
@@ -631,14 +606,16 @@ function crearTranscriptorEnVivo(onTexto) {
       ws.onclose = (ev) => {
         if (detenidoManualmente) return;
         huboCorte = true;
-        if (ev.code !== 1000) {
+        if (ev.code !== 1000 && !avisoDelServidor) {
           onTexto(`⚠️ Vista previa en vivo se cortó (código ${ev.code}${ev.reason ? ": " + ev.reason : ""}). La grabación real no se ve afectada.`);
         }
       };
     } catch (e) {
+      // api() tira { status, error } (sin horas, demasiados pedidos); el
+      // navegador, un Error con message.
       huboCorte = true;
-      onTexto("⚠️ Vista previa en vivo no disponible: " + e.message);
-      console.warn("Transcripción en vivo no disponible:", e.message);
+      onTexto("⚠️ Vista previa en vivo no disponible: " + (e.error || e.message));
+      console.warn("Transcripción en vivo no disponible:", e.error || e.message);
     }
   }
 
@@ -647,9 +624,9 @@ function crearTranscriptorEnVivo(onTexto) {
     if (workletNode) { try { workletNode.disconnect(); } catch {} }
     if (source) { try { source.disconnect(); } catch {} }
     if (audioCtx) { try { audioCtx.close(); } catch {} }
-    // AssemblyAI factura la sesión hasta que se cierra: si solo se corta el
-    // socket sin avisar, la da por viva y cobra hasta el tope de 3 horas.
-    // Por eso primero se manda Terminate y recién después se cierra.
+    // AssemblyAI cobra la sesión hasta que se cierra. El servidor le pide que
+    // termine apenas se cierra esta conexión; el Terminate de acá es el
+    // mismo pedido, un instante antes.
     if (ws) {
       try {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "Terminate" }));

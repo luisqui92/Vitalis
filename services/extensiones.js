@@ -37,7 +37,12 @@ const PUNTOS = {
   "sesion.token": { forma: "sumar", que: "marcas que se suman al token de sesión" },
   "sesion.datos": { forma: "sumar", que: "datos que se suman a la sesión que recibe la pantalla" },
   // Las consultas (routes/consultaMedica.js).
+  // Al subir, req.vistaPrevia es la vista previa de esa misma grabación, si
+  // tuvo (services/vistaPrevia.js → deEstaGrabacion).
   "consulta.antesDeGrabar": { forma: "revisar", que: "antes de empezar o de subir una grabación: puede frenarla" },
+  // La vista previa en vivo (services/vistaPrevia.js): se llama con
+  // { adminUser } al abrirla y cada medio minuto mientras sigue abierta.
+  "vistaPrevia.durante": { forma: "revisar", que: "mientras la vista previa en vivo está abierta: puede cortarla" },
   "consulta.alCrear": { forma: "sumar", que: "campos que se suman a la consulta nueva" },
   "consulta.alConfirmar": { forma: "sumar", que: "lo que se fuerza en lo que se aplica al confirmar" },
   "consulta.detalle": { forma: "extras", que: "lo que viaja con la consulta al abrirla (consulta.extras)" },

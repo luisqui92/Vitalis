@@ -201,7 +201,7 @@ console.log("\n── 3. El interruptor, en el proceso ──");
     if (!linea) throw new Error("no montó:\n" + r.stdout + r.stderr);
     return JSON.parse(linea.slice(2));
   };
-  const REGLAS = ["sesion.token", "sesion.datos", "consulta.antesDeGrabar", "consulta.alCrear", "consulta.alConfirmar", "paciente.mensajes", "kardex.alertas"];
+  const REGLAS = ["sesion.token", "sesion.datos", "consulta.antesDeGrabar", "vistaPrevia.durante", "consulta.alCrear", "consulta.alConfirmar", "paciente.mensajes", "kardex.alertas"];
   const FUNCIONES = ["notaEnVivo.extras", "consulta.detalle"];
 
   const prendido = montar("prendido");

@@ -2276,6 +2276,27 @@ const membreteEmitidoSchema = new mongoose.Schema({
 membreteEmitidoSchema.index({ medicoPhone: 1, huella: 1 }, { unique: true });
 const MembreteEmitido = mongoose.model("MembreteEmitido", membreteEmitidoSchema);
 
+// Una vista previa en vivo (services/vistaPrevia.js): cuánto estuvo abierta
+// la conexión con AssemblyAI, que es lo que se paga, se hable o no.
+// «segundos» se guarda cada medio minuto mientras está abierta: si el
+// servidor se cae a la mitad, queda lo último guardado y «fin» en null.
+const vistaPreviaSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true },
+  inicio: { type: Date, required: true },
+  fin: { type: Date, default: null },
+  segundos: { type: Number, default: 0 },
+  // Lo que dijo AssemblyAI al cerrar (el mensaje Termination), para poder
+  // comparar con lo medido acá.
+  segundosAssembly: { type: Number, default: null },
+  segundosAudio: { type: Number, default: null },
+  motivo: { type: String, default: "" },
+  // La consulta que se subió con esta grabación: la grabación y su vista
+  // previa son la misma hora de consulta, y así se cuentan una sola vez.
+  consultaId: { type: mongoose.Schema.Types.ObjectId, default: null },
+});
+vistaPreviaSchema.index({ medicoPhone: 1, inicio: -1 });
+const VistaPrevia = mongoose.model("VistaPrevia", vistaPreviaSchema);
+
 const informeSchema = new mongoose.Schema({
   pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
   medicoPhone: { type: String, index: true, required: true },
@@ -3286,7 +3307,7 @@ module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, ResumenCompartido, LlavePaci
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
   MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
-  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, MembreteEmitido, Informe,
+  PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, MembreteEmitido, VistaPrevia, Informe,
   CALIFICACIONES_INSTRUMENTO,
   InformeFamilia, EquipoNeuro,
   CONDICIONES_NEURO, FORMAS_COMUNICACION, MODALIDADES_SENSORIALES, RESPUESTAS_SENSORIALES, AREAS_OBJETIVO,

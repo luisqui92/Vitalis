@@ -86,17 +86,21 @@ verificar('assemblyai.js ya no manda language_code: "es" fijo', !/language_code:
 verificar("  ...manda el idioma que recibe", /language_code:\s*lang/.test(assembly));
 verificar("  ...y el domain va condicionado", /conMedicalMode\s*\?\s*\{\s*domain/.test(assembly));
 
+// La vista previa en vivo pasa por el servidor (services/vistaPrevia.js):
+// el idioma lo pone él, sacado de la cuenta, y el navegador no elige nada.
 const audio = fuente("public/js/audio.js");
-verificar('audio.js ya no manda language_codes: ["es"] fijo', !/language_codes:\s*JSON\.stringify\(\["es"\]\)/.test(audio));
-verificar("  ...usa el idioma que le manda el servidor", /JSON\.stringify\(\[lang\]\)/.test(audio));
+verificar("audio.js no elige el idioma de la vista previa", !/language_codes/.test(audio));
+const vista = fuente("services/vistaPrevia.js");
+verificar("  ...lo pone el servidor, con el idioma de la cuenta",
+  /select\("tipoEspecialidad idioma"\)/.test(vista) && /language_codes:\s*JSON\.stringify\(\[idioma\]\)/.test(vista));
 
 const ruta = fuente("routes/consultaMedica.js");
 const selects = [...ruta.matchAll(/\.select\("tipoEspecialidad[^"]*"\)/g)].map(m => m[0]);
-// Los dos que alimentan la transcripción tienen que traer el idioma. Hay un
-// tercero más abajo que solo mira la especialidad para el catálogo de
-// tratamientos, y ese no lo necesita.
+// El que alimenta la transcripción tiene que traer el idioma. Hay otro más
+// abajo que solo mira la especialidad para el catálogo de tratamientos, y
+// ese no lo necesita.
 const conIdioma = selects.filter(s => s.includes("idioma")).length;
-verificar(`${conIdioma} de ${selects.length} consultas al médico traen el idioma`, conIdioma >= 2);
+verificar(`${conIdioma} de ${selects.length} consultas al médico traen el idioma`, conIdioma >= 1);
 // Se busca que el idioma sea un argumento, no que sea el ÚLTIMO: la llamada
 // lleva además un objeto de opciones (multicanal, para la teleconsulta) y
 // atarse a la posición hacía fallar la prueba por agregar un parámetro que no
