@@ -506,8 +506,14 @@ pacienteSchema.index({ medicoPhone: 1, nombre: 1 });
 // scripts/codigos_repetidos.js.
 pacienteSchema.index({ medicoPhone: 1, codigo: 1 }, { unique: true, partialFilterExpression: { codigo: { $gt: "" } } });
 const Paciente = mongoose.model("Paciente", pacienteSchema);
+// Solo con repetidos de verdad (11000): un script corto que cierra la
+// conexión mientras Mongoose todavía arma los índices también dispara este
+// evento ("Cannot use a session that has ended"), y eso no dice nada de los
+// datos.
 Paciente.on("index", (e) => {
-  if (e) log.error("[CODIGOS] No se pudo crear el índice de códigos de paciente únicos (¿hay repetidos?). Revisalos con: node scripts/codigos_repetidos.js —", e.message);
+  if (e?.code === 11000 || e?.codeName === "DuplicateKey") {
+    log.error("[CODIGOS] No se pudo crear el índice de códigos de paciente únicos: hay códigos repetidos. Revisalos con: node scripts/codigos_repetidos.js");
+  }
 });
 
 // Los números correlativos de cada consultorio, uno por tipo de código

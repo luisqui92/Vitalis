@@ -153,7 +153,26 @@ const distintos = (lista) => new Set(lista).size === lista.length;
   const indices = await M.Paciente.collection.indexes();
   verificar("  ...y el índice único queda creado", indices.some(i => i.unique && i.key?.medicoPhone === 1 && i.key?.codigo === 1));
   s = await correrScript(uri, []);
-  verificar("después: «No hay códigos de paciente repetidos»", /No hay códigos de paciente repetidos/.test(s.salida) && /índice de códigos únicos está creado/.test(s.salida));
+  verificar("después: «No hay códigos de paciente repetidos», y sin el aviso rojo", /No hay códigos de paciente repetidos/.test(s.salida)
+    && /índice de códigos únicos está creado/.test(s.salida) && !/\[CODIGOS\]/.test(s.salida));
+
+  console.log("\n── 7. El aviso del índice, solo con repetidos de verdad ──");
+  // En producción, el script dijo «No hay códigos repetidos» y abajo salió
+  // el aviso rojo: cerró la conexión mientras Mongoose todavía armaba los
+  // índices («Cannot use a session that has ended»), y el aviso tomaba
+  // cualquier falla como repetidos.
+  const { log } = require(path.join(RAIZ, "config"));
+  const errorOriginal = log.error;
+  const avisos = [];
+  log.error = (...a) => { avisos.push(a.join(" ")); };
+  const deCodigos = () => avisos.filter(a => /\[CODIGOS\]/.test(a)).length;
+  M.Paciente.emit("index", Object.assign(new Error("Cannot use a session that has ended"), { name: "MongoExpiredSessionError" }));
+  const trasCorte = deCodigos();
+  M.Paciente.emit("index", Object.assign(new Error("Index build failed: E11000 duplicate key"), { code: 11000, codeName: "DuplicateKey" }));
+  const trasRepetidos = deCodigos();
+  log.error = errorOriginal;
+  verificar("una conexión cerrada a mitad de armar los índices no avisa «repetidos»", trasCorte === 0);
+  verificar("  ...un 11000, que son repetidos de verdad, sí", trasRepetidos === 1);
 
   // Las previas que guardó la caja, fuera.
   const { DIR_ESTUDIOS } = require(path.join(RAIZ, "services", "archivosEstudio"));
