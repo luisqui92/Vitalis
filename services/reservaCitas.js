@@ -5,7 +5,7 @@
 // tan estructurado como elegir un turno, es más confiable que dejar que el
 // paciente escriba libre y una IA interprete la fecha/hora.
 const { Medico, Cita, SesionCitaWA, Paciente, ConsultaMedica, Vacuna, Medicamento, Interesado } = require("../db/models");
-const { obtenerHorariosDisponibles, horarioSigueLibre } = require("./agenda");
+const { obtenerHorariosDisponibles, horarioSigueLibre, duracionDe } = require("./agenda");
 const { eliminarEvento } = require("./googleCalendar");
 const { enrutarMensaje } = require("./asistenteWhatsapp");
 const { atenderMedico, precios } = require("./asistenteVentas");
@@ -637,7 +637,7 @@ async function elegirHora(medicoPhone, numero, t, texto, datos, medico) {
     if (desvio?.tipo === "cancelar") return iniciarCancelacion(medicoPhone, numero);
     return comoTexto("Elegí uno de los horarios de la lista de arriba (o escribí qué necesitás).");
   }
-  const libre = await horarioSigueLibre(medicoPhone, slot, medico.duracionConsultaMinutos || 30);
+  const libre = await horarioSigueLibre(medicoPhone, slot, duracionDe(medico.duracionConsultaMinutos));
   if (!libre) {
     // Se re-arma la lista de ese mismo día por si sigue teniendo otros
     // horarios libres, en vez de mandar al paciente de vuelta al principio.

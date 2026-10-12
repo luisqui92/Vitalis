@@ -12,6 +12,32 @@ function seSuperponen(inicioA, finA, inicioB, finB) {
   return inicioA < finB && finA > inicioB;
 }
 
+// ═══ LO QUE PUEDE DURAR UNA CONSULTA, Y CUÁNTOS DÍAS SE MIRAN ══════════════
+//
+// El cálculo de horarios avanza de a una consulta por vez. Con una duración
+// de −30 minutos retrocedía para siempre, y con 0,001 daba miles de millones
+// de vueltas: el proceso entero quedaba colgado y Symphomed dejaba de
+// contestar a todos los médicos y pacientes. Bastaba guardar ese número en
+// el horario de una cuenta cualquiera, o que el asistente de voz pidiera
+// mil millones de días (revisión integral del 11 de octubre de 2026, S07).
+//
+// Por eso se valida al guardar (routes/citas.js) y, además, acá se usa
+// siempre un valor sano: lo que ya esté guardado mal no puede colgar nada.
+const DURACION_MIN = 5;
+const DURACION_MAX = 240;
+const DIAS_MAX = 60;
+// Más franjas que estas no son un horario de atención.
+const FRANJAS_MAX = 50;
+
+// Minutos enteros de 5 a 240, o null.
+function duracionValida(valor) {
+  const n = Number(valor);
+  return Number.isInteger(n) && n >= DURACION_MIN && n <= DURACION_MAX ? n : null;
+}
+// La que se usa: la guardada si es válida; si no, media hora.
+const duracionDe = (valor) => duracionValida(valor) || 30;
+const diasDe = (valor, porDefecto) => Math.min(DIAS_MAX, Math.max(1, Math.floor(Number(valor)) || porDefecto));
+
 // fechaDia: {anio, mesIndex, dia} de un día concreto EN LA ZONA DEL MÉDICO
 // (nunca un Date de "hora local del server" — en producción corre en UTC).
 //
@@ -25,11 +51,12 @@ function combinarFechaHora(zona, fechaDia, horaStr) {
 
 // [{ fecha: "2026-08-11", slots: [Date, ...] }, ...] — solo días con al
 // menos un horario libre, solo horarios futuros.
-async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
+async function obtenerHorariosDisponibles(medicoPhone, diasPedidos = 7) {
+  const diasAdelante = diasDe(diasPedidos, 7);
   const medico = await Medico.findOne({ phone: medicoPhone }).lean();
   if (!medico) return [];
-  const duracion = medico.duracionConsultaMinutos || 30;
-  const horario = medico.horarioAtencion || [];
+  const duracion = duracionDe(medico.duracionConsultaMinutos);
+  const horario = (medico.horarioAtencion || []).slice(0, FRANJAS_MAX);
   if (horario.length === 0) return [];
 
   // "Hoy" EN LA ZONA DEL MÉDICO, no en la del server (que en producción
@@ -91,7 +118,7 @@ async function obtenerHorariosDisponibles(medicoPhone, diasAdelante = 7) {
 // sea en Symphomed o directo en el Google Calendar del médico).
 async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
   const inicio = new Date(fecha).getTime();
-  const fin = inicio + (duracionMinutos || 30) * 60000;
+  const fin = inicio + duracionDe(duracionMinutos) * 60000;
   const margen = 6 * 3600000;
 
   const [citas, medico] = await Promise.all([
@@ -116,4 +143,4 @@ async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
   return true;
 }
 
-module.exports = { obtenerHorariosDisponibles, horarioSigueLibre };
+module.exports = { obtenerHorariosDisponibles, horarioSigueLibre, duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX };

@@ -7,7 +7,7 @@
 // esta única pantalla.
 const { Medico } = require("../db/models");
 const { generarToken, verificarToken } = require("../services/auth");
-const { obtenerHorariosDisponibles, horarioSigueLibre } = require("../services/agenda");
+const { obtenerHorariosDisponibles, horarioSigueLibre, duracionDe } = require("../services/agenda");
 const { crearCitaConfirmada } = require("../services/crearCita");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
@@ -66,7 +66,7 @@ module.exports = function (app) {
     const fecha = new Date(String(req.body?.fecha || ""));
     if (isNaN(fecha.getTime())) throw new ErrorHttp(400, "Horario inválido.");
 
-    const libre = await horarioSigueLibre(medicoPhone, fecha, medico.duracionConsultaMinutos || 30);
+    const libre = await horarioSigueLibre(medicoPhone, fecha, duracionDe(medico.duracionConsultaMinutos));
     if (!libre) throw new ErrorHttp(409, "Ups, ese horario se acaba de ocupar. Elegí otro.");
 
     let cita;

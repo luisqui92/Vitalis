@@ -5,7 +5,7 @@
 // (routes/reservaPublica.js) — antes esta lógica estaba duplicada.
 const { Paciente, Cita } = require("../db/models");
 const { crearEvento } = require("./googleCalendar");
-const { horarioSigueLibre } = require("./agenda");
+const { horarioSigueLibre, duracionDe } = require("./agenda");
 const { notificarMedico } = require("./push");
 const { log } = require("../config");
 
@@ -38,7 +38,7 @@ async function crearCitaConfirmada({ medicoPhone, medico, pacienteTelefono, paci
   // varios mensajes atrás (el paciente todavía tiene que escribir su nombre
   // y el motivo) — se revalida acá, lo más cerca posible de la escritura
   // real, para no confirmar dos citas para el mismo horario.
-  const libre = await horarioSigueLibre(medicoPhone, fecha, medico.duracionConsultaMinutos || 30);
+  const libre = await horarioSigueLibre(medicoPhone, fecha, duracionDe(medico.duracionConsultaMinutos));
   if (!libre) throw new HorarioOcupadoError();
 
   const paciente = await Paciente.findOne({ medicoPhone, telefono: pacienteTelefono }).lean();
@@ -50,7 +50,7 @@ async function crearCitaConfirmada({ medicoPhone, medico, pacienteTelefono, paci
       pacienteNombre,
       pacienteTelefono,
       fecha,
-      duracionMinutos: medico.duracionConsultaMinutos || 30,
+      duracionMinutos: duracionDe(medico.duracionConsultaMinutos),
       motivo,
       estado: "confirmada",
       origen,

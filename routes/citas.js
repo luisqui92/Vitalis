@@ -4,7 +4,7 @@
 const { Medico, Paciente, Cita } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { obtenerHorariosDisponibles } = require("../services/agenda");
+const { obtenerHorariosDisponibles, duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX } = require("../services/agenda");
 const { localAInstante, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 
 // La zona en la que trabaja esta cuenta. Se pregunta a la base y no se
@@ -32,15 +32,32 @@ module.exports = function (app) {
     res.json({ horario });
   }));
 
+  // Con una duración imposible o un horario mal formado, el cálculo de
+  // horarios libres colgaba el servidor entero (services/agenda.js, S07): se
+  // rechaza acá, con el motivo, antes de guardarlo.
   app.patch("/medico/horario", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medico = await Medico.findOne({ phone: req.adminUser.usuario });
     if (Array.isArray(req.body?.horarioAtencion)) {
-      medico.horarioAtencion = req.body.horarioAtencion
+      // Una fila sin horas es un día que no se marcó: se deja afuera, como
+      // siempre. Una con horas que no son horas, o que termina antes de
+      // empezar, es un error de carga y se dice.
+      const franjas = req.body.horarioAtencion
         .map(h => ({ diaSemana: Number(h?.diaSemana), horaInicio: String(h?.horaInicio || ""), horaFin: String(h?.horaFin || "") }))
-        .filter(h => !Number.isNaN(h.diaSemana) && h.horaInicio && h.horaFin);
+        .filter(h => h.horaInicio && h.horaFin);
+      const hora = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+      const mal = franjas.find(h => !Number.isInteger(h.diaSemana) || h.diaSemana < 0 || h.diaSemana > 6
+        || !hora.test(h.horaInicio) || !hora.test(h.horaFin) || h.horaInicio >= h.horaFin);
+      if (mal || franjas.length > FRANJAS_MAX) {
+        throw new ErrorHttp(400, "Revisá el horario: cada día necesita una hora de inicio y una de fin (HH:MM), y el fin después del inicio.");
+      }
+      medico.horarioAtencion = franjas;
     }
-    if (req.body?.duracionConsultaMinutos !== undefined) {
-      medico.duracionConsultaMinutos = Number(req.body.duracionConsultaMinutos) || 30;
+    const duracion = req.body?.duracionConsultaMinutos;
+    if (duracion !== undefined && duracion !== null && duracion !== "") {
+      if (!duracionValida(duracion)) {
+        throw new ErrorHttp(400, `La duración de cada consulta tiene que ser de ${DURACION_MIN} a ${DURACION_MAX} minutos.`);
+      }
+      medico.duracionConsultaMinutos = duracionValida(duracion);
     }
     if (req.body?.googleCalendarId !== undefined) {
       medico.googleCalendarId = String(req.body.googleCalendarId).trim();
@@ -90,11 +107,15 @@ module.exports = function (app) {
     }
     if (!pacienteNombre) throw new ErrorHttp(400, "pacienteNombre es requerido (o elegí un paciente)");
 
+    const pedida = req.body?.duracionMinutos;
+    if (pedida !== undefined && pedida !== null && pedida !== "" && !duracionValida(pedida)) {
+      throw new ErrorHttp(400, `La duración de la cita tiene que ser de ${DURACION_MIN} a ${DURACION_MAX} minutos.`);
+    }
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
     const cita = await Cita.create({
       medicoPhone, pacienteId, pacienteNombre,
       pacienteTelefono: String(req.body?.pacienteTelefono || "").trim(),
-      fecha, duracionMinutos: Number(req.body?.duracionMinutos) || medico?.duracionConsultaMinutos || 30,
+      fecha, duracionMinutos: duracionValida(pedida) || duracionDe(medico?.duracionConsultaMinutos),
       motivo: String(req.body?.motivo || "").trim(),
       estado: "confirmada", origen: "manual",
     });
