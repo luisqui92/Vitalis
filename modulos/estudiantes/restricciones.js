@@ -113,7 +113,7 @@ const ESCRITURA_PERMITIDA = [
   ["POST", ruta(`consultas/${ID}/razonamiento`), IA],
   // Lo que termina una consulta que ya subió: sale aunque el acceso venza
   // en el medio (ver cuenta.js).
-  ["POST", ruta(`consultas/${ID}/(texto-en-vivo|nota/regenerar|confirmar)`)],
+  ["POST", ruta(`consultas/${ID}/(texto-en-vivo|nota/regenerar|confirmar|transcripcion/reintentar)`)],
   // Lo del módulo.
   ["POST DELETE", ruta(`estudio/tarjetas/${ID}/reportar`)],
   ["POST", ruta(`estudio/tarjetas/${ID}/responder`)],

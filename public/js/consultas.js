@@ -602,6 +602,16 @@ async function vigilarVerificacion(id) {
 const REINTENTOS_DETALLE = 3;
 const ESPERA_REINTENTO_MS = 2500;
 
+// Si la transcripción falló varias veces por algo pasajero, el servidor
+// guarda el audio unos días (routes/consultaMedica.js, S04): se ofrece
+// volver a transcribirla, con la fecha hasta la que se puede.
+function botonReintentarTranscripcion(c) {
+  const hasta = c.audioRetenidoHasta ? new Date(c.audioRetenidoHasta) : null;
+  if (!hasta || hasta <= new Date()) return "";
+  return `<div class="hint" style="margin-top:8px">${t("consulta.audioGuardado", { fecha: hasta.toLocaleDateString(localeActual()) })}</div>
+    <button class="secondary" id="btnReintentarTranscripcion" style="margin-top:8px">${t("consulta.reintentarTranscripcion")}</button>`;
+}
+
 async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
   detenerPolling();
   if (!esRefrescoAutomatico) app.innerHTML = `<div class="loading"><div class="spinner"></div>${t("consulta.cargando")}</div>`;
@@ -767,6 +777,22 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
             <span>${t("confirmar.vacuna", { item: esc(v.nombre + (v.dosis ? " — " + v.dosis : "")) })}</span></label>
         </div>`));
 
+      // Lo que la IA entendió para el mapa de la especialidad: se carga
+      // recién al confirmar, lo que quede marcado (routes/consultaMedica.js,
+      // aplicarHallazgosAlMapa). Antes se cargaba solo, sin revisar.
+      const filaMapa = (clase, i, texto, detalle) => `
+        <div class="conf-fila">
+          <label class="conf-check"><input type="checkbox" class="${clase}" data-i="${i}" checked>
+            <span>${texto}</span></label>
+          ${detalle ? `<div class="hint">${esc(detalle)}</div>` : ""}
+        </div>`;
+      (n.odontogramaSugerido || []).forEach((h, i) => filas.push(filaMapa("cf-odonto", i,
+        t("confirmar.mapaOdonto", { pieza: esc(h.piezaFdi), estado: esc(t(`pieza.${h.estado}`)) }), h.hallazgo)));
+      (n.examenOcularSugerido || []).forEach((h, i) => filas.push(filaMapa("cf-ojo", i,
+        t("confirmar.mapaOjo", { ojo: esc(h.ojo), estructura: esc(t(`estruct.${h.estructura}`)), estado: esc(t(`estOcu.${h.estado}`)) }), h.hallazgo)));
+      (n.ginecoSugerido || []).forEach((h, i) => filas.push(filaMapa("cf-gineco", i,
+        t("confirmar.mapaGineco", { organo: esc(t(`organo.${h.organo}`)), hallazgo: esc(t(`hall.${h.hallazgo}`)) }), h.detalle)));
+
       confirmarHtml = `
         <div class="card">
           ${filas.length > 1 || (n.medicamentosRecetados || []).length ? `
@@ -787,7 +813,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
     } else if (c.estado === "procesando") {
       body = `<div class="hint">${t("consulta.procesando")}</div>`;
     } else if (c.estado === "error") {
-      body = `<div class="error">⚠️ ${esc(c.error || t("consulta.errTranscribir"))}</div>`;
+      body = `<div class="error">⚠️ ${esc(c.error || t("consulta.errTranscribir"))}</div>${botonReintentarTranscripcion(c)}`;
     } else if (c.segmentos && c.segmentos.length) {
       body = transcripcionHtml(c.segmentos);
     } else {
@@ -807,6 +833,19 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
       <div style="margin-top:14px" id="cuerpoTranscripcion">${body}</div>
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(c.pacienteId, "consultas");
+    const btnReintentarT = document.getElementById("btnReintentarTranscripcion");
+    if (btnReintentarT) btnReintentarT.onclick = async () => {
+      btnReintentarT.disabled = true;
+      btnReintentarT.textContent = t("consulta.reintentandoTranscripcion");
+      try {
+        await api(`/medico/consultas/${c._id}/transcripcion/reintentar`, { method: "POST" });
+        renderDetalle(c._id);
+      } catch (e) {
+        btnReintentarT.disabled = false;
+        btnReintentarT.textContent = t("consulta.reintentarTranscripcion");
+        btnReintentarT.insertAdjacentHTML("afterend", `<div class="error">${esc(e.error || t("consulta.errTranscribir"))}</div>`);
+      }
+    };
     engancharHiloClinico();
     despues.alPintar();
 
@@ -943,6 +982,9 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
           antecedentesPersonales: [...document.querySelectorAll(".cf-antp:checked")].map(x => Number(x.dataset.i)),
           antecedentesFamiliares: [...document.querySelectorAll(".cf-antf:checked")].map(x => Number(x.dataset.i)),
           vacunas: [...document.querySelectorAll(".cf-vac:checked")].map(x => Number(x.dataset.i)),
+          odontograma: [...document.querySelectorAll(".cf-odonto:checked")].map(x => Number(x.dataset.i)),
+          examenOcular: [...document.querySelectorAll(".cf-ojo:checked")].map(x => Number(x.dataset.i)),
+          gineco: [...document.querySelectorAll(".cf-gineco:checked")].map(x => Number(x.dataset.i)),
         };
 
         btnConfirmar.disabled = true;

@@ -10,11 +10,14 @@
 // quedaba «procesando» para siempre (informe de QA del 9 de octubre de 2026).
 //
 // Ahora el audio se escribe acá ANTES de contestar, y se borra cuando la
-// transcripción termina, bien o mal. Lo que hay acá al arrancar es lo que se
-// interrumpió, y se retoma (routes/consultaMedica.js, retomarConsultas).
+// transcripción quedó guardada o cuando el audio mismo no sirve. Si la falla
+// es pasajera, se reintenta con este audio; agotados los intentos, se guarda
+// unos días para reintentar a mano (routes/consultaMedica.js, «CUANDO LA
+// TRANSCRIPCIÓN FALLA»). Lo que hay acá al arrancar es lo que se interrumpió,
+// y se retoma (retomarConsultas).
 //
 // Fuera de /public, como los estudios: es la voz de un paciente. Y solo el
-// tiempo que dura la transcripción: no es un archivo de grabaciones.
+// tiempo que hace falta para transcribirla: no es un archivo de grabaciones.
 const fs = require("fs");
 const path = require("path");
 

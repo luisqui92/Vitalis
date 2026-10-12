@@ -59,16 +59,17 @@ module.exports = function (app) {
     // demás. Un stock inicial puesto a mano es el único número que nunca se
     // puede explicar después.
     const inicial = Number(req.body?.stockInicial) || 0;
+    let creado = insumo;
     if (inicial > 0) {
-      await registrarMovimiento(req, insumo, {
+      ({ insumo: creado } = await registrarMovimiento(req, insumo, {
         tipo: "entrada", cantidad: inicial,
         costoUnitarioCentavos: insumo.costoUnitarioCentavos,
         motivo: "Carga inicial",
-      });
+      }));
     }
 
     registrar({ req, medicoPhone: req.adminUser.usuario, accion: "crear_insumo", recurso: `Insumo:${insumo._id}` });
-    res.status(201).json({ ok: true, insumo });
+    res.status(201).json({ ok: true, insumo: creado });
   }));
 
   app.patch("/medico/insumos/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {

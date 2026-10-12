@@ -63,6 +63,89 @@ async function verificarLista(medicoPhone, nombres) {
   }
 }
 
+// Lo que crea confirmar una consulta, una sola vez: con la clave de la
+// consulta y de qué es, el índice único frena el segundo (11000), y eso
+// cuenta como hecho. Devuelve el documento nuevo, o null si ya estaba.
+async function crearUnaVez(Modelo, datos) {
+  try {
+    return await Modelo.create(datos);
+  } catch (e) {
+    if (e?.code === 11000) return null;
+    throw e;
+  }
+}
+const claveDe = (...partes) => partes.map(p => String(p ?? "").trim().toLowerCase()).join("|");
+
+// Los hallazgos para el mapa de la especialidad que el médico dejó marcados
+// al confirmar. Cada cambio queda en el historial de la pieza, estructura u
+// órgano con fuente "voz" y el id de la consulta. Si ya está (una
+// confirmación que se reintenta), no se repite. Si el paciente todavía no
+// tenía mapa, se crea igual que cuando el médico lo abre a mano.
+async function aplicarHallazgosAlMapa(consulta, paciente, medicoPhone, { ocular = [], odonto = [], gineco = [] }) {
+  const cargados = [];
+  if (!ocular.length && !odonto.length && !gineco.length) return cargados;
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+  const ya = (historial, cambio) => (historial || []).some(h => String(h.consultaId) === String(consulta._id)
+    && Object.entries(cambio).every(([k, v]) => (h[k] || "") === (v || "")));
+  const ahora = new Date();
+
+  if (medico?.tipoEspecialidad === "oftalmologia" && ocular.length) {
+    let examen = await ExamenOcular.findOne({ pacienteId: paciente._id, medicoPhone });
+    if (!examen) {
+      const estructuras = [];
+      for (const ojo of OJOS) for (const estructura of ESTRUCTURAS_OCULARES) estructuras.push({ ojo, estructura, estado: "normal", notas: "", historial: [] });
+      examen = await ExamenOcular.create({ pacienteId: paciente._id, medicoPhone, estructuras });
+    }
+    for (const h of ocular) {
+      if (!OJOS.includes(h.ojo) || !ESTRUCTURAS_OCULARES.includes(h.estructura) || !ESTADOS_ESTRUCTURA_OCULAR.includes(h.estado)) continue;
+      const item = examen.estructuras.find(e => e.ojo === h.ojo && e.estructura === h.estructura);
+      if (!item || ya(item.historial, { estado: h.estado, notas: h.hallazgo })) continue;
+      item.estado = h.estado;
+      item.notas = h.hallazgo;
+      item.historial.push({ fecha: ahora, estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
+      cargados.push(`Mapa ocular: ${h.ojo} ${h.estructura}`);
+    }
+    await examen.save();
+  }
+
+  if (medico?.tipoEspecialidad === "odontologia" && odonto.length) {
+    let odontograma = await Odontograma.findOne({ pacienteId: paciente._id, medicoPhone });
+    if (!odontograma) {
+      const piezas = PIEZAS_FDI_PERMANENTE.map(numero => ({ numero, estado: "sano", notas: "", historial: [] }));
+      odontograma = await Odontograma.create({ pacienteId: paciente._id, medicoPhone, piezas });
+    }
+    for (const h of odonto) {
+      if (!PIEZAS_FDI_PERMANENTE.includes(h.piezaFdi) || !ESTADOS_PIEZA_DENTAL.includes(h.estado)) continue;
+      const pieza = odontograma.piezas.find(x => x.numero === h.piezaFdi);
+      if (!pieza || ya(pieza.historial, { estado: h.estado, notas: h.hallazgo })) continue;
+      pieza.estado = h.estado;
+      pieza.notas = h.hallazgo;
+      pieza.historial.push({ fecha: ahora, estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
+      cargados.push(`Odontograma: pieza ${h.piezaFdi}`);
+    }
+    await odontograma.save();
+  }
+
+  if (medico?.tipoEspecialidad === "ginecologia" && gineco.length) {
+    let mapa = await ExamenGinecologico.findOne({ pacienteId: paciente._id, medicoPhone });
+    if (!mapa) {
+      const organos = ORGANOS_GINECO.map(organo => ({ organo, hallazgo: "normal", notas: "", historial: [] }));
+      mapa = await ExamenGinecologico.create({ pacienteId: paciente._id, medicoPhone, organos });
+    }
+    for (const h of gineco) {
+      if (!ORGANOS_GINECO.includes(h.organo) || !HALLAZGOS_GINECO.includes(h.hallazgo)) continue;
+      const item = mapa.organos.find(o => o.organo === h.organo);
+      if (!item || ya(item.historial, { hallazgo: h.hallazgo, notas: h.detalle })) continue;
+      item.hallazgo = h.hallazgo;
+      item.notas = h.detalle;
+      item.historial.push({ fecha: ahora, hallazgo: h.hallazgo, notas: h.detalle, fuente: "voz", consultaId: consulta._id });
+      cargados.push(`Mapa ginecológico: ${h.organo}`);
+    }
+    await mapa.save();
+  }
+  return cargados;
+}
+
 module.exports = function (app) {
 
   // ─── PASE PARA LA VISTA PREVIA EN VIVO ─────────────────────────────────
@@ -188,6 +271,33 @@ module.exports = function (app) {
     res.status(202).json({ ok: true, consulta });
     transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { multicanal })
       .catch(e => log.error(`[CONSULTA_MEDICA] consulta ${consulta._id} en segundo plano:`, e.message));
+  }));
+
+  // ─── REINTENTAR LA TRANSCRIPCIÓN ───────────────────────────────────────
+  // Cuando falló varias veces por algo pasajero, el audio queda guardado
+  // unos días (ver «CUANDO LA TRANSCRIPCIÓN FALLA», abajo). Es la misma
+  // consulta que ya se subió: no se mira de nuevo el saldo ni las horas.
+  app.post("/medico/consultas/:id/transcripcion/reintentar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    const medicoPhone = req.adminUser.usuario;
+    const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
+    if (consulta.estado !== "error" || !consulta.audioRetenidoHasta || new Date(consulta.audioRetenidoHasta) <= new Date()) {
+      throw new ErrorHttp(409, "Esta consulta no tiene un audio guardado para volver a transcribir.");
+    }
+    const audio = await audioPendiente.leer(consulta._id);
+    if (!audio) {
+      await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { audioRetenidoHasta: null } });
+      throw new ErrorHttp(409, "El audio de esta consulta ya no está guardado.");
+    }
+    const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
+    // Atómico: dos toques seguidos no la transcriben dos veces.
+    const reclamo = await ConsultaMedica.updateOne({ _id: consulta._id, estado: "error" },
+      { $set: { estado: "procesando", error: "", intentosTranscripcion: 0 } });
+    if (!reclamo.modifiedCount) throw new ErrorHttp(409, "Ya se está volviendo a transcribir.");
+    res.status(202).json({ ok: true });
+    const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }));
+    consulta.estado = "procesando";
+    transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal })
+      .catch(e => log.error(`[CONSULTA_MEDICA] consulta ${consulta._id}, al reintentar:`, e.message));
   }));
 
   // ─── LA NOTA EN VIVO (ver services/notaEnVivo.js) ─────────────────────
@@ -339,8 +449,7 @@ module.exports = function (app) {
   //
   // Solo si la nota está en error o vacía, y nunca después de confirmar. Una
   // nota con contenido se corrige a mano: regenerarla pisaría lo que el
-  // médico ya miró, y volvería a aplicar sus hallazgos al odontograma o al
-  // mapa ocular una segunda vez.
+  // médico ya miró.
   app.post("/medico/consultas/:id/nota/regenerar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const consulta = await obtenerOFallar(ConsultaMedica, { _id: req.params.id, medicoPhone }, "Consulta no encontrada");
@@ -401,6 +510,32 @@ module.exports = function (app) {
     const paciente = await obtenerOFallar(Paciente, { _id: consulta.pacienteId, medicoPhone }, "Paciente no encontrado");
     // Lo que esta cuenta no puede aplicar lo fuerza un módulo, sin importar
     // lo que haya mandado la pantalla (el punto «consulta.alConfirmar»).
+    // Una confirmación por vez (revisión integral del 11 de octubre de 2026,
+    // S02). Lo que sigue crea medicación, vacunas, receta y tratamientos: dos
+    // toques seguidos los creaban dos veces. El reclamo vence a los dos
+    // minutos por si el proceso se cayó en el medio, y si algo falla se suelta
+    // en el momento para poder reintentar. Reintentar no duplica: cada cosa
+    // lleva la clave de esta consulta (crearUnaVez).
+    const reclamada = new Date();
+    const reclamo = await ConsultaMedica.updateOne(
+      { _id: consulta._id, medicoPhone, confirmadaEn: null,
+        $or: [{ confirmandoDesde: null }, { confirmandoDesde: { $lt: new Date(reclamada.getTime() - 120000) } }] },
+      { $set: { confirmandoDesde: reclamada } });
+    if (!reclamo.modifiedCount) {
+      const ahora = await ConsultaMedica.findById(consulta._id).select("confirmadaEn").lean();
+      throw new ErrorHttp(409, ahora?.confirmadaEn ? "Esta consulta ya fue confirmada" : "Esta consulta se está confirmando: esperá unos segundos.");
+    }
+    try {
+      await aplicarConfirmacion(req, res, consulta, paciente);
+    } catch (e) {
+      await ConsultaMedica.updateOne({ _id: consulta._id, confirmandoDesde: reclamada }, { $set: { confirmandoDesde: null } }).catch(() => {});
+      throw e;
+    }
+  }));
+
+  // Lo que aplica confirmar, con la consulta ya reclamada (arriba).
+  async function aplicarConfirmacion(req, res, consulta, paciente) {
+    const medicoPhone = req.adminUser.usuario;
     const aplicar = { ...(req.body?.aplicar || {}), ...extensiones.sumar("consulta.alConfirmar", req) };
     const aplicado = [];
     const fallado = [];
@@ -500,7 +635,12 @@ module.exports = function (app) {
           await enviarTextoOPlantilla(paciente.telefono, texto,
             { plantilla: PLANTILLAS.reconsulta, parametros: [primerNombre, quien, cuando, link], idioma: medico?.idioma });
 
+          // Anotada apenas sale: si después algo falla y se confirma de
+          // nuevo, el paciente no recibe el mensaje dos veces.
           sugerida.estado = "confirmada";
+          await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: {
+            "notaClinica.reconsultaSugerida.estado": "confirmada", "notaClinica.reconsultaSugerida.fechaHora": sugerida.fechaHora,
+          } });
           aplicado.push("Reconsulta avisada por WhatsApp");
           registrar({ req, medicoPhone, accion: "reconsulta_confirmada", recurso: `ConsultaMedica:${consulta._id}` });
         } catch (e) {
@@ -529,9 +669,10 @@ module.exports = function (app) {
         registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "nombre", valorSugerido: item.catalogoNombreSugerido, valorFinal: nombre });
         registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "piezaFdi", valorSugerido: item.piezaFdi, valorFinal: piezaFdi });
 
-        await TratamientoPlan.create({
+        await crearUnaVez(TratamientoPlan, {
           pacienteId: consulta.pacienteId, medicoPhone, nombre, precio,
           piezaFdi: piezaFdi ?? null, estado: "pendiente",
+          consultaId: consulta._id, claveConfirmacion: claveDe("trat", item._id),
         });
         item.estado = "agregado";
         aplicado.push(`Tratamiento al presupuesto: ${nombre}`);
@@ -546,9 +687,10 @@ module.exports = function (app) {
       const m = (nota.medicamentosRecetados || [])[Number(i)];
       if (!m?.nombre) continue;
       try {
-        await Medicamento.create({
+        await crearUnaVez(Medicamento, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "",
+          consultaId: consulta._id, claveConfirmacion: claveDe("med", m.nombre, m.dosis, m.frecuencia),
         });
         aplicado.push(`Medicación: ${m.nombre}`);
       } catch (e) {
@@ -568,7 +710,8 @@ module.exports = function (app) {
     for (const i of (Array.isArray(aplicar.antecedentesFamiliares) ? aplicar.antecedentesFamiliares : [])) {
       const a = (nota.antecedentesFamiliaresNuevos || [])[Number(i)];
       if (!a?.condicion) continue;
-      paciente.antecedentesFamiliares = [...(paciente.antecedentesFamiliares || []), { parentesco: a.parentesco || "", condicion: a.condicion }];
+      const yaEsta = (paciente.antecedentesFamiliares || []).some(x => x.parentesco === (a.parentesco || "") && x.condicion === a.condicion);
+      if (!yaEsta) paciente.antecedentesFamiliares = [...(paciente.antecedentesFamiliares || []), { parentesco: a.parentesco || "", condicion: a.condicion }];
       aplicado.push(`Antecedente familiar: ${a.parentesco} — ${a.condicion}`);
     }
     await paciente.save();
@@ -582,9 +725,10 @@ module.exports = function (app) {
         // Bolivia (UTC-4).
         const base = new Date(consulta.createdAt);
         const fecha = v.fecha || new Date(base.getTime() - base.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-        await Vacuna.create({
+        await crearUnaVez(Vacuna, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: v.nombre, dosis: v.dosis || "", fecha,
+          consultaId: consulta._id, claveConfirmacion: claveDe("vac", v.nombre, v.dosis, fecha),
         });
         aplicado.push(`Vacuna: ${v.nombre}`);
       } catch (e) {
@@ -592,18 +736,35 @@ module.exports = function (app) {
       }
     }
 
+    // ── 5b. Lo que la IA entendió para el mapa, lo que el médico dejó marcado ──
+    // Solo números enteros: Number(null) es 0, y un índice vacío cargaba el primero.
+    const elegidos = (lista, indices) => [...new Set(Array.isArray(indices) ? indices : [])]
+      .filter(Number.isInteger).map(i => (lista || [])[i]).filter(Boolean);
+    try {
+      aplicado.push(...await aplicarHallazgosAlMapa(consulta, paciente, medicoPhone, {
+        ocular: elegidos(nota.examenOcularSugerido, aplicar.examenOcular),
+        odonto: elegidos(nota.odontogramaSugerido, aplicar.odontograma),
+        gineco: elegidos(nota.ginecoSugerido, aplicar.gineco),
+      }));
+    } catch (e) {
+      log.error("[CONFIRMAR/mapa]", e.message);
+      fallado.push("No se pudieron cargar los hallazgos al mapa: " + e.message);
+    }
+
     // ── 6. Receta con los medicamentos (ya corregidos arriba) ──
     let recetaId = null;
     if (aplicar.receta && (nota.medicamentosRecetados || []).length) {
       try {
-        const receta = await Receta.create({
-          pacienteId: consulta.pacienteId, medicoPhone, consultaId: consulta._id,
+        const datosReceta = {
+          pacienteId: consulta.pacienteId, medicoPhone, consultaId: consulta._id, claveConfirmacion: "receta",
           fecha: new Date(),
           medicamentos: nota.medicamentosRecetados.map(m => ({
             nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "", duracion: "",
           })),
-        });
-        recetaId = receta._id;
+        };
+        // Una sola por consulta: si ya salió en una confirmación que se cortó, es esa.
+        recetaId = (await crearUnaVez(Receta, datosReceta))?._id
+          || (await Receta.findOne({ consultaId: consulta._id, claveConfirmacion: "receta" }).select("_id").lean())?._id || null;
         aplicado.push("Receta generada");
       } catch (e) {
         fallado.push("No se pudo generar la receta: " + e.message);
@@ -612,13 +773,19 @@ module.exports = function (app) {
 
     consulta.confirmadaEn = new Date();
     await consulta.save();
+    await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { confirmandoDesde: null } }).catch(() => {});
     // Lo que acaba de confirmar (y lo que corrigió) ya cuenta para su
     // vocabulario desde la próxima consulta (services/vocabularioMedico.js).
     olvidarVocabulario(medicoPhone);
+    // El resumen previo del paciente salió de esta nota como borrador: se
+    // rehace con la confirmada. Y el hilo, si el médico la corrigió
+    // (revisión integral del 11 de octubre de 2026, S03).
+    regenerarBriefClinico(consulta.pacienteId).catch(e => log.error("[BRIEF_CLINICO]", e.message));
+    if (consulta.notaEditadaPorMedico) generarHilo(consulta._id, { alConfirmar: true }).catch(e => log.error("[HILO_CLINICO]", e.message));
     registrar({ req, medicoPhone, accion: "consulta_confirmada", recurso: `ConsultaMedica:${consulta._id}` });
 
     res.json({ ok: true, aplicado, fallado, recetaId });
-  }));
+  }
 
   // ─── RECONSULTA POR VOZ: confirmar o descartar lo que detectó la IA ─────
   // El médico siempre revisa antes de que le llegue algo al paciente — acá
@@ -783,7 +950,7 @@ async function contextoDeNota(paciente, medicoPhone) {
 // (services/notaEnVivo.js).
 async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, notaHecha } = {}) {
   try {
-    const { contexto, esOftalmologia, esOdontologia, esGinecologia } = await contextoDeNota(paciente, medicoPhone);
+    const { contexto } = await contextoDeNota(paciente, medicoPhone);
     // El mismo idioma con el que se transcribió: una nota en español
     // sobre una consulta en portugués obliga al médico a traducir de
     // vuelta lo que él mismo dijo.
@@ -792,82 +959,11 @@ async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, no
     consulta.notaClinicaEstado = "completado";
     consulta.notaClinicaError = undefined;
 
-    // El mapa ocular se actualiza solo apenas termina la nota (el
-    // médico lo revisa/corrige después desde la pestaña Ojos) — cada
-    // cambio queda en el historial con fuente:"voz" y el id de esta
-    // consulta, nunca se pierde el origen del dato.
-    const hallazgos = consulta.notaClinica?.examenOcularSugerido;
-    if (esOftalmologia && hallazgos?.length) {
-      try {
-        let examen = await ExamenOcular.findOne({ pacienteId: paciente._id, medicoPhone });
-        if (!examen) {
-          const estructuras = [];
-          for (const ojo of OJOS) for (const estructura of ESTRUCTURAS_OCULARES) {
-            estructuras.push({ ojo, estructura, estado: "normal", notas: "", historial: [] });
-          }
-          examen = await ExamenOcular.create({ pacienteId: paciente._id, medicoPhone, estructuras });
-        }
-        for (const h of hallazgos) {
-          if (!OJOS.includes(h.ojo) || !ESTRUCTURAS_OCULARES.includes(h.estructura) || !ESTADOS_ESTRUCTURA_OCULAR.includes(h.estado)) continue;
-          const item = examen.estructuras.find(e => e.ojo === h.ojo && e.estructura === h.estructura);
-          if (!item) continue;
-          item.estado = h.estado;
-          item.notas = h.hallazgo;
-          item.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
-        }
-        await examen.save();
-      } catch (e) {
-        log.error("[EXAMEN_OCULAR]", e.message);
-      }
-    }
-
-    // Symphomed Odonto: mismo patrón — el odontograma se actualiza solo
-    // apenas termina la nota, con fuente:"voz" en el historial de la
-    // pieza para que quede claro que vino de la consulta.
-    const hallazgosOdonto = consulta.notaClinica?.odontogramaSugerido;
-    if (esOdontologia && hallazgosOdonto?.length) {
-      try {
-        let odontograma = await Odontograma.findOne({ pacienteId: paciente._id, medicoPhone });
-        if (!odontograma) {
-          const piezas = PIEZAS_FDI_PERMANENTE.map(numero => ({ numero, estado: "sano", notas: "", historial: [] }));
-          odontograma = await Odontograma.create({ pacienteId: paciente._id, medicoPhone, piezas });
-        }
-        for (const h of hallazgosOdonto) {
-          if (!PIEZAS_FDI_PERMANENTE.includes(h.piezaFdi) || !ESTADOS_PIEZA_DENTAL.includes(h.estado)) continue;
-          const pieza = odontograma.piezas.find(p => p.numero === h.piezaFdi);
-          if (!pieza) continue;
-          pieza.estado = h.estado;
-          pieza.notas = h.hallazgo;
-          pieza.historial.push({ fecha: new Date(), estado: h.estado, notas: h.hallazgo, fuente: "voz", consultaId: consulta._id });
-        }
-        await odontograma.save();
-      } catch (e) {
-        log.error("[ODONTOGRAMA]", e.message);
-      }
-    }
-
-    // Symphomed Gineco: mismo patrón, por órgano.
-    const hallazgosGineco = consulta.notaClinica?.ginecoSugerido;
-    if (esGinecologia && hallazgosGineco?.length) {
-      try {
-        let mapa = await ExamenGinecologico.findOne({ pacienteId: paciente._id, medicoPhone });
-        if (!mapa) {
-          const organos = ORGANOS_GINECO.map(organo => ({ organo, hallazgo: "normal", notas: "", historial: [] }));
-          mapa = await ExamenGinecologico.create({ pacienteId: paciente._id, medicoPhone, organos });
-        }
-        for (const h of hallazgosGineco) {
-          if (!ORGANOS_GINECO.includes(h.organo) || !HALLAZGOS_GINECO.includes(h.hallazgo)) continue;
-          const item = mapa.organos.find(o => o.organo === h.organo);
-          if (!item) continue;
-          item.hallazgo = h.hallazgo;
-          item.notas = h.detalle;
-          item.historial.push({ fecha: new Date(), hallazgo: h.hallazgo, notas: h.detalle, fuente: "voz", consultaId: consulta._id });
-        }
-        await mapa.save();
-      } catch (e) {
-        log.error("[MAPA_GINECO]", e.message);
-      }
-    }
+    // Lo que la IA entendió para el mapa de la especialidad (odontograma,
+    // mapa ocular, mapa ginecológico) queda en la nota como sugerencia: se
+    // carga recién al confirmar, lo que el médico deja marcado
+    // (aplicarHallazgosAlMapa). Antes se cargaba solo acá, sin que nadie lo
+    // revisara (revisión integral del 11 de octubre de 2026, S05).
   } catch (e) {
     log.error("[NOTA_CLINICA]", e.response?.data || e.message);
     consulta.notaClinicaEstado = "error";
@@ -1023,9 +1119,94 @@ async function intentarVerificar(consultaId) {
 // Lo que pasa después del 202. Lo usan la subida y el arranque, que retoma lo
 // que un reinicio dejó a medias (retomarConsultas, abajo). Nunca tira: lo que
 // falla queda anotado en la consulta y se le avisa al médico.
-async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { multicanal }) {
+// ═══ CUANDO LA TRANSCRIPCIÓN FALLA ═════════════════════════════════════════
+//
+// Antes, cualquier falla borraba el audio y la consulta quedaba perdida: un
+// corte de red de un segundo con AssemblyAI, una demora, o la base que no
+// contestó justo al guardar una transcripción que ya estaba hecha. El
+// teléfono ya había borrado su copia al recibir el 202, así que no quedaba
+// nada (revisión integral del 11 de octubre de 2026, S04).
+//
+// Ahora el audio se borra solo cuando la transcripción quedó guardada, o
+// cuando el problema es el audio mismo (AssemblyAI lo recibió y no pudo con
+// él: services/assemblyai.js, «definitiva»). Lo demás es pasajero:
+//   · guardar el resultado se reintenta en el momento, unos segundos;
+//   · la transcripción se reintenta con el audio del disco, esperando cada
+//     vez más (AJUSTES_AUDIO.ESPERAS_MS);
+//   · agotados los intentos, la consulta queda con error y el audio guardado
+//     RETENER_MS, para reintentar a mano desde la consulta.
+// Un reinicio en el medio no corta la cuenta: el intento queda en la base y
+// retomarConsultas sigue desde ahí.
+const AJUSTES_AUDIO = {
+  ESPERAS_MS: [60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000, 60 * 60 * 1000],
+  GUARDAR_ESPERAS_MS: [1000, 3000, 9000],
+  RETENER_MS: 7 * 86400 * 1000,
+};
+
+async function conReintentos(fn, esperas) {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= esperas.length) throw e;
+      await new Promise(r => setTimeout(r, esperas[i]));
+    }
+  }
+}
+
+async function fallaDeTranscripcion(consulta, { intento = 0 }, e) {
   const medicoPhone = consulta.medicoPhone;
-  let medicoParaVocabulario, duracionSegundos, transcripcionMs;
+  const motivo = e.response?.data?.error || e.message;
+  if (e.definitiva) {
+    log.error(`[CONSULTA_MEDICA] consulta ${consulta._id}: AssemblyAI no pudo con el audio:`, motivo);
+    await audioPendiente.borrar(consulta._id).catch(e2 => log.error("[CONSULTA_MEDICA] no se pudo borrar el audio:", e2.message));
+    return marcarTranscripcionFallida(consulta._id, medicoPhone, motivo);
+  }
+  const siguiente = intento + 1;
+  const espera = AJUSTES_AUDIO.ESPERAS_MS[intento];
+  log.error(`[CONSULTA_MEDICA] consulta ${consulta._id}: falla pasajera transcribiendo (intento ${siguiente}):`, motivo);
+  // Si la base tampoco contesta, el intento igual se cuenta acá, en la cadena.
+  await ConsultaMedica.updateOne({ _id: consulta._id, estado: "procesando" }, { $set: { intentosTranscripcion: siguiente } }).catch(() => {});
+  if (espera !== undefined) {
+    const t = setTimeout(() => reintentarTranscripcion(consulta._id, siguiente)
+      .catch(e2 => log.error(`[CONSULTA_MEDICA] no se pudo reintentar ${consulta._id}:`, e2.message)), espera);
+    t.unref?.();
+    return;
+  }
+  const hasta = new Date(Date.now() + AJUSTES_AUDIO.RETENER_MS);
+  await ConsultaMedica.updateOne({ _id: consulta._id, estado: "procesando" }, { $set: { audioRetenidoHasta: hasta } }).catch(() => {});
+  return marcarTranscripcionFallida(consulta._id, medicoPhone, `No se pudo transcribir después de varios intentos: ${motivo}`);
+}
+
+// El intento que sigue, con el audio del disco: no se tiene en memoria
+// durante la espera (una consulta de una hora pesa decenas de MB).
+async function reintentarTranscripcion(consultaId, intento) {
+  let consulta, paciente, audio;
+  try {
+    consulta = await ConsultaMedica.findOne({ _id: consultaId, estado: "procesando" });
+    if (!consulta) return;   // ya terminó por otro lado
+    paciente = await Paciente.findOne({ _id: consulta.pacienteId, medicoPhone: consulta.medicoPhone });
+    audio = await audioPendiente.leer(consultaId);
+  } catch (e) {
+    // La base sigue sin contestar: cuenta como otro intento pasajero.
+    if (consulta) return fallaDeTranscripcion(consulta, { intento }, e);
+    const t = setTimeout(() => reintentarTranscripcion(consultaId, intento).catch(() => {}),
+      AJUSTES_AUDIO.ESPERAS_MS[Math.min(intento, AJUSTES_AUDIO.ESPERAS_MS.length - 1)]);
+    t.unref?.();
+    return;
+  }
+  if (!paciente || !audio) {
+    await audioPendiente.borrar(consultaId).catch(() => {});
+    return marcarTranscripcionFallida(consultaId, consulta.medicoPhone,
+      !audio ? "No se pudo leer el audio guardado." : "El paciente de esta consulta ya no está.");
+  }
+  const multicanal = Boolean(await Teleconsulta.exists({ consultaId }).catch(() => false));
+  return transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal, intento });
+}
+
+async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { multicanal, intento = 0 }) {
+  const medicoPhone = consulta.medicoPhone;
+  let medicoParaVocabulario, duracionSegundos, transcripcionMs, t;
   try {
     // La especialidad afina el vocabulario; el idioma decide en qué lengua
     // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
@@ -1033,21 +1214,23 @@ async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { mult
     medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
     const delMedico = await medicamentosDelMedico(medicoPhone);
     const inicioTranscripcion = Date.now();
-    const t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico });
+    t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico });
     transcripcionMs = Date.now() - inicioTranscripcion;
     duracionSegundos = t.duracionSegundos;
+  } catch (e) {
+    return fallaDeTranscripcion(consulta, { intento }, e);
+  }
+  try {
     // Un update y no consulta.save(): mientras AssemblyAI trabajaba, la
     // nota en vivo pudo haberse guardado en este mismo documento, y el
-    // objeto en memoria no la tiene.
-    await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: {
+    // objeto en memoria no la tiene. Si la base no contesta, se insiste
+    // unos segundos antes de tirar una transcripción que ya se pagó.
+    await conReintentos(() => ConsultaMedica.updateOne({ _id: consulta._id }, { $set: {
       estado: "completado", transcripcionCompleta: t.transcripcionCompleta, segmentos: t.segmentos, duracionSegundos,
-      "tiempos.transcripcionMs": transcripcionMs,
-    } });
+      "tiempos.transcripcionMs": transcripcionMs, audioRetenidoHasta: null,
+    } }), AJUSTES_AUDIO.GUARDAR_ESPERAS_MS);
   } catch (e) {
-    log.error("[CONSULTA_MEDICA] Error transcribiendo:", e.response?.data || e.message);
-    await audioPendiente.borrar(consulta._id).catch(e2 => log.error("[CONSULTA_MEDICA] no se pudo borrar el audio:", e2.message));
-    await marcarTranscripcionFallida(consulta._id, medicoPhone, e.response?.data?.error || e.message);
-    return;
+    return fallaDeTranscripcion(consulta, { intento }, e);
   }
   // La transcripción ya está guardada: el audio no hace falta más.
   await audioPendiente.borrar(consulta._id).catch(e => log.error("[CONSULTA_MEDICA] no se pudo borrar el audio:", e.message));
@@ -1130,7 +1313,9 @@ async function marcarTranscripcionFallida(consultaId, medicoPhone, motivo, { avi
 //     de «procesando» para siempre.
 //   · Una nota que se estaba escribiendo: se escribe de nuevo, de la
 //     transcripción o del texto en vivo, que sí están guardados.
-//   · Un audio en disco sin consulta en curso: sobró. Se borra.
+//   · Un audio en disco sin consulta en curso: sobró. Se borra. Salvo el de
+//     una consulta que falló varias veces por algo pasajero: ese se guarda
+//     a propósito hasta «audioRetenidoHasta», para reintentar a mano.
 // Lo de más de un día no se retoma solo, porque nadie lo está esperando:
 // queda en error sin avisar, y la nota se puede volver a generar.
 const ARRANQUE = new Date();
@@ -1172,9 +1357,15 @@ async function retomarConsultas(arranque = ARRANQUE) {
     }
     aTranscribir.push({ consulta: intento, paciente });
   }
+  const retenidos = await ConsultaMedica.find({ _id: { $in: [...enDisco] }, estado: "error", audioRetenidoHasta: { $gt: new Date() } })
+    .select("_id").lean();
+  for (const c of retenidos) enDisco.delete(String(c._id));
   for (const id of enDisco) {
     await audioPendiente.borrar(id).catch(() => {});
     resumen.sobras++;
+  }
+  if (enDisco.size) {
+    await ConsultaMedica.updateMany({ _id: { $in: [...enDisco] }, audioRetenidoHasta: { $ne: null } }, { $set: { audioRetenidoHasta: null } });
   }
 
   const aEscribir = [];
@@ -1203,7 +1394,7 @@ async function retomarConsultas(arranque = ARRANQUE) {
         resumen.transcripciones++;
         log.info(`[CONSULTA_MEDICA] retomando la transcripción de ${consulta._id} (se cortó al reiniciar)`);
         const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }));
-        await transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal })
+        await transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal, intento: consulta.intentosTranscripcion || 0 })
           .catch(e => log.error(`[CONSULTA_MEDICA] no se pudo retomar la transcripción de ${consulta._id}:`, e.message));
       }
     })(),
@@ -1227,4 +1418,18 @@ async function retomarConsultas(arranque = ARRANQUE) {
   return resumen;
 }
 
+// Los audios guardados para reintentar a mano, cuando vencen: es la voz de
+// un paciente y se guarda solo lo necesario. Lo llama index.js cada doce
+// horas (y al arrancar ya los borró retomarConsultas).
+async function limpiarAudiosRetenidos(ahora = new Date()) {
+  const vencidas = await ConsultaMedica.find({ audioRetenidoHasta: { $ne: null, $lte: ahora } }).select("_id").lean();
+  for (const c of vencidas) {
+    await audioPendiente.borrar(c._id).catch(() => {});
+    await ConsultaMedica.updateOne({ _id: c._id }, { $set: { audioRetenidoHasta: null } }).catch(() => {});
+  }
+  return vencidas.length;
+}
+
 module.exports.retomarConsultas = retomarConsultas;
+module.exports.limpiarAudiosRetenidos = limpiarAudiosRetenidos;
+module.exports.AJUSTES_AUDIO = AJUSTES_AUDIO;

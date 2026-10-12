@@ -387,7 +387,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
         ${(b.factoresRiesgo||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.riesgo")}</b> ${esc(b.factoresRiesgo.join(", "))}</div>` : ""}
         ${(b.preguntasSugeridas||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.preguntas")}</b> ${esc(b.preguntasSugeridas.join(" · "))}</div>` : ""}
         ${(b.diagnosticosDiferenciales||[]).length ? `<div class="nota-campo"><b>${t("kardex.brief.diferenciales")}</b> ${esc(b.diagnosticosDiferenciales.join(", "))}</div>` : ""}
-        <div class="hint" style="margin-top:8px">${t("kardex.brief.aviso")}</div>
+        ${p.briefClinicoFuentes?.sinRevisar > 0 ? `<div class="hint" style="margin-top:8px">${t("kardex.brief.sinRevisar", { n: Number(p.briefClinicoFuentes.sinRevisar) })}</div>` : ""}<div class="hint" style="margin-top:8px">${t("kardex.brief.aviso")}</div>
       </div>`;
   } else {
     briefHtml = `<div class="card"><div class="hint">${t("kardex.brief.vacio")}</div></div>`;

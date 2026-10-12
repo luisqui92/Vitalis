@@ -21,6 +21,21 @@ async function esDeNeuro(medicoPhone) {
   return { neuro: m?.tipoEspecialidad === "neurodesarrollo", clinicaId: m?.clinicaId || null };
 }
 
+// ═══ QUIÉN PUEDE USAR EL EQUIPO ════════════════════════════════════════════
+//
+// La misma regla para todo camino que lleve a la ficha de otro o al equipo:
+// estar en el equipo, ser de neuro y seguir en el centro del equipo. Lo
+// último se mira en la cuenta, AHORA: si se fue del centro, el equipo puede
+// tardar en actualizarse y eso no puede darle acceso. Antes, entrar por la
+// ficha propia enlazada miraba solo lo primero, y quien ya se había ido del
+// centro seguía llegando a la titular (revisión integral del 11 de octubre
+// de 2026, S01).
+async function puedeUsarEquipo(equipo, medicoPhone) {
+  if (!esMiembro(equipo, medicoPhone)) return false;
+  const { neuro, clinicaId } = await esDeNeuro(medicoPhone);
+  return neuro && Boolean(clinicaId) && String(clinicaId) === String(equipo.clinicaId);
+}
+
 // ═══ LA FUNCIÓN QUE DECIDE TODO ════════════════════════════════════════════
 //
 // Devuelve sobre QUÉ ficha hay que trabajar, que puede no ser la que se pidió:
@@ -50,24 +65,20 @@ async function fichaNeuro(req, pacienteId, { paraEscribir = false } = {}) {
     // trabaja sobre la ficha titular. Si no, cada uno seguiría escribiendo en
     // la suya y "compartido" sería una etiqueta sin nada detrás.
     if (equipo && String(equipo.pacienteIdTitular) !== String(propia._id)) {
-      if (!esMiembro(equipo, medicoPhone)) return null;   // lo sacaron del equipo
-      registrarAcceso(req, medicoPhone, equipo, "ficha_equipo");
+      // Lo sacaron del equipo, se fue del centro o dejó la rama: la ficha
+      // propia no es un atajo a la titular.
+      if (!(await puedeUsarEquipo(equipo, medicoPhone))) return null;
+      registrarAcceso(req, medicoPhone, equipo, paraEscribir ? "escribir_ficha_equipo" : "ficha_equipo");
       return { pacienteId: equipo.pacienteIdTitular, medicoPhone: equipo.medicoPhoneTitular, equipo, compartida: true };
     }
     return { pacienteId: propia._id, medicoPhone, equipo, compartida: Boolean(equipo) };
   }
 
   // 2. No es suya. ¿Está en el equipo del chico?
+  // La rama es la única con esta regla: si la cuenta no es de neuro, no
+  // corresponde, aunque figure en un equipo por un arrastre de datos.
   const equipo = await EquipoNeuro.findOne({ pacienteIdTitular: pacienteId, activo: true }).lean();
-  if (!equipo || !esMiembro(equipo, medicoPhone)) return null;
-
-  // La rama es la única con esta regla. Si la cuenta no es de neuro, no
-  // corresponde — aunque figure en un equipo por un arrastre de datos.
-  const { neuro, clinicaId } = await esDeNeuro(medicoPhone);
-  if (!neuro) return null;
-  // Y tiene que seguir siendo del mismo centro: si se fue de la clínica, el
-  // equipo puede tardar en actualizarse y eso no puede darle acceso.
-  if (!clinicaId || String(clinicaId) !== String(equipo.clinicaId)) return null;
+  if (!equipo || !(await puedeUsarEquipo(equipo, medicoPhone))) return null;
 
   registrarAcceso(req, medicoPhone, equipo, paraEscribir ? "escribir_ficha_equipo" : "ficha_equipo");
   return { pacienteId: equipo.pacienteIdTitular, medicoPhone: equipo.medicoPhoneTitular, equipo, compartida: true };
@@ -95,9 +106,7 @@ async function objetoNeuroOFallar(req, Modelo, id, mensaje = "No encontrado") {
   if (doc.medicoPhone === medicoPhone) return doc;
 
   const equipo = await EquipoNeuro.findOne({ pacienteIdTitular: doc.pacienteId, activo: true }).lean();
-  if (!equipo || !esMiembro(equipo, medicoPhone)) throw new ErrorHttp(404, mensaje);
-  const { neuro, clinicaId } = await esDeNeuro(medicoPhone);
-  if (!neuro || !clinicaId || String(clinicaId) !== String(equipo.clinicaId)) throw new ErrorHttp(404, mensaje);
+  if (!equipo || !(await puedeUsarEquipo(equipo, medicoPhone))) throw new ErrorHttp(404, mensaje);
 
   registrarAcceso(req, medicoPhone, equipo, "escribir_ficha_equipo");
   return doc;
@@ -125,4 +134,4 @@ function registrarAcceso(req, medicoPhone, equipo, accion) {
   });
 }
 
-module.exports = { fichaNeuro, fichaNeuroOFallar, objetoNeuroOFallar, esMiembro, esDeNeuro };
+module.exports = { fichaNeuro, fichaNeuroOFallar, objetoNeuroOFallar, esMiembro, esDeNeuro, puedeUsarEquipo };

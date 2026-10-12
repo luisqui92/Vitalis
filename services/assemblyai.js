@@ -135,7 +135,15 @@ async function esperarTranscripcion(id) {
       timeout: CONFIG.TIMEOUT_ASSEMBLYAI,
     });
     if (res.data.status === "completed") return res.data;
-    if (res.data.status === "error") throw new Error(res.data.error || "AssemblyAI falló al transcribir");
+    // AssemblyAI recibió el audio y no pudo con él (no se entiende, no tiene
+    // voz): esa falla es del audio y reintentar da lo mismo. Cualquier otra
+    // —la red, una demora, un error suyo— es pasajera, y la consulta se
+    // reintenta con el audio guardado (routes/consultaMedica.js).
+    if (res.data.status === "error") {
+      const e = new Error(res.data.error || "AssemblyAI falló al transcribir");
+      e.definitiva = true;
+      throw e;
+    }
     await new Promise(r => setTimeout(r, 3000));
   }
   throw new Error("Tiempo de espera agotado transcribiendo el audio");

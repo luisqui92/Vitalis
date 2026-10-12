@@ -391,6 +391,11 @@ server.listen(PORT, () => log.info(`🚀 Symphomed corriendo en puerto ${PORT}`)
 require("./routes/consultaMedica").retomarConsultas()
   .then((r) => { if (r.transcripciones || r.sinAudio || r.notas || r.sobras) log.info("[CONSULTA_MEDICA] retomado al arrancar:", JSON.stringify(r)); })
   .catch((e) => log.error("[CONSULTA_MEDICA] no se pudo retomar lo interrumpido:", e.message));
+// Los audios guardados para reintentar una transcripción a mano se borran
+// cuando vencen (ver limpiarAudiosRetenidos en routes/consultaMedica.js).
+setInterval(() => require("./routes/consultaMedica").limpiarAudiosRetenidos()
+  .then((n) => { if (n) log.info(`[CONSULTA_MEDICA] ${n} audio(s) guardado(s) para reintentar vencieron y se borraron`); })
+  .catch((e) => log.error("[CONSULTA_MEDICA] no se pudieron borrar los audios vencidos:", e.message)), 12 * 3600 * 1000).unref();
 // Los informes firmados antes de que lo impreso se congelara (ver
 // routes/informes.js): una sola vez, después no encuentra ninguno.
 require("./routes/informes").congelarInformesFirmados()

@@ -92,6 +92,14 @@ Object.assign(I18N.es, {
   // ─── Transcripción ────────────────────────────────────────────────────
   "consulta.procesando": "⏳ Transcribiendo tu consulta... para audios largos puede tardar varios minutos. Esta pantalla se actualiza sola, no hace falta que hagas nada.",
   "consulta.errTranscribir": "Ocurrió un error al transcribir",
+  // Lo que la IA entendió para el mapa: se carga al confirmar.
+  "confirmar.mapaOdonto": "Al odontograma: pieza {pieza}, {estado}",
+  "confirmar.mapaOjo": "Al mapa ocular: {ojo}, {estructura}: {estado}",
+  "confirmar.mapaGineco": "Al mapa ginecológico: {organo}, {hallazgo}",
+  // Cuando falló varias veces por algo pasajero, el audio queda guardado unos días.
+  "consulta.audioGuardado": "El audio quedó guardado hasta el {fecha}: se puede volver a transcribir.",
+  "consulta.reintentarTranscripcion": "Volver a transcribir",
+  "consulta.reintentandoTranscripcion": "Volviendo a transcribir…",
   "consulta.transcripcion": "Transcripción",
   "consulta.hablante": "Hablante {n}",
   // En la teleconsulta se sabe quién es quién (canales separados), no se adivina.

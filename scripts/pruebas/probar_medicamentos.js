@@ -271,8 +271,11 @@ function pedir(puerto, metodo, ruta, token, cuerpo, tipo = "application/json") {
   const c4 = await ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "completado",
     transcripcionCompleta: "Consulta de controle. ".repeat(30), notaClinicaEstado: "error" });
   await pedir(puerto, "POST", `/medico/consultas/${c4._id}/nota/regenerar`, tk);
-  for (let i = 0; i < 50 && !pedidosIA.length; i++) await new Promise((r) => setTimeout(r, 50));
-  const prompt = JSON.stringify(pedidosIA[0]?.messages || []);
+  // El pedido de la nota, no otro: confirmar también le pide a la IA el
+  // resumen previo y el hilo (services/briefClinico.js, hiloClinico.js).
+  const pedidoNota = () => pedidosIA.find(p => /odontogramaSugerido/.test(p.messages?.[0]?.content || ""));
+  for (let i = 0; i < 50 && !pedidoNota(); i++) await new Promise((r) => setTimeout(r, 50));
+  const prompt = JSON.stringify(pedidoNota()?.messages || []);
   verificar("la IA de la nota recibe los medicamentos que él receta (con sus marcas)", /receta habitualmente/.test(prompt) && prompt.includes("Jardiance") && prompt.includes("Rivotril"));
   verificar("  ...y sus correcciones: «Inibidor de ATE» → «Espironolactona»", /Inibidor de ATE\\" → \\"Espironolactona/.test(prompt));
   verificar("  ...con la regla de NO agregar lo que no se dijo", /NUNCA agregues/.test(prompt));

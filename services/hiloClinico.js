@@ -57,6 +57,8 @@ REGLAS QUE NO SE NEGOCIAN:
 
 5. NADA DE PORCENTAJES NI PUNTAJES DE CERTEZA. Son números inventados con apariencia de medición.
 
+6. LAS MARCADAS "sin revisar" SON BORRADORES: las escribió una IA a partir del audio y el médico todavía no las confirmó. Pueden tener errores. Si conectás con una, empezá "queDijoEntonces" con "(sin confirmar)".
+
 Respondé SOLO JSON:
 {
   "conexiones": [
@@ -72,6 +74,8 @@ function resumirConsulta(c, incluirId) {
   const partes = [];
   if (incluirId) partes.push(`id: ${c._id}`);
   partes.push(`fecha: ${new Date(c.createdAt).toLocaleDateString("es-BO")}`);
+  // Las anteriores que el médico no confirmó son borradores (regla 6).
+  if (incluirId && !c.confirmadaEn) partes.push("sin revisar");
   if (n.motivoConsulta) partes.push(`motivo: ${n.motivoConsulta}`);
   if (n.sintomas?.length) partes.push(`síntomas: ${n.sintomas.join(", ")}`);
   if (n.diagnostico) partes.push(`diagnóstico: ${n.diagnostico}`);
@@ -117,7 +121,7 @@ async function tejerHilo(consultaHoy) {
     _id: { $ne: consultaHoy._id },
     notaClinicaEstado: "completado",
     createdAt: { $lt: consultaHoy.createdAt },
-  }).sort({ createdAt: -1 }).limit(CUANTAS_ANTERIORES).select("notaClinica createdAt").lean();
+  }).sort({ createdAt: -1 }).limit(CUANTAS_ANTERIORES).select("notaClinica createdAt confirmadaEn").lean();
 
   // Sin historial no hay hilo que tejer. Es el caso de la primera consulta de
   // cualquier paciente, así que ni se le pregunta al modelo.
@@ -151,16 +155,28 @@ async function tejerHilo(consultaHoy) {
 
 // Lo teje y lo guarda en la consulta de hoy. Nunca tumba nada: si falla, la
 // consulta y su nota quedan igual — esto es un extra, no la historia clínica.
-async function generarHilo(consultaId) {
+//
+// Se teje cuando la nota está lista y otra vez al confirmar, si el médico la
+// corrigió (alConfirmar): el de antes salió del motivo y el diagnóstico que
+// él cambió. El de antes que termine tarde ya no pisa al de la nota
+// corregida (revisión integral del 11 de octubre de 2026, S03).
+async function generarHilo(consultaId, { alConfirmar = false } = {}) {
   const consulta = await ConsultaMedica.findById(consultaId).lean();
   if (!consulta || consulta.notaClinicaEstado !== "completado") return null;
+  const corregida = { confirmadaEn: { $ne: null }, notaEditadaPorMedico: true };
+  if (!alConfirmar && consulta.confirmadaEn && consulta.notaEditadaPorMedico) return null;
+  const vigente = alConfirmar ? { _id: consultaId } : { _id: consultaId, $nor: [corregida] };
 
   const hilo = await tejerHilo(consulta);
   // Sin conexiones no se guarda nada: una consulta con un hilo vacío guardado
-  // y una sin hilo son lo mismo, y la pantalla ya sabe no mostrar nada.
-  if (!hilo || !hilo.conexiones.length) return null;
+  // y una sin hilo son lo mismo, y la pantalla ya sabe no mostrar nada. Si
+  // había uno de la nota sin corregir, se va.
+  if (!hilo || !hilo.conexiones.length) {
+    if (hilo) await ConsultaMedica.updateOne(vigente, { $unset: { hiloClinico: 1 } });
+    return null;
+  }
 
-  await ConsultaMedica.updateOne({ _id: consultaId }, {
+  await ConsultaMedica.updateOne(vigente, {
     $set: { hiloClinico: { conexiones: hilo.conexiones, preguntas: hilo.preguntasParaElMedico, generadoEn: new Date() } },
   });
   log.info(`[HILO_CLINICO] ${hilo.conexiones.length} conexión(es) en la consulta ${consultaId}`);

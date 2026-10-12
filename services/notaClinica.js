@@ -128,10 +128,10 @@ Reglas:
         "grave", "severo".
     Si la gravedad no queda clara por lo que dijo, usá "leve" en vez de
     "normal" (para no esconder un hallazgo real) y en vez de "importante"
-    (para no generar una alarma que el médico no dijo). Esto se aplica
-    directo a la ficha del paciente sin que el médico lo confirme antes,
-    así que ante cualquier duda real de a qué estructura/ojo se refiere,
-    mejor no reportar ese ítem.
+    (para no generar una alarma que el médico no dijo). Esto se le propone
+    al médico para la ficha del paciente y queda si lo confirma con un
+    toque, así que ante cualquier duda real de a qué estructura/ojo se
+    refiere, mejor no reportar ese ítem.
 - "odontogramaSugerido": SOLO si más abajo te doy la lista de estados
   válidos de pieza dental (si no te la doy, dejá esta lista vacía — es una
   función solo para odontología). El odontólogo va mencionando el estado
@@ -170,10 +170,9 @@ Reglas:
   "caries" (marcarla "obturacion_indicada" escondería la caries). Usá los
   estados "_indicada" cuando el tratamiento es lo único que dijo de esa
   pieza: "hay que hacer una endodoncia en la 11" → "endodoncia_indicada".
-  Esto se aplica directo al odontograma del paciente sin que el médico lo
-  confirme antes (lo revisa/corrige después desde la pestaña Odontograma),
-  así que ante cualquier duda real de la pieza o el estado, mejor no
-  reportar ese ítem. Es un campo DISTINTO de "tratamientosSugeridos": acá
+  Esto se le propone al médico para el odontograma del paciente y queda si
+  lo confirma con un toque, así que ante cualquier duda real de la pieza o
+  el estado, mejor no reportar ese ítem. Es un campo DISTINTO de "tratamientosSugeridos": acá
   va cómo queda la pieza en la ficha, allá va el ítem que se le va a
   cobrar al paciente — el mismo tratamiento dictado suele ir a los dos
   lados (ej: "hay que obturar la 36" → acá "obturacion_indicada" si no
@@ -202,10 +201,10 @@ Reglas:
   · "detalle": lo que dijo tal cual, con las medidas si las mencionó (para
     que quede en el registro).
   UNA SOLA entrada por órgano — cada uno guarda un único hallazgo, así que
-  dos entradas del mismo órgano se pisan. Esto se aplica directo a la ficha
-  sin que la médica lo confirme antes (lo corrige después desde el Mapa),
-  así que ante cualquier duda real del órgano, del lado o del hallazgo,
-  mejor no reportar ese ítem.`;
+  dos entradas del mismo órgano se pisan. Esto se le propone a la médica
+  para la ficha y queda si lo confirma con un toque, así que ante cualquier
+  duda real del órgano, del lado o del hallazgo, mejor no reportar ese
+  ítem.`;
 
 // El prompt completo para un idioma: la plantilla de arriba con el idioma
 // puesto, más la regla de en qué lengua sale el contenido. Las claves del

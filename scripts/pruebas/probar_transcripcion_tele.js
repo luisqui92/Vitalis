@@ -29,6 +29,7 @@ function verificar(descripcion, condicion) {
 // la habrían llamado. Lo que se prueba es QUÉ SE PIDE, no que ellos anden.
 const pedidos = [];
 let respuestaUtterances = [];
+let modoGet = "ok";   // "error": AssemblyAI no pudo con el audio; "red": se cortó
 const cargarOriginal = Module.prototype.require;
 Module.prototype.require = function (nombre) {
   if (nombre === "axios") {
@@ -38,14 +39,18 @@ Module.prototype.require = function (nombre) {
         if (url.includes("/upload")) return { data: { upload_url: "https://falso/audio" } };
         return { data: { id: "trans-1" } };
       },
-      get: async () => ({
-        data: {
-          status: "completed",
-          text: "consulta de prueba",
-          audio_duration: 120,
-          utterances: respuestaUtterances,
-        },
-      }),
+      get: async () => {
+        if (modoGet === "red") throw Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+        if (modoGet === "error") return { data: { status: "error", error: "Audio file could not be decoded" } };
+        return {
+          data: {
+            status: "completed",
+            text: "consulta de prueba",
+            audio_duration: 120,
+            utterances: respuestaUtterances,
+          },
+        };
+      },
     };
   }
   return cargarOriginal.apply(this, arguments);
@@ -104,6 +109,18 @@ const { transcribirConsultaMedica } = require(path.join(RAIZ, "services", "assem
   verificar("un canal desconocido queda vacío", roto.segmentos[1].quien === "");
   verificar("  ...pero el texto se guarda igual, que es lo que importa",
     roto.transcripcionCompleta === "consulta de prueba" && roto.segmentos.length === 2);
+
+  console.log("\n── 4b. Qué falla es del audio y cuál es pasajera ──");
+  // AssemblyAI recibió el audio y no pudo con él: reintentar da lo mismo y el
+  // audio se puede borrar. Una falla de red no: la consulta se reintenta con
+  // el audio guardado (revisión integral del 11 de octubre de 2026, S04).
+  const fallaCon = async (modo) => {
+    modoGet = modo;
+    try { await transcribirConsultaMedica(Buffer.from("audio"), "medicina_general", "es"); return null; } catch (e) { return e; } finally { modoGet = "ok"; }
+  };
+  verificar("«status: error» de AssemblyAI → falla definitiva (es el audio)", (await fallaCon("error"))?.definitiva === true);
+  const deRed = await fallaCon("red");
+  verificar("  ...una falla de red → pasajera, se reintenta", Boolean(deRed) && !deRed.definitiva);
 
   console.log("\n── 5. Las dos puntas de la convención coinciden ──");
   // El canal izquierdo es el médico porque grabacionTele.js lo conecta a la

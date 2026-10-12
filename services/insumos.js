@@ -13,6 +13,7 @@
 // movimiento y el stock sale de ahí.
 const { Insumo, MovimientoInsumo } = require("../db/models");
 const { ErrorHttp } = require("./httpHelpers");
+const { log } = require("../config");
 
 // De quién es este stock. Un centro lo comparte entre sus profesionales; un
 // profesional solo lo tiene para él. Sale del token, nunca del cuerpo del
@@ -42,18 +43,30 @@ async function insumoDelDueno(req, id) {
 // de los que decía". Que sea su propio tipo permite después distinguir el
 // consumo real del error de carga, que es lo único que interesa mirar
 // cuando el inventario no cuadra.
+//
+// ═══ UNA SOLA OPERACIÓN SOBRE EL STOCK ═════════════════════════════════════
+//
+// Antes el stock nuevo se calculaba desde la copia que había leído la ruta y
+// se guardaba ese número: dos salidas a la vez de un stock de 10 (3 y 4)
+// dejaban 6 o 7 en vez de 3, con los dos movimientos anotados (revisión
+// integral del 11 de octubre de 2026, S08). Ahora suma o resta la base misma
+// ($inc), y el ajuste pone el valor ($set), en una operación que además le
+// da al movimiento su número de orden en el insumo. El movimiento anota el
+// stock que quedó justo después de ESA operación.
+//
+// Con un ajuste y otros movimientos a la vez, vale el orden en que la base
+// los aplicó, y queda escrito en cada movimiento: un ajuste es «conté y hay
+// 18», y lo que salga después se resta de esos 18.
+//
+// Si el movimiento no se puede guardar, se deshace lo que se le hizo al
+// stock: un número que cambia sin movimiento es lo que este archivo evita.
 async function registrarMovimiento(req, insumo, datos) {
   const tipo = datos.tipo;
   const cantidad = Number(datos.cantidad);
   if (!Number.isFinite(cantidad) || cantidad < 0) {
     throw new ErrorHttp(400, "La cantidad tiene que ser un número positivo");
   }
-
-  let stockNuevo;
-  if (tipo === "entrada") stockNuevo = (insumo.stock || 0) + cantidad;
-  else if (tipo === "salida") stockNuevo = (insumo.stock || 0) - cantidad;
-  else if (tipo === "ajuste") stockNuevo = cantidad;
-  else throw new ErrorHttp(400, "Tipo de movimiento desconocido");
+  if (!["entrada", "salida", "ajuste"].includes(tipo)) throw new ErrorHttp(400, "Tipo de movimiento desconocido");
 
   // ═══ SE PERMITE STOCK NEGATIVO, Y ES A PROPÓSITO ═════════════════════════
   //
@@ -65,29 +78,67 @@ async function registrarMovimiento(req, insumo, datos) {
   //
   // Un stock en −3 es una señal clara de que falta cargar una entrada, y se
   // arregla con un ajuste. Un stock en 0 que en realidad es −3 no se ve.
-  const mov = await MovimientoInsumo.create({
-    insumoId: insumo._id,
-    clinicaId: insumo.clinicaId || null,
-    medicoPhone: insumo.medicoPhone || "",
-    tipo, cantidad,
-    stockDespues: stockNuevo,
-    costoUnitarioCentavos: Number(datos.costoUnitarioCentavos) || 0,
-    motivo: String(datos.motivo || "").trim().slice(0, 300),
-    pacienteId: datos.pacienteId || null,
-    registradoPor: req.adminUser?.usuario || "",
-    fecha: datos.fecha ? new Date(datos.fecha) : new Date(),
-  });
-
-  insumo.stock = stockNuevo;
+  const delta = tipo === "entrada" ? cantidad : tipo === "salida" ? -cantidad : 0;
+  const poner = {};
+  if (tipo === "ajuste") poner.stock = cantidad;
   // El costo se actualiza solo en las entradas: una salida no cambia lo que
   // costó comprarlo.
-  if (tipo === "entrada" && Number(datos.costoUnitarioCentavos) > 0) {
-    insumo.costoUnitarioCentavos = Number(datos.costoUnitarioCentavos);
-  }
-  if (datos.venceEl) insumo.venceEl = new Date(datos.venceEl);
-  await insumo.save();
+  if (tipo === "entrada" && Number(datos.costoUnitarioCentavos) > 0) poner.costoUnitarioCentavos = Number(datos.costoUnitarioCentavos);
+  if (datos.venceEl) poner.venceEl = new Date(datos.venceEl);
+  const cambios = { $inc: { secuencia: 1, ...(delta ? { stock: delta } : {}) }, ...(Object.keys(poner).length ? { $set: poner } : {}) };
 
-  return { movimiento: mov, insumo };
+  const antes = await Insumo.findOneAndUpdate({ _id: insumo._id }, cambios, { new: false }).lean();
+  if (!antes) throw new ErrorHttp(404, "Ese insumo no existe");
+  const stockDespues = tipo === "ajuste" ? cantidad : (antes.stock || 0) + delta;
+  const orden = (antes.secuencia || 0) + 1;
+
+  let mov;
+  try {
+    mov = await MovimientoInsumo.create({
+      insumoId: insumo._id,
+      clinicaId: antes.clinicaId || null,
+      medicoPhone: antes.medicoPhone || "",
+      tipo, cantidad, orden,
+      stockDespues,
+      costoUnitarioCentavos: Number(datos.costoUnitarioCentavos) || 0,
+      motivo: String(datos.motivo || "").trim().slice(0, 300),
+      pacienteId: datos.pacienteId || null,
+      registradoPor: req.adminUser?.usuario || "",
+      fecha: datos.fecha ? new Date(datos.fecha) : new Date(),
+    });
+  } catch (e) {
+    // El ajuste se deshace solo si nadie movió el insumo después: si no,
+    // volver al número de antes pisaría a ese otro movimiento.
+    const deshacer = tipo === "ajuste"
+      ? Insumo.updateOne({ _id: insumo._id, secuencia: orden }, { $set: { stock: antes.stock || 0 } })
+      : Insumo.updateOne({ _id: insumo._id }, { $inc: { stock: -delta } });
+    const r = await deshacer.catch((e2) => { log.error(`[INSUMOS] insumo ${insumo._id}: no se pudo deshacer el stock:`, e2.message); return null; });
+    if (r && !r.modifiedCount && tipo === "ajuste") log.error(`[INSUMOS] insumo ${insumo._id}: el ajuste no se pudo deshacer, hubo otro movimiento: revisalo con revisarStock`);
+    throw e;
+  }
+
+  // El insumo como quedó justo después de este movimiento.
+  return { movimiento: mov, insumo: { ...antes, ...poner, stock: stockDespues, secuencia: orden } };
+}
+
+// ═══ EL STOCK, REHECHO DESDE LOS MOVIMIENTOS ═══════════════════════════════
+//
+// Lo que tiene que cuadrar: el stock del insumo es lo que da aplicar sus
+// movimientos en el orden en que la base los aplicó. Los de antes del número
+// de orden van primero, por cuándo se cargaron.
+async function revisarStock(insumoId) {
+  const [insumo, movimientos] = await Promise.all([
+    Insumo.findById(insumoId).select("stock").lean(),
+    MovimientoInsumo.find({ insumoId }).sort({ orden: 1, createdAt: 1, _id: 1 }).select("tipo cantidad").lean(),
+  ]);
+  let segunMovimientos = 0;
+  for (const m of movimientos) {
+    if (m.tipo === "entrada") segunMovimientos += m.cantidad;
+    else if (m.tipo === "salida") segunMovimientos -= m.cantidad;
+    else segunMovimientos = m.cantidad;
+  }
+  const enElInsumo = insumo?.stock || 0;
+  return { segunMovimientos, enElInsumo, cuadra: Math.abs(segunMovimientos - enElInsumo) < 1e-9 };
 }
 
 // ─── LO QUE HAY QUE REPONER ───────────────────────────────────────────────
@@ -134,6 +185,6 @@ async function valorDelStock(req) {
 }
 
 module.exports = {
-  duenoDe, insumoDelDueno, registrarMovimiento, loQueFalta, valorDelStock,
+  duenoDe, insumoDelDueno, registrarMovimiento, revisarStock, loQueFalta, valorDelStock,
   DIAS_AVISO_VENCIMIENTO,
 };

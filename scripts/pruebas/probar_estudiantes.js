@@ -135,6 +135,9 @@ function textoPdf(buf) {
   const meta = require(path.join(RAIZ, "services", "metaWhatsapp"));
   const enviados = [];
   meta.enviarTextoOPlantilla = async (...a) => { enviados.push(a); return { ok: true }; };
+  // Ni la IA del resumen previo y del hilo, que se rehacen al confirmar.
+  require(path.join(RAIZ, "services", "briefClinico")).regenerarBriefClinico = async () => {};
+  require(path.join(RAIZ, "services", "hiloClinico")).generarHilo = async () => null;
   const { procesarRecordatoriosVencidos } = require(path.join(RAIZ, "services", "recordatorioMedicamento"));
 
   const express = require("express");

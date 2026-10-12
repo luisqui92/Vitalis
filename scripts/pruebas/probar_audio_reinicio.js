@@ -127,10 +127,12 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
     c.estado === "completado" && c.notaClinicaEstado === "completado" && !hayAudio(id1));
   r = await subir("AUDIO-DOS");
   const id2 = r.cuerpo.consulta._id;
-  (await transcripcionDe("AUDIO-DOS"))?.reject(new Error("AssemblyAI no contestó"));
+  // AssemblyAI recibió el audio y no pudo con él: eso no tiene arreglo.
+  (await transcripcionDe("AUDIO-DOS"))?.reject(Object.assign(new Error("Audio file could not be decoded"), { definitiva: true }));
   await hasta(async () => (await leer(id2)).estado === "error");
-  verificar("si la transcripción falla: en error, se le avisa al médico, y el audio también se borra",
-    (await leer(id2)).estado === "error" && avisos.some(a => /No se pudo transcribir/.test(a.titulo)) && !hayAudio(id2));
+  verificar("si el audio mismo no sirve: en error con el motivo, se le avisa al médico, el audio se borra y no se reintenta",
+    /could not be decoded/.test((await leer(id2)).error || "") && avisos.some(a => /No se pudo transcribir/.test(a.titulo)) && !hayAudio(id2)
+    && !(await transcripcionDe("AUDIO-DOS", 2, 600)));
   const guardar = audioPendiente.guardar;
   audioPendiente.guardar = async () => { throw new Error("no hay lugar en el disco"); };
   const antes = await M.ConsultaMedica.countDocuments();
@@ -138,6 +140,75 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   audioPendiente.guardar = guardar;
   verificar("si el audio no se puede guardar → 503 («la grabación sigue en el teléfono»), y no queda una consulta sin audio",
     r.estado === 503 && /teléfono/.test(r.cuerpo?.error || "") && (await M.ConsultaMedica.countDocuments()) === antes && !(await transcripcionDe("AUDIO-SIN-LUGAR", 1, 500)));
+
+  console.log("\n── 1b. Una falla pasajera no pierde la consulta (revisión integral, S04) ──");
+  Object.assign(rutas.AJUSTES_AUDIO, { ESPERAS_MS: [150, 150], GUARDAR_ESPERAS_MS: [50, 50], RETENER_MS: 60000 });
+  const pasajera = () => Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+
+  // Se corta la red con AssemblyAI una vez, y después anda.
+  r = await subir("AUDIO-RED");
+  const idRed = r.cuerpo.consulta._id;
+  (await transcripcionDe("AUDIO-RED"))?.reject(pasajera());
+  await hasta(async () => (await leer(idRed)).intentosTranscripcion === 1);
+  c = await leer(idRed);
+  verificar("un corte de red → sigue «procesando», con el audio en disco y el intento contado",
+    c.estado === "procesando" && hayAudio(idRed) && c.intentosTranscripcion === 1);
+  const otraVez = await transcripcionDe("AUDIO-RED", 2);
+  verificar("  ...al rato se reintenta sola, con el audio del disco", !!otraVez);
+  if (otraVez) terminar(otraVez, "Texto después del corte");
+  await hasta(async () => (await leer(idRed)).estado === "completado");
+  verificar("  ...termina completa, y recién ahí se borra el audio", (await leer(idRed)).estado === "completado" && !hayAudio(idRed));
+
+  // La transcripción salió, pero la base no contestó justo al guardarla.
+  const updateOneOriginal = M.ConsultaMedica.updateOne;
+  let fallasDeLaBase = 1;
+  M.ConsultaMedica.updateOne = function (filtro, cambio, ...resto) {
+    if (fallasDeLaBase > 0 && cambio?.$set?.estado === "completado") { fallasDeLaBase--; return Promise.reject(new Error("la base no contestó")); }
+    return updateOneOriginal.call(this, filtro, cambio, ...resto);
+  };
+  r = await subir("AUDIO-BASE");
+  const idBase = r.cuerpo.consulta._id;
+  const tBase = await transcripcionDe("AUDIO-BASE");
+  if (tBase) terminar(tBase, "Texto que costó guardar");
+  await hasta(async () => (await leer(idBase)).estado === "completado");
+  M.ConsultaMedica.updateOne = updateOneOriginal;
+  c = await leer(idBase);
+  verificar("la base falla al guardar una transcripción ya hecha → se insiste y se guarda, sin pagarla dos veces",
+    c.transcripcionCompleta === "Texto que costó guardar" && !hayAudio(idBase) && transcripciones.filter(t => t.audio === "AUDIO-BASE").length === 1);
+
+  // Falla una y otra vez: queda en error, con el audio guardado para reintentar a mano.
+  r = await subir("AUDIO-SIEMPRE-FALLA");
+  const idTerca = r.cuerpo.consulta._id;
+  for (let vez = 1; vez <= 3; vez++) (await transcripcionDe("AUDIO-SIEMPRE-FALLA", vez))?.reject(pasajera());
+  await hasta(async () => (await leer(idTerca)).estado === "error");
+  c = await leer(idTerca);
+  verificar("tres fallas pasajeras seguidas → error «después de varios intentos», y el audio queda guardado unos días",
+    /varios intentos/.test(c.error || "") && hayAudio(idTerca) && new Date(c.audioRetenidoHasta) > new Date());
+  verificar("  ...y no se reintenta sola una cuarta vez", !(await transcripcionDe("AUDIO-SIEMPRE-FALLA", 4, 600)));
+  const reintentar = (id) => pedir(puerto, "POST", `/medico/consultas/${id}/transcripcion/reintentar`, tk);
+  const dos = await Promise.all([reintentar(idTerca), reintentar(idTerca)]);
+  verificar("«Volver a transcribir» → 202; tocado dos veces a la vez, el segundo → 409", dos.map(x => x.estado).sort().join() === "202,409");
+  const aMano = await transcripcionDe("AUDIO-SIEMPRE-FALLA", 4);
+  verificar("  ...se transcribe una vez más, una sola, con el audio guardado", !!aMano && !(await transcripcionDe("AUDIO-SIEMPRE-FALLA", 5, 300)));
+  if (aMano) terminar(aMano, "Texto que salió a mano");
+  await hasta(async () => (await leer(idTerca)).estado === "completado");
+  c = await leer(idTerca);
+  verificar("  ...queda completa, el audio se borra y ya no figura guardado",
+    c.transcripcionCompleta === "Texto que salió a mano" && !hayAudio(idTerca) && !c.audioRetenidoHasta);
+  verificar("reintentar una consulta que no tiene audio guardado → 409", (await reintentar(idTerca)).estado === 409);
+
+  // Los guardados vencen: se borran solos.
+  const vencida = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "error", audioRetenidoHasta: new Date(Date.now() - 1000) });
+  await audioPendiente.guardar(vencida._id, Buffer.from("AUDIO-VENCIDO"));
+  const vigente = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "error", audioRetenidoHasta: new Date(Date.now() + 86400000) });
+  await audioPendiente.guardar(vigente._id, Buffer.from("AUDIO-VIGENTE"));
+  // La limpieza pasa cada 12 horas: hasta entonces el archivo sigue ahí.
+  verificar("con la retención vencida → 409, aunque el audio siga en el disco hasta la limpieza",
+    (await reintentar(vencida._id)).estado === 409 && (await leer(vencida._id)).estado === "error");
+  const limpiados = await rutas.limpiarAudiosRetenidos();
+  verificar("la limpieza borra el audio guardado que venció, y deja el que sigue vigente",
+    limpiados === 1 && !hayAudio(vencida._id) && !(await leer(vencida._id)).audioRetenidoHasta && hayAudio(vigente._id));
+  Object.assign(rutas.AJUSTES_AUDIO, { ESPERAS_MS: [], GUARDAR_ESPERAS_MS: [], RETENER_MS: 60000 });
 
   console.log("\n── 2. Al arrancar, lo que quedó a medias ──");
   // A. Una subida a mitad de transcribir cuando «se cayó» el proceso: su
@@ -162,7 +233,10 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   const notaVieja = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "completado", notaFuente: "audio",
     transcripcionCompleta: "NOTA_VIEJA", notaClinicaEstado: "pendiente" });
   await M.ConsultaMedica.collection.updateOne({ _id: notaVieja._id }, { $set: { createdAt: new Date(Date.now() - 3 * 86400000) } });
-  // E. Sobras: un audio sin consulta en curso, y uno a medio escribir.
+  // E. Sobras: un audio sin consulta en curso, y uno a medio escribir. El de
+  // una consulta que falló y se guarda para reintentar a mano no es sobra.
+  const retenida = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "error", audioRetenidoHasta: new Date(Date.now() + 86400000) });
+  await audioPendiente.guardar(retenida._id, Buffer.from("AUDIO-RETENIDO"));
   const huerfano = new mongoose.Types.ObjectId();
   await audioPendiente.guardar(huerfano, Buffer.from("SOBRA"));
   fs.writeFileSync(archivo(new mongoose.Types.ObjectId()) + ".parcial", "MEDIO");
@@ -204,6 +278,7 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   verificar("  ...la de hace días no se escribe sola: queda en error, para volver a generarla",
     c.notaClinicaEstado === "error" && /Volvé a generarla/.test(c.notaClinicaError) && !alaIA.some(x => x.includes("NOTA_VIEJA")));
   verificar("E. el audio sobrante y el que quedó a medio escribir se borran", !hayAudio(huerfano) && !fs.readdirSync(DIR_AUDIO).some(n => n.endsWith(".parcial")));
+  verificar("  ...pero el que se guarda para reintentar a mano, no", hayAudio(retenida._id));
   c = await leer(idNueva);
   verificar("F. lo que llegó después del arranque no se toca: sigue transcribiéndose, con su audio, una sola vez",
     c.estado === "procesando" && hayAudio(idNueva) && transcripciones.filter(t => t.audio === "AUDIO-NUEVO").length === 1);

@@ -177,12 +177,16 @@ module.exports = function (app) {
     // 1. El técnico tipeó el código de paciente de Symphomed en el equipo.
     //    Es el mejor caso: el estudio se archiva solo, sin que nadie toque
     //    nada, y es exactamente para lo que existe ese código.
+    //    Solo si el código es de UN paciente: con dos iguales (de antes de
+    //    que fueran únicos, revisión integral del 11 de octubre de 2026,
+    //    S06) se archivaba en cualquiera de los dos. Así sigue al paso 2.
     if (meta.pacienteIdDicom) {
-      paciente = await Paciente.findOne({
+      const conEseCodigo = await Paciente.find({
         medicoPhone,
         codigo: new RegExp(`^${meta.pacienteIdDicom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
-      }).lean();
-      if (paciente) via = "codigo";
+      }).limit(2).lean();
+      if (conEseCodigo.length === 1) { paciente = conEseCodigo[0]; via = "codigo"; }
+      else if (conEseCodigo.length > 1) log.warn(`[CAJA] el código ${meta.pacienteIdDicom} es de más de un paciente: no se archiva solo`);
     }
 
     // 2. Hay una ventana de captura abierta (el flujo del consultorio: el

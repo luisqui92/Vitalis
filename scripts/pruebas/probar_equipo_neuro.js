@@ -241,6 +241,65 @@ for (const archivo of ["neurodesarrollo", "instrumentos", "informeFamilia"]) {
   const titularSigue = await pedir(`/medico/pacientes/${fichaLeo._id}/neuro`, { token: tk["70000001"] });
   verificar("y su propia ficha le sigue funcionando al titular", titularSigue.estado === 200);
 
+  console.log("\n── 12. Irse del centro o de la rama corta los DOS caminos ──");
+  // La colega tiene su propia ficha del chico, enlazada a la misma persona.
+  // Pedir ESA ficha la llevaba a la titular mirando solo si estaba en el
+  // equipo: desvinculada del centro, seguía entrando (revisión integral del
+  // 11 de octubre de 2026, S01). Se prueba por los dos caminos, y también el
+  // equipo y los objetos que se editan por su id.
+  const mateo = await PersonaClinica.create({ clinicaId: centro._id, nombre: "Mateo Quispe" });
+  const fichaMateo = await Paciente.create({ nombre: "Mateo Quispe", medicoPhone: "70000001", codigo: "P-0010", personaId: mateo._id });
+  const fichaMateoRojas = await Paciente.create({ nombre: "Mateo Quispe", medicoPhone: "70000002", codigo: "P-0011", personaId: mateo._id });
+  const eqMateo = await pedir(`/medico/pacientes/${fichaMateo._id}/equipo`, { metodo: "POST", token: tk["70000001"],
+    cuerpo: { rol: "Psicopedagogía", autorizacion: { porQuien: "Ana Quispe", vinculo: "madre", fecha: new Date() } } });
+  const equipoMateo = eqMateo.cuerpo?.equipo?._id;
+  await pedir(`/medico/equipos/${equipoMateo}/miembros`, { metodo: "POST", token: tk["70000001"], cuerpo: { telefono: "70000002", rol: "Fonoaudiología" } });
+  await pedir(`/medico/pacientes/${fichaMateoRojas._id}/neuro/objetivos`,
+    { metodo: "POST", token: tk["70000002"], cuerpo: { titulo: "Nombrar colores", area: "comunicacion" } });
+  const objMateo = await ObjetivoNeuro.findOne({ titulo: "Nombrar colores" }).lean();
+  verificar("en el equipo, entrando por SU ficha escribe en la titular",
+    objMateo && String(objMateo.pacienteId) === String(fichaMateo._id));
+
+  const caminos = async () => {
+    const t = tk["70000002"];
+    const estados = {
+      suFicha: (await pedir(`/medico/pacientes/${fichaMateoRojas._id}/neuro`, { token: t })).estado,
+      titular: (await pedir(`/medico/pacientes/${fichaMateo._id}/neuro`, { token: t })).estado,
+      equipo: (await pedir(`/medico/pacientes/${fichaMateoRojas._id}/equipo`, { token: t })).estado,
+      objetivo: (await pedir(`/medico/neuro/objetivos/${objMateo._id}/progreso`, { metodo: "POST", token: t, cuerpo: { logros: 1, intentos: 2 } })).estado,
+    };
+    return { estados, todos404: Object.values(estados).every(e => e === 404), ninguno404: Object.values(estados).every(e => e >= 200 && e < 300) };
+  };
+  let c = await caminos();
+  verificar(`antes: entra por los dos caminos, ve el equipo y escribe (${JSON.stringify(c.estados)})`, c.ninguno404);
+
+  await Medico.updateOne({ phone: "70000002" }, { $set: { clinicaId: null } });
+  c = await caminos();
+  verificar(`desvinculada del centro: 404 en todo, también por SU ficha (${JSON.stringify(c.estados)})`, c.todos404);
+  const sumaDeAfuera = await pedir(`/medico/equipos/${equipoMateo}/miembros`,
+    { metodo: "POST", token: tk["70000002"], cuerpo: { telefono: "70000003" } });
+  verificar("  ...no puede sumar a nadie al equipo", sumaDeAfuera.estado === 404);
+  const sacaDeAfuera = await pedir(`/medico/equipos/${equipoMateo}/miembros/70000001`, { metodo: "DELETE", token: tk["70000002"] });
+  const cierraDeAfuera = await pedir(`/medico/equipos/${equipoMateo}`, { metodo: "DELETE", token: tk["70000002"] });
+  verificar("  ...ni sacar gente ni cerrar el equipo", sacaDeAfuera.estado === 404 && cierraDeAfuera.estado === 404);
+  const compartidos = await pedir("/medico/equipos/compartidos", { token: tk["70000002"] });
+  verificar("  ...y el chico no le aparece entre los compartidos", compartidos.estado === 200 && compartidos.cuerpo?.pacientes?.length === 0);
+
+  await Medico.updateOne({ phone: "70000002" }, { $set: { clinicaId: centro._id } });
+  c = await caminos();
+  verificar(`vuelve al centro: entra de nuevo, la regla mira la cuenta de hoy (${JSON.stringify(c.estados)})`, c.ninguno404);
+
+  await Medico.updateOne({ phone: "70000002" }, { $set: { tipoEspecialidad: "psicologia" } });
+  c = await caminos();
+  verificar(`deja la rama de neuro: 404 en todo (${JSON.stringify(c.estados)})`, c.todos404);
+  await Medico.updateOne({ phone: "70000002" }, { $set: { tipoEspecialidad: "neurodesarrollo" } });
+
+  await pedir(`/medico/equipos/${equipoMateo}/miembros/70000002`, { metodo: "DELETE", token: tk["70000001"] });
+  c = await caminos();
+  verificar(`la sacan del equipo: 404 en todo (${JSON.stringify(c.estados)})`, c.todos404);
+  const titularMateo = await pedir(`/medico/pacientes/${fichaMateo._id}/neuro`, { token: tk["70000001"] });
+  verificar("el titular sigue con su ficha", titularMateo.estado === 200);
+
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();

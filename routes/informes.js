@@ -174,8 +174,9 @@ module.exports = function (app) {
     // El paciente recibe su código la primera vez que se le hace un informe,
     // no al registrarlo: así los pacientes viejos también lo consiguen sin
     // tener que migrar nada.
+    // Si dos informes salen a la vez, el código que queda es el primero.
     if (!paciente.codigo) {
-      await Paciente.updateOne({ _id: paciente._id }, { codigo: await siguienteCodigo(Paciente, medicoPhone, "P") });
+      await Paciente.updateOne({ _id: paciente._id, codigo: { $in: [null, ""] } }, { codigo: await siguienteCodigo(Paciente, medicoPhone, "P") });
     }
 
     const informe = await Informe.create({

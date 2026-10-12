@@ -18,14 +18,20 @@ Reglas:
 - Sé breve y directo, como si le contestaras a un colega médico.
 - Si la respuesta depende de una fecha o consulta puntual, mencioná la fecha.
 - No dés consejos médicos nuevos ni diagnósticos — solo reportá lo que ya
-  está en el historial.`;
+  está en el historial.
+- Las consultas marcadas "borrador sin revisar" las escribió una IA a partir
+  del audio y el médico todavía no las confirmó: si tu respuesta sale de una
+  de ésas, decilo.`;
 
 function fechaStr(d) {
   return d ? new Date(d).toLocaleDateString("es-BO") : "";
 }
 
+// Sin el nombre: para contestar sobre la historia no hace falta, y el nombre
+// de un paciente no sale de Symphomed hacia la IA.
 function construirContextoPaciente(ctx) {
-  const partes = [`Paciente: ${ctx.nombre}${ctx.edad != null ? `, ${ctx.edad} años` : ""}${ctx.sexo ? `, ${ctx.sexo}` : ""}`];
+  const datos = [ctx.edad != null && `${ctx.edad} años`, ctx.sexo].filter(Boolean).join(", ");
+  const partes = [`Paciente${datos ? `: ${datos}` : ""}`];
 
   if (ctx.antecedentesPersonales?.length) {
     partes.push(`Antecedentes personales: ${ctx.antecedentesPersonales.join("; ")}`);
@@ -59,7 +65,10 @@ function construirContextoPaciente(ctx) {
         n.plan && `Plan: ${n.plan}`,
         n.medicamentosRecetados?.length && `Recetado: ${n.medicamentosRecetados.map(m => m.nombre).join(", ")}`,
       ].filter(Boolean).join(" | ");
-      return `- [${fechaStr(c.createdAt)}] ${campos || "(sin nota clínica)"}`;
+      // Las que el médico no confirmó son borradores (revisión integral del
+      // 11 de octubre de 2026, S03).
+      const borrador = c.notaClinica && !c.confirmadaEn ? " (borrador sin revisar)" : "";
+      return `- [${fechaStr(c.createdAt)}]${borrador} ${campos || "(sin nota clínica)"}`;
     }).join("\n"));
   }
   return partes.join("\n\n");
@@ -83,4 +92,4 @@ async function responderPregunta(pregunta, ctx) {
   return res.data.choices[0].message.content.trim();
 }
 
-module.exports = { responderPregunta };
+module.exports = { responderPregunta, construirContextoPaciente };

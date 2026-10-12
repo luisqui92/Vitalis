@@ -475,7 +475,8 @@ const pacienteSchema = new mongoose.Schema({
   // Brief Clínico Inteligente: resumen ejecutivo generado por IA a partir del
   // historial de consultas, para que el médico lo lea antes de la próxima
   // visita. Se regenera solo cada vez que termina la nota clínica de una
-  // consulta nueva (ver services/briefClinico.js).
+  // consulta nueva, y otra vez cuando el médico la confirma (ver
+  // services/briefClinico.js).
   briefClinicoEstado: { type: String, enum: ["pendiente", "generando", "completado", "error"], default: "pendiente" },
   briefClinico: {
     estadoActual: String,
@@ -489,9 +490,36 @@ const pacienteSchema = new mongoose.Schema({
   },
   briefClinicoActualizadoEn: Date,
   briefClinicoError: String,
+  // De cuántas consultas salió, y cuántas eran borradores que el médico
+  // todavía no había confirmado: la pantalla lo avisa.
+  briefClinicoFuentes: { consultas: Number, sinRevisar: Number },
+  // Cada generación toma un número al empezar y guarda solo si sigue siendo
+  // la última: una vieja que termina tarde no pisa a una más nueva.
+  briefClinicoVersion: { type: Number, default: 0 },
 }, { timestamps: true });
 pacienteSchema.index({ medicoPhone: 1, nombre: 1 });
+// Un código, un paciente por consultorio: la caja DICOM archiva el estudio
+// por el código, y con dos iguales se lo daba a cualquiera de los dos
+// (revisión integral del 11 de octubre de 2026, S06). Los que no tienen
+// código ("") quedan afuera. Si la base ya trae códigos repetidos, el índice
+// no se crea (el servidor sigue andando) hasta resolverlos con
+// scripts/codigos_repetidos.js.
+pacienteSchema.index({ medicoPhone: 1, codigo: 1 }, { unique: true, partialFilterExpression: { codigo: { $gt: "" } } });
 const Paciente = mongoose.model("Paciente", pacienteSchema);
+Paciente.on("index", (e) => {
+  if (e) log.error("[CODIGOS] No se pudo crear el índice de códigos de paciente únicos (¿hay repetidos?). Revisalos con: node scripts/codigos_repetidos.js —", e.message);
+});
+
+// Los números correlativos de cada consultorio, uno por tipo de código
+// (services/codigos.js). Sumarle uno es atómico: contar lo que había no
+// reservaba nada, y dos altas a la vez salían con el mismo código.
+const contadorSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true },
+  clave: { type: String, required: true },   // "Paciente:P", "Informe:INF"
+  valor: { type: Number, default: 0 },
+});
+contadorSchema.index({ medicoPhone: 1, clave: 1 }, { unique: true });
+const Contador = mongoose.model("Contador", contadorSchema);
 
 // Una consulta médica transcrita: audio subido por el médico, diarizado
 // (separa quién habla) por AssemblyAI. Ligada a un Paciente real (no texto
@@ -520,6 +548,12 @@ const consultaMedicaSchema = new mongoose.Schema({
   // en el medio (routes/consultaMedica.js, retomarConsultas): un audio que
   // tira el servidor no se reintenta para siempre.
   reintentosAudio: { type: Number, default: 0 },
+  // Cuántas veces falló la transcripción por algo pasajero (la red, una
+  // demora, un error del servicio) y se volvió a intentar con el audio
+  // guardado. Agotados los intentos, el audio queda guardado hasta
+  // «audioRetenidoHasta» para reintentar a mano desde la consulta.
+  intentosTranscripcion: { type: Number, default: 0 },
+  audioRetenidoHasta: { type: Date, default: null },
   // Nota clínica estructurada, generada por IA a partir de la transcripción
   // una vez que esta termina. Es un segundo paso, independiente del de arriba.
   notaClinicaEstado: { type: String, enum: ["pendiente", "completado", "error"], default: "pendiente" },
@@ -528,6 +562,10 @@ const consultaMedicaSchema = new mongoose.Schema({
   // tratamientos, receta, medicación, antecedentes, vacunas). Queda la
   // fecha para no volver a aplicar lo mismo si entra de nuevo a la pantalla.
   confirmadaEn: { type: Date, default: null },
+  // Mientras una confirmación aplica lo suyo: otra al mismo tiempo (dos
+  // toques, dos pestañas) no entra. Vence sola por si el proceso se cayó
+  // (routes/consultaMedica.js, S02).
+  confirmandoDesde: { type: Date, default: null },
   notaEditadaPorMedico: { type: Boolean, default: false },
 
   // ─── La nota en vivo (ver services/notaEnVivo.js) ──────────────────────
@@ -631,10 +669,10 @@ const consultaMedicaSchema = new mongoose.Schema({
     }],
     // Symphomed Visión: hallazgos por ojo/estructura detectados en la
     // consulta ("ojo derecho, cristalino con opacidad cortical leve").
-    // A diferencia de las sugerencias de arriba, estos se aplican solos al
-    // mapa ocular apenas termina de generarse la nota (el médico corrige
-    // después si hace falta) — se guarda una copia acá para que quede
-    // visible en la nota qué fue lo que se aplicó y por qué.
+    // Como las sugerencias de arriba, se cargan al mapa ocular recién al
+    // confirmar, los que el médico deja marcados (antes se aplicaban solos
+    // al escribirse la nota: revisión integral del 11 de octubre de 2026,
+    // S05). Ver aplicarHallazgosAlMapa en routes/consultaMedica.js.
     examenOcularSugerido: [{
       ojo: { type: String, default: "" },
       estructura: { type: String, default: "" },
@@ -643,9 +681,8 @@ const consultaMedicaSchema = new mongoose.Schema({
     }],
     // Symphomed Odonto: igual que examenOcularSugerido, pero para el estado
     // clínico de cada pieza del odontograma ("la 33 tiene caries", "hay que
-    // extraer la 18") — se aplica solo al odontograma apenas termina de
-    // generarse la nota, no hace falta que el odontólogo lo confirme (lo
-    // corrige después desde la pestaña Odontograma si hace falta). Es
+    // extraer la 18") — se carga al odontograma al confirmar, lo que el
+    // odontólogo deja marcado (S05). Es
     // independiente de tratamientosSugeridos (que es para el PRESUPUESTO,
     // se confirma a mano) — la misma consulta puede generar los dos para
     // la misma pieza a la vez (el estado clínico, y el tratamiento a hacer).
@@ -699,6 +736,11 @@ const medicamentoSchema = new mongoose.Schema({
   fechaInicio: { type: Date, default: null },
   fechaFin: { type: Date, default: null }, // null = activo/en curso
   notas: { type: String, default: "" }, // efectos secundarios, alergias relacionadas, etc.
+  // Si salió de confirmar una consulta: de cuál y qué es. Confirmar de nuevo
+  // (un reintento después de un error) no lo duplica: lo frena el índice
+  // único de abajo (routes/consultaMedica.js, S02).
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  claveConfirmacion: { type: String },
 
   // ─── Recordatorio automático al PACIENTE por WhatsApp ───────────────────
   // No confundir con el modelo Recordatorio (routes/recordatorios.js): aquel
@@ -728,6 +770,7 @@ medicamentoSchema.index({ pacienteId: 1, fechaFin: 1 });
 // índice, cada pasada haría un table scan de TODOS los medicamentos de
 // TODOS los médicos para encontrar los pocos con un recordatorio activo.
 medicamentoSchema.index({ "recordatorio.activo": 1, fechaFin: 1 });
+medicamentoSchema.index({ consultaId: 1, claveConfirmacion: 1 }, { unique: true, partialFilterExpression: { claveConfirmacion: { $exists: true } } });
 const Medicamento = mongoose.model("Medicamento", medicamentoSchema);
 
 // Vacunación: vacunas aplicadas (y se puede usar para anotar dosis pendientes
@@ -739,8 +782,14 @@ const vacunaSchema = new mongoose.Schema({
   dosis: { type: String, default: "" }, // ej: "1ra dosis", "Refuerzo"
   fecha: { type: Date, required: true },
   notas: { type: String, default: "" },
+  // Si salió de confirmar una consulta: de cuál y qué es. Confirmar de nuevo
+  // (un reintento después de un error) no lo duplica: lo frena el índice
+  // único de abajo (routes/consultaMedica.js, S02).
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  claveConfirmacion: { type: String },
 }, { timestamps: true });
 vacunaSchema.index({ pacienteId: 1, fecha: -1 });
+vacunaSchema.index({ consultaId: 1, claveConfirmacion: 1 }, { unique: true, partialFilterExpression: { claveConfirmacion: { $exists: true } } });
 const Vacuna = mongoose.model("Vacuna", vacunaSchema);
 
 // ─── SYMPHOMED GANADERÍA (bovino, porcino, avícola) ────────────────────────
@@ -1283,8 +1332,14 @@ const tratamientoPlanSchema = new mongoose.Schema({
     type: [{ monto: Number, fecha: { type: Date, default: Date.now }, notas: { type: String, default: "" } }],
     default: [],
   },
+  // Si salió de confirmar una consulta: de cuál y qué es. Confirmar de nuevo
+  // (un reintento después de un error) no lo duplica: lo frena el índice
+  // único de abajo (routes/consultaMedica.js, S02).
+  consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  claveConfirmacion: { type: String },
 }, { timestamps: true });
 tratamientoPlanSchema.index({ pacienteId: 1, createdAt: 1 });
+tratamientoPlanSchema.index({ consultaId: 1, claveConfirmacion: 1 }, { unique: true, partialFilterExpression: { claveConfirmacion: { $exists: true } } });
 const TratamientoPlan = mongoose.model("TratamientoPlan", tratamientoPlanSchema);
 
 // Evolución clínica: signos vitales/indicadores sueltos en el tiempo (presión,
@@ -2355,6 +2410,8 @@ const recetaSchema = new mongoose.Schema({
   pacienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Paciente", required: true, index: true },
   medicoPhone: { type: String, index: true, required: true },
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null },
+  // "receta" cuando salió de confirmar la consulta: una sola por consulta (S02).
+  claveConfirmacion: { type: String },
   medicamentos: [{
     nombre: { type: String, required: true },
     dosis: { type: String, default: "" },
@@ -2396,6 +2453,7 @@ recetaSchema.index({ "memed.prescriptionUuid": 1 }, {
   unique: true,
   partialFilterExpression: { "memed.prescriptionUuid": { $type: "string", $gt: "" } },
 });
+recetaSchema.index({ consultaId: 1, claveConfirmacion: 1 }, { unique: true, partialFilterExpression: { claveConfirmacion: { $exists: true } } });
 const Receta = mongoose.model("Receta", recetaSchema);
 
 // Recordatorios Médicos: vencimientos/controles próximos, vistos en una
@@ -2926,6 +2984,9 @@ const insumoSchema = new mongoose.Schema({
   unidad: { type: String, enum: UNIDADES_INSUMO, default: "unidad" },
   // Caché de la suma de movimientos. Ver el comentario de arriba.
   stock: { type: Number, default: 0 },
+  // Cuántos movimientos se le aplicaron: cada uno toma el siguiente número
+  // en la misma operación que cambia el stock (services/insumos.js).
+  secuencia: { type: Number, default: 0 },
   // Desde acá avisa que hay que reponer. 0 = no avisar nunca.
   stockMinimo: { type: Number, default: 0 },
   // Para saber cuánto vale el stock parado. Es el último costo conocido, no
@@ -2961,6 +3022,9 @@ const movimientoInsumoSchema = new mongoose.Schema({
   // Cómo quedó el stock después. Igual que en MovimientoSaldo: deja
   // reconstruir el estado de cualquier día sin sumar toda la historia.
   stockDespues: { type: Number, default: 0 },
+  // En qué orden lo aplicó la base al stock del insumo (su "secuencia" en
+  // ese momento). Con dos movimientos a la vez, la fecha no lo dice.
+  orden: { type: Number },
   costoUnitarioCentavos: { type: Number, default: 0 },
   motivo: { type: String, default: "" },
   // Si se gastó atendiendo a alguien, queda enganchado. Es lo que después
@@ -3315,4 +3379,4 @@ module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, ResumenCompartido, LlavePaci
   REGIONES_CUERPO, LADOS_FISIO, TIPOS_DOLOR, BANDERAS_ROJAS, ARTICULACIONES_ROM, AREAS_OBJETIVO_FISIO,
   Socio, LoteCupos,
   Insumo, MovimientoInsumo, UNIDADES_INSUMO, TIPOS_MOV_INSUMO,
-  InvitacionReporte };
+  InvitacionReporte, Contador };

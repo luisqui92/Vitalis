@@ -27,7 +27,7 @@ module.exports = function (app) {
 
     const [consultas, medicamentos, vacunas, mediciones, estudios] = await Promise.all([
       ConsultaMedica.find({ pacienteId: paciente._id, medicoPhone, estado: "completado" })
-        .select("notaClinica createdAt")
+        .select("notaClinica createdAt confirmadaEn")
         .sort({ createdAt: 1 })
         .lean(),
       Medicamento.find({ pacienteId: paciente._id, medicoPhone }).lean(),
@@ -42,7 +42,7 @@ module.exports = function (app) {
 
     try {
       const respuesta = await responderPregunta(pregunta, {
-        nombre: paciente.nombre, edad, sexo: paciente.sexo,
+        edad, sexo: paciente.sexo,
         antecedentesPersonales: paciente.antecedentesPersonales || [],
         antecedentesFamiliares: paciente.antecedentesFamiliares || [],
         medicamentos, vacunas, mediciones, estudios, consultas,

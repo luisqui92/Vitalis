@@ -94,6 +94,12 @@ Object.assign(I18N.pt, {
   // ─── Transcrição ──────────────────────────────────────────────────────
   "consulta.procesando": "⏳ Transcrevendo sua consulta... para áudios longos pode levar vários minutos. Esta tela se atualiza sozinha, você não precisa fazer nada.",
   "consulta.errTranscribir": "Ocorreu um erro ao transcrever",
+  "confirmar.mapaOdonto": "No odontograma: dente {pieza}, {estado}",
+  "confirmar.mapaOjo": "No mapa ocular: {ojo}, {estructura}: {estado}",
+  "confirmar.mapaGineco": "No mapa ginecológico: {organo}, {hallazgo}",
+  "consulta.audioGuardado": "O áudio ficou guardado até {fecha}: dá para transcrever de novo.",
+  "consulta.reintentarTranscripcion": "Transcrever de novo",
+  "consulta.reintentandoTranscripcion": "Transcrevendo de novo…",
   "consulta.transcripcion": "Transcrição",
   "consulta.hablante": "Interlocutor {n}",
   "consulta.quienMedico": "Médico",

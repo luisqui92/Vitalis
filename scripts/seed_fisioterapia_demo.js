@@ -505,7 +505,7 @@ async function cargarPaciente(p, telefono, nombreProfesional, clinicaId) {
   if (!ficha) {
     ficha = await Paciente.create({
       nombre: p.nombre, medicoPhone: telefono,
-      codigo: await siguienteCodigo(Paciente, telefono),
+      codigo: await siguienteCodigo(Paciente, telefono, "P"),
       fechaNacimiento: nacimientoHace(p.edad),
       sexo: p.sexo, telefono: p.telefono,
     });

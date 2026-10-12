@@ -86,6 +86,7 @@ Object.assign(I18N.pt, {
   "kardex.brief.preguntas": "Perguntas sugeridas:",
   "kardex.brief.diferenciales": "Diferenciais a considerar:",
   "kardex.brief.aviso": "Gerado por IA como apoio — não substitui o critério profissional.",
+  "kardex.brief.sinRevisar": "Inclui {n} consulta(s) que você ainda não confirmou: o que vier só delas pode ter erros.",
   "kardex.brief.vacio": "🧠 O resumo clínico vai aparecer aqui depois da primeira consulta com nota clínica gerada.",
 
   "kardex.edadNoRegistrada": "Idade não registrada",

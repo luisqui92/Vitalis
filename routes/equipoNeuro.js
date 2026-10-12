@@ -23,7 +23,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
-const { esMiembro, esDeNeuro } = require("../services/equipoNeuro");
+const { esMiembro, esDeNeuro, puedeUsarEquipo } = require("../services/equipoNeuro");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -93,7 +93,11 @@ module.exports = function (app) {
       if (!paciente) throw new ErrorHttp(404, "Paciente no encontrado");
       return res.json({ equipo: null, tienePersona: Boolean(paciente.personaId) });
     }
-    if (!esMiembro(equipo, medicoPhone)) throw new ErrorHttp(404, "Paciente no encontrado");
+    // El titular ve el equipo de su propia ficha; los demás, con la misma
+    // regla que para entrar a ella (services/equipoNeuro.js).
+    if (equipo.medicoPhoneTitular !== medicoPhone && !(await puedeUsarEquipo(equipo, medicoPhone))) {
+      throw new ErrorHttp(404, "Paciente no encontrado");
+    }
     res.json({ equipo: equipoParaElMedico(equipo, medicoPhone), tienePersona: true });
   }));
 
@@ -161,8 +165,9 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const equipo = await EquipoNeuro.findOne({ _id: req.params.id, activo: true });
     // 404 y no 403: decir "no tenés permiso" confirmaría que ese equipo
-    // existe, y con eso se puede averiguar si un chico se atiende acá.
-    if (!equipo || !esMiembro(equipo, medicoPhone)) throw new ErrorHttp(404, "Equipo no encontrado");
+    // existe, y con eso se puede averiguar si un chico se atiende acá. Y
+    // sumar gente lo hace quien sigue en el centro, no quien ya se fue.
+    if (!equipo || !(await puedeUsarEquipo(equipo, medicoPhone))) throw new ErrorHttp(404, "Equipo no encontrado");
 
     const telefono = String(req.body?.telefono || "").replace(/\D/g, "");
     if (!telefono) throw new ErrorHttp(400, "¿A quién sumamos? Poné su teléfono de Symphomed.");
@@ -212,7 +217,7 @@ module.exports = function (app) {
   app.delete("/medico/equipos/:id/miembros/:telefono", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const equipo = await EquipoNeuro.findOne({ _id: req.params.id, activo: true });
-    if (!equipo || !esMiembro(equipo, medicoPhone)) throw new ErrorHttp(404, "Equipo no encontrado");
+    if (!equipo || !(await puedeUsarEquipo(equipo, medicoPhone))) throw new ErrorHttp(404, "Equipo no encontrado");
 
     const telefono = String(req.params.telefono || "").replace(/\D/g, "");
     if (telefono === equipo.medicoPhoneTitular) {
@@ -240,7 +245,10 @@ module.exports = function (app) {
   app.delete("/medico/equipos/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const equipo = await EquipoNeuro.findOne({ _id: req.params.id, activo: true });
-    if (!equipo || !esMiembro(equipo, medicoPhone)) throw new ErrorHttp(404, "Equipo no encontrado");
+    // El titular lo puede cerrar siempre: la ficha es suya.
+    if (!equipo || (equipo.medicoPhoneTitular !== medicoPhone && !(await puedeUsarEquipo(equipo, medicoPhone)))) {
+      throw new ErrorHttp(404, "Equipo no encontrado");
+    }
 
     // Se marca inactivo, no se borra. Borrarlo destruiría el registro de que
     // la familia autorizó y de quién entró a la ficha mientras duró — que es

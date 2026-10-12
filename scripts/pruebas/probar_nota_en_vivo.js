@@ -78,7 +78,9 @@ assemblyai.transcribirConsultaMedica = () => new Promise((resolve, reject) => pe
 async function terminarTranscripcion(texto, { falla = false } = {}) {
   await hasta(() => pendientes.length > 0);
   const p = pendientes.shift();
-  if (falla) p.reject(new Error("AssemblyAI falló"));
+  // La falla que no tiene arreglo (AssemblyAI no pudo con el audio). Una
+  // pasajera se reintenta sola: la prueba la tiene probar_audio_reinicio.js.
+  if (falla) p.reject(Object.assign(new Error("AssemblyAI falló"), { definitiva: true }));
   else p.resolve({ transcripcionCompleta: texto, segmentos: [{ hablante: "A", texto }], duracionSegundos: 600 });
 }
 
