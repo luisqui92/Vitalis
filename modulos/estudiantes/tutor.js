@@ -30,6 +30,8 @@
 const { log } = require("../../config");
 const { perfil } = require("../../services/idiomas");
 const ia = require("../../services/ia");
+const { Medico } = require("../../db/models");
+const { carreraDe } = require("./carreras");
 
 const MAX_TEXTO = 80000;            // una consulta de 70 minutos entra con margen
 const PALABRAS_MINIMAS = 15;
@@ -80,12 +82,29 @@ REGLAS:
 Respondé SOLO JSON:
 {"preguntas":[{"pregunta":"string","porQue":"string"}],"banderasRojas":["string"]}`;
 
-async function preguntasFaltantes(transcripcion, idioma, paciente = null) {
+// Enfermería: lo que falta VALORAR (por patrones funcionales) y los signos
+// de alarma. La misma forma de respuesta: la pantalla cambia los títulos.
+const PROMPT_FALTA_ENF = `Sos un tutor de enfermería que acompaña a un estudiante de enfermería mientras valora a un paciente. Te paso lo que se habló HASTA AHORA (transcripción automática: puede tener errores, y no siempre queda claro quién habla).
+
+Tu tarea: decir qué falta VALORAR en este paciente —preguntas de los patrones funcionales que importan y todavía no se hicieron (cómo come y toma líquidos, cómo duerme, cómo orina y evacua, cómo se mueve, el dolor, qué entiende de su enfermedad, quién lo acompaña), o controles que no se mencionaron (signos vitales, dolor, piel, riesgo de caídas)— y qué signos de alarma conviene vigilar.
+
+REGLAS:
+1. SOLO LO QUE FALTA. Si ya se preguntó, se controló o el paciente ya lo contó, no lo pongas.
+2. Máximo 5, lo más importante primero. Cortas: como se las diría al paciente, o la acción («controlar la saturación»).
+3. "porQue": una frase corta de qué cambia en el cuidado esa respuesta.
+4. Signos de alarma: máximo 3, solo los pertinentes.
+5. NO DES DIAGNÓSTICOS: eso lo piensa el estudiante al final.
+6. Si todavía no hay un motivo de atención claro, devolvé las listas vacías.
+
+Respondé SOLO JSON:
+{"preguntas":[{"pregunta":"string","porQue":"string"}],"banderasRojas":["string"]}`;
+
+async function preguntasFaltantes(transcripcion, idioma, paciente = null, carrera = "medicina") {
   const vacio = { preguntas: [], banderasRojas: [] };
   if (palabras(transcripcion) < PALABRAS_MINIMAS) return vacio;
   try {
     const ficha = datosDeFicha(paciente);
-    const r = await pedirJson(`${PROMPT_FALTA}\n\n${reglaDeIdioma(idioma)}`,
+    const r = await pedirJson(`${carrera === "enfermeria" ? PROMPT_FALTA_ENF : PROMPT_FALTA}\n\n${reglaDeIdioma(idioma)}`,
       `${ficha ? `DATOS DE LA FICHA:\n${ficha}\n\n` : ""}LO QUE SE HABLÓ HASTA AHORA:\n${String(transcripcion).slice(-MAX_TEXTO)}`, 700);
     return {
       preguntas: (Array.isArray(r?.preguntas) ? r.preguntas : [])
@@ -126,6 +145,37 @@ REGLAS QUE NO SE NEGOCIAN:
 Respondé SOLO JSON:
 {"diferenciales":[{"diagnostico":"string","aFavor":["string"],"enContra":["string"],"estudio":"string"}],"banderasRojas":["string"],"faltoPreguntar":["string"],"comparacion":{"acertoPrincipal":true,"comentario":"string","noConsideraste":[{"diagnostico":"string","porQue":"string"}]},"perla":"string"}`;
 
+// Enfermería: el mismo ejercicio con el proceso de atención. Las mismas
+// claves (la pantalla y las tarjetas no cambian de forma): «diferenciales»
+// son los diagnósticos de enfermería por prioridad, «estudio» la intervención
+// clave de cada uno, «banderasRojas» los signos de alarma y «faltoPreguntar»
+// lo que faltó valorar.
+const PROMPT_RAZONAMIENTO_ENF = `Sos un tutor de enfermería. Un estudiante de enfermería atendió a un paciente. Te paso la transcripción de la atención, los datos registrados en la ficha, y el diagnóstico de enfermería prioritario que el estudiante propuso ANTES de ver tu análisis. Tu trabajo es enseñarle a razonar, no reemplazar a su docente.
+
+Hacé esto:
+1. "diferenciales": los diagnósticos de enfermería razonables para ESTE paciente, en formato PES y con palabras (el problema; en "aFavor", los datos que lo manifiestan), ordenados de MÁS a MENOS prioritario (máximo 5). Para cada uno:
+   - "diagnostico": el problema, corto («Dolor agudo», «Riesgo de caídas»).
+   - "aFavor": datos DE ESTA ATENCIÓN o de la ficha que lo sostienen (los signos y lo que lo causa).
+   - "enContra": lo que lo contradice, o lo que falta valorar para sostenerlo.
+   - "estudio": la intervención de enfermería clave para ese problema.
+2. "banderasRojas": los signos de alarma que hay que vigilar en este paciente (máximo 3).
+3. "faltoPreguntar": lo que no se valoró y habría cambiado el análisis (máximo 3).
+4. "comparacion":
+   - "acertoPrincipal": true si el diagnóstico prioritario del estudiante coincide en lo esencial con tu primer diagnóstico, aunque lo nombre distinto; si no, false.
+   - "comentario": 2 o 3 frases en segunda persona, concretas: qué razonó bien y qué le faltó (la prioridad: lo que amenaza la vida o la seguridad va primero).
+   - "noConsideraste": diagnósticos de enfermería importantes que el estudiante no nombró (máximo 3), cada uno con "porQue" basado en datos de la atención.
+5. "perla": la enseñanza clave de este caso, en una frase.
+
+REGLAS QUE NO SE NEGOCIAN:
+1. USÁ SOLO DATOS QUE ESTÉN EN LA TRANSCRIPCIÓN O EN LA FICHA. Si falta información, decilo («no se valoró…»). NUNCA inventes signos, resultados ni antecedentes.
+2. Sin etiquetas ni códigos de taxonomías con licencia (NANDA-I, NIC, NOC): con tus palabras. No escribas enfermedades como diagnósticos de enfermería.
+3. NADA DE PORCENTAJES NI PUNTAJES: el orden ya dice qué es prioritario.
+4. SÉ HONESTO: si el estudiante acertó, decíselo; si se equivocó, explicá por qué, sin vueltas y con respeto.
+5. Es material de aprendizaje: lo revisa su docente.
+
+Respondé SOLO JSON:
+{"diferenciales":[{"diagnostico":"string","aFavor":["string"],"enContra":["string"],"estudio":"string"}],"banderasRojas":["string"],"faltoPreguntar":["string"],"comparacion":{"acertoPrincipal":true,"comentario":"string","noConsideraste":[{"diagnostico":"string","porQue":"string"}]},"perla":"string"}`;
+
 function sanearRazonamiento(r) {
   const comp = r?.comparacion || {};
   return {
@@ -144,11 +194,14 @@ function sanearRazonamiento(r) {
 }
 
 // respuesta: { principal, diferenciales: [..] } — lo que pensó el estudiante.
-async function razonamientoDiagnostico(transcripcion, respuesta, idioma, paciente = null) {
+async function razonamientoDiagnostico(transcripcion, respuesta, idioma, paciente = null, carrera = "medicina") {
   const ficha = datosDeFicha(paciente);
-  const delEstudiante = `Diagnóstico principal: ${respuesta.principal}\nDiferenciales: ${respuesta.diferenciales.length ? respuesta.diferenciales.join("; ") : "(no propuso)"}`;
-  const r = await pedirJson(`${PROMPT_RAZONAMIENTO}\n\n${reglaDeIdioma(idioma)}`,
-    `TRANSCRIPCIÓN DE LA CONSULTA:\n${String(transcripcion).slice(0, MAX_TEXTO)}\n\n${ficha ? `DATOS DE LA FICHA:\n${ficha}\n\n` : ""}LO QUE PROPUSO EL ESTUDIANTE:\n${delEstudiante}`, 2200);
+  const enfermeria = carrera === "enfermeria";
+  const delEstudiante = enfermeria
+    ? `Diagnóstico de enfermería prioritario: ${respuesta.principal}\nOtros diagnósticos: ${respuesta.diferenciales.length ? respuesta.diferenciales.join("; ") : "(no propuso)"}`
+    : `Diagnóstico principal: ${respuesta.principal}\nDiferenciales: ${respuesta.diferenciales.length ? respuesta.diferenciales.join("; ") : "(no propuso)"}`;
+  const r = await pedirJson(`${enfermeria ? PROMPT_RAZONAMIENTO_ENF : PROMPT_RAZONAMIENTO}\n\n${reglaDeIdioma(idioma)}`,
+    `${enfermeria ? "TRANSCRIPCIÓN DE LA ATENCIÓN" : "TRANSCRIPCIÓN DE LA CONSULTA"}:\n${String(transcripcion).slice(0, MAX_TEXTO)}\n\n${ficha ? `DATOS DE LA FICHA:\n${ficha}\n\n` : ""}LO QUE PROPUSO EL ESTUDIANTE:\n${delEstudiante}`, 2200);
   const saneado = sanearRazonamiento(r);
   if (!saneado.diferenciales.length) throw new Error("La IA no devolvió diferenciales");
   return saneado;
@@ -159,7 +212,10 @@ async function razonamientoDiagnostico(transcripcion, respuesta, idioma, pacient
 // la par de la nota. Un médico no lo recibe: no le agrega nada y cuesta.
 async function extrasDelBorrador({ req, texto, idioma, paciente }) {
   if (!req.adminUser?.estudiante) return {};
-  return { tutor: await preguntasFaltantes(texto, idioma, paciente) };
+  // La carrera decide qué falta: preguntar (medicina) o valorar (enfermería).
+  const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("estudiante").lean();
+  const carrera = carreraDe(medico);
+  return { tutor: { ...(await preguntasFaltantes(texto, idioma, paciente, carrera)), carrera } };
 }
 
 module.exports = { preguntasFaltantes, razonamientoDiagnostico, sanearRazonamiento, datosDeFicha, extrasDelBorrador, PALABRAS_MINIMAS };

@@ -12,6 +12,9 @@
 //   node scripts/banco_estudio.js preguntas --idioma es --todas --n 20      (20 por área)
 //   node scripts/banco_estudio.js casos --idioma es --area clinica --dificultad intermedio --n 3
 //   node scripts/banco_estudio.js casos --idioma es --todas --n 2           (2 por área y dificultad)
+//   node scripts/banco_estudio.js preguntas --carrera enfermeria --todas --n 20   (las de enfermería)
+//   node scripts/banco_estudio.js casos --carrera enfermeria --todas --n 1
+//     (sin --carrera, --todas son las de medicina; con --area, la carrera es la del área)
 //   node scripts/banco_estudio.js reportadas         (lo que los estudiantes marcaron como mal)
 //   node scripts/banco_estudio.js restaurar <id>     (vuelve al banco algo que se sacó por reportes)
 //
@@ -22,6 +25,7 @@ const mongoose = require("mongoose");
 const { PreguntaSimulacro, CasoVirtual } = require("../modulos/estudiantes/modelos");
 const simulacros = require("../modulos/estudiantes/simulacros");
 const pv = require("../modulos/estudiantes/pacienteVirtual");
+const { NOMBRES_CARRERA, carreraDeArea } = require("../modulos/estudiantes/carreras");
 
 const VERDE = (t) => `\x1b[32m${t}\x1b[0m`;
 const ROJO = (t) => `\x1b[31m${t}\x1b[0m`;
@@ -40,6 +44,19 @@ async function conectar() {
 const opcion = (argv, nombre) => { const i = argv.indexOf("--" + nombre); return i > -1 ? argv[i + 1] : undefined; };
 const fallar = (msg) => { console.error(ROJO(`\n  ❌ ${msg}\n`)); process.exitCode = 1; };
 
+// Las áreas que se piden: las de --area, o todas las de la carrera. Con
+// --area, la carrera es la de esa área; sin nada, medicina. null si algo no
+// existe (y ya se dijo qué).
+function areasPedidas(argv, areasDe) {
+  const area = opcion(argv, "area");
+  const carrera = opcion(argv, "carrera") || carreraDeArea(area) || "medicina";
+  if (!NOMBRES_CARRERA.includes(carrera)) { fallar(`--carrera tiene que ser ${NOMBRES_CARRERA.join(", ")}`); return null; }
+  const validas = areasDe(carrera);
+  const areas = argv.includes("--todas") ? validas : [area];
+  if (areas.some(a => !validas.includes(a))) { fallar(`--area tiene que ser una de ${carrera}: ${validas.join(", ")} (o --todas)`); return null; }
+  return areas;
+}
+
 async function estado() {
   const [preguntas, casos] = await Promise.all([
     PreguntaSimulacro.aggregate([{ $group: { _id: { idioma: "$idioma", area: "$area" }, n: { $sum: 1 }, ocultas: { $sum: { $cond: ["$oculta", 1, 0] } } } }, { $sort: { _id: 1 } }]),
@@ -47,18 +64,18 @@ async function estado() {
   ]);
   console.log("\n  Preguntas de simulacro:");
   if (!preguntas.length) console.log(GRIS("    (ninguna todavía)"));
-  for (const x of preguntas) console.log(`    ${x._id.idioma} · ${x._id.area.padEnd(14)} ${String(x.n).padStart(4)}${x.ocultas ? ROJO(`  (${x.ocultas} sacadas por reportes)`) : ""}`);
+  for (const x of preguntas) console.log(`    ${x._id.idioma} · ${x._id.area.padEnd(17)} ${String(x.n).padStart(4)}${x.ocultas ? ROJO(`  (${x.ocultas} sacadas por reportes)`) : ""}`);
   console.log("\n  Casos del paciente virtual:");
   if (!casos.length) console.log(GRIS("    (ninguno todavía)"));
-  for (const x of casos) console.log(`    ${x._id.idioma} · ${x._id.area.padEnd(12)} ${x._id.dificultad.padEnd(11)} ${String(x.n).padStart(3)} caso(s), usados ${x.usos} vez/veces${x.ocultos ? ROJO(`  (${x.ocultos} sacados)`) : ""}`);
+  for (const x of casos) console.log(`    ${x._id.idioma} · ${x._id.area.padEnd(20)} ${x._id.dificultad.padEnd(11)} ${String(x.n).padStart(3)} caso(s), usados ${x.usos} vez/veces${x.ocultos ? ROJO(`  (${x.ocultos} sacados)`) : ""}`);
   console.log("");
 }
 
 async function preguntas(argv) {
   const idioma = opcion(argv, "idioma") || "es";
   const n = Number(opcion(argv, "n") || 20);
-  const areas = argv.includes("--todas") ? simulacros.AREAS : [opcion(argv, "area")];
-  if (areas.some(a => !simulacros.AREAS.includes(a))) return fallar(`--area tiene que ser ${simulacros.AREAS.join(", ")} (o --todas)`);
+  const areas = areasPedidas(argv, simulacros.areasDe);
+  if (!areas) return;
   if (!(n > 0 && n <= 100)) return fallar("--n tiene que ser de 1 a 100");
   for (const area of areas) {
     let hechas = 0;
@@ -75,9 +92,9 @@ async function preguntas(argv) {
 async function casos(argv) {
   const idioma = opcion(argv, "idioma") || "es";
   const n = Number(opcion(argv, "n") || 1);
-  const areas = argv.includes("--todas") ? pv.AREAS : [opcion(argv, "area")];
+  const areas = areasPedidas(argv, pv.areasDe);
+  if (!areas) return;
   const dificultades = argv.includes("--todas") ? pv.DIFICULTADES : [opcion(argv, "dificultad") || "intermedio"];
-  if (areas.some(a => !pv.AREAS.includes(a))) return fallar(`--area tiene que ser ${pv.AREAS.join(", ")} (o --todas)`);
   if (dificultades.some(d => !pv.DIFICULTADES.includes(d))) return fallar(`--dificultad tiene que ser ${pv.DIFICULTADES.join(", ")}`);
   if (!(n > 0 && n <= 10)) return fallar("--n tiene que ser de 1 a 10");
   for (const area of areas) {

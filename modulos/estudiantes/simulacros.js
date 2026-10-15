@@ -9,6 +9,11 @@
 // con tiempo, recién al final. Las que erra pasan a sus tarjetas de repaso
 // (estudio.js) y vuelven espaciadas hasta que las sabe.
 //
+// Enfermería tiene sus áreas (carreras.js) y su docente: preguntas de cuidado
+// y también de cálculo de medicación, con todos los datos en el enunciado. La
+// cuenta de cada una se rehace acá con aritmética de verdad (calculos.js) y
+// la que no da se tira, antes de que la conteste la otra IA.
+//
 // ═══ DE DÓNDE SALEN LAS PREGUNTAS ═════════════════════════════════════════
 //
 // No hay un banco oficial que se pueda usar, así que las escribe una IA, con
@@ -36,7 +41,8 @@ const ia = require("../../services/ia");
 const { NIVELES, inicioDelMes } = require("./cuenta");
 const { ErrorHttp } = require("../../services/httpHelpers");
 const { marcarDiaDeEstudio, inicioDeDia, reportarEnBanco } = require("./estudio");
-const { configDe } = require("./carreras");
+const { configDe, carreraDeArea } = require("./carreras");
+const { calcular, numerosDe, coincide } = require("./calculos");
 
 // Las de cada carrera están en carreras.js; AREAS son las de medicina.
 const areasDe = (carrera) => configDe(carrera).areasSimulacro;
@@ -44,6 +50,10 @@ const AREAS = areasDe("medicina");
 const NOMBRE_AREA = {
   clinica: "medicina interna", pediatria: "pediatría", gineco: "ginecología y obstetricia",
   cirugia: "cirugía general", salud_publica: "salud pública y medicina preventiva",
+  enf_fundamentos: "fundamentos de enfermería", enf_adulto: "enfermería del adulto (médico-quirúrgica)",
+  enf_materno: "enfermería materno-perinatal", enf_pediatria: "enfermería pediátrica y neonatal",
+  enf_comunitaria: "enfermería comunitaria y salud pública", enf_urgencias: "enfermería en urgencias y cuidados críticos",
+  enf_salud_mental: "enfermería en salud mental",
 };
 // Para que un lote no salga con cinco preguntas del mismo tema.
 const TEMAS = {
@@ -59,6 +69,27 @@ const TEMAS = {
   salud_publica: ["medidas de frecuencia en epidemiología", "diseños de estudios epidemiológicos", "sensibilidad, especificidad y valores predictivos",
     "bioestadística básica", "vigilancia epidemiológica", "niveles de prevención", "tamizaje", "brotes y epidemias",
     "atención primaria de salud", "salud materno-infantil"],
+  // Enfermería: el cuidado, la seguridad del paciente y los cálculos de
+  // medicación (con todos los datos en el enunciado: ver promptPreguntas).
+  enf_fundamentos: ["proceso de atención de enfermería", "valoración por patrones funcionales", "signos vitales", "bioseguridad y aislamiento",
+    "higiene de manos e infecciones asociadas a la atención", "administración segura de medicamentos", "cálculo de goteo y de mL por hora",
+    "vías de administración parenteral", "seguridad del paciente y prevención de caídas", "prevención de lesiones por presión", "registros de enfermería"],
+  enf_adulto: ["cuidados preoperatorios", "cuidados posoperatorios", "manejo del dolor", "cuidados del paciente con diabetes",
+    "cuidados en la insuficiencia cardíaca", "oxigenoterapia y cuidados respiratorios", "balance hídrico y electrolitos",
+    "cuidado de heridas y drenajes", "sondas y catéteres", "transfusión de sangre", "cálculo de dosis y diluciones"],
+  enf_materno: ["control prenatal", "signos de alarma en el embarazo", "trabajo de parto y parto", "atención inmediata del recién nacido",
+    "puerperio", "lactancia materna", "planificación familiar", "trastornos hipertensivos del embarazo", "hemorragia posparto"],
+  enf_pediatria: ["crecimiento y desarrollo", "vacunación", "valoración del recién nacido", "deshidratación y rehidratación",
+    "infecciones respiratorias en niños", "fiebre en el niño", "alimentación infantil", "cálculo de dosis por peso",
+    "seguridad del niño hospitalizado", "dolor en pediatría"],
+  enf_comunitaria: ["atención primaria de salud", "educación para la salud", "visita domiciliaria", "vigilancia epidemiológica",
+    "programa de inmunizaciones", "salud materno-infantil en la comunidad", "enfermedades transmisibles", "enfermedades crónicas en la comunidad",
+    "saneamiento básico", "niveles de prevención"],
+  enf_urgencias: ["triaje", "reanimación cardiopulmonar básica", "valoración ABCDE", "shock", "paciente politraumatizado", "quemaduras",
+    "intoxicaciones", "insuficiencia respiratoria", "monitoreo del paciente crítico", "cálculo de infusiones continuas"],
+  enf_salud_mental: ["comunicación terapéutica", "ansiedad", "depresión y riesgo suicida", "paciente agitado", "consumo de alcohol y otras drogas",
+    "psicosis", "trastornos de la conducta alimentaria", "cuidados en la demencia", "efectos adversos de los psicofármacos que hay que vigilar",
+    "salud mental comunitaria"],
 };
 const PAIS = { BO: "Bolivia", BR: "Brasil" };
 const CANTIDADES = [10, 20, 40];
@@ -90,6 +121,7 @@ const paisDe = (idioma) => PAIS[perfil(idioma).pais] || "Bolivia";
 // ─── GENERAR Y VERIFICAR ───────────────────────────────────────────────────
 
 function promptPreguntas(idioma, area, temas) {
+  if (carreraDeArea(area) === "enfermeria") return promptPreguntasEnfermeria(idioma, area, temas);
   const pais = paisDe(idioma);
   return `Sos un docente que escribe preguntas para el examen de ingreso a la residencia médica en ${pais}. Escribí ${temas.length} preguntas de opción múltiple de ${NOMBRE_AREA[area]}, una de cada uno de estos temas: ${temas.join("; ")}.
 
@@ -113,6 +145,62 @@ ${reglaDeIdioma(idioma)}
 Respondé SOLO JSON: {"preguntas":[{"tema":"string","enunciado":"string","opciones":["string"],"correcta":0,"explicacion":"string","porOpcion":["string"]}]}`;
 }
 
+// Enfermería: preguntas de cuidado, y también de cálculo. Las de cálculo se
+// pueden porque no piden recordar ninguna dosis: todos los datos van en el
+// enunciado, y la IA dice con qué datos se resuelve, para rehacer la cuenta
+// acá (calculoComprobado, abajo).
+function promptPreguntasEnfermeria(idioma, area, temas) {
+  const pais = paisDe(idioma);
+  return `Sos un docente de enfermería que escribe preguntas de estudio para estudiantes de la licenciatura en enfermería de ${pais}, del nivel de un examen final de la carrera. Escribí ${temas.length} preguntas de opción múltiple de ${NOMBRE_AREA[area]}, una de cada uno de estos temas: ${temas.join("; ")}.
+
+Cada pregunta:
+- "tema": el tema, corto.
+- "enunciado": una situación de cuidado breve (2 a 5 frases) y, al final, la pregunta: qué valorar, qué hacer primero, qué intervención corresponde, qué signo de alarma vigilar o qué enseñarle al paciente.
+- "opciones": exactamente 5, todas del mismo tipo, plausibles y distintas.
+- "correcta": el número de la opción correcta, de 0 a 4.
+- "explicacion": por qué esa es la correcta, en 2 o 3 frases.
+- "porOpcion": 5 frases cortas, una por opción y en el mismo orden: por qué es o no es.
+- "calculo": null, salvo en las preguntas de cálculo (regla 4).
+
+REGLAS QUE NO SE NEGOCIAN:
+1. Solo conocimiento consolidado de enfermería: guías vigentes y libros de texto de referencia. Nada dudoso ni controvertido.
+2. Una sola opción defendible. Si dudás de una pregunta, no la escribas.
+3. Nada de dosis de memoria ni marcas comerciales: ninguna pregunta puede necesitar recordar la dosis de un medicamento.
+4. Se pueden hacer preguntas de cálculo (goteo, mL por hora, dosis por peso, volumen a administrar, dilución, infusión continua) SOLO si TODOS los datos están en el enunciado: lo indicado, la presentación, el peso, el tiempo y las gotas por mL del equipo. Escribí los números con coma decimal y sin separador de miles. En esas preguntas, "calculo" lleva los datos con que se resuelve, en estas unidades:
+   - gotas por minuto: {"tipo":"goteo","datos":{"volumenMl":0,"minutos":0,"factor":20}} (factor: gotas por mL del equipo: 10, 15, 20 o 60)
+   - mL por hora: {"tipo":"mlHora","datos":{"volumenMl":0,"minutos":0}}
+   - dosis de cada toma según el peso: {"tipo":"dosisPorPeso","datos":{"dosisPorKg":0,"pesoKg":0,"tomas":1}} (tomas: en cuántas se reparte; 1 si es una sola)
+   - mL a administrar: {"tipo":"volumen","datos":{"dosis":0,"cantidad":0,"volumenMl":0}} (dosis y cantidad en la misma unidad; la presentación trae «cantidad» en «volumenMl»)
+   - mL de la solución inicial para diluir: {"tipo":"dilucion","datos":{"c1":0,"c2":0,"v2":0}} (C1 × V1 = C2 × V2)
+   - mL por hora de una infusión continua: {"tipo":"infusion","datos":{"dosisMcgKgMin":0,"pesoKg":0,"mg":0,"volumenMl":0}} (mg del medicamento en volumenMl de la mezcla)
+   El resultado tiene que estar en UNA sola opción, la correcta.
+5. Nada de «todas las anteriores» ni «ninguna de las anteriores».
+6. Sin etiquetas ni códigos de taxonomías con licencia (NANDA-I, NIC, NOC): un diagnóstico de enfermería se escribe con palabras.
+7. La terminología y la realidad sanitaria de ${pais}, sin detalles de normativa local que puedan haber cambiado.
+
+${reglaDeIdioma(idioma)}
+
+Respondé SOLO JSON: {"preguntas":[{"tema":"string","enunciado":"string","opciones":["string"],"correcta":0,"explicacion":"string","porOpcion":["string"],"calculo":null}]}`;
+}
+
+// Lo que delata una pregunta de cálculo (en español y en portugués). Solo
+// para enfermería: en medicina no se piden cálculos, y «cálculo renal» no lo es.
+const PARECE_CALCULO = /gotas?\s*(?:\/|por)\s*min|microgotas|\bgtt\b|\bml\s*\/\s*h\b|\bml\s+por\s+hora\b|\bmg\s*\/\s*kg\b|\bmcg\s*\/\s*kg\b|\bdiluci[oó]n\b|\bdilui[cç][aã]o\b|\bdiluir\b|cu[aá]ntos\s+ml\b|quantos\s+ml\b/i;
+
+// Una de cálculo se comprueba con aritmética de verdad (calculos.js): con los
+// datos que dio la IA, la cuenta tiene que dar un resultado que esté en la
+// opción correcta y en ninguna otra. Si parece de cálculo y no trae con qué
+// rehacerla, no se puede comprobar: se tira. La otra IA, la que contesta a
+// ciegas, mira además que esos datos sean los del enunciado.
+function calculoComprobado(p, crudo) {
+  const c = crudo?.calculo;
+  if (!c || typeof c !== "object") return !PARECE_CALCULO.test(`${p.enunciado} ${p.opciones.join(" ")}`);
+  const resultado = calcular(c.tipo, c.datos);
+  if (resultado === null) return false;
+  const conResultado = p.opciones.map(o => numerosDe(o).some(n => coincide(n, resultado)));
+  return conResultado[p.correcta] === true && conResultado.filter(Boolean).length === 1;
+}
+
 function sanearPregunta(p) {
   const opciones = (Array.isArray(p?.opciones) ? p.opciones : []).map(o => texto(o, 200));
   const correcta = Number(p?.correcta);
@@ -132,18 +220,25 @@ function mezclarOpciones(p) {
 }
 
 async function generarLote(idioma, area, temas) {
+  const enfermeria = carreraDeArea(area) === "enfermeria";
   const r = await ia.pedirJson(promptPreguntas(idioma, area, temas), "Escribí las preguntas.",
-    { maxTokens: 3500, temperatura: 0.7, timeout: 120000 });
-  return (Array.isArray(r?.preguntas) ? r.preguntas : []).map(sanearPregunta).filter(Boolean);
+    { maxTokens: enfermeria ? 4500 : 3500, temperatura: 0.7, timeout: 120000 });
+  return (Array.isArray(r?.preguntas) ? r.preguntas : []).map((crudo) => {
+    const p = sanearPregunta(crudo);
+    return p && (!enfermeria || calculoComprobado(p, crudo)) ? p : null;
+  }).filter(Boolean);
 }
 
 const PROMPT_VERIFICAR = `Sos un médico que rinde el examen de residencia. Respondé cada pregunta eligiendo UNA opción (su número, de 0 a 4). Si una pregunta tiene más de una opción defendible, ninguna correcta o un error médico, marcala "dudosa": true.
 Respondé SOLO JSON, una respuesta por pregunta y en el mismo orden: {"respuestas":[{"opcion":0,"dudosa":false}]}`;
 
+const PROMPT_VERIFICAR_ENFERMERIA = `Sos un licenciado en enfermería que rinde un examen. Respondé cada pregunta eligiendo UNA opción (su número, de 0 a 4); si es de cálculo, hacé la cuenta con los datos del enunciado. Si una pregunta tiene más de una opción defendible, ninguna correcta, un dato que falta o un error, marcala "dudosa": true.
+Respondé SOLO JSON, una respuesta por pregunta y en el mismo orden: {"respuestas":[{"opcion":0,"dudosa":false}]}`;
+
 // Se quedan las que otra IA, sin ver la respuesta, contesta igual y sin dudar.
-async function verificarLote(preguntas) {
+async function verificarLote(preguntas, carrera = "medicina") {
   if (!preguntas.length) return [];
-  const r = await ia.pedirJson(PROMPT_VERIFICAR,
+  const r = await ia.pedirJson(carrera === "enfermeria" ? PROMPT_VERIFICAR_ENFERMERIA : PROMPT_VERIFICAR,
     preguntas.map((p, i) => `PREGUNTA ${i + 1}: ${p.enunciado}\n${p.opciones.map((o, k) => `${k}. ${o}`).join("\n")}`).join("\n\n"),
     { maxTokens: 400, temperatura: 0 });
   const respuestas = Array.isArray(r?.respuestas) ? r.respuestas : [];
@@ -159,7 +254,7 @@ async function generarPreguntas(idioma, area, cantidad) {
   const temasDe = (k) => Array.from({ length: POR_LOTE }, (_, j) => temas[(k * POR_LOTE + j) % temas.length]);
   const generadas = await Promise.all(Array.from({ length: lotes }, (_, k) => generarLote(idioma, area, temasDe(k))
     .catch(e => { log.warn("[SIMULACROS] lote:", e.message); return []; })));
-  const verificadas = await Promise.all(generadas.map(l => verificarLote(l)
+  const verificadas = await Promise.all(generadas.map(l => verificarLote(l, carreraDeArea(area) || "medicina")
     .catch(e => { log.warn("[SIMULACROS] verificación:", e.message); return []; })));
   // Sin repetir lo que ya hay (ni entre ellas).
   const existentes = await PreguntaSimulacro.find({ idioma, area }).select("enunciado").lean();
@@ -421,5 +516,6 @@ async function reportarPregunta(medicoPhone, preguntaId, motivo, ahora = new Dat
 module.exports = {
   AREAS, areasDe, CANTIDADES, MODOS, SEGUNDOS_POR_PREGUNTA, MAX_PREGUNTAS_NUEVAS_DIA,
   sanearPregunta, mezclarOpciones, generarLote, verificarLote, generarPreguntas, elegirPreguntas, prepararSimulacro,
+  promptPreguntas, calculoComprobado, NOMBRE_AREA, TEMAS,
   responder, terminar, completarCierre, completarCierresPendientes, vista, obtener, cupoDe, progreso, reportarPregunta, normalizar,
 };

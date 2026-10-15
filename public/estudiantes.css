@@ -98,8 +98,9 @@
 /* ─── Etapa 4: las pestañas de Estudiar, el paciente virtual y los simulacros
    (public/js/estudiantesPacienteVirtual.js, estudiantesSimulacros.js). Mismos colores y
    piezas que el repaso: las opciones de un simulacro son .est-opcion. */
-.est-pestanas{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);}
-.est-pestana{background:none;border:none;border-radius:var(--radius-sm);padding:9px 6px;font-size:13px;font-weight:600;color:var(--text-muted);font-family:var(--font-texto);line-height:1.2;}
+/* Una columna por pestaña, del mismo ancho, las que sean. */
+.est-pestanas{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);}
+.est-pestana{background:none;border:none;border-radius:var(--radius-sm);padding:9px 4px;font-size:12.5px;font-weight:600;color:var(--text-muted);font-family:var(--font-texto);line-height:1.2;min-width:0;overflow-wrap:anywhere;}
 .est-pestana.activa{background:rgba(var(--primary-rgb),.14);color:var(--primary);}
 .est-pestana:focus-visible{outline:2px solid var(--primary);outline-offset:1px;}
 .est-rotulo{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin:14px 0 6px;}
@@ -167,3 +168,26 @@
   .sim-barra-fila{grid-template-columns:1fr auto;}
   .sim-barra{grid-column:1 / -1;grid-row:2;}
 }
+
+/* ─── La calculadora de medicación (public/js/estudiantesCalculadora.js) ────
+   Cada campo con su unidad al lado; el resultado en un recuadro, el número
+   grande y debajo la fórmula con los números puestos, que es lo que enseña. */
+.calc-ayuda{margin:12px 0 0;}
+.calc-campo label{margin-top:12px;}
+.calc-fila{display:flex;align-items:center;gap:8px;}
+.calc-fila input{flex:1;min-width:0;font-variant-numeric:tabular-nums;}
+.calc-u{flex:none;min-width:44px;font-size:13px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+.calc-fila .calc-unidad{flex:none;width:auto;min-width:76px;}
+.calc-err{font-size:12px;color:var(--danger);margin-top:4px;min-height:0;}
+.calc-err:empty{display:none;}
+.calc-resultado{margin-top:16px;padding:14px;border-radius:var(--radius-sm);background:rgba(var(--primary-rgb),.07);border:1px solid rgba(var(--primary-rgb),.18);}
+.calc-grande{font-family:var(--font-marca);font-size:28px;font-weight:600;line-height:1.15;color:var(--text);font-variant-numeric:tabular-nums;}
+.calc-grande span{font-family:var(--font-texto);font-size:14px;font-weight:500;color:var(--text-muted);}
+.calc-sub{font-size:13px;color:var(--text);margin-top:4px;font-variant-numeric:tabular-nums;}
+.calc-paso{font-size:12.5px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px dashed rgba(var(--primary-rgb),.25);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.calc-paso + .calc-paso{border-top:none;padding-top:0;margin-top:4px;}
+.calc-regla{margin:8px 0 0;}
+.calc-equivalencias{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-variant-numeric:tabular-nums;}
+.calc-equivalencias div{padding:8px;border-radius:var(--radius-sm);background:var(--card);font-size:13px;overflow-wrap:anywhere;}
+.calc-equivalencias b{display:block;font-family:var(--font-marca);font-size:17px;color:var(--text);}
+.calc-equivalencias .calc-de{outline:1px solid rgba(var(--primary-rgb),.35);}

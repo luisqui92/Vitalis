@@ -150,6 +150,9 @@ function tarjetasDeCaso(consulta, paciente, azar = mezclar) {
   const hayCaso = Boolean(caso.motivo || caso.sintomas.length);
   const perla = recortar(r.perla, 300);
   const tarjetas = [];
+  // Las de un razonamiento de enfermería llevan su carrera: la pantalla les
+  // pone sus preguntas.
+  const carrera = rz.carrera && rz.carrera !== "medicina" ? { carrera: rz.carrera } : {};
 
   // Sin motivo ni síntomas no hay caso que leer: elegir entre diagnósticos
   // sería adivinar.
@@ -175,7 +178,7 @@ function tarjetasDeCaso(consulta, paciente, azar = mezclar) {
   if (banderas.length) tarjetas.push({ tipo: "banderas", caso, perla, sobre, respuesta: banderas });
   const falto = lista(r.faltoPreguntar, 3);
   if (falto.length) tarjetas.push({ tipo: "faltoPreguntar", caso, perla, sobre, respuesta: falto });
-  return tarjetas;
+  return tarjetas.map(x => ({ ...x, ...carrera }));
 }
 
 // Crea las que falten de una consulta. Se puede llamar las veces que sea: la
@@ -242,7 +245,7 @@ async function tarjetasDeRepaso(medicoPhone, ahora = new Date()) {
 // Las de «me acordaba / no me acordaba» llevan la respuesta, que la pantalla
 // muestra recién cuando él la pide.
 function paraMostrar(t, azar = mezclar) {
-  const base = { _id: t._id, tipo: t.tipo, consultaId: t.consultaId, caso: t.caso, sobre: t.sobre || "", caja: t.caja };
+  const base = { _id: t._id, tipo: t.tipo, consultaId: t.consultaId, caso: t.caso, sobre: t.sobre || "", caja: t.caja, carrera: t.carrera || "medicina" };
   if (t.tipo === "pregunta") Object.assign(base, { enunciado: t.enunciado || "", area: t.area || "", fecha: t.createdAt });
   if (DE_OPCIONES.has(t.tipo)) return { ...base, opciones: azar((t.opciones || []).map((texto, i) => ({ i, texto }))) };
   return { ...base, respuesta: t.respuesta || [], perla: t.perla || "" };

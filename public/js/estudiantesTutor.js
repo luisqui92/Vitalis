@@ -12,20 +12,28 @@
 // «Te falta preguntar» y las banderas rojas.
 // conNota: si ya hay de qué hablar, «no te falta nada» también es una
 // respuesta (y una buena noticia).
+// En enfermería lo que falta es valorar, y las banderas rojas son signos de
+// alarma (tutor.carrera lo manda el servidor con cada borrador).
 function tutorEnVivoHtml(tutor, conNota) {
   if (!tutor) return "";
+  const enf = tutor.carrera === "enfermeria";
   const preguntas = Array.isArray(tutor.preguntas) ? tutor.preguntas : [];
   const banderas = Array.isArray(tutor.banderasRojas) ? tutor.banderasRojas : [];
   if (!preguntas.length && !banderas.length) {
-    return conNota ? `<div class="tutor-vivo"><div class="hint" style="margin:0">${t("tutor.nadaFalta")}</div></div>` : "";
+    return conNota ? `<div class="tutor-vivo"><div class="hint" style="margin:0">${t(enf ? "tutor.enf.nadaFalta" : "tutor.nadaFalta")}</div></div>` : "";
   }
   return `<div class="tutor-vivo">
-    ${preguntas.length ? `<div class="nota-titulo">${t("tutor.faltaPreguntar")}</div>
+    ${preguntas.length ? `<div class="nota-titulo">${t(enf ? "tutor.enf.faltaValorar" : "tutor.faltaPreguntar")}</div>
       <ul class="tutor-lista">${preguntas.map(p => `<li><b>${esc(p.pregunta)}</b>${p.porQue ? `<div class="hint" style="margin:2px 0 0">${esc(p.porQue)}</div>` : ""}</li>`).join("")}</ul>` : ""}
-    ${banderas.length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div>
+    ${banderas.length ? `<div class="nota-titulo">${t(enf ? "tutor.enf.banderasRojas" : "tutor.banderasRojas")}</div>
       <ul class="tutor-lista">${banderas.map(b => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
   </div>`;
 }
+
+// La carrera de la cuenta (llega con el login): enfermería razona con
+// diagnósticos de enfermería.
+const tutorEsEnfermeria = () => ES_ESTUDIANTE?.carrera === "enfermeria";
+const tutorT = (enf, clave, vars) => t(enf ? clave.replace(/^tutor\./, "tutor.enf.") : clave, vars);
 
 // ─── EL RAZONAMIENTO DIAGNÓSTICO ──────────────────────────────────────────
 //
@@ -38,13 +46,14 @@ function razonamientoTarjetaHtml(c) {
   if (hecho?.en) return razonamientoResultadoHtml(hecho);
   const texto = c?.transcripcionCompleta || c?.transcripcionEnVivo || "";
   if (!esCuentaEstudiante() || c?.notaClinicaEstado !== "completado" || texto.split(/\s+/).filter(Boolean).length < 15) return "";
+  const enf = tutorEsEnfermeria();
   return `
     <div class="card tutor-card" id="razonamientoCard">
-      <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
-      <div class="hint" style="margin-bottom:10px">${t("tutor.consigna")}</div>
-      <label for="rzPrincipal">${t("tutor.principal")}</label>
+      <div class="nota-titulo" style="margin-top:0">${tutorT(enf, "tutor.titulo")}</div>
+      <div class="hint" style="margin-bottom:10px">${tutorT(enf, "tutor.consigna")}</div>
+      <label for="rzPrincipal">${tutorT(enf, "tutor.principal")}</label>
       <input id="rzPrincipal" type="text" maxlength="160">
-      <label for="rzDiferenciales">${t("tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
+      <label for="rzDiferenciales">${tutorT(enf, "tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
       <input id="rzDiferenciales" type="text" maxlength="400">
       <div id="rzErr"></div>
       <button class="primary" id="rzBtn">${t("tutor.ver")}</button>
@@ -59,22 +68,25 @@ function razonamientoResultadoHtml(rz, tarjetasNuevas = 0) {
   const r = rz.resultado || {};
   const lista = (xs) => (xs || []).map(x => `<li>${esc(x)}</li>`).join("");
   const estudiante = esCuentaEstudiante();
+  // El de enfermería: diagnósticos de enfermería por prioridad, con su
+  // intervención clave (modulos/estudiantes/tutor.js).
+  const enf = rz.carrera === "enfermeria";
   return `
     <div class="card tutor-card" id="razonamientoCard">
-      <div class="nota-titulo" style="margin-top:0">${t("tutor.titulo")}</div>
-      <div class="tutor-aviso">🎓 ${t("tutor.aviso")}</div>
+      <div class="nota-titulo" style="margin-top:0">${tutorT(enf, "tutor.titulo")}</div>
+      <div class="tutor-aviso">🎓 ${tutorT(enf, "tutor.aviso")}</div>
       <div class="nota-campo"><b>${t("tutor.tuRespuesta")}</b> ${esc(rz.principal)}${(rz.diferenciales || []).length ? ` · <span class="hint">${esc(rz.diferenciales.join(", "))}</span>` : ""}</div>
-      <div class="${r.acertoPrincipal ? "tutor-bien" : "tutor-mal"}">${r.acertoPrincipal ? "✓ " + t("tutor.acertaste") : "✗ " + t("tutor.noAcertaste")}</div>
+      <div class="${r.acertoPrincipal ? "tutor-bien" : "tutor-mal"}">${r.acertoPrincipal ? "✓ " + tutorT(enf, "tutor.acertaste") : "✗ " + tutorT(enf, "tutor.noAcertaste")}</div>
       ${r.comentario ? `<div class="nota-campo">${esc(r.comentario)}</div>` : ""}
       ${(r.noConsideraste || []).length ? `<div class="nota-titulo">${t("tutor.noConsideraste")}</div>
         <ul class="tutor-lista">${r.noConsideraste.map(x => `<li><b>${esc(x.diagnostico)}</b>${x.porQue ? ` — ${esc(x.porQue)}` : ""}</li>`).join("")}</ul>` : ""}
-      ${(r.diferenciales || []).length ? `<div class="nota-titulo">${t("tutor.diferencialesTitulo")}</div>
+      ${(r.diferenciales || []).length ? `<div class="nota-titulo">${tutorT(enf, "tutor.diferencialesTitulo")}</div>
         <ol class="tutor-lista">${r.diferenciales.map(d => `<li class="tutor-dx"><b>${esc(d.diagnostico)}</b>
-          ${(d.aFavor || []).length ? `<div class="tutor-favor">${t("tutor.aFavor")} ${esc(d.aFavor.join("; "))}</div>` : ""}
+          ${(d.aFavor || []).length ? `<div class="tutor-favor">${tutorT(enf, "tutor.aFavor")} ${esc(d.aFavor.join("; "))}</div>` : ""}
           ${(d.enContra || []).length ? `<div class="tutor-contra">${t("tutor.enContra")} ${esc(d.enContra.join("; "))}</div>` : ""}
-          ${d.estudio ? `<div class="hint" style="margin:2px 0 0">${t("tutor.estudio")} ${esc(d.estudio)}</div>` : ""}</li>`).join("")}</ol>` : ""}
-      ${(r.banderasRojas || []).length ? `<div class="nota-titulo">${t("tutor.banderasRojas")}</div><ul class="tutor-lista">${lista(r.banderasRojas)}</ul>` : ""}
-      ${(r.faltoPreguntar || []).length ? `<div class="nota-titulo">${t("tutor.faltoPreguntar")}</div><ul class="tutor-lista">${lista(r.faltoPreguntar)}</ul>` : ""}
+          ${d.estudio ? `<div class="hint" style="margin:2px 0 0">${tutorT(enf, "tutor.estudio")} ${esc(d.estudio)}</div>` : ""}</li>`).join("")}</ol>` : ""}
+      ${(r.banderasRojas || []).length ? `<div class="nota-titulo">${tutorT(enf, "tutor.banderasRojas")}</div><ul class="tutor-lista">${lista(r.banderasRojas)}</ul>` : ""}
+      ${(r.faltoPreguntar || []).length ? `<div class="nota-titulo">${tutorT(enf, "tutor.faltoPreguntar")}</div><ul class="tutor-lista">${lista(r.faltoPreguntar)}</ul>` : ""}
       ${r.perla ? `<div class="tutor-perla">💡 ${esc(r.perla)}</div>` : ""}
       ${estudiante ? `<div class="tutor-estudiar">
         <span class="hint" style="margin:0">${tarjetasNuevas ? t(tarjetasNuevas === 1 ? "estudio.nuevas.una" : "estudio.nuevas.varias", { n: tarjetasNuevas }) : t("estudio.nuevas.repasar")}</span>
@@ -97,7 +109,7 @@ function engancharRazonamiento(id) {
     const diferenciales = document.getElementById("rzDiferenciales").value.split(",").map(x => x.trim()).filter(Boolean);
     const err = document.getElementById("rzErr");
     err.innerHTML = "";
-    if (principal.length < 3) { err.innerHTML = `<div class="error">${t("tutor.errPrincipal")}</div>`; return; }
+    if (principal.length < 3) { err.innerHTML = `<div class="error">${tutorT(tutorEsEnfermeria(), "tutor.errPrincipal")}</div>`; return; }
     btn.disabled = true;
     btn.textContent = t("tutor.pensando");
     try {

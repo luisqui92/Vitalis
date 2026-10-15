@@ -14,6 +14,14 @@ const PV_AREAS = ["cualquiera", "clinica", "pediatria", "gineco", "cirugia", "em
 const PV_DIFICULTADES = ["basico", "intermedio", "avanzado"];
 const PV_EXAMENES = ["signos", "general", "cabeza", "torax", "corazon", "abdomen", "extremidades", "neuro", "piel", "gineco"];
 const PV_ESTUDIOS = ["hemograma", "quimica", "orina", "pcr", "rxTorax", "ecoAbdomen", "ecg", "embarazo"];
+// Enfermería practica la valoración: se valora (en vez de examinar) y se
+// piden escalas, controles y datos (en vez de estudios). Las áreas de
+// enfermería empiezan con «enf_» (modulos/estudiantes/carreras.js).
+const PV_VALORACIONES = ["signos", "general", "piel", "respiratorio", "cardiovascular", "abdomen", "eliminacion", "neuro", "dolor", "movilidad"];
+const PV_ESCALAS = ["eva", "glasgow", "braden", "caidas", "balance", "glucemia", "hemograma", "electrolitos"];
+const pvEsEnfermeria = (area) => /^enf_/.test(area || "");
+// La clave de enfermería si el área es de enfermería: «pv.examinar» → «pv.enf.examinar».
+const pvT = (enf, clave, vars) => t(enf ? clave.replace(/^pv\./, "pv.enf.") : clave, vars);
 const PV_MOTIVOS_REPORTE = ["incoherente", "paciente", "evaluacion"];
 
 // La práctica abierta.
@@ -57,19 +65,20 @@ function edadPV(p) {
 function pintarInicioPV(d) {
   const cupo = d.cupo || { quedan: 0, limite: 0 };
   const abierta = d.enCurso;
+  const enf = (d.areas || []).some(pvEsEnfermeria);
   app.innerHTML = `
     ${volverEstudioHtml()}
     ${pestanasEstudioHtml("paciente")}
     <div class="card pv-portada">
       <div class="nota-titulo" style="margin-top:0">${t("pv.titulo")}</div>
-      <div class="hint" style="margin:0 0 12px">${t("pv.bajada")}</div>
+      <div class="hint" style="margin:0 0 12px">${pvT(enf, "pv.bajada")}</div>
       ${abierta ? `<button class="secondary" id="pvSeguir" style="margin:0 0 12px">${abierta.paciente?.nombre
         ? t("pv.seguirCon", { nombre: esc(abierta.paciente.nombre) }) : t("pv.seguir")}</button>` : ""}
       <div class="est-rotulo">${t("pv.area")}</div>
       ${chipsHtml("pvAreas", ["cualquiera", ...(d.areas || PV_AREAS.slice(1))], PV_ELECCION.area, a => "estudio.area." + a)}
       <div class="est-rotulo">${t("pv.dificultad")}</div>
       ${chipsHtml("pvDificultades", PV_DIFICULTADES, PV_ELECCION.dificultad, x => "pv.dificultad." + x)}
-      <div class="hint" id="pvDificultadAyuda" style="margin-top:6px">${t("pv.dificultadAyuda." + PV_ELECCION.dificultad)}</div>
+      <div class="hint" id="pvDificultadAyuda" style="margin-top:6px">${pvT(enf, "pv.dificultadAyuda." + PV_ELECCION.dificultad)}</div>
       <button class="primary" id="pvEmpezar"${cupo.quedan ? "" : " disabled"}>${t("pv.empezar")}</button>
       <div class="hint">${cupo.quedan ? t("pv.cupo", { quedan: cupo.quedan, limite: cupo.limite }) : t("pv.sinCupo", { limite: cupo.limite })}</div>
       <div id="pvErr"></div>
@@ -83,7 +92,7 @@ function pintarInicioPV(d) {
   engancharChips("pvDificultades", v => {
     PV_ELECCION.dificultad = v;
     PV_CLAVE = claveDePedido();
-    document.getElementById("pvDificultadAyuda").textContent = t("pv.dificultadAyuda." + v);
+    document.getElementById("pvDificultadAyuda").textContent = pvT(enf, "pv.dificultadAyuda." + v);
   });
   if (abierta) document.getElementById("pvSeguir").onclick = () => abrirPracticaPV(String(abierta._id));
   document.getElementById("pvEmpezar").onclick = empezarPV;
@@ -159,13 +168,13 @@ async function seguirPracticaPV(sim) {
 
 // ─── LA ENTREVISTA ─────────────────────────────────────────────────────────
 
-function burbujaPV(m) {
+function burbujaPV(m, enf = false) {
   if (m.rol === "estudiante") {
-    const etiqueta = m.tipo === "examen" ? `<span class="pv-tipo">${t("pv.examina")}</span>` : m.tipo === "estudio" ? `<span class="pv-tipo">${t("pv.pide")}</span>` : "";
+    const etiqueta = m.tipo === "examen" ? `<span class="pv-tipo">${pvT(enf, "pv.examina")}</span>` : m.tipo === "estudio" ? `<span class="pv-tipo">${t("pv.pide")}</span>` : "";
     return `<div class="pv-msj pv-est">${etiqueta}${esc(m.texto)}</div>`;
   }
   if (m.rol === "paciente") return `<div class="pv-msj pv-pac">${esc(m.texto)}</div>`;
-  return `<div class="pv-msj pv-sis"><span class="pv-tipo">${t(m.tipo === "examen" ? "pv.hallazgo" : "pv.resultado")}</span>${esc(m.texto)}</div>`;
+  return `<div class="pv-msj pv-sis"><span class="pv-tipo">${m.tipo === "examen" ? pvT(enf, "pv.hallazgo") : t("pv.resultado")}</span>${esc(m.texto)}</div>`;
 }
 
 const pvDictadoDisponible = () => Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -173,6 +182,7 @@ const pvDictadoDisponible = () => Boolean(window.SpeechRecognition || window.web
 function pintarChatPV(sim) {
   // fallida: el último pedido que no llegó, para reintentarlo con su clave.
   PV = { sim, enviando: false, fallida: null };
+  const enf = pvEsEnfermeria(sim.area);
   const p = sim.paciente || {};
   const quienHabla = /madre|padre|m[aã]e|pai/i.test(sim.quienHabla || "") ? sim.quienHabla : "";
   app.innerHTML = `
@@ -186,13 +196,14 @@ function pintarChatPV(sim) {
         <div>
           <div><b>${esc(p.nombre || "")}</b>${edadPV(p) ? ` · ${esc(edadPV(p))}` : ""}${p.sexo ? ` · ${esc(sexoEstudio(p.sexo))}` : ""}</div>
           <div class="hint" style="margin:2px 0 0">${t("pv.lugar." + (sim.lugar || "consultorio"))}${quienHabla ? ` · ${t("pv.hablaCon", { quien: esc(quienHabla) })}` : ""}</div>
+          ${sim.diagnosticoMedico ? `<div class="hint pv-dx-medico" style="margin:2px 0 0">${t("pv.enf.dxMedico", { dx: esc(sim.diagnosticoMedico) })}</div>` : ""}
         </div>
       </div>
-      <div class="pv-mensajes" id="pvMensajes" aria-live="polite">${(sim.mensajes || []).map(burbujaPV).join("")}</div>
+      <div class="pv-mensajes" id="pvMensajes" aria-live="polite">${(sim.mensajes || []).map(m => burbujaPV(m, enf)).join("")}</div>
       <div id="pvPanel"></div>
       <div class="pv-acciones">
-        <button type="button" class="secondary" id="pvExaminar">🩺 ${t("pv.examinar")}</button>
-        <button type="button" class="secondary" id="pvPedir">🧪 ${t("pv.pedirEstudio")}</button>
+        <button type="button" class="secondary" id="pvExaminar">🩺 ${pvT(enf, "pv.examinar")}</button>
+        <button type="button" class="secondary" id="pvPedir">${enf ? "📋" : "🧪"} ${pvT(enf, "pv.pedirEstudio")}</button>
         <button type="button" class="secondary" id="pvTerminar">🏁 ${t("pv.terminar")}</button>
       </div>
       <form class="pv-escribir" id="pvForm">
@@ -238,7 +249,8 @@ async function enviarPV(tipo, texto, input) {
   const err = document.getElementById("pvErr");
   err.innerHTML = "";
   const temporal = document.createElement("div");
-  temporal.innerHTML = burbujaPV({ rol: "estudiante", tipo, texto }) + `<div class="pv-msj pv-pac pv-escribiendo">${t(tipo === "pregunta" ? "pv.escribiendo" : "pv.buscando")}</div>`;
+  const enf = pvEsEnfermeria(PV.sim.area);
+  temporal.innerHTML = burbujaPV({ rol: "estudiante", tipo, texto }, enf) + `<div class="pv-msj pv-pac pv-escribiendo">${t(tipo === "pregunta" ? "pv.escribiendo" : "pv.buscando")}</div>`;
   const nodos = [...temporal.children];
   nodos.forEach(n => caja.appendChild(n));
   if (input) input.value = "";
@@ -256,7 +268,7 @@ async function enviarPV(tipo, texto, input) {
     });
     if (PV) PV.fallida = null;
     if (!document.getElementById("pvMensajes")) return;
-    nodos[1].outerHTML = burbujaPV(r.mensajes[1]);
+    nodos[1].outerHTML = burbujaPV(r.mensajes[1], enf);
     PV.sim.mensajes.push(...r.mensajes);
     PV.sim.preguntasHechas = (PV.sim.preguntasHechas || 0) + 1;
     const cuenta = document.getElementById("pvCuenta");
@@ -282,16 +294,17 @@ function panelPedidoPV(tipo) {
   const panel = document.getElementById("pvPanel");
   if (panel.dataset.abierto === tipo) { panel.innerHTML = ""; panel.dataset.abierto = ""; return; }
   panel.dataset.abierto = tipo;
-  const lista = tipo === "examen"
+  const enf = pvEsEnfermeria(PV.sim.area);
+  const lista = enf ? (tipo === "examen" ? PV_VALORACIONES : PV_ESCALAS) : tipo === "examen"
     ? PV_EXAMENES.filter(x => x !== "gineco" || PV.sim.area === "gineco")
     : PV_ESTUDIOS;
-  const prefijo = tipo === "examen" ? "pv.ex." : "pv.es.";
+  const prefijo = enf ? (tipo === "examen" ? "pv.enf.va." : "pv.enf.es.") : tipo === "examen" ? "pv.ex." : "pv.es.";
   panel.innerHTML = `
     <div class="pv-panel">
-      <div class="est-rotulo" style="margin-top:0">${t(tipo === "examen" ? "pv.queExaminas" : "pv.quePedis")}</div>
+      <div class="est-rotulo" style="margin-top:0">${pvT(enf, tipo === "examen" ? "pv.queExaminas" : "pv.quePedis")}</div>
       <div class="est-chips">${lista.map(x => `<button type="button" class="est-chip pv-pedido" data-texto="${esc(t(prefijo + x))}">${t(prefijo + x)}</button>`).join("")}</div>
       <div class="pv-otro">
-        <input id="pvOtro" type="text" maxlength="200" placeholder="${t(tipo === "examen" ? "pv.otroExamen" : "pv.otroEstudio")}">
+        <input id="pvOtro" type="text" maxlength="200" placeholder="${pvT(enf, tipo === "examen" ? "pv.otroExamen" : "pv.otroEstudio")}">
         <button type="button" class="pv-enviar" id="pvOtroBtn">${t("pv.pedir")}</button>
       </div>
     </div>`;
@@ -306,16 +319,17 @@ function panelTerminarPV() {
   const panel = document.getElementById("pvPanel");
   if (panel.dataset.abierto === "terminar") { panel.innerHTML = ""; panel.dataset.abierto = ""; return; }
   panel.dataset.abierto = "terminar";
+  const enf = pvEsEnfermeria(PV.sim.area);
   const hechas = (PV.sim.mensajes || []).filter(m => m.rol === "estudiante" && m.tipo === "pregunta").length;
   panel.innerHTML = `
     <div class="pv-panel">
-      <div class="est-rotulo" style="margin-top:0">${t("pv.tuDiagnostico")}</div>
-      <label for="pvPrincipal">${t("tutor.principal")}</label>
+      <div class="est-rotulo" style="margin-top:0">${pvT(enf, "pv.tuDiagnostico")}</div>
+      <label for="pvPrincipal">${t(enf ? "tutor.enf.principal" : "tutor.principal")}</label>
       <input id="pvPrincipal" type="text" maxlength="160">
-      <label for="pvDiferenciales">${t("tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
+      <label for="pvDiferenciales">${t(enf ? "tutor.enf.diferenciales" : "tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
       <input id="pvDiferenciales" type="text" maxlength="400">
-      <label for="pvPlan">${t("pv.conducta")} <span class="hint">${t("pv.opcional")}</span></label>
-      <textarea id="pvPlan" rows="2" maxlength="600"></textarea>
+      <label for="pvPlan">${pvT(enf, "pv.conducta")} <span class="hint">${t("pv.opcional")}</span></label>
+      <textarea id="pvPlan" rows="${enf ? 3 : 2}" maxlength="600"></textarea>
       <div id="pvTermErr"></div>
       <button class="primary" id="pvVerEval">${t("pv.verEvaluacion")}</button>
       <div class="hint">${hechas < (PV.sim.minPreguntas || 3) ? t("pv.faltanPreguntas", { n: PV.sim.minPreguntas || 3 }) : t("pv.despuesNoSePuede")}</div>
@@ -325,7 +339,7 @@ function panelTerminarPV() {
     const principal = document.getElementById("pvPrincipal").value.trim();
     const errBox = document.getElementById("pvTermErr");
     errBox.innerHTML = "";
-    if (principal.length < 3) { errBox.innerHTML = `<div class="error">${t("tutor.errPrincipal")}</div>`; return; }
+    if (principal.length < 3) { errBox.innerHTML = `<div class="error">${t(enf ? "tutor.enf.errPrincipal" : "tutor.errPrincipal")}</div>`; return; }
     const btn = document.getElementById("pvVerEval");
     btn.disabled = true;
     btn.textContent = t("pv.evaluando");
@@ -398,28 +412,32 @@ function listaPV(items, clase, signo) {
   return (items || []).length ? `<ul class="pv-check">${items.map(x => `<li class="${clase}"><span aria-hidden="true">${signo}</span> ${esc(x)}</li>`).join("")}</ul>` : "";
 }
 
-function casoCompletoPVHtml(g) {
+function casoCompletoPVHtml(g, enf = false) {
   if (!g) return "";
   const ant = g.antecedentes || {};
   const antecedentes = [...(ant.personales || []), ...(ant.familiares || []), ...(ant.medicamentos || []), ...(ant.alergias || []), ...(ant.habitos || []), ...(ant.ginecoObstetricos || [])];
   return `
     <details class="pv-detalle">
       <summary>${t("pv.casoCompleto")}</summary>
+      ${g.diagnosticoMedico ? `<div class="nota-campo">${t("pv.enf.dxMedico", { dx: esc(g.diagnosticoMedico) })}</div>` : ""}
       <div class="nota-campo"><b>${t("estudio.caso.motivo")}</b> ${esc(g.motivo)}</div>
       <div class="nota-campo"><b>${t("pv.historia")}</b></div><ul class="tutor-lista">${(g.historia || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
       ${antecedentes.length ? `<div class="nota-campo"><b>${t("estudio.caso.antecedentes")}</b> ${esc(antecedentes.join("; "))}</div>` : ""}
       ${(g.negativos || []).length ? `<div class="nota-campo"><b>${t("pv.niega")}</b> ${esc(g.negativos.join("; "))}</div>` : ""}
       <div class="nota-campo"><b>${t("pv.ex.signos")}:</b> ${esc(Object.entries(g.signosVitales || {}).map(([k, v]) => `${k} ${v}`).join(" · "))}</div>
-      <div class="nota-campo"><b>${t("pv.examenFisico")}</b></div><ul class="tutor-lista">${(g.examenFisico || []).map(x => `<li><b>${esc(x.region)}:</b> ${esc(x.hallazgo)}</li>`).join("")}</ul>
-      ${(g.estudios || []).length ? `<div class="nota-campo"><b>${t("pv.estudios")}</b></div><ul class="tutor-lista">${g.estudios.map(x => `<li><b>${esc(x.nombre)}:</b> ${esc(x.resultado)}</li>`).join("")}</ul>` : ""}
-      <div class="nota-campo"><b>${t("pv.diagnostico")}</b> ${esc(g.diagnostico)}</div>
-      <div class="nota-campo"><b>${t("pv.diferencialesCaso")}</b></div>
+      <div class="nota-campo"><b>${pvT(enf, "pv.examenFisico")}</b></div><ul class="tutor-lista">${(g.examenFisico || []).map(x => `<li><b>${esc(x.region)}:</b> ${esc(x.hallazgo)}</li>`).join("")}</ul>
+      ${(g.estudios || []).length ? `<div class="nota-campo"><b>${pvT(enf, "pv.estudios")}</b></div><ul class="tutor-lista">${g.estudios.map(x => `<li><b>${esc(x.nombre)}:</b> ${esc(x.resultado)}</li>`).join("")}</ul>` : ""}
+      <div class="nota-campo"><b>${pvT(enf, "pv.diagnostico")}</b> ${esc(g.diagnostico)}</div>
+      <div class="nota-campo"><b>${pvT(enf, "pv.diferencialesCaso")}</b></div>
       <ul class="tutor-lista">${(g.diferenciales || []).map(x => `<li><b>${esc(x.diagnostico)}</b> — ${esc(x.porQueNo)}</li>`).join("")}</ul>
+      ${(g.intervencionesClave || []).length ? `<div class="nota-campo"><b>${t("pv.enf.intervencionesClave")}</b></div>
+        <ul class="tutor-lista">${g.intervencionesClave.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
     </details>`;
 }
 
 function pintarEvaluacionPV(sim) {
   PV = null;
+  const enf = pvEsEnfermeria(sim.area);
   const ev = sim.evaluacion || {};
   const g = sim.guion || {};
   const r = sim.respuesta || {};
@@ -431,29 +449,33 @@ function pintarEvaluacionPV(sim) {
       <div class="nota-titulo" style="margin-top:0">${t("pv.tuEvaluacion")} · ${esc(g.paciente?.nombre || "")}</div>
       <div class="tutor-aviso">🎓 ${t("pv.avisoEvaluacion")}</div>
       <div class="${ev.diagnostico?.acerto ? "tutor-bien" : "tutor-mal"}">${ev.diagnostico?.acerto
-        ? "✓ " + t("pv.acertaste", { dx: esc(g.diagnostico || "") }) : "✗ " + t("pv.eraOtro", { dx: esc(g.diagnostico || "") })}</div>
+        ? "✓ " + pvT(enf, "pv.acertaste", { dx: esc(g.diagnostico || "") }) : "✗ " + pvT(enf, "pv.eraOtro", { dx: esc(g.diagnostico || "") })}</div>
       <div class="nota-campo"><b>${t("tutor.tuRespuesta")}</b> ${esc(r.principal || "")}${(r.diferenciales || []).length ? ` · <span class="hint">${esc(r.diferenciales.join(", "))}</span>` : ""}</div>
+      ${enf && r.plan ? `<div class="nota-campo"><b>${t("pv.enf.tusIntervenciones")}</b> ${esc(r.plan)}</div>` : ""}
       ${ev.comentario ? `<div class="nota-campo">${esc(ev.comentario)}</div>` : ""}
       <div class="pv-puntos">
-        <div><b>${hechas}/${(ev.preguntasClave || []).length}</b><span>${t("pv.preguntasClave")}</span></div>
-        <div><b>${exploradas}/${(ev.banderasRojas || []).length}</b><span>${t("pv.banderas")}</span></div>
-        <div><b>${(ev.estudios?.pertinentes || []).length}</b><span>${t("pv.estudiosBien")}</span></div>
+        <div><b>${hechas}/${(ev.preguntasClave || []).length}</b><span>${pvT(enf, "pv.preguntasClave")}</span></div>
+        <div><b>${exploradas}/${(ev.banderasRojas || []).length}</b><span>${pvT(enf, "pv.banderas")}</span></div>
+        <div><b>${(ev.estudios?.pertinentes || []).length}</b><span>${pvT(enf, "pv.estudiosBien")}</span></div>
       </div>
-      <div class="nota-titulo">${t("pv.preguntasClave")}</div>
+      <div class="nota-titulo">${pvT(enf, "pv.preguntasClave")}</div>
       ${chequeosPV(ev.preguntasClave, "hecha", "pregunta")}
-      ${(ev.banderasRojas || []).length ? `<div class="nota-titulo">${t("pv.banderas")}</div>${chequeosPV(ev.banderasRojas, "explorada", "bandera")}` : ""}
-      <div class="nota-titulo">${t("pv.estudios")}</div>
+      ${(ev.banderasRojas || []).length ? `<div class="nota-titulo">${pvT(enf, "pv.banderas")}</div>${chequeosPV(ev.banderasRojas, "explorada", "bandera")}` : ""}
+      <div class="nota-titulo">${pvT(enf, "pv.estudios")}</div>
       ${listaPV(ev.estudios?.pertinentes, "si", "✓")}${listaPV(ev.estudios?.faltaron, "no", "✗")}${listaPV(ev.estudios?.innecesarios, "ojo", "–")}
-      ${!(ev.estudios?.pertinentes || []).length && !(ev.estudios?.faltaron || []).length ? `<div class="hint">${t("pv.sinEstudios")}</div>` : ""}
-      <div class="nota-titulo">${t("pv.diferencialesCaso")}</div>
+      ${!(ev.estudios?.pertinentes || []).length && !(ev.estudios?.faltaron || []).length ? `<div class="hint">${pvT(enf, "pv.sinEstudios")}</div>` : ""}
+      <div class="nota-titulo">${pvT(enf, "pv.diferencialesCaso")}</div>
       ${listaPV(ev.diferenciales?.considero, "si", "✓")}${listaPV(ev.diferenciales?.faltaron, "no", "✗")}
+      ${ev.intervenciones ? `<div class="nota-titulo">${t("pv.enf.intervenciones")}</div>
+        ${listaPV(ev.intervenciones.adecuadas, "si", "✓")}${listaPV(ev.intervenciones.faltaron, "no", "✗")}${listaPV(ev.intervenciones.inadecuadas, "ojo", "⚠")}
+        ${![...(ev.intervenciones.adecuadas || []), ...(ev.intervenciones.faltaron || []), ...(ev.intervenciones.inadecuadas || [])].length ? `<div class="hint">${t("pv.enf.sinIntervenciones")}</div>` : ""}` : ""}
       <div class="nota-titulo">${t("pv.comunicacion")}</div>
       ${listaPV(ev.comunicacion?.bien, "si", "✓")}${listaPV(ev.comunicacion?.mejorar, "ojo", "→")}
       ${g.perla ? `<div class="tutor-perla">💡 ${esc(g.perla)}</div>` : ""}
-      ${casoCompletoPVHtml(g)}
+      ${casoCompletoPVHtml(g, enf)}
       <details class="pv-detalle">
         <summary>${t("pv.laConversacion")}</summary>
-        <div class="pv-mensajes pv-mensajes-libres">${(sim.mensajes || []).map(burbujaPV).join("")}</div>
+        <div class="pv-mensajes pv-mensajes-libres">${(sim.mensajes || []).map(m => burbujaPV(m, enf)).join("")}</div>
       </details>
       <button class="primary" id="pvOtro">${t("pv.otroPaciente")}</button>
       <div class="est-pie"><button type="button" class="link est-reportar" id="pvReportar">⚑ ${t("pv.casoMal")}</button></div>

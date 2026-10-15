@@ -40,4 +40,21 @@ Object.assign(I18N.es, {
   "tutor.faltoPreguntar": "Faltó preguntar",
   "tutor.errPrincipal": "Escribí tu diagnóstico principal antes de comparar.",
   "tutor.errGeneral": "No se pudo armar el razonamiento. Probá de nuevo en un rato.",
+
+  // ─── El tutor de enfermería (modulos/estudiantes/tutor.js) ─────────────
+  "tutor.enf.faltaValorar": "🎓 Te falta valorar",
+  "tutor.enf.banderasRojas": "⚠️ Signos de alarma a vigilar",
+  "tutor.enf.nadaFalta": "🎓 ✓ Por ahora no te falta valorar nada importante.",
+  "tutor.enf.titulo": "🧠 Tu razonamiento de enfermería",
+  "tutor.enf.consigna": "Antes de ver el análisis: ¿cuál es el problema de cuidado prioritario? Escribilo vos primero, así se aprende.",
+  "tutor.enf.principal": "Tu diagnóstico de enfermería prioritario",
+  "tutor.enf.diferenciales": "Otros diagnósticos de enfermería",
+  "tutor.enf.aviso": "Es una ayuda para aprender, hecha solo con lo que se dijo en la atención. Lo revisa tu docente.",
+  "tutor.enf.acertaste": "Acertaste el diagnóstico prioritario.",
+  "tutor.enf.noAcertaste": "El diagnóstico prioritario era otro.",
+  "tutor.enf.diferencialesTitulo": "Diagnósticos de enfermería, por prioridad",
+  "tutor.enf.aFavor": "Lo sostienen:",
+  "tutor.enf.estudio": "Intervención clave:",
+  "tutor.enf.faltoPreguntar": "Faltó valorar",
+  "tutor.enf.errPrincipal": "Escribí tu diagnóstico de enfermería prioritario antes de comparar.",
 });

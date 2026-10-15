@@ -17,11 +17,12 @@ const { log } = require("../../../config");
 const { razonamientoDiagnostico, PALABRAS_MINIMAS } = require("../tutor");
 const { crearTarjetasDeConsulta, marcarDiaDeEstudio } = require("../estudio");
 const { frenarSinAcceso } = require("../restricciones");
+const { carreraDe } = require("../carreras");
 
 const requireMedico = requireAuth(["medico"]);
-const CAMPOS = "principal diferenciales resultado en";
+const CAMPOS = "principal diferenciales resultado en carrera";
 
-const sinId = ({ principal, diferenciales, resultado, en }) => ({ principal, diferenciales, resultado, en });
+const sinId = ({ principal, diferenciales, resultado, en, carrera }) => ({ principal, diferenciales, resultado, en, carrera: carrera || "medicina" });
 
 // Al abrir la consulta, su razonamiento viaja con ella (el punto
 // «consulta.detalle» del núcleo → consulta.extras.razonamiento). Solo en
@@ -52,11 +53,15 @@ module.exports = function (app) {
 
     const [paciente, medico] = await Promise.all([
       Paciente.findOne({ _id: consulta.pacienteId, medicoPhone }).lean(),
-      Medico.findOne({ phone: medicoPhone }).select("idioma zonaHoraria").lean(),
+      Medico.findOne({ phone: medicoPhone }).select("idioma zonaHoraria estudiante").lean(),
     ]);
+    // Enfermería razona con el proceso de atención: diagnósticos de
+    // enfermería por prioridad (../tutor.js). Queda anotada en el
+    // razonamiento, y de ahí pasa a sus tarjetas.
+    const carrera = carreraDe(medico);
     let resultado;
     try {
-      resultado = await razonamientoDiagnostico(transcripcion, { principal, diferenciales }, medico?.idioma, paciente);
+      resultado = await razonamientoDiagnostico(transcripcion, { principal, diferenciales }, medico?.idioma, paciente, carrera);
     } catch (e) {
       log.warn("[TUTOR] razonamiento:", e.message);
       throw new ErrorHttp(502, "No se pudo armar el razonamiento. Probá de nuevo en un rato.");
@@ -65,7 +70,8 @@ module.exports = function (app) {
     // consulta.
     let guardado;
     try {
-      guardado = await RazonamientoDiagnostico.create({ medicoPhone, consultaId: consulta._id, principal, diferenciales, resultado, en: new Date() });
+      guardado = await RazonamientoDiagnostico.create({ medicoPhone, consultaId: consulta._id, principal, diferenciales, resultado, en: new Date(),
+        ...(carrera !== "medicina" ? { carrera } : {}) });
     } catch (e) {
       if (e?.code === 11000) throw new ErrorHttp(409, "Ya hiciste el razonamiento de esta consulta.");
       throw e;

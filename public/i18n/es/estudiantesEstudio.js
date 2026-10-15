@@ -123,4 +123,12 @@ Object.assign(I18N.es, {
   "estudio.logro.simulacro1": "Primer simulacro",
   "estudio.logro.simulacros10": "10 simulacros",
   "estudio.logro.simulacro80": "Un simulacro con 80 % o más",
+
+  // Las tarjetas de un razonamiento de enfermería.
+  "estudio.pregEnf.dx": "¿Cuál es el diagnóstico de enfermería prioritario?",
+  "estudio.pregEnf.estudio": "Para «{dx}», ¿qué intervención de enfermería es la clave?",
+  "estudio.pregEnf.banderas": "En este paciente, ¿qué signos de alarma hay que vigilar?",
+  "estudio.pregEnf.banderasDe": "En un paciente con «{dx}», ¿qué signos de alarma hay que vigilar?",
+  "estudio.pregEnf.falto": "En esta atención, ¿qué faltó valorar que habría cambiado el análisis?",
+  "estudio.pregEnf.faltoDe": "En esta atención por «{dx}», ¿qué faltó valorar que habría cambiado el análisis?",
 });

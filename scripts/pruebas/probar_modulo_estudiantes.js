@@ -141,7 +141,7 @@ console.log("\n── 2. La pantalla: las del núcleo no conocen al módulo ─�
 {
   const delModulo = archivosJs(path.join("public", "js"), n => n.startsWith("estudiantes"));
   const nucleo = archivosJs(path.join("public", "js"), n => !n.startsWith("estudiantes"));
-  verificar(`el módulo son ${delModulo.length} archivos (public/js/estudiantes*.js)`, delModulo.length === 5);
+  verificar(`el módulo son ${delModulo.length} archivos (public/js/estudiantes*.js)`, delModulo.length === 6);
   const nombran = [];
   for (const f of nucleo) {
     sinComentarios(leer(f)).split("\n").forEach((linea, i) => {
@@ -175,7 +175,8 @@ console.log("\n── 2. La pantalla: las del núcleo no conocen al módulo ─�
     scriptsModulo.every(p => p > 0 && p < pos("/js/escritorio.js") && p < pos("/js/realtime.js") && p < pos("/js/rutas.js")));
 
   const reglas = (css) => [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{/g)].map(m => m[1].trim()).filter(s => !s.startsWith("@"));
-  const CLASE_DEL_MODULO = /\.(tutor|est|pv|sim)-/;
+  // calc-: la calculadora de medicación (public/js/estudiantesCalculadora.js).
+  const CLASE_DEL_MODULO = /\.(tutor|est|pv|sim|calc)-/;
   verificar("estilos.css no tiene estilos del módulo", !reglas(leer("public", "estilos.css")).some(s => CLASE_DEL_MODULO.test(s)));
   const propias = reglas(leer("public", "estudiantes.css"));
   verificar(`estudiantes.css solo tiene los suyos (${propias.length} reglas)`, propias.length > 50 && propias.every(s => s.split(",").every(x => CLASE_DEL_MODULO.test(x))));

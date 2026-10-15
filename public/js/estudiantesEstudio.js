@@ -9,9 +9,10 @@
 // La pantalla nunca presenta la respuesta como la verdad: es la del
 // razonamiento de ese caso, y el diagnóstico lo confirma su tutor.
 //
-// Etapa 4: arriba, tres pestañas — sus casos (esto), el paciente virtual
-// (public/js/estudiantesPacienteVirtual.js) y los simulacros
-// (public/js/estudiantesSimulacros.js).
+// Etapa 4: arriba, las pestañas — sus casos (esto), el paciente virtual
+// (public/js/estudiantesPacienteVirtual.js), los simulacros
+// (public/js/estudiantesSimulacros.js) y la calculadora de medicación
+// (public/js/estudiantesCalculadora.js).
 // Las preguntas que erra en un simulacro vuelven acá, como tarjetas.
 
 // La sentada en curso: las tarjetas, por cuál va y cómo le va.
@@ -30,11 +31,12 @@ const MOTIVOS_REPORTE_ESTUDIO = ["respuesta", "pregunta", "datos"];
 // las de simulacro); las otras, «me acordaba o no».
 const TARJETAS_DE_OPCIONES = ["dx", "pregunta"];
 
-// ─── LAS TRES PESTAÑAS ─────────────────────────────────────────────────────
+// ─── LAS PESTAÑAS ──────────────────────────────────────────────────────────
 const PESTANAS_ESTUDIO = [
   { id: "casos", clave: "estudio.pestana.casos", fn: "renderEstudiar" },
   { id: "paciente", clave: "estudio.pestana.paciente", fn: "renderPacienteVirtual" },
   { id: "simulacros", clave: "estudio.pestana.simulacros", fn: "renderSimulacros" },
+  { id: "calculadora", clave: "estudio.pestana.calculadora", fn: "renderCalculadora" },
 ];
 
 function pestanasEstudioHtml(activa) {
@@ -279,6 +281,15 @@ function casoEstudioHtml(tj) {
 
 function preguntaEstudio(tj) {
   const dx = esc(tj.sobre || "");
+  // Las de un razonamiento de enfermería: el diagnóstico de enfermería
+  // prioritario, la intervención clave, los signos de alarma y lo que faltó
+  // valorar (modulos/estudiantes/tutor.js).
+  if (tj.carrera === "enfermeria") {
+    if (tj.tipo === "dx") return t("estudio.pregEnf.dx");
+    if (tj.tipo === "estudio") return t("estudio.pregEnf.estudio", { dx });
+    if (tj.tipo === "banderas") return dx ? t("estudio.pregEnf.banderasDe", { dx }) : t("estudio.pregEnf.banderas");
+    return dx ? t("estudio.pregEnf.faltoDe", { dx }) : t("estudio.pregEnf.falto");
+  }
   if (tj.tipo === "dx") return t("estudio.preg.dx");
   if (tj.tipo === "estudio") return t("estudio.preg.estudio", { dx });
   if (tj.tipo === "banderas") return dx ? t("estudio.preg.banderasDe", { dx }) : t("estudio.preg.banderas");

@@ -15,6 +15,7 @@
 //   estudiantesEstudio.js          Estudiar: tarjetas, racha, logros
 //   estudiantesPacienteVirtual.js  el paciente virtual
 //   estudiantesSimulacros.js       los simulacros
+//   estudiantesCalculadora.js      la calculadora de medicación
 
 // { nivel, hasta, horasMes } o null. Llega con el login, como el rol.
 let ES_ESTUDIANTE = (() => {
@@ -203,10 +204,11 @@ if (ESTUDIANTES_PRENDIDO) {
   Extensiones.agregar("notaEnVivo", ({ conNota, extras }) => tutorEnVivoHtml(extras?.tutor, conNota));
   Extensiones.agregar("consulta.despues", (c) => ({ html: razonamientoTarjetaHtml(c), alPintar: () => engancharRazonamiento(c._id) }));
 
-  // Sus pantallas: con dirección propia, sin repintarse solas, y las tres
+  // Sus pantallas: con dirección propia, sin repintarse solas, y todas
   // marcan «Estudiar» en el menú de la compu.
   const marcaEstudiar = { id: "estudiar", claveLabel: "escr.nav.estudiar" };
   Extensiones.pantalla({ fn: "renderEstudiar", tipo: "estudiar", ruta: "estudiar", menu: marcaEstudiar });
   Extensiones.pantalla({ fn: "renderPacienteVirtual", tipo: "pacienteVirtual", ruta: "paciente-virtual", menu: marcaEstudiar });
   Extensiones.pantalla({ fn: "renderSimulacros", tipo: "simulacros", ruta: "simulacros", menu: marcaEstudiar });
+  Extensiones.pantalla({ fn: "renderCalculadora", tipo: "calculadora", ruta: "calculadora", menu: marcaEstudiar });
 }

@@ -191,8 +191,8 @@ const servidorIa = http.createServer((req, res) => {
     console.log("── 1. El paciente virtual ──");
     await page.click("#btnEstudiar");
     await page.waitForSelector(".est-pestanas", { timeout: 15000 });
-    verificar("«Estudiar» tiene tres pestañas: mis casos, paciente virtual y simulacros",
-      (await page.$$eval(".est-pestana", (xs) => xs.map(x => x.dataset.pestana).join())) === "casos,paciente,simulacros");
+    verificar("«Estudiar» tiene cuatro pestañas: mis casos, paciente virtual, simulacros y la calculadora",
+      (await page.$$eval(".est-pestana", (xs) => xs.map(x => x.dataset.pestana).join())) === "casos,paciente,simulacros,calculadora");
     await page.click('.est-pestana[data-pestana="paciente"]');
     await page.waitForSelector("#pvEmpezar", { timeout: 15000 });
     verificar("  ...el paciente virtual, con su cupo del mes y su dirección propia", /30 de 30/.test(await page.innerText(".pv-portada")) && page.url().endsWith("/app/paciente-virtual"));

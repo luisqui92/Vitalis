@@ -58,6 +58,10 @@ const tarjetaEstudioSchema = new mongoose.Schema({
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null,
     required() { return this.tipo !== "pregunta"; } },
   tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar", "pregunta"], required: true },
+  // Las de un razonamiento de enfermería: los mismos tipos, otras preguntas
+  // («¿cuál es el diagnóstico de enfermería prioritario?», «¿qué
+  // intervención corresponde?»). Sin carrera, de medicina.
+  carrera: { type: String, default: undefined },
   preguntaId: { type: mongoose.Schema.Types.ObjectId, ref: "PreguntaSimulacro", default: null },
   area: { type: String, default: "" },        // la del simulacro
   enunciado: { type: String, default: "" },   // la viñeta y la pregunta del simulacro
@@ -249,6 +253,8 @@ const razonamientoDiagnosticoSchema = new mongoose.Schema({
     noConsideraste: [{ diagnostico: String, porQue: String, _id: false }],
     perla: String,
   },
+  // Enfermería razona con el proceso de atención (tutor.js); sin carrera, medicina.
+  carrera: { type: String, default: undefined },
   en: { type: Date, default: Date.now },
 }, { timestamps: true });
 razonamientoDiagnosticoSchema.index({ consultaId: 1 }, { unique: true });
