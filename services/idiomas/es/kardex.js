@@ -61,6 +61,26 @@ module.exports = {
     sinNota: (mostradas, total) => `Se muestran ${mostradas} de ${total} consultas confirmadas: las demás no tienen nota clínica.`,
   },
 
+  // La nota de enfermería (services/notaClinica.js).
+  enfermeria: {
+    signosVitales: "Signos vitales",
+    signos: { PA: "PA", FC: "FC", FR: "FR", T: "T°", SatO2: "SatO2", dolor: "Dolor", glucemia: "Glucemia" },
+    valoracion: "Valoración por patrones funcionales",
+    patrones: {
+      percepcion_salud: "Percepción y manejo de la salud", nutricional: "Nutricional-metabólico", eliminacion: "Eliminación",
+      actividad: "Actividad-ejercicio", sueno: "Sueño-descanso", cognitivo: "Cognitivo-perceptivo",
+      autopercepcion: "Autopercepción-autoconcepto", rol: "Rol-relaciones", sexualidad: "Sexualidad-reproducción",
+      afrontamiento: "Afrontamiento-tolerancia al estrés", valores: "Valores-creencias",
+    },
+    diagnosticos: "Diagnósticos de enfermería",
+    rc: "r/c",
+    mp: "m/p",
+    objetivos: "Objetivos",
+    intervenciones: "Intervenciones",
+    evaluacion: "Evaluación",
+    educacion: "Educación al paciente y la familia",
+  },
+
   recetas: {
     indicaciones: "Indicaciones",
     memed: "emitida por Memed",

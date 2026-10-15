@@ -388,6 +388,10 @@ function normalizarNota(crudo) {
 // especialidad no cuentan: una consulta sin odontograma es lo normal.
 function notaVacia(nota) {
   const lleno = (v) => (Array.isArray(v) ? v.some(x => x && (typeof x !== "string" || x.trim())) : typeof v === "string" && v.trim().length > 0);
+  if (nota?.formato === "enfermeria") {
+    return !["motivoConsulta", "valoracion", "diagnosticosEnfermeria", "objetivos", "intervenciones", "evaluacion"].some(c => lleno(nota?.[c]))
+      && !Object.values(nota?.signosVitales || {}).some(lleno);
+  }
   return !["motivoConsulta", "sintomas", "antecedentesRelevantes", "diagnostico", "plan", "medicamentosRecetados", "examenesSolicitados"]
     .some(c => lleno(nota?.[c]));
 }
@@ -396,7 +400,7 @@ function notaVacia(nota) {
 // se cortó). Por encima, hubo una consulta y la nota vacía es un error.
 const PALABRAS_MINIMAS_PARA_NOTA = 80;
 
-async function pedirNota(mensajes) {
+async function pedirNota(mensajes, normalizar = normalizarNota) {
   const res = await axios.post(
     "https://api.openai.com/v1/chat/completions",
     {
@@ -416,10 +420,12 @@ async function pedirNota(mensajes) {
   );
   const content = res.data.choices[0].message.content.replace(/```json|```/g, "").trim();
   const crudo = JSON.parse(content);
-  return { ...normalizarNota(crudo), clavesRecibidas: Object.keys(crudo || {}) };
+  return { ...normalizar(crudo), clavesRecibidas: Object.keys(crudo || {}) };
 }
 
 async function generarNotaClinica(transcripcion, contexto, idioma) {
+  // Las cuentas de enfermería escriben la suya (abajo).
+  if (contexto?.enfermeria) return generarNotaEnfermeria(transcripcion, contexto, idioma);
   const mensajes = [
     { role: "system", content: promptSistema(idioma) },
     { role: "user", content: transcripcion + construirContexto(contexto, idioma) },
@@ -482,6 +488,266 @@ function sanearNota(nota) {
   return nota;
 }
 
+// ═══ LA NOTA DE ENFERMERÍA ═════════════════════════════════════════════════
+//
+// La de las cuentas con tipoEspecialidad "enfermeria" (hoy, los estudiantes
+// de enfermería: modulos/estudiantes/carreras.js). No es la nota del médico
+// con otros nombres: sigue el proceso de atención de enfermería, que es como
+// se enseña y se registra en enfermería —valoración por patrones funcionales,
+// diagnósticos en formato PES, objetivos, intervenciones y evaluación—.
+//
+// Sin taxonomías con licencia: NANDA-I, NIC y NOC tienen dueño, y copiar sus
+// etiquetas o sus códigos sin permiso no corresponde. El diagnóstico se
+// escribe con palabras propias en formato PES (problema, etiología, signos),
+// que es un método y no tiene dueño. Los patrones funcionales de Gordon son un
+// marco de valoración que se enseña en todas partes.
+//
+// Las mismas redes que la nota médica: JSON obligatorio, claves traducidas o
+// envueltas que se reconocen, y una nota vacía de una atención con contenido
+// se pide de nuevo y, si vuelve vacía, es un error que se ve.
+
+const PATRONES_GORDON = ["percepcion_salud", "nutricional", "eliminacion", "actividad", "sueno", "cognitivo",
+  "autopercepcion", "rol", "sexualidad", "afrontamiento", "valores"];
+const SIGNOS_VITALES = ["PA", "FC", "FR", "T", "SatO2", "dolor", "glucemia"];
+
+const PROMPT_ENFERMERIA = `Eres un asistente de enfermería. A partir de la transcripción de una atención
+de enfermería en {IDIOMA} (puede tener errores de transcripción, y a veces no
+queda claro quién habla), generá una NOTA DE ENFERMERÍA que siga el proceso de
+atención de enfermería.
+
+RESPONDE SOLO JSON con esta estructura exacta:
+{
+  "motivoConsulta": "motivo de la atención, breve, o null",
+  "valoracion": [{"patron":"uno exacto de la lista de patrones","hallazgos":"string"}],
+  "signosVitales": {"PA":"string o null","FC":"string o null","FR":"string o null","T":"string o null","SatO2":"string o null","dolor":"string o null","glucemia":"string o null"},
+  "diagnosticosEnfermeria": [{"problema":"string","etiologia":"string o null","signos":"string o null"}],
+  "objetivos": ["string", ...],
+  "intervenciones": ["string", ...],
+  "evaluacion": "string o null",
+  "educacion": "string o null"
+}
+
+Reglas:
+- Si algo no se dijo ni se observó en la atención, va null o una lista vacía.
+  NUNCA inventes datos: ni signos vitales, ni hallazgos, ni lo que respondió
+  el paciente. Esto es un apoyo: lo revisa quien atendió.
+- "valoracion": un ítem por cada patrón funcional de salud del que SE HABLÓ o
+  que se observó, con lo que se dijo. "patron" va EXACTO, uno de: ${PATRONES_GORDON.join(", ")}
+  (percepción y manejo de la salud, nutricional-metabólico, eliminación,
+  actividad-ejercicio, sueño-descanso, cognitivo-perceptivo,
+  autopercepción-autoconcepto, rol-relaciones, sexualidad-reproducción,
+  afrontamiento-tolerancia al estrés, valores-creencias). Los patrones de los
+  que no se habló no van. Un patrón, una sola vez.
+- "signosVitales": solo los que se midieron o se dijeron, con sus unidades
+  tal como se dijeron ("120/80 mmHg", "38,5 °C"). "dolor" es la escala de 0 a
+  10 si se usó ("6/10"). Los demás, null.
+- "diagnosticosEnfermeria": en formato PES, con datos de ESTA atención:
+  "problema" es la respuesta del paciente que enfermería puede tratar (por
+  ejemplo, dolor agudo, riesgo de caídas, deterioro de la movilidad,
+  ansiedad); "etiologia", con qué se relaciona; "signos", por qué se
+  manifiesta. Máximo 4, el más prioritario primero. NO uses códigos ni
+  etiquetas textuales de taxonomías con licencia (NANDA-I, NIC, NOC): escribí
+  el diagnóstico con tus palabras. No escribas diagnósticos médicos
+  (enfermedades) como diagnósticos de enfermería.
+- "objetivos": los resultados esperados para el paciente, concretos y
+  medibles ("refiere dolor menor a 3/10 en 2 horas").
+- "intervenciones": lo que se hizo o se indicó en esta atención, una por
+  línea. Si se nombra un medicamento administrado, poné el nombre y la vía
+  tal como se dijeron; una dosis que no se dijo NO se completa.
+- "evaluacion": cómo respondió el paciente a lo que se hizo, si se dijo.
+- "educacion": lo que se le explicó al paciente o a la familia, si se dijo.`;
+
+function promptEnfermeria(idioma) {
+  const cfg = notaDe(idioma);
+  return PROMPT_ENFERMERIA.replace("{IDIOMA}", cfg.nombre) + `
+
+IDIOMA DE LA NOTA: escribí el CONTENIDO —todos los valores del JSON— en ${cfg.nombre}.
+Las CLAVES del JSON NO se traducen nunca: van exactamente como están arriba.
+Tampoco se traduce el valor de "patron": va tal cual figura en la lista.`;
+}
+
+const CLAVES_ENFERMERIA = ["motivoConsulta", "valoracion", "signosVitales", "diagnosticosEnfermeria", "objetivos", "intervenciones", "evaluacion", "educacion"];
+// Cómo aparecen cuando el modelo las traduce (portugués e inglés).
+const SINONIMOS_ENFERMERIA = {
+  motivoConsulta: ["motivo", "motivodeatencion", "motivodaatencao", "motivodoatendimento", "queixa", "queixaprincipal", "chiefcomplaint"],
+  valoracion: ["valoracao", "valoracaodeenfermagem", "historicodeenfermagem", "coletadedados", "avaliacaoinicial", "assessment"],
+  signosVitales: ["sinaisvitais", "vitalsigns"],
+  diagnosticosEnfermeria: ["diagnosticos", "diagnosticosdeenfermeria", "diagnosticosdeenfermagem", "diagnosticodeenfermagem", "nursingdiagnoses"],
+  objetivos: ["metas", "resultadosesperados", "goals", "outcomes"],
+  intervenciones: ["intervencoes", "intervencoesdeenfermagem", "prescricaodeenfermagem", "cuidados", "interventions"],
+  evaluacion: ["avaliacao", "avaliacaodeenfermagem", "evolucao", "evaluation"],
+  educacion: ["educacao", "educacaoemsaude", "orientacoes", "education"],
+};
+const ENF_POR_PLANA = new Map();
+for (const clave of CLAVES_ENFERMERIA) ENF_POR_PLANA.set(plana(clave), clave);
+for (const [clave, alias] of Object.entries(SINONIMOS_ENFERMERIA)) for (const a of alias) ENF_POR_PLANA.set(a, clave);
+
+const SUBCLAVES_ENFERMERIA = {
+  patron: ["padrao", "padraofuncional", "pattern"], hallazgos: ["achados", "dados", "findings"],
+  problema: ["diagnostico", "titulo", "problem"], etiologia: ["relacionadoa", "relacionadocon", "fatoresrelacionados", "causa", "etiology"],
+  signos: ["sinais", "manifestadopor", "evidenciadopor", "caracteristicasdefinidoras", "signs"],
+  PA: ["presionarterial", "pressaoarterial", "ta", "bloodpressure"], FC: ["frecuenciacardiaca", "frequenciacardiaca", "pulso", "heartrate"],
+  FR: ["frecuenciarespiratoria", "frequenciarespiratoria", "respiratoryrate"], T: ["temperatura", "temp", "temperature"],
+  SatO2: ["saturacion", "saturacao", "spo2", "sato2"], dolor: ["dor", "eva", "escaladedolor", "escaladedor", "pain"],
+  glucemia: ["glicemia", "glicemiacapilar", "glucosa", "hgt", "glucose"],
+};
+const SUBENF_POR_PLANA = new Map();
+for (const [clave, alias] of Object.entries(SUBCLAVES_ENFERMERIA)) {
+  SUBENF_POR_PLANA.set(plana(clave), clave);
+  for (const a of alias) SUBENF_POR_PLANA.set(a, clave);
+}
+const subobjetoEnfermeria = (o) => (o && typeof o === "object" && !Array.isArray(o)
+  ? Object.fromEntries(Object.entries(o).map(([k, v]) => [SUBENF_POR_PLANA.get(plana(k)) || k, v])) : o);
+
+// "Nutricional-metabólico" o "Padrão sono e repouso" → la clave del patrón.
+function patronDe(v) {
+  const p = plana(v);
+  if (PATRONES_GORDON.includes(String(v))) return String(v);
+  const reglas = [[/^(padrao)?percep/, "percepcion_salud"], [/^(padrao)?nutri/, "nutricional"], [/^(padrao)?elimin/, "eliminacion"],
+    [/^(padrao)?(activ|ativ)/, "actividad"], [/^(padrao)?(sueno|sono)/, "sueno"], [/^(padrao)?cognit/, "cognitivo"],
+    [/^(padrao)?auto/, "autopercepcion"], [/^(padrao)?(rol|papel|papeis)/, "rol"], [/^(padrao)?sexual/, "sexualidad"],
+    [/^(padrao)?(afront|enfrent)/, "afrontamiento"], [/^(padrao)?(valor|crenc|creenc)/, "valores"]];
+  for (const [re, clave] of reglas) if (re.test(p)) return clave;
+  return null;
+}
+
+function normalizarNotaEnfermeria(crudo) {
+  let obj = crudo && typeof crudo === "object" ? crudo : {};
+  let clavesAjustadas = false;
+  const conocidas = (o) => Object.keys(o || {}).filter(k => ENF_POR_PLANA.has(plana(k))).length;
+  if (conocidas(obj) === 0) {
+    const adentro = Object.values(obj).find(v => v && typeof v === "object" && !Array.isArray(v) && conocidas(v) >= 2);
+    if (adentro) { obj = adentro; clavesAjustadas = true; }
+  }
+  const nota = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const clave = ENF_POR_PLANA.get(plana(k));
+    if (!clave) continue;
+    if (clave !== k) clavesAjustadas = true;
+    if (nota[clave] === undefined || nota[clave] === null) nota[clave] = v;
+  }
+  for (const c of ["motivoConsulta", "evaluacion", "educacion"]) {
+    if (Array.isArray(nota[c])) nota[c] = nota[c].filter(Boolean).join("; ");
+  }
+  for (const c of ["objetivos", "intervenciones"]) {
+    if (typeof nota[c] === "string") nota[c] = nota[c].split(/\n|;/).map(x => x.trim()).filter(Boolean);
+  }
+  if (Array.isArray(nota.valoracion)) nota.valoracion = nota.valoracion.map(subobjetoEnfermeria);
+  else if (nota.valoracion && typeof nota.valoracion === "object") {
+    // {"nutricional": "...", "sueno": "..."}: un objeto por patrón.
+    nota.valoracion = Object.entries(nota.valoracion).map(([patron, hallazgos]) => ({ patron, hallazgos }));
+  }
+  if (Array.isArray(nota.diagnosticosEnfermeria)) {
+    nota.diagnosticosEnfermeria = nota.diagnosticosEnfermeria.map(d => (typeof d === "string" ? { problema: d } : subobjetoEnfermeria(d)));
+  }
+  nota.signosVitales = subobjetoEnfermeria(nota.signosVitales);
+  return { nota, clavesAjustadas };
+}
+
+const textoDe = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : typeof v === "number" ? String(v) : "");
+
+// Lo que se guarda: claves y patrones conocidos, largos acotados, sin filas
+// vacías. Lo que la IA dejó en blanco no se guarda. Pasa por acá también lo
+// que corrige quien atendió (routes/consultaMedica.js, confirmar): los topes
+// son para frenar una respuesta desbocada, y alcanzan de sobra para una nota
+// escrita a mano, que no puede perder texto sin que nadie lo note.
+const TOPES_ENFERMERIA = { diagnosticos: 8, objetivos: 15, intervenciones: 30 };
+
+function sanearNotaEnfermeria(n) {
+  const nota = { formato: "enfermeria" };
+  const motivo = textoDe(n?.motivoConsulta, 300);
+  if (motivo) nota.motivoConsulta = motivo;
+  const porPatron = new Map();
+  for (const x of (Array.isArray(n?.valoracion) ? n.valoracion : [])) {
+    const patron = patronDe(x?.patron);
+    const hallazgos = textoDe(x?.hallazgos, 2000);
+    if (!patron || !hallazgos) continue;
+    // Un patrón, una vez: si vino repetido, se juntan sus hallazgos.
+    porPatron.set(patron, porPatron.has(patron) ? `${porPatron.get(patron)}; ${hallazgos}`.slice(0, 3000) : hallazgos);
+  }
+  nota.valoracion = PATRONES_GORDON.filter(p => porPatron.has(p)).map(patron => ({ patron, hallazgos: porPatron.get(patron) }));
+  const signos = {};
+  for (const k of SIGNOS_VITALES) {
+    const v = textoDe(n?.signosVitales?.[k], 40);
+    if (v && !/^null$/i.test(v)) signos[k] = v;
+  }
+  nota.signosVitales = signos;
+  nota.diagnosticosEnfermeria = (Array.isArray(n?.diagnosticosEnfermeria) ? n.diagnosticosEnfermeria : [])
+    .map(d => ({ problema: textoDe(d?.problema, 300), etiologia: textoDe(d?.etiologia, 500), signos: textoDe(d?.signos, 500) }))
+    .filter(d => d.problema).slice(0, TOPES_ENFERMERIA.diagnosticos);
+  const lista = (v, maxItems) => (Array.isArray(v) ? v : []).map(x => textoDe(x, 500)).filter(Boolean).slice(0, maxItems);
+  nota.objetivos = lista(n?.objetivos, TOPES_ENFERMERIA.objetivos);
+  nota.intervenciones = lista(n?.intervenciones, TOPES_ENFERMERIA.intervenciones);
+  const evaluacion = textoDe(n?.evaluacion, 2000);
+  if (evaluacion) nota.evaluacion = evaluacion;
+  const educacion = textoDe(n?.educacion, 2000);
+  if (educacion) nota.educacion = educacion;
+  return nota;
+}
+
+// Los nombres de los patrones, para contarle una nota a otra IA.
+const NOMBRES_PATRONES = {
+  percepcion_salud: "percepción y manejo de la salud", nutricional: "nutricional-metabólico", eliminacion: "eliminación",
+  actividad: "actividad-ejercicio", sueno: "sueño-descanso", cognitivo: "cognitivo-perceptivo",
+  autopercepcion: "autopercepción-autoconcepto", rol: "rol-relaciones", sexualidad: "sexualidad-reproducción",
+  afrontamiento: "afrontamiento-tolerancia al estrés", valores: "valores-creencias",
+};
+
+// La nota de enfermería en renglones de texto, para lo que se la cuenta a otra
+// IA —el resumen previo, el hilo con las consultas anteriores, la memoria
+// clínica—, que hasta ahora leían solo los campos de la nota médica y de una
+// nota de enfermería veían el motivo y nada más. Una nota médica, sin renglones.
+function renglonesNotaEnfermeria(n) {
+  if (n?.formato !== "enfermeria") return [];
+  const r = [];
+  const sv = SIGNOS_VITALES.filter(k => n.signosVitales?.[k]).map(k => `${k} ${n.signosVitales[k]}`);
+  if (sv.length) r.push(`Signos vitales: ${sv.join(", ")}`);
+  const valorados = (n.valoracion || []).filter(v => v?.hallazgos);
+  if (valorados.length) r.push(`Valoración: ${valorados.map(v => `${NOMBRES_PATRONES[v.patron] || v.patron}: ${v.hallazgos}`).join("; ")}`);
+  const dx = (n.diagnosticosEnfermeria || []).filter(d => d?.problema);
+  if (dx.length) {
+    r.push(`Diagnósticos de enfermería: ${dx.map(d => d.problema + (d.etiologia ? ` r/c ${d.etiologia}` : "") + (d.signos ? ` m/p ${d.signos}` : "")).join("; ")}`);
+  }
+  if (n.objetivos?.length) r.push(`Objetivos: ${n.objetivos.join("; ")}`);
+  if (n.intervenciones?.length) r.push(`Intervenciones: ${n.intervenciones.join("; ")}`);
+  if (n.evaluacion) r.push(`Evaluación: ${n.evaluacion}`);
+  if (n.educacion) r.push(`Educación: ${n.educacion}`);
+  return r;
+}
+
+async function generarNotaEnfermeria(transcripcion, contexto, idioma) {
+  const mensajes = [
+    { role: "system", content: promptEnfermeria(idioma) },
+    { role: "user", content: transcripcion + construirContexto(contexto, idioma) },
+  ];
+  let r = await pedirNota(mensajes, normalizarNotaEnfermeria);
+  const palabras = String(transcripcion || "").split(/\s+/).filter(Boolean).length;
+  // Los NOMBRES de las claves, nunca los valores (son la historia clínica).
+  if (r.clavesAjustadas) log.warn(`[NOTA_ENFERMERIA] claves ajustadas (idioma ${idioma || "es"}): ${r.clavesRecibidas.join(", ")}`);
+  let nota = sanearNotaEnfermeria(r.nota);
+  if (notaVacia(nota) && palabras >= PALABRAS_MINIMAS_PARA_NOTA) {
+    log.warn(`[NOTA_ENFERMERIA] nota vacía de una transcripción de ${palabras} palabras (claves: ${r.clavesRecibidas.join(", ") || "ninguna"}) — se pide de nuevo`);
+    r = await pedirNota([
+      ...mensajes,
+      { role: "system", content:
+        "Tu respuesta anterior vino sin contenido, pero la transcripción SÍ tiene una atención. " +
+        "Volvé a generarla completando cada campo con lo que se dijo. Usá EXACTAMENTE las claves del formato pedido " +
+        "(motivoConsulta, valoracion, signosVitales, diagnosticosEnfermeria, objetivos, intervenciones, evaluacion, educacion), " +
+        "sin traducirlas y sin envolverlas en otro objeto." },
+    ], normalizarNotaEnfermeria);
+    nota = sanearNotaEnfermeria(r.nota);
+    if (notaVacia(nota)) {
+      log.error(`[NOTA_ENFERMERIA] nota vacía otra vez (claves: ${r.clavesRecibidas.join(", ") || "ninguna"})`);
+      throw new Error("La IA devolvió una nota vacía. Probá generarla de nuevo.");
+    }
+  }
+  return nota;
+}
+
 // promptSistema se exporta solo para poder verificar el prompt ARMADO en las
 // pruebas, y no que el archivo contenga ciertas palabras sueltas.
-module.exports = { generarNotaClinica, promptSistema, normalizarNota, notaVacia };
+module.exports = {
+  generarNotaClinica, promptSistema, normalizarNota, notaVacia,
+  promptEnfermeria, normalizarNotaEnfermeria, sanearNotaEnfermeria, patronDe, PATRONES_GORDON, SIGNOS_VITALES, TOPES_ENFERMERIA,
+  renglonesNotaEnfermeria,
+};

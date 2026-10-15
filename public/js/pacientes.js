@@ -360,6 +360,10 @@ async function renderPacienteDetalle(pacienteId, tabInicial) {
   }
 }
 
+// El diagnóstico que se muestra de una consulta: el del médico o, en la nota
+// de enfermería, el primero de sus diagnósticos (es el prioritario).
+const dxDeNota = (n) => n?.diagnostico || n?.diagnosticosEnfermeria?.[0]?.problema || "";
+
 function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios, recetas, tabActiva) {
   detenerPolling();
   const edad = edadDesde(p.fechaNacimiento);
@@ -367,7 +371,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
 
   const consultasCompletas = consultas.filter(c => c.estado === "completado");
   const ultima = consultas[0]; // ya viene ordenado por fecha descendente
-  const ultimaConDx = consultasCompletas.find(c => c.notaClinica && (c.notaClinica.diagnostico || c.notaClinica.motivoConsulta));
+  const ultimaConDx = consultasCompletas.find(c => c.notaClinica && (dxDeNota(c.notaClinica) || c.notaClinica.motivoConsulta));
 
   let briefHtml = "";
   if (p.briefClinicoEstado === "generando") {
@@ -428,7 +432,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
       <div class="seccion-titulo" style="margin-top:0">${t("kardex.ultimoDx")}</div>
       <div class="fecha" style="margin-bottom:6px">${new Date(ultimaConDx.createdAt).toLocaleDateString(localeActual())}</div>
       ${ultimaConDx.notaClinica.motivoConsulta ? `<div class="nota-campo"><b>${t("kardex.motivo")}</b> ${esc(ultimaConDx.notaClinica.motivoConsulta)}</div>` : ""}
-      ${ultimaConDx.notaClinica.diagnostico ? `<div class="nota-campo"><b>${t("kardex.diagnostico")}</b> ${esc(ultimaConDx.notaClinica.diagnostico)}</div>` : ""}
+      ${dxDeNota(ultimaConDx.notaClinica) ? `<div class="nota-campo"><b>${t("kardex.diagnostico")}</b> ${esc(dxDeNota(ultimaConDx.notaClinica))}</div>` : ""}
     </div>` : ""}`;
 
   const tabConsultas = `
@@ -441,7 +445,7 @@ function pintarKardex(p, consultas, medicamentos, vacunas, mediciones, estudios,
           <span class="badge badge-${c.estado}">${estadoTxt[c.estado] || c.estado}</span>
         </span>
         ${c.notaClinica && c.notaClinica.motivoConsulta ? `<span class="preview">${esc(c.notaClinica.motivoConsulta)}</span>` : ""}
-        ${c.notaClinica && c.notaClinica.diagnostico ? `<span class="preview"><b>${t("kardex.dx")}</b> ${esc(c.notaClinica.diagnostico)}</span>` : ""}
+        ${c.notaClinica && dxDeNota(c.notaClinica) ? `<span class="preview"><b>${t("kardex.dx")}</b> ${esc(dxDeNota(c.notaClinica))}</span>` : ""}
       </button>`).join("")}`;
 
   const medActivos = medicamentos.filter(m => !m.fechaFin);

@@ -37,6 +37,7 @@
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
 const { ConsultaMedica } = require("../db/models");
+const { renglonesNotaEnfermeria } = require("./notaClinica");
 
 // Cuántas consultas anteriores se miran. No es "todas": una historia de
 // cuarenta consultas no entra en el contexto y, sobre todo, diluye — lo que
@@ -85,6 +86,7 @@ function resumirConsulta(c, incluirId) {
     partes.push(`medicamentos: ${n.medicamentosRecetados.map(m => m.nombre).filter(Boolean).join(", ")}`);
   }
   if (n.examenesSolicitados?.length) partes.push(`exámenes pedidos: ${n.examenesSolicitados.join(", ")}`);
+  partes.push(...renglonesNotaEnfermeria(n));
   return partes.join(" | ");
 }
 

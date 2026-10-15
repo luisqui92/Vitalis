@@ -63,6 +63,25 @@ module.exports = {
     sinNota: (mostradas, total) => `São mostradas ${mostradas} de ${total} consultas confirmadas: as demais não têm nota clínica.`,
   },
 
+  enfermeria: {
+    signosVitales: "Sinais vitais",
+    signos: { PA: "PA", FC: "FC", FR: "FR", T: "T", SatO2: "SatO2", dolor: "Dor", glucemia: "Glicemia" },
+    valoracion: "Coleta de dados por padrões funcionais",
+    patrones: {
+      percepcion_salud: "Percepção e controle da saúde", nutricional: "Nutricional-metabólico", eliminacion: "Eliminação",
+      actividad: "Atividade e exercício", sueno: "Sono e repouso", cognitivo: "Cognitivo-perceptivo",
+      autopercepcion: "Autopercepção e autoconceito", rol: "Papéis e relacionamentos", sexualidad: "Sexualidade e reprodução",
+      afrontamiento: "Enfrentamento e tolerância ao estresse", valores: "Valores e crenças",
+    },
+    diagnosticos: "Diagnósticos de enfermagem",
+    rc: "relacionado a",
+    mp: "evidenciado por",
+    objetivos: "Resultados esperados",
+    intervenciones: "Intervenções",
+    evaluacion: "Avaliação",
+    educacion: "Educação em saúde (paciente e família)",
+  },
+
   recetas: {
     indicaciones: "Orientações",
     memed: "emitida pela Memed",

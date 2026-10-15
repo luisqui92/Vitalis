@@ -73,7 +73,7 @@ module.exports = function (app) {
 
     const [consultas, medicamentos, vacunas, mediciones, estudios, recetas] = await Promise.all([
       ConsultaMedica.find({ pacienteId: paciente._id, medicoPhone })
-        .select("estado notaClinicaEstado notaClinica.motivoConsulta notaClinica.diagnostico duracionSegundos createdAt")
+        .select("estado notaClinicaEstado notaClinica.motivoConsulta notaClinica.diagnostico notaClinica.diagnosticosEnfermeria.problema duracionSegundos createdAt")
         .sort({ createdAt: -1 })
         .lean(),
       Medicamento.find({ pacienteId: paciente._id, medicoPhone }).sort({ fechaFin: 1, createdAt: -1 }).lean(),

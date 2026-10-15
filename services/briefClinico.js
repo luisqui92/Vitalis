@@ -11,6 +11,7 @@
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
 const { Paciente, ConsultaMedica } = require("../db/models");
+const { renglonesNotaEnfermeria } = require("./notaClinica");
 
 const PROMPT_SISTEMA = `Eres un asistente clínico. A partir del historial de consultas anteriores
 de un paciente (en español, ordenadas de la más vieja a la más nueva),
@@ -57,6 +58,7 @@ function formatearHistorial(consultas) {
     }
     if (n.examenesSolicitados?.length) partes.push(`Exámenes solicitados: ${n.examenesSolicitados.join(", ")}`);
     if (n.proximoControl) partes.push(`Próximo control: ${n.proximoControl}`);
+    partes.push(...renglonesNotaEnfermeria(n));
     return partes.join("\n");
   }).join("\n\n---\n\n");
 }

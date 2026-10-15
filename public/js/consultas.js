@@ -268,6 +268,13 @@ function notaEnVivoHtml(estado, n, noNombrados = [], extras = {}) {
     return `<div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
       <div class="hint">${t(estado === "pidiendo" ? "vivo.actualizando" : "vivo.esperando")}</div>${Extensiones.lugar("notaEnVivo", { conNota: false, extras }).html}`;
   }
+  if (esNotaEnfermeria(n)) {
+    return `
+    <div class="nota-titulo" style="margin-top:0">${t("vivo.titulo")}</div>
+    <div class="hint" style="margin-bottom:8px">${t(estado === "final" ? "vivo.final" : estado === "pidiendo" ? "vivo.actualizando" : "vivo.ayuda")}</div>
+    ${notaEnfermeriaLecturaHtml(n)}
+    ${Extensiones.lugar("notaEnVivo", { conNota: true, extras }).html}`;
+  }
   const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
   // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
   const meds = (n.medicamentosRecetados || []).map((m, i) => [m?.nombre, m?.dosis, m?.frecuencia].filter(Boolean).join(" ")
@@ -474,6 +481,10 @@ function avisoMedicamentoHtml(v) {
 // services/notaClinica.js). Mismo criterio que notaVacia() del servidor.
 function notaClinicaVaciaCliente(n) {
   const lleno = (v) => (Array.isArray(v) ? v.some(x => x && (typeof x !== "string" || x.trim())) : typeof v === "string" && v.trim().length > 0);
+  if (esNotaEnfermeria(n)) {
+    return !["motivoConsulta", "valoracion", "diagnosticosEnfermeria", "objetivos", "intervenciones", "evaluacion"].some(c => lleno(n?.[c]))
+      && !Object.values(n?.signosVitales || {}).some(lleno);
+  }
   return !["motivoConsulta", "sintomas", "antecedentesRelevantes", "diagnostico", "plan", "medicamentosRecetados", "examenesSolicitados"]
     .some(c => lleno(n?.[c]));
 }
@@ -481,6 +492,169 @@ function notaClinicaVaciaCliente(n) {
 function botonRegenerarNotaHtml() {
   return `<button class="secondary" id="btnRegenerarNota">🔄 ${t("nota.regenerar")}</button>
     <div class="hint">${t("nota.regenerarAyuda")}</div>`;
+}
+
+// ─── LA NOTA DE ENFERMERÍA (services/notaClinica.js) ────────────────────
+//
+// La de las cuentas de enfermería: el proceso de atención —valoración por
+// patrones funcionales, diagnósticos en formato PES, objetivos,
+// intervenciones y evaluación— en vez del motivo-diagnóstico-plan. El mismo
+// recorrido que la del médico: la IA la escribe, quien atendió la corrige y
+// la confirma. Va aparte para no tocar la nota médica.
+const PATRONES_ENF = ["percepcion_salud", "nutricional", "eliminacion", "actividad", "sueno", "cognitivo",
+  "autopercepcion", "rol", "sexualidad", "afrontamiento", "valores"];
+const SIGNOS_ENF = ["PA", "FC", "FR", "T", "SatO2", "dolor", "glucemia"];
+// Los mismos topes que sanearNotaEnfermeria() en el servidor.
+const MAX_DX_ENF = 8;
+
+const esNotaEnfermeria = (n) => n?.formato === "enfermeria";
+const nombrePatronEnf = (p) => (PATRONES_ENF.includes(p) ? t("nota.enf.patron." + p) : String(p || ""));
+
+// Como texto: la nota confirmada y el borrador en vivo.
+function notaEnfermeriaLecturaHtml(n) {
+  const campo = (clave, valor) => (valor ? `<div class="nota-campo"><b>${t(clave)}:</b> ${esc(valor)}</div>` : "");
+  const lista = (clave, items, etiqueta = "ul") => {
+    const llenos = (items || []).filter(Boolean);
+    return llenos.length ? `<div class="nota-campo"><b>${t(clave)}:</b>
+      <${etiqueta} class="nfe-lista">${llenos.map(x => `<li>${x}</li>`).join("")}</${etiqueta}></div>` : "";
+  };
+  const sv = SIGNOS_ENF.filter(k => n.signosVitales?.[k]).map(k => `${t("nota.enf.sv." + k)} ${esc(n.signosVitales[k])}`).join(" · ");
+  return `
+    ${campo("nota.enf.motivo", n.motivoConsulta)}
+    ${sv ? `<div class="nota-campo"><b>${t("nota.enf.signos")}:</b> ${sv}</div>` : ""}
+    ${lista("nota.enf.valoracion", (n.valoracion || []).map(v => v?.hallazgos
+      ? `<span class="nfe-patron-nombre">${esc(nombrePatronEnf(v.patron))}:</span> ${esc(v.hallazgos)}` : ""))}
+    ${lista("nota.enf.diagnosticos", (n.diagnosticosEnfermeria || []).map(d => (d?.problema ? esc(d.problema)
+      + (d.etiologia ? ` <i>${t("nota.enf.rc")}</i> ${esc(d.etiologia)}` : "")
+      + (d.signos ? ` <i>${t("nota.enf.mp")}</i> ${esc(d.signos)}` : "") : "")), "ol")}
+    ${lista("nota.enf.objetivos", (n.objetivos || []).map(x => esc(x)))}
+    ${lista("nota.enf.intervenciones", (n.intervenciones || []).map(x => esc(x)))}
+    ${campo("nota.enf.evaluacion", n.evaluacion)}
+    ${campo("nota.enf.educacion", n.educacion)}`;
+}
+
+function filaValoracionHtml(patron, hallazgos) {
+  return `<div class="nfe-val-fila" data-patron="${esc(patron)}">
+      <label class="nfe-sublabel" for="nfeVal_${esc(patron)}">${esc(nombrePatronEnf(patron))}</label>
+      <textarea id="nfeVal_${esc(patron)}" rows="2">${esc(hallazgos || "")}</textarea>
+    </div>`;
+}
+
+// El número es la prioridad: el primero es el que se atiende primero.
+function filaDiagnosticoHtml(d, i) {
+  return `<div class="nfe-dx">
+      <div class="nfe-dx-cab">
+        <span class="nfe-dx-num">${i + 1}</span>
+        <input class="nfe-dx-problema" type="text" aria-label="${t("nota.enf.problema")}" placeholder="${t("nota.enf.problema")}" value="${esc(d?.problema || "")}">
+        <button type="button" class="link nfe-dx-quitar" title="${t("nota.enf.quitarDx")}" aria-label="${t("nota.enf.quitarDx")}">✕</button>
+      </div>
+      <div class="nfe-sublabel">${t("nota.enf.relacionado")}</div>
+      <input class="nfe-dx-etiologia" type="text" aria-label="${t("nota.enf.relacionado")}" value="${esc(d?.etiologia || "")}">
+      <div class="nfe-sublabel">${t("nota.enf.manifestado")}</div>
+      <input class="nfe-dx-signos" type="text" aria-label="${t("nota.enf.manifestado")}" value="${esc(d?.signos || "")}">
+    </div>`;
+}
+
+// El formulario, antes de confirmar. El motivo usa el mismo campo que la
+// nota médica (nfMotivo): en la base es el mismo dato.
+function notaEnfermeriaFormHtml(n) {
+  const sv = n.signosVitales || {};
+  const valorados = (n.valoracion || []).filter(v => PATRONES_ENF.includes(v?.patron));
+  const sinValorar = PATRONES_ENF.filter(p => !valorados.some(v => v.patron === p));
+  const dx = n.diagnosticosEnfermeria || [];
+  return `
+    <label for="nfMotivo">${t("nota.enf.motivo")}</label>
+    <input id="nfMotivo" type="text" value="${esc(n.motivoConsulta || "")}">
+    <label>${t("nota.enf.signos")}</label>
+    <div class="nfe-signos">
+      ${SIGNOS_ENF.map(k => `<div>
+        <label class="nfe-sublabel" for="nfeSv_${k}">${t("nota.enf.sv." + k)}</label>
+        <input id="nfeSv_${k}" class="nfe-sv" data-k="${k}" type="text" placeholder="${t("nota.enf.svu." + k)}" value="${esc(sv[k] || "")}">
+      </div>`).join("")}
+    </div>
+    <label>${t("nota.enf.valoracion")}</label>
+    <div class="hint" style="margin:0 0 6px">${t("nota.enf.ayudaValoracion")}</div>
+    <div id="nfeValoracion">${valorados.map(v => filaValoracionHtml(v.patron, v.hallazgos)).join("")}</div>
+    <select id="nfePatronNuevo" aria-label="${t("nota.enf.agregarPatron")}"${sinValorar.length ? "" : ` style="display:none"`}>
+      <option value="">${t("nota.enf.agregarPatron")}</option>
+      ${sinValorar.map(p => `<option value="${p}">${esc(nombrePatronEnf(p))}</option>`).join("")}
+    </select>
+    <label>${t("nota.enf.diagnosticos")}</label>
+    <div class="hint" style="margin:0 0 6px">${t("nota.enf.ayudaPes")}</div>
+    <div id="nfeDiagnosticos">${dx.map((d, i) => filaDiagnosticoHtml(d, i)).join("")}</div>
+    <button type="button" class="link" id="nfeAgregarDx" style="margin:0 0 10px 0;width:auto${dx.length >= MAX_DX_ENF ? ";display:none" : ""}">${t("nota.enf.agregarDx")}</button>
+    <label for="nfeObjetivos">${t("nota.enf.objetivos")} <span class="hint">${t("nota.enf.lineaObjetivo")}</span></label>
+    <textarea id="nfeObjetivos" rows="3">${esc((n.objetivos || []).join("\n"))}</textarea>
+    <label for="nfeIntervenciones">${t("nota.enf.intervenciones")} <span class="hint">${t("nota.enf.lineaIntervencion")}</span></label>
+    <textarea id="nfeIntervenciones" rows="4">${esc((n.intervenciones || []).join("\n"))}</textarea>
+    <label for="nfeEvaluacion">${t("nota.enf.evaluacion")}</label>
+    <textarea id="nfeEvaluacion" rows="2">${esc(n.evaluacion || "")}</textarea>
+    <label for="nfeEducacion">${t("nota.enf.educacion")}</label>
+    <textarea id="nfeEducacion" rows="2">${esc(n.educacion || "")}</textarea>`;
+}
+
+// Agregar un patrón que no se valoró, y agregar o quitar diagnósticos.
+function engancharNotaEnfermeria() {
+  const caja = document.getElementById("nfeValoracion");
+  const nuevo = document.getElementById("nfePatronNuevo");
+  if (caja && nuevo) nuevo.onchange = () => {
+    const p = nuevo.value;
+    nuevo.value = "";
+    if (!PATRONES_ENF.includes(p) || caja.querySelector(`[data-patron="${p}"]`)) return;
+    const molde = document.createElement("div");
+    molde.innerHTML = filaValoracionHtml(p, "");
+    const fila = molde.firstElementChild;
+    // En el orden de los patrones, no al final.
+    const siguiente = [...caja.children].find(f => PATRONES_ENF.indexOf(f.dataset.patron) > PATRONES_ENF.indexOf(p));
+    caja.insertBefore(fila, siguiente || null);
+    nuevo.querySelector(`option[value="${p}"]`)?.remove();
+    if (nuevo.options.length <= 1) nuevo.style.display = "none";
+    fila.querySelector("textarea").focus();
+  };
+
+  const dx = document.getElementById("nfeDiagnosticos");
+  const agregar = document.getElementById("nfeAgregarDx");
+  if (!dx || !agregar) return;
+  const renumerar = () => {
+    [...dx.children].forEach((f, i) => { f.querySelector(".nfe-dx-num").textContent = i + 1; });
+    agregar.style.display = dx.children.length >= MAX_DX_ENF ? "none" : "";
+  };
+  agregar.onclick = (e) => {
+    e.preventDefault();
+    dx.insertAdjacentHTML("beforeend", filaDiagnosticoHtml({}, dx.children.length));
+    renumerar();
+    dx.lastElementChild.querySelector(".nfe-dx-problema").focus();
+  };
+  dx.onclick = (e) => {
+    const quitar = e.target.closest(".nfe-dx-quitar");
+    if (!quitar) return;
+    e.preventDefault();
+    quitar.closest(".nfe-dx").remove();
+    renumerar();
+  };
+}
+
+// Lo que se manda al confirmar. Lo vacío lo descarta el servidor
+// (sanearNotaEnfermeria), con la misma limpieza que a lo que escribió la IA.
+function notaEnfermeriaDelFormulario() {
+  const val = (id) => (document.getElementById(id)?.value || "").trim();
+  // Una por línea; la viñeta que se haya escrito adelante no es parte del texto.
+  const lineas = (id) => val(id).split("\n").map(x => x.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean);
+  return {
+    motivoConsulta: val("nfMotivo"),
+    signosVitales: Object.fromEntries([...document.querySelectorAll(".nfe-sv")].map(x => [x.dataset.k, x.value.trim()])),
+    valoracion: [...document.querySelectorAll("#nfeValoracion .nfe-val-fila")]
+      .map(f => ({ patron: f.dataset.patron, hallazgos: f.querySelector("textarea").value.trim() })),
+    diagnosticosEnfermeria: [...document.querySelectorAll("#nfeDiagnosticos .nfe-dx")].map(f => ({
+      problema: f.querySelector(".nfe-dx-problema").value.trim(),
+      etiologia: f.querySelector(".nfe-dx-etiologia").value.trim(),
+      signos: f.querySelector(".nfe-dx-signos").value.trim(),
+    })),
+    objetivos: lineas("nfeObjetivos"),
+    intervenciones: lineas("nfeIntervenciones"),
+    evaluacion: val("nfeEvaluacion"),
+    educacion: val("nfeEducacion"),
+  };
 }
 
 // "quien" solo viene de la teleconsulta, donde el médico y el paciente se
@@ -642,6 +816,24 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
         notaHtml = `<div class="card"><div class="hint">${t("nota.generando")}</div></div>`;
       } else if (c.notaClinicaEstado === "error") {
         notaHtml = `<div class="card"><div class="error">${t("nota.error")}</div>${yaConfirmada ? "" : botonRegenerarNotaHtml()}</div>`;
+      } else if (n && esNotaEnfermeria(n) && yaConfirmada) {
+        notaHtml = `
+          <div class="card">
+            <div class="nota-titulo">${t("nota.enf.titulo")}${c.notaEditadaPorMedico ? t("nota.corregida") : ""}</div>
+            ${marcaNota.html}
+            <div class="hint" style="color:var(--success);margin-bottom:10px">${t("nota.confirmada", { fecha: new Date(c.confirmadaEn).toLocaleString(localeActual()) })}</div>
+            ${notaEnfermeriaLecturaHtml(n)}
+          </div>`;
+      } else if (n && esNotaEnfermeria(n)) {
+        notaHtml = `
+          <div class="card">
+            <div class="nota-titulo">${t("nota.enf.tituloIA")}</div>
+            ${marcaNota.html}
+            ${enVivo ? `<div id="verifBox">${verificacionHtml(c.verificacion)}</div>` : ""}
+            ${notaClinicaVaciaCliente(n) ?`<div class="error" style="margin-top:0">${t("nota.vacia")}</div>${botonRegenerarNotaHtml()}` : ""}
+            <div class="hint" style="margin-bottom:12px">${t("nota.revisar")}</div>
+            ${notaEnfermeriaFormHtml(n)}
+          </div>`;
       } else if (n && yaConfirmada) {
         const meds = (n.medicamentosRecetados || []).filter(Boolean).map(m =>
           esc(m.nombre + (m.dosis ? " " + m.dosis : "") + (m.frecuencia ? " — " + m.frecuencia : ""))
@@ -848,6 +1040,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
     };
     engancharHiloClinico();
     despues.alPintar();
+    if (esNotaEnfermeria(n) && !yaConfirmada) engancharNotaEnfermeria();
 
     // ── medicamentos: quitar / agregar filas en la nota editable ──
     const medsBox = document.getElementById("nfMeds");
@@ -942,7 +1135,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
         const lista = (id) => val(id).split(",").map(x => x.trim()).filter(Boolean);
         const marcado = (id) => !!document.getElementById(id)?.checked;
 
-        const nota = {
+        const nota = esNotaEnfermeria(n) ? notaEnfermeriaDelFormulario() : {
           motivoConsulta: val("nfMotivo"),
           sintomas: lista("nfSintomas"),
           antecedentesRelevantes: val("nfAntecedentes"),

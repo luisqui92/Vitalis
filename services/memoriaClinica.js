@@ -4,6 +4,7 @@
 // médico nuevo). No queda guardado en la base — es una consulta puntual.
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
+const { renglonesNotaEnfermeria } = require("./notaClinica");
 
 const PROMPT_SISTEMA = `Sos un asistente clínico que responde preguntas de un médico sobre la
 historia de UN paciente puntual, en español. Abajo te paso TODA la
@@ -64,6 +65,7 @@ function construirContextoPaciente(ctx) {
         n.diagnostico && `Diagnóstico: ${n.diagnostico}`,
         n.plan && `Plan: ${n.plan}`,
         n.medicamentosRecetados?.length && `Recetado: ${n.medicamentosRecetados.map(m => m.nombre).join(", ")}`,
+        ...renglonesNotaEnfermeria(n),
       ].filter(Boolean).join(" | ");
       // Las que el médico no confirmó son borradores (revisión integral del
       // 11 de octubre de 2026, S03).

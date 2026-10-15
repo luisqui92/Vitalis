@@ -705,12 +705,41 @@ const consultaMedicaSchema = new mongoose.Schema({
     }],
     // Symphomed Gineco: hallazgos por órgano detectados en la consulta
     // ("ovario izquierdo con quiste simple"). Igual que el mapa ocular y el
-    // odontograma, se aplican solos al mapa apenas se genera la nota.
+    // odontograma, se cargan al mapa al confirmar, lo que la médica deja
+    // marcado (S05).
     ginecoSugerido: [{
       organo: { type: String, default: "" },
       hallazgo: { type: String, default: "" },
       detalle: { type: String, default: "" },
     }],
+
+    // ─── NOTA DE ENFERMERÍA ────────────────────────────────────────────
+    // La de las cuentas con tipoEspecialidad "enfermeria": sigue el proceso
+    // de atención de enfermería —valoración, diagnóstico, planificación,
+    // intervenciones y evaluación— en vez del motivo-diagnóstico-plan del
+    // médico. El motivo de la atención va en motivoConsulta, como en la
+    // médica, para que las listas y el Kardex lo muestren igual. Sin
+    // taxonomías con licencia (NANDA-I, NIC, NOC): el diagnóstico se escribe
+    // en formato PES. Ver services/notaClinica.js.
+    formato: { type: String, default: undefined },   // "enfermeria"; sin formato, la médica
+    // Por patrón funcional de salud (Gordon): solo los que se valoraron.
+    valoracion: [{ patron: { type: String, default: "" }, hallazgos: { type: String, default: "" }, _id: false }],
+    // Tal como se dijeron, con sus unidades: texto, no números.
+    signosVitales: {
+      PA: String, FC: String, FR: String, T: String, SatO2: String, dolor: String, glucemia: String,
+    },
+    // PES: el problema, relacionado con (etiología), manifestado por (signos).
+    diagnosticosEnfermeria: [{
+      problema: { type: String, default: "" },
+      etiologia: { type: String, default: "" },
+      signos: { type: String, default: "" },
+      _id: false,
+    }],
+    objetivos: [String],
+    intervenciones: [String],
+    evaluacion: String,
+    // Lo que se le enseñó al paciente o a la familia.
+    educacion: String,
   },
   notaClinicaError: String,
 }, { timestamps: true });
@@ -720,7 +749,7 @@ const consultaMedicaSchema = new mongoose.Schema({
 // la IA ya las saca (services/notaClinica.js → normalizarNota); esto es la
 // red para cualquier otro camino que guarde la consulta.
 const LISTAS_DE_LA_NOTA = ["medicamentosRecetados", "vacunasMencionadas", "antecedentesFamiliaresNuevos", "tratamientosSugeridos",
-  "examenOcularSugerido", "odontogramaSugerido", "ginecoSugerido"];
+  "examenOcularSugerido", "odontogramaSugerido", "ginecoSugerido", "valoracion", "diagnosticosEnfermeria"];
 consultaMedicaSchema.pre("save", function (next) {
   for (const lista of LISTAS_DE_LA_NOTA) {
     const ruta = `notaClinica.${lista}`;

@@ -116,6 +116,25 @@ function fecha(d) {
   return d ? new Date(d).toISOString() : null;
 }
 
+// Las partes de una nota de enfermería que tienen algo, o null si ninguna.
+const SIGNOS_VITALES = ["PA", "FC", "FR", "T", "SatO2", "dolor", "glucemia"];
+function notaDeEnfermeria(n) {
+  const e = {
+    signosVitales: Object.fromEntries(SIGNOS_VITALES.map(k => [k, texto(n.signosVitales?.[k])]).filter(([, v]) => v)),
+    valoracion: (n.valoracion || []).map(v => ({ patron: texto(v?.patron), hallazgos: texto(v?.hallazgos) })).filter(v => v.hallazgos),
+    diagnosticos: (n.diagnosticosEnfermeria || [])
+      .map(d => ({ problema: texto(d?.problema), etiologia: texto(d?.etiologia), signos: texto(d?.signos) }))
+      .filter(d => d.problema),
+    objetivos: lista(n.objetivos),
+    intervenciones: lista(n.intervenciones),
+    evaluacion: texto(n.evaluacion),
+    educacion: texto(n.educacion),
+  };
+  const algo = Object.keys(e.signosVitales).length || e.valoracion.length || e.diagnosticos.length
+    || e.objetivos.length || e.intervenciones.length || e.evaluacion || e.educacion;
+  return algo ? e : null;
+}
+
 // ═══ ARMAR EL CONTENIDO ════════════════════════════════════════════════════
 //
 // Devuelve el objeto que se congela en `ResumenCompartido.contenido`. Recibe
@@ -211,8 +230,12 @@ function armarContenido({ paciente, persona, consultas, medicamentos, informes, 
           .filter(r => r.nombre),
         proximoControl: texto(n.proximoControl),
       };
+      // La nota de enfermería (services/notaClinica.js) tiene sus propias
+      // partes, y son lo que quien atendió escribió y confirmó: van todas.
+      const enfermeria = n.formato === "enfermeria" ? notaDeEnfermeria(n) : null;
+      if (enfermeria) fila.enfermeria = enfermeria;
       return vacio({ motivo: fila.motivo, diagnostico: fila.diagnostico, plan: fila.plan,
-                     sintomas: fila.sintomas, examenes: fila.examenes, recetado: fila.recetado })
+                     sintomas: fila.sintomas, examenes: fila.examenes, recetado: fila.recetado }) && !enfermeria
         ? null : fila;
     }).filter(Boolean);
     if (items.length) {

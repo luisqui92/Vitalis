@@ -173,6 +173,31 @@ function crearPie({ membrete, T }) {
 }
 
 // ─── El cuerpo ─────────────────────────────────────────────────────────────
+// La nota de enfermería (services/notaClinica.js): el proceso de atención, en
+// el orden en que se hace. Lo vacío no se imprime (ver «campo» en pdf.js).
+function bloquesDeEnfermeria(B, e, TE, continuacion) {
+  const titulo = (texto) => B.push({ tipo: "parrafo", partes: [{ texto: `${texto}:`, estilo: "negrita" }], continuacion });
+  const signos = Object.entries(e.signosVitales || {}).map(([k, v]) => `${TE.signos[k] || k} ${v}`).join(" · ");
+  B.push({ tipo: "campo", etiqueta: TE.signosVitales, valor: signos, continuacion });
+  if (e.valoracion?.length) {
+    titulo(TE.valoracion);
+    B.push({ tipo: "lista", items: e.valoracion.map(v => [
+      { texto: `${TE.patrones[v.patron] || v.patron}: `, estilo: "negrita" }, { texto: v.hallazgos },
+    ]), continuacion });
+  }
+  if (e.diagnosticos?.length) {
+    titulo(TE.diagnosticos);
+    B.push({ tipo: "lista", items: e.diagnosticos.map(d => [
+      { texto: d.problema, estilo: "negrita" },
+      { texto: (d.etiologia ? ` ${TE.rc} ${d.etiologia}` : "") + (d.signos ? ` ${TE.mp} ${d.signos}` : "") },
+    ]), continuacion });
+  }
+  if (e.objetivos?.length) { titulo(TE.objetivos); B.push({ tipo: "lista", items: e.objetivos, continuacion }); }
+  if (e.intervenciones?.length) { titulo(TE.intervenciones); B.push({ tipo: "lista", items: e.intervenciones, continuacion }); }
+  B.push({ tipo: "campo", etiqueta: TE.evaluacion, valor: e.evaluacion, continuacion });
+  B.push({ tipo: "campo", etiqueta: TE.educacion, valor: e.educacion, continuacion });
+}
+
 function bloquesDelKardex({ contenido: c, paciente, recetas, consultasSinConfirmar, T, f, locale, hoy, firma, alertas = [] }) {
   const B = [];
   const S = T.secciones;
@@ -243,6 +268,7 @@ function bloquesDelKardex({ contenido: c, paciente, recetas, consultasSinConfirm
       }
       B.push({ tipo: "campo", etiqueta: T.consulta.examenes, valor: (x.examenes || []).join(", "), continuacion });
       B.push({ tipo: "campo", etiqueta: T.consulta.proximoControl, valor: x.proximoControl, continuacion });
+      if (x.enfermeria) bloquesDeEnfermeria(B, x.enfermeria, T.enfermeria, continuacion);
     });
     if (c.consultas?.length && c.consultasTotales > c.consultas.length) {
       B.push({ tipo: "nota", texto: T.consulta.sinNota(c.consultas.length, c.consultasTotales) });

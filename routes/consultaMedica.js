@@ -9,7 +9,7 @@ const { Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Receta, CatalogoT
 const { requireAuth, generarToken } = require("../services/auth");
 const { limitMedico, limitVistaPrevia } = require("../services/ratelimit");
 const { transcribirConsultaMedica, idiomaSoportado } = require("../services/assemblyai");
-const { generarNotaClinica, notaVacia } = require("../services/notaClinica");
+const { generarNotaClinica, notaVacia, sanearNotaEnfermeria } = require("../services/notaClinica");
 const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
@@ -598,6 +598,23 @@ module.exports = function (app) {
           huboCambios = true;
         }
       }
+      // La nota de enfermería (services/notaClinica.js): lo corregido pasa
+      // por la misma limpieza que lo que escribió la IA. El motivo ya se
+      // guardó arriba, con los textos de siempre.
+      if (n.formato === "enfermeria") {
+        const actual = typeof n.toObject === "function" ? n.toObject() : n;
+        const CAMPOS_ENF = ["valoracion", "signosVitales", "diagnosticosEnfermeria", "objetivos", "intervenciones", "evaluacion", "educacion"];
+        const editados = Object.fromEntries(CAMPOS_ENF.filter(c => notaEditada[c] !== undefined).map(c => [c, notaEditada[c]]));
+        const candidata = sanearNotaEnfermeria({ ...actual, ...editados });
+        for (const campo of Object.keys(editados)) {
+          const antes = JSON.stringify(actual[campo] ?? null);
+          const despues = JSON.stringify(candidata[campo] ?? null);
+          if (antes === despues) continue;
+          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: antes, valorFinal: despues });
+          n[campo] = candidata[campo];
+          huboCambios = true;
+        }
+      }
       if (huboCambios) {
         consulta.notaEditadaPorMedico = true;
         aplicado.push("Nota clínica corregida");
@@ -927,6 +944,8 @@ async function contextoDeNota(paciente, medicoPhone) {
   return {
     esOftalmologia, esOdontologia, esGinecologia,
     contexto: {
+      // La nota de enfermería en vez de la médica (services/notaClinica.js).
+      enfermeria: medico?.tipoEspecialidad === "enfermeria",
       antecedentesPersonales: paciente.antecedentesPersonales || [],
       antecedentesFamiliares: paciente.antecedentesFamiliares || [],
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
@@ -958,6 +977,13 @@ async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, no
       || await generarNotaClinica(texto ?? consulta.transcripcionCompleta, contexto, idioma);
     consulta.notaClinicaEstado = "completado";
     consulta.notaClinicaError = undefined;
+    // La de enfermería escrita en vivo no espera la verificación: lo que se
+    // verifica son los medicamentos recetados, y esa nota no receta. Decir
+    // «verificada con el audio completo» sobre algo que nadie comparó sería
+    // inventar una certeza (ver intentarVerificar).
+    if (consulta.notaClinica?.formato === "enfermeria" && consulta.notaFuente === "vivo") {
+      consulta.verificacion = { estado: "" };
+    }
 
     // Lo que la IA entendió para el mapa de la especialidad (odontograma,
     // mapa ocular, mapa ginecológico) queda en la nota como sugerencia: se
@@ -1046,6 +1072,8 @@ async function intentarVerificar(consultaId) {
   const c = await ConsultaMedica.findById(consultaId);
   if (!c || c.notaFuente !== "vivo" || c.confirmadaEn) return;
   if (c.estado === "procesando" || c.notaClinicaEstado === "pendiente") return;   // falta uno de los dos
+  // La nota de enfermería no receta: no hay nada que comparar (producirNota).
+  if (c.notaClinicaEstado === "completado" && c.notaClinica?.formato === "enfermeria") return;
 
   // La transcripción completa falló: la nota en vivo está, pero nadie la
   // comparó con el audio. Se le dice al médico, y puede confirmar igual.
