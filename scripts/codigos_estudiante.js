@@ -7,14 +7,16 @@
 //
 // Uso:
 //   node scripts/codigos_estudiante.js crear --nivel interno --meses 6
-//        [--horas 12] [--precio 89] [--moneda BOB] [--cantidad 5] [--nota "Univalle 5to año"]
+//        [--carrera enfermeria] [--horas 12] [--precio 89] [--moneda BOB] [--cantidad 5] [--nota "Univalle 5to año"]
 //   node scripts/codigos_estudiante.js listar            (los sin usar y los de los últimos 90 días)
 //   node scripts/codigos_estudiante.js listar --todos
 //   node scripts/codigos_estudiante.js anular EST-AB12CD
 //   node scripts/codigos_estudiante.js cuentas           (los estudiantes, con horas y vencimiento)
 //   node scripts/codigos_estudiante.js renovar <telefono> --meses 6 [--horas 12]
-//   node scripts/codigos_estudiante.js convertir <telefono>   (se recibió: pasa a cuenta de médico)
+//   node scripts/codigos_estudiante.js convertir <telefono>   (se recibió de médico: pasa a cuenta de médico)
 //
+// Carreras (modulos/estudiantes/carreras.js): medicina (la de siempre, si no
+// se dice otra) y enfermeria. Enfermería no tiene residentes.
 // Niveles: estudiante (3 h/mes), interno (6 h/mes), residente (12 h/mes).
 // --horas cambia ese tope; --precio es lo que cobraste, en bolivianos o reales,
 // para que quede anotado. Un código sin usar vence a los 60 días.
@@ -26,6 +28,7 @@ const mongoose = require("mongoose");
 const { Medico, AuditLog } = require("../db/models");
 const { CodigoEstudiante } = require("../modulos/estudiantes/modelos");
 const { NIVELES, generarCodigo, normalizarCodigo, estadoDe } = require("../modulos/estudiantes/cuenta");
+const { CARRERAS, NOMBRES_CARRERA, carreraDe } = require("../modulos/estudiantes/carreras");
 const { buscarPorTelefono } = require("../services/telefono");
 
 const VENCE_SIN_USAR_DIAS = 60;
@@ -55,9 +58,13 @@ const dia = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "—");
 const fallar = (msg) => { console.error(ROJO(`\n  ❌ ${msg}\n`)); process.exitCode = 1; };
 
 async function crear(argv) {
+  const carrera = opcion(argv, "carrera") || "medicina";
   const nivel = opcion(argv, "nivel");
   const meses = Number(opcion(argv, "meses"));
-  if (!NIVELES[nivel]) return fallar(`--nivel tiene que ser ${Object.keys(NIVELES).join(", ")}`);
+  if (!CARRERAS[carrera]) return fallar(`--carrera tiene que ser ${NOMBRES_CARRERA.join(", ")}`);
+  if (!NIVELES[nivel] || !CARRERAS[carrera].niveles.includes(nivel)) {
+    return fallar(`--nivel tiene que ser ${CARRERAS[carrera].niveles.join(", ")}${carrera === "medicina" ? "" : ` (en ${carrera})`}`);
+  }
   if (!Number.isInteger(meses) || meses < 1 || meses > 24) return fallar("--meses tiene que ser un número de 1 a 24");
   const horasMes = opcion(argv, "horas") !== undefined ? Number(opcion(argv, "horas")) : NIVELES[nivel].horasMes;
   if (!(horasMes > 0)) return fallar("--horas tiene que ser un número mayor que 0");
@@ -75,14 +82,14 @@ async function crear(argv) {
   const hechos = [];
   while (hechos.length < cantidad) {
     try {
-      const c = await CodigoEstudiante.create({ codigo: generarCodigo(), nivel, meses, horasMes, precioCentavos, moneda, nota, vence, creadoPor: "script" });
+      const c = await CodigoEstudiante.create({ codigo: generarCodigo(), carrera, nivel, meses, horasMes, precioCentavos, moneda, nota, vence, creadoPor: "script" });
       hechos.push(c);
     } catch (e) {
       if (e.code !== 11000) throw e;   // un código repetido: se saca otro
     }
   }
   const simbolo = moneda === "BRL" ? "R$" : "Bs";
-  console.log(VERDE(`\n  ✅ ${hechos.length} código(s) de ${nivel}, ${meses} mes(es), ${horasMes} h de audio por mes, ${simbolo} ${(precioCentavos / 100).toFixed(2)}:\n`));
+  console.log(VERDE(`\n  ✅ ${hechos.length} código(s) de ${carrera}, ${nivel}, ${meses} mes(es), ${horasMes} h de audio por mes, ${simbolo} ${(precioCentavos / 100).toFixed(2)}:\n`));
   for (const c of hechos) console.log(`     ${c.codigo}`);
   console.log(GRIS(`\n  Cada uno sirve para UNA persona. Si nadie lo usa, vence el ${dia(vence)}.`));
   console.log(GRIS("  Se usa en symphomed: «Entrar» → «Tengo un código de estudiante».\n"));
@@ -99,7 +106,7 @@ async function listar(argv) {
     const estado = c.anulado ? ROJO("anulado")
       : c.usadoPor ? `usado por ${c.usadoPor} el ${dia(c.usadoEn)}`
         : c.vence < new Date() ? ROJO("vencido sin usar") : VERDE("libre") + GRIS(` (vence ${dia(c.vence)})`);
-    console.log(`  ${c.codigo}  ${c.nivel.padEnd(10)} ${String(c.meses).padStart(2)} mes(es) ${String(c.horasMes).padStart(3)} h  ${estado}${c.nota ? GRIS("  · " + c.nota) : ""}`);
+    console.log(`  ${c.codigo}  ${(c.carrera || "medicina").padEnd(10)} ${c.nivel.padEnd(10)} ${String(c.meses).padStart(2)} mes(es) ${String(c.horasMes).padStart(3)} h  ${estado}${c.nota ? GRIS("  · " + c.nota) : ""}`);
   }
   console.log("");
 }
@@ -123,7 +130,7 @@ async function cuentas() {
     const e = await estadoDe(m);
     const vence = e.vencido ? ROJO(`VENCIDO ${dia(e.hasta)}`) : e.diasRestantes <= 7 ? ROJO(`vence ${dia(e.hasta)}`) : `vence ${dia(e.hasta)}`;
     const horas = e.sinHoras ? ROJO(`${e.horasUsadas}/${e.horasMes} h`) : `${e.horasUsadas}/${e.horasMes} h`;
-    console.log(`  ${m.phone.padEnd(14)} ${String(m.nombre).slice(0, 30).padEnd(32)} ${e.nivel.padEnd(10)} ${horas.padEnd(12)} ${vence}`);
+    console.log(`  ${m.phone.padEnd(14)} ${String(m.nombre).slice(0, 30).padEnd(32)} ${e.carrera.padEnd(10)} ${e.nivel.padEnd(10)} ${horas.padEnd(12)} ${vence}`);
   }
   console.log("");
 }
@@ -161,6 +168,9 @@ async function convertir(argv) {
   await conectar();
   const m = await cuentaDeEstudiante(argv[1]);
   if (!m) return;
+  // Pasar a médico es para quien se recibió de médico. Una cuenta de
+  // enfermería no se convierte en una que receta.
+  if (carreraDe(m) !== "medicina") return fallar(`${m.nombre} es de ${carreraDe(m)}: convertir pasa una cuenta de medicina a cuenta de médico, y no hay otra conversión por ahora.`);
   console.log(`\n  ${m.nombre} (${m.phone}) pasa a ser una cuenta de MÉDICO: va a poder recetar, escribirle a pacientes y cobrar.`);
   console.log("  Sus pacientes y consultas siguen. Las notas que grabó como estudiante conservan la marca.");
   if (await preguntar("  Escribí SI para confirmar: ") !== "SI") return console.log("  Cancelado. No se tocó nada.\n");
@@ -177,7 +187,8 @@ async function main() {
   const accion = acciones[argv[0]];
   if (!accion) {
     console.error("\n  Uso: node scripts/codigos_estudiante.js crear|listar|anular|cuentas|renovar|convertir …");
-    console.error("  Ejemplo: node scripts/codigos_estudiante.js crear --nivel interno --meses 6\n");
+    console.error("  Ejemplo: node scripts/codigos_estudiante.js crear --nivel interno --meses 6");
+    console.error("  De enfermería: node scripts/codigos_estudiante.js crear --carrera enfermeria --nivel estudiante --meses 6\n");
     process.exitCode = 1;
     return;
   }

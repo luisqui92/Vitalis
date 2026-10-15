@@ -39,8 +39,11 @@ const { perfil } = require("../../services/idiomas");
 const ia = require("../../services/ia");
 const { NIVELES, inicioDelMes } = require("./cuenta");
 const { ErrorHttp } = require("../../services/httpHelpers");
+const { configDe } = require("./carreras");
 
-const AREAS = ["clinica", "pediatria", "gineco", "cirugia", "emergencias"];
+// Las de cada carrera están en carreras.js; AREAS son las de medicina.
+const areasDe = (carrera) => configDe(carrera).areasPaciente;
+const AREAS = areasDe("medicina");
 const DIFICULTADES = ["basico", "intermedio", "avanzado"];
 const NOMBRE_AREA = {
   clinica: "medicina interna", pediatria: "pediatría", gineco: "ginecología y obstetricia",
@@ -445,7 +448,7 @@ function resumenDe(sim) {
 }
 
 module.exports = {
-  AREAS, DIFICULTADES, MAX_MENSAJES, MAX_TEXTO, MIN_PREGUNTAS, MAX_CASOS_NUEVOS_DIA,
+  AREAS, areasDe, DIFICULTADES, MAX_MENSAJES, MAX_TEXTO, MIN_PREGUNTAS, MAX_CASOS_NUEVOS_DIA,
   sanearGuion, guionDelPaciente, casoSinRespuesta, resolverAciegas, generarCaso, tomarDelBanco, prepararSimulacion,
   promptPaciente, responderComoPaciente, pedirHallazgo, sanearEvaluacion, evaluar,
   cupoDe, preguntasDe, filtroConLugar, turnoGuardado, sinClave, vista, obtener, resumenDe, normalizar,

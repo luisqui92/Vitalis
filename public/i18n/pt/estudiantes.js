@@ -12,6 +12,7 @@ Object.assign(I18N.pt, {
   "est.nivel.estudiante": "Estudante",
   "est.nivel.interno": "Interno",
   "est.nivel.residente": "Residente",
+  "est.carrera.enfermeria": "Enfermagem",
   "est.aviso.venceEl": "seu acesso vence em {fecha}",
   "est.aviso.venceProntoEl": "⚠️ seu acesso vence em {fecha} (em {dias} dias): peça a renovação à Symphomed",
   "est.aviso.horas": "Este mês você usou {usadas} de {total} horas de áudio.",

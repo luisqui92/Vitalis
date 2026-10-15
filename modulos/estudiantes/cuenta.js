@@ -39,6 +39,7 @@
 // barata que el audio (centavos de dólar por práctica), pero con su tope por
 // mes para que nadie la use sin límite.
 const { ConsultaMedica, VistaPrevia } = require("../../db/models");
+const { carreraDe } = require("./carreras");
 
 // Lo que trae cada nivel si el código no dice otra cosa.
 //
@@ -119,6 +120,7 @@ async function estadoDe(medico, ahora = new Date(), { sinVistaPrevia = null } = 
   const diasRestantes = hasta ? Math.max(0, Math.ceil((hasta - ahora) / 86400000)) : 0;
   return {
     nivel: e.nivel,
+    carrera: carreraDe(medico),
     hasta,
     diasRestantes,
     horasMes,

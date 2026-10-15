@@ -36,8 +36,11 @@ const ia = require("../../services/ia");
 const { NIVELES, inicioDelMes } = require("./cuenta");
 const { ErrorHttp } = require("../../services/httpHelpers");
 const { marcarDiaDeEstudio, inicioDeDia, reportarEnBanco } = require("./estudio");
+const { configDe } = require("./carreras");
 
-const AREAS = ["clinica", "pediatria", "gineco", "cirugia", "salud_publica"];
+// Las de cada carrera están en carreras.js; AREAS son las de medicina.
+const areasDe = (carrera) => configDe(carrera).areasSimulacro;
+const AREAS = areasDe("medicina");
 const NOMBRE_AREA = {
   clinica: "medicina interna", pediatria: "pediatría", gineco: "ginecología y obstetricia",
   cirugia: "cirugía general", salud_publica: "salud pública y medicina preventiva",
@@ -213,7 +216,7 @@ async function prepararSimulacro(id) {
   const s = await Simulacro.findById(id).lean();
   if (!s || s.estado !== "preparando") return;
   try {
-    const areas = s.area === "mixto" ? AREAS : [s.area];
+    const areas = s.area === "mixto" ? areasDe(s.carrera) : [s.area];
     // Que a cada área le alcance sin repetirle nada. Con el banco armado no
     // genera nada: solo cuenta.
     await completarBanco(s.medicoPhone, s.idioma, areas, s.cantidad);
@@ -416,7 +419,7 @@ async function reportarPregunta(medicoPhone, preguntaId, motivo, ahora = new Dat
 }
 
 module.exports = {
-  AREAS, CANTIDADES, MODOS, SEGUNDOS_POR_PREGUNTA, MAX_PREGUNTAS_NUEVAS_DIA,
+  AREAS, areasDe, CANTIDADES, MODOS, SEGUNDOS_POR_PREGUNTA, MAX_PREGUNTAS_NUEVAS_DIA,
   sanearPregunta, mezclarOpciones, generarLote, verificarLote, generarPreguntas, elegirPreguntas, prepararSimulacro,
   responder, terminar, completarCierre, completarCierresPendientes, vista, obtener, cupoDe, progreso, reportarPregunta, normalizar,
 };

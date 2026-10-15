@@ -9,6 +9,7 @@
 // navegador sabe pasar voz a texto), y el paciente puede contestar en voz
 // alta: es una práctica de entrevista, no un chat.
 
+// Las de medicina; las de cada carrera las manda el servidor (d.areas).
 const PV_AREAS = ["cualquiera", "clinica", "pediatria", "gineco", "cirugia", "emergencias"];
 const PV_DIFICULTADES = ["basico", "intermedio", "avanzado"];
 const PV_EXAMENES = ["signos", "general", "cabeza", "torax", "corazon", "abdomen", "extremidades", "neuro", "piel", "gineco"];
@@ -65,7 +66,7 @@ function pintarInicioPV(d) {
       ${abierta ? `<button class="secondary" id="pvSeguir" style="margin:0 0 12px">${abierta.paciente?.nombre
         ? t("pv.seguirCon", { nombre: esc(abierta.paciente.nombre) }) : t("pv.seguir")}</button>` : ""}
       <div class="est-rotulo">${t("pv.area")}</div>
-      ${chipsHtml("pvAreas", PV_AREAS, PV_ELECCION.area, a => "estudio.area." + a)}
+      ${chipsHtml("pvAreas", ["cualquiera", ...(d.areas || PV_AREAS.slice(1))], PV_ELECCION.area, a => "estudio.area." + a)}
       <div class="est-rotulo">${t("pv.dificultad")}</div>
       ${chipsHtml("pvDificultades", PV_DIFICULTADES, PV_ELECCION.dificultad, x => "pv.dificultad." + x)}
       <div class="hint" id="pvDificultadAyuda" style="margin-top:6px">${t("pv.dificultadAyuda." + PV_ELECCION.dificultad)}</div>

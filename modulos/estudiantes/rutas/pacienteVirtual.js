@@ -13,6 +13,7 @@ const { estadoDe: estadoDeEstudiante } = require("../cuenta");
 const { marcarDiaDeEstudio, zonaDe, reportarEnBanco } = require("../estudio");
 const { conCandado, claveDelPedido } = require("../candado");
 const pv = require("../pacienteVirtual");
+const { carreraDe } = require("../carreras");
 const { log } = require("../../../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -44,7 +45,7 @@ module.exports = function (app) {
     ]);
     res.json({
       cupo,
-      areas: pv.AREAS,
+      areas: pv.areasDe(carreraDe(medico)),
       enCurso: abiertas[0] ? { _id: abiertas[0]._id, area: abiertas[0].area, estado: abiertas[0].estado, paciente: abiertas[0].guion?.paciente || null } : null,
       historial: terminadas.map(pv.resumenDe),
     });
@@ -60,9 +61,11 @@ module.exports = function (app) {
   app.post("/medico/pacientes-virtuales", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = escritura(req, res);
     const pedida = String(req.body?.area || "");
-    const area = pedida === "cualquiera" ? pv.AREAS[Math.floor(Math.random() * pv.AREAS.length)] : pedida;
+    // Las áreas de SU carrera: una de otra carrera no es un área para él.
+    const areas = pv.areasDe(carreraDe(await Medico.findOne({ phone: medicoPhone }).select("estudiante").lean()));
+    const area = pedida === "cualquiera" ? areas[Math.floor(Math.random() * areas.length)] : pedida;
     const dificultad = String(req.body?.dificultad || "intermedio");
-    if (!pv.AREAS.includes(area)) throw new ErrorHttp(400, "Elegí un área.");
+    if (!areas.includes(area)) throw new ErrorHttp(400, "Elegí un área.");
     if (!pv.DIFICULTADES.includes(dificultad)) throw new ErrorHttp(400, "Elegí la dificultad.");
     const clave = claveDelPedido(req);
     const sim = await conCandado(`pv:${medicoPhone}`, "Ya estás empezando una práctica. Esperá un momento.", async () => {

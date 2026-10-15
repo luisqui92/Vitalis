@@ -11,6 +11,7 @@ const { zonaPorMoneda } = require("../../../services/zonaHoraria");
 const { tokenDeMedico, datosDeSesion } = require("../../../services/sesionMedico");
 const { log } = require("../../../config");
 const { normalizarCodigo, estadoDe } = require("../cuenta");
+const { carreraValida, configDe, nivelValido, tituloDe } = require("../carreras");
 
 // Como el resto de las rutas de la propia cuenta (routes/medicoAuth.js).
 const requireMedico = requireAuth(["medico", "admin"]);
@@ -59,12 +60,17 @@ function registro(app) {
     const hasta = new Date(ahora);
     hasta.setMonth(hasta.getMonth() + cod.meses);
     const moneda = cod.moneda || (idioma === "pt" ? "BRL" : "BOB");
+    // La carrera la trae el código (carreras.js): decide el título, la
+    // especialidad del núcleo —y con ella el formato de su nota— y las áreas
+    // en las que practica.
+    const carrera = carreraValida(cod.carrera);
     let medico;
     try {
+      if (!nivelValido(carrera, cod.nivel)) throw new ErrorHttp(400, "Ese código no es válido. Pedí uno nuevo a Symphomed.");
       medico = await Medico.create({
         phone, nombre, idioma,
-        especialidad: { estudiante: "Estudiante de medicina", interno: "Interno de medicina", residente: "Médico residente" }[cod.nivel],
-        tipoEspecialidad: "medicina_general",
+        especialidad: tituloDe(carrera, cod.nivel, idioma),
+        tipoEspecialidad: configDe(carrera).tipoEspecialidad,
         moneda,
         // Su «hoy»: el de la racha de estudio (../estudio.js). Sin esto un
         // estudiante de Brasil quedaba con la hora de Bolivia.
@@ -72,7 +78,7 @@ function registro(app) {
         passwordHash: await hashPassword(password),
         activo: true,
         estadoCuenta: "aprobada",
-        estudiante: { nivel: cod.nivel, hasta, horasMes: cod.horasMes, codigo: cod.codigo, universidad },
+        estudiante: { nivel: cod.nivel, carrera, hasta, horasMes: cod.horasMes, codigo: cod.codigo, universidad },
         // El plan que ya existe hace que sus consultas no descuenten saldo:
         // lo que pagó por el código cubre el período.
         suscripcion: { plan: "mensual", desde: ahora, hasta, precioCentavos: cod.precioCentavos, moneda: cod.moneda, activadaPor: "codigo:" + cod.codigo },
@@ -82,8 +88,8 @@ function registro(app) {
       await CodigoEstudiante.updateOne({ _id: cod._id }, { $set: { usadoPor: null, usadoEn: null } }).catch(() => {});
       throw e;
     }
-    registrar({ req, medicoPhone: phone, accion: "registro_estudiante", detalle: `${cod.codigo} · ${cod.nivel} · ${cod.meses} mes(es)` });
-    log.info(`[ESTUDIANTES] ${nombre} (${phone}) entró con ${cod.codigo} — ${cod.nivel}, ${cod.meses} mes(es)`);
+    registrar({ req, medicoPhone: phone, accion: "registro_estudiante", detalle: `${cod.codigo} · ${carrera} · ${cod.nivel} · ${cod.meses} mes(es)` });
+    log.info(`[ESTUDIANTES] ${nombre} (${phone}) entró con ${cod.codigo} — ${carrera}, ${cod.nivel}, ${cod.meses} mes(es)`);
     // La misma sesión que da el login (services/sesionMedico.js).
     res.json({ token: tokenDeMedico(medico), ...datosDeSesion(medico) });
   }));

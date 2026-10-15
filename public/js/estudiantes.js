@@ -97,7 +97,8 @@ async function estadoEstudiante() {
 function avisoEstudianteHtml(e) {
   if (!e) return "";
   const fecha = e.hasta ? new Date(e.hasta).toLocaleDateString(localeActual()) : "";
-  const nivel = t("est.nivel." + e.nivel);
+  // Medicina, como siempre; las otras carreras dicen cuál es.
+  const nivel = t("est.nivel." + e.nivel) + (e.carrera && e.carrera !== "medicina" ? " · " + t("est.carrera." + e.carrera) : "");
   if (e.bloqueado) return `<div class="error est-aviso" style="margin-top:0">⚠️ ${esc(e.motivo)}</div>`;
   const porVencer = e.diasRestantes <= 7;
   return `<div class="card card-secundaria est-aviso"${porVencer ? ` style="border-color:var(--warning)"` : ""}>

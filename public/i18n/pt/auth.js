@@ -75,5 +75,6 @@ Object.assign(I18N.pt, {
   "area.pediatria": "🧸 Pediatria",
   "area.neurodesarrollo": "🧩 Neurodesenvolvimento (autismo, síndrome de Down)",
   "area.fisioterapia": "🦴 Fisioterapia e reabilitação",
+  "area.enfermeria": "🩹 Enfermagem",
   "area.veterinaria": "🐾 Veterinária",
 });

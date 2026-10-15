@@ -13,6 +13,7 @@ const { estadoDe: estadoDeEstudiante } = require("../cuenta");
 const { zonaDe, MOTIVOS_REPORTE } = require("../estudio");
 const { conCandado, claveDelPedido } = require("../candado");
 const sim = require("../simulacros");
+const { carreraDe } = require("../carreras");
 const { log } = require("../../../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -44,7 +45,7 @@ module.exports = function (app) {
     ]);
     const abierto = abiertos[0];
     res.json({
-      cupo, progreso, areas: sim.AREAS, cantidades: sim.CANTIDADES,
+      cupo, progreso, areas: sim.areasDe(carreraDe(medico)), cantidades: sim.CANTIDADES,
       enCurso: abierto ? { _id: abierto._id, area: abierto.area, modo: abierto.modo, cantidad: abierto.cantidad, estado: abierto.estado,
         respondidas: (abierto.preguntas || []).filter(p => p.elegida != null).length } : null,
       historial: terminados,
@@ -60,7 +61,9 @@ module.exports = function (app) {
     const area = String(req.body?.area || "");
     const cantidad = Number(req.body?.cantidad);
     const modo = String(req.body?.modo || "practica");
-    if (area !== "mixto" && !sim.AREAS.includes(area)) throw new ErrorHttp(400, "Elegí un área.");
+    // Las áreas de SU carrera: una de otra carrera no es un área para él.
+    const carrera = carreraDe(await Medico.findOne({ phone: medicoPhone }).select("estudiante").lean());
+    if (area !== "mixto" && !sim.areasDe(carrera).includes(area)) throw new ErrorHttp(400, "Elegí un área.");
     if (!sim.CANTIDADES.includes(cantidad)) throw new ErrorHttp(400, "Elegí cuántas preguntas.");
     if (!sim.MODOS.includes(modo)) throw new ErrorHttp(400, "Elegí el modo.");
     const clave = claveDelPedido(req);
@@ -77,7 +80,7 @@ module.exports = function (app) {
       const zona = await zonaDe(medicoPhone);
       for (const v of viejos) await sim.terminar(medicoPhone, String(v._id), zona).catch(() => {});
       await Simulacro.updateMany({ medicoPhone, estado: "preparando" }, { $set: { estado: "error" } });
-      const nuevo = await Simulacro.create({ medicoPhone, idioma: medico.idioma || "es", area, cantidad, modo, ...(clave ? { clave } : {}) });
+      const nuevo = await Simulacro.create({ medicoPhone, idioma: medico.idioma || "es", carrera, area, cantidad, modo, ...(clave ? { clave } : {}) });
       sim.prepararSimulacro(nuevo._id).catch(e => log.warn("[SIMULACROS]", e.message));
       return nuevo.toObject();
     });

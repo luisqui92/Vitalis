@@ -24,6 +24,9 @@ const mongoose = require("mongoose");
 // scripts/codigos_estudiante.js.
 const codigoEstudianteSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true },
+  // De qué carrera es (carreras.js): medicina, enfermería. Los de antes, de
+  // medicina.
+  carrera: { type: String, default: "medicina" },
   nivel: { type: String, enum: ["estudiante", "interno", "residente"], required: true },
   meses: { type: Number, required: true, min: 1, max: 24 },
   horasMes: { type: Number, required: true, min: 1 },
@@ -194,6 +197,8 @@ const simulacroSchema = new mongoose.Schema({
   medicoPhone: { type: String, required: true },
   clave: { type: String, default: undefined },   // como en la práctica, arriba
   idioma: { type: String, default: "es" },
+  // La de la cuenta al empezarlo: con «mixto» dice de qué áreas mezclar.
+  carrera: { type: String, default: "medicina" },
   area: { type: String, required: true },
   // práctica: ve la respuesta en cada pregunta. examen: con tiempo, al final.
   modo: { type: String, enum: ["practica", "examen"], default: "practica" },

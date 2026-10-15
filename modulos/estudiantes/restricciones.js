@@ -51,6 +51,7 @@ const { ErrorHttp } = require("../../services/httpHelpers");
 const extensiones = require("../../services/extensiones");
 const { NIVELES, MOTIVO_VENCIDO, esEstudiante, accesoVencido, estadoDe } = require("./cuenta");
 const { textosDe } = require("./textos");
+const { carreraDe } = require("./carreras");
 
 // Como compara Express (sin «case sensitive» ni «strict routing»): /MEDICO/x/
 // y /medico/x son la misma ruta.
@@ -216,7 +217,7 @@ function marcaDelToken(medico) {
 function datosDeLaSesion(medico) {
   return {
     estudiante: esEstudiante(medico)
-      ? { nivel: medico.estudiante.nivel, hasta: medico.estudiante.hasta, horasMes: medico.estudiante.horasMes }
+      ? { nivel: medico.estudiante.nivel, carrera: carreraDe(medico), hasta: medico.estudiante.hasta, horasMes: medico.estudiante.horasMes }
       : null,
   };
 }

@@ -4,6 +4,7 @@
 // la respuesta y la explicación aparecen al contestar cada una; en examen,
 // con reloj y recién al final. Las que erra pasan a sus tarjetas de repaso.
 
+// Las de medicina; las de cada carrera las manda el servidor (d.areas).
 const SIM_AREAS = ["mixto", "clinica", "pediatria", "gineco", "cirugia", "salud_publica"];
 const SIM_CANTIDADES = [10, 20, 40];
 const SIM_MODOS = ["practica", "examen"];
@@ -45,7 +46,7 @@ function pintarInicioSim(d) {
       <div class="hint" style="margin:0 0 12px">${t("sim.bajada")}</div>
       ${abierto ? `<button class="secondary" id="simSeguir" style="margin:0 0 12px">${t("sim.seguir", { area: esc(nombreArea(abierto.area)), n: abierto.respondidas, total: abierto.cantidad })}</button>` : ""}
       <div class="est-rotulo">${t("sim.area")}</div>
-      ${chipsHtml("simAreas", SIM_AREAS, SIM_ELECCION.area, a => "estudio.area." + a)}
+      ${chipsHtml("simAreas", ["mixto", ...(d.areas || SIM_AREAS.slice(1))], SIM_ELECCION.area, a => "estudio.area." + a)}
       <div class="est-rotulo">${t("sim.cuantas")}</div>
       ${chipsHtml("simCantidades", SIM_CANTIDADES, SIM_ELECCION.cantidad, n => "sim.cantidad." + n)}
       <div class="est-rotulo">${t("sim.modo")}</div>

@@ -98,7 +98,10 @@ const medicoSchema = new mongoose.Schema({
   // (medicina general vs. odontología, que necesitan fichas muy distintas).
   // "especialidad" de arriba queda como texto libre descriptivo (ej.
   // "Cardiología"), esto es lo que realmente rama la interfaz.
-  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo", "fisioterapia"], default: "medicina_general" },
+  // "enfermeria": la nota sigue el proceso de atención de enfermería
+  // (services/notaClinica.js). Por ahora solo la usan los estudiantes de
+  // enfermería; no está en la lista del registro de médicos.
+  tipoEspecialidad: { type: String, enum: ["medicina_general", "odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo", "fisioterapia", "enfermeria"], default: "medicina_general" },
   // Idioma en el que este médico trabaja: la interfaz, sus notas clínicas y
   // lo que sus pacientes reciben por WhatsApp. Va acá y no en el servidor
   // porque es un ajuste profesional, no de infraestructura — el mismo
@@ -203,6 +206,9 @@ const medicoSchema = new mongoose.Schema({
   estudiante: {
     type: {
       nivel: { type: String, enum: ["estudiante", "interno", "residente"] },
+      // Medicina, enfermería… (modulos/estudiantes/carreras.js). Sin carrera
+      // es medicina: las cuentas de antes de que hubiera otras.
+      carrera: { type: String, default: undefined },
       // Hasta cuándo puede grabar. Vencido, entra y ve sus casos, pero no
       // graba consultas nuevas hasta que se renueve.
       hasta: { type: Date, default: null },
