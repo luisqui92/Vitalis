@@ -17,6 +17,9 @@
 //     (sin --carrera, --todas son las de medicina; con --area, la carrera es la del área)
 //   node scripts/banco_estudio.js reportadas         (lo que los estudiantes marcaron como mal)
 //   node scripts/banco_estudio.js restaurar <id>     (vuelve al banco algo que se sacó por reportes)
+//   node scripts/banco_estudio.js muestra --area enf_adulto --n 10            (para revisar: preguntas al azar, con su respuesta)
+//   node scripts/banco_estudio.js muestra --area enf_hospitalizacion --casos  (casos al azar, con su diagnóstico)
+//   node scripts/banco_estudio.js ocultar <id>       (saca del banco una pregunta o un caso que está mal)
 //
 // Cuesta centavos de dólar: unas 20 preguntas o un caso, alrededor de 1 centavo.
 const path = require("path");
@@ -133,6 +136,55 @@ async function reportadas() {
   console.log(GRIS("\n  Para devolver uno al banco: node scripts/banco_estudio.js restaurar <id>\n"));
 }
 
+// Para que alguien que sabe (una enfermera, un docente) revise el banco antes
+// de dárselo a los estudiantes: preguntas o casos al azar, con la respuesta.
+// Solo lee. La que esté mal se saca con «ocultar».
+async function muestra(argv) {
+  const idioma = opcion(argv, "idioma") || "es";
+  const area = opcion(argv, "area");
+  const n = Number(opcion(argv, "n") || 10);
+  const casosPedidos = argv.includes("--casos");
+  const carrera = carreraDeArea(area);
+  const areas = carrera ? (casosPedidos ? pv.areasDe(carrera) : simulacros.areasDe(carrera)) : [];
+  if (!areas.includes(area)) {
+    const todas = NOMBRES_CARRERA.flatMap(c => (casosPedidos ? pv.areasDe(c) : simulacros.areasDe(c)));
+    return fallar(`--area tiene que ser un área de ${casosPedidos ? "casos" : "simulacro"}: ${todas.join(", ")}`);
+  }
+  if (!(n > 0 && n <= 50)) return fallar("--n tiene que ser de 1 a 50");
+  if (casosPedidos) {
+    const xs = await CasoVirtual.aggregate([{ $match: { idioma, area, oculto: false } }, { $sample: { size: n } }]);
+    if (!xs.length) return console.log(`\n  No hay casos de ${area} (${idioma}) todavía.\n`);
+    for (const c of xs) {
+      const g = c.guion || {};
+      console.log(`\n  ${GRIS(String(c._id))} · ${c.dificultad}${g.diagnosticoMedico ? ` · diagnóstico médico: ${g.diagnosticoMedico}` : ""}`);
+      console.log(`  «${g.motivo}»`);
+      console.log(`  ${VERDE("→")} ${g.diagnostico}`);
+      for (const d of g.diferenciales || []) console.log(GRIS(`    no es ${d.diagnostico}: ${d.porQueNo}`));
+      if ((g.intervencionesClave || []).length) console.log(GRIS(`    intervenciones: ${g.intervencionesClave.join("; ")}`));
+    }
+  } else {
+    const xs = await PreguntaSimulacro.aggregate([{ $match: { idioma, area, oculta: false } }, { $sample: { size: n } }]);
+    if (!xs.length) return console.log(`\n  No hay preguntas de ${area} (${idioma}) todavía.\n`);
+    for (const p of xs) {
+      console.log(`\n  ${GRIS(String(p._id))} · ${p.tema}`);
+      console.log(`  ${p.enunciado}`);
+      p.opciones.forEach((o, i) => console.log(`    ${i === p.correcta ? VERDE("→") : " "} ${"ABCDE"[i]}. ${o}`));
+      console.log(GRIS(`    ${p.explicacion}`));
+    }
+  }
+  console.log(GRIS("\n  Si alguno está mal: node scripts/banco_estudio.js ocultar <id>\n"));
+}
+
+// Lo que alguien que sabe encontró mal sale del banco al toque: no espera a
+// que dos estudiantes lo marquen. Se devuelve con «restaurar».
+async function ocultar(id) {
+  if (!mongoose.isValidObjectId(id)) return fallar("Falta el id: node scripts/banco_estudio.js ocultar <id>");
+  const a = await PreguntaSimulacro.updateOne({ _id: id }, { $set: { oculta: true } });
+  const b = await CasoVirtual.updateOne({ _id: id }, { $set: { oculto: true } });
+  if (!a.matchedCount && !b.matchedCount) return fallar("No hay ninguna pregunta ni caso con ese id");
+  console.log(VERDE("\n  ✅ Sale del banco: no se le muestra a nadie más. Para devolverlo: node scripts/banco_estudio.js restaurar <id>\n"));
+}
+
 async function restaurar(id) {
   if (!mongoose.isValidObjectId(id)) return fallar("Falta el id: node scripts/banco_estudio.js restaurar <id>");
   const a = await PreguntaSimulacro.updateOne({ _id: id }, { $set: { oculta: false, reportes: [] } });
@@ -149,7 +201,9 @@ async function main() {
   if (comando === "casos") return casos(resto);
   if (comando === "reportadas") return reportadas();
   if (comando === "restaurar") return restaurar(resto[0]);
-  fallar("Uso: node scripts/banco_estudio.js [preguntas|casos|reportadas|restaurar] …");
+  if (comando === "muestra") return muestra(resto);
+  if (comando === "ocultar") return ocultar(resto[0]);
+  fallar("Uso: node scripts/banco_estudio.js [preguntas|casos|reportadas|restaurar|muestra|ocultar] …");
 }
 
 main()

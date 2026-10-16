@@ -192,6 +192,33 @@ const TEXTO = "Buenas tardes señora soy la estudiante de enfermería, ¿cómo s
   verificar("las contestó a ciegas un licenciado en enfermería, sin la respuesta", alVerificador && !/"correcta"/.test(alVerificador.ultimo) && /hacé la cuenta/.test(alVerificador.sistema));
   verificar("  ...y la de cálculo con la cuenta mal ni le llegó", alVerificador && !/500 mL en 4 horas/.test(alVerificador.ultimo));
 
+  // Revisar el banco antes de dárselo a los estudiantes (scripts/banco_estudio.js).
+  // Con spawn y no spawnSync: mientras esta prueba esperara bloqueada, nadie
+  // leería lo que escribe la base de prueba, y la base se trabaría.
+  const { spawn } = require("child_process");
+  const banco = (...args) => new Promise((resolve) => {
+    const h = spawn(process.execPath, [path.join(RAIZ, "scripts", "banco_estudio.js"), ...args], { cwd: RAIZ, env: process.env });
+    let stdout = "", stderr = "";
+    h.stdout.on("data", (c) => { stdout += c; });
+    h.stderr.on("data", (c) => { stderr += c; });
+    const tope = setTimeout(() => h.kill("SIGKILL"), 60000);
+    h.on("close", (status) => { clearTimeout(tope); resolve({ status, stdout, stderr }); });
+  });
+  let b = await banco("muestra", "--area", "enf_fundamentos", "--n", "10");
+  verificar(`«muestra» enseña las preguntas con su respuesta, para que alguien que sabe las revise (${b.status})`,
+    b.status === 0 && /dolor 8\/10/.test(b.stdout) && /1000 mL/.test(b.stdout) && /→/.test(b.stdout) && guardadas.every(p => b.stdout.includes(String(p._id))));
+  const mala = guardadas.find(p => /dolor 8\/10/.test(p.enunciado));
+  b = await banco("ocultar", String(mala._id));
+  verificar("«ocultar» la saca del banco al toque", b.status === 0 && (await M.PreguntaSimulacro.findById(mala._id).lean()).oculta === true);
+  b = await banco("muestra", "--area", "enf_fundamentos", "--n", "10");
+  verificar("  ...y ya no aparece", b.status === 0 && !/dolor 8\/10/.test(b.stdout) && /1000 mL/.test(b.stdout));
+  b = await banco("restaurar", String(mala._id));
+  verificar("  ...«restaurar» la devuelve", b.status === 0 && (await M.PreguntaSimulacro.findById(mala._id).lean()).oculta === false);
+  b = await banco("muestra", "--area", "cardiologia");
+  verificar("un área que no existe → error que dice cuáles hay", b.status === 1 && /enf_fundamentos/.test(b.stderr));
+  b = await banco("preguntas", "--carrera", "odontologia", "--todas");
+  verificar("una carrera que no existe → error, sin pedirle nada a la IA", b.status === 1 && /medicina, enfermeria/.test(b.stderr));
+
   console.log("\n── 2. El paciente virtual de enfermería ──");
   const pCaso = PV.promptCaso("es", "enf_hospitalizacion", "intermedio", []);
   verificar("el caso lo arma un docente de enfermería: valorar y encontrar el problema de cuidado prioritario",
@@ -203,6 +230,9 @@ const TEXTO = "Buenas tardes señora soy la estudiante de enfermería, ¿cómo s
   const resolver = ultimoDe("resolverEnf");
   verificar("  ...cerró: lo resolvió a ciegas un licenciado en enfermería, con el diagnóstico médico a la vista",
     resolver && /Diagnóstico médico: Neumonía/.test(resolver.ultimo) && !/Posición semisentada/.test(resolver.ultimo));
+  b = await banco("muestra", "--area", "enf_hospitalizacion", "--casos");
+  verificar("«muestra --casos» enseña los casos con su diagnóstico médico y el de enfermería",
+    b.status === 0 && /diagnóstico médico: Neumonía/.test(b.stdout) && /Deterioro del intercambio gaseoso/.test(b.stdout) && /intervenciones: Posición semisentada/.test(b.stdout));
   const sim = { _id: new mongoose.Types.ObjectId(), area: "enf_hospitalizacion", idioma: "es", guion: caso.guion, mensajes: [], hallazgos: [], estado: "en_curso" };
   await PV.responderComoPaciente(sim, "¿Qué le dijo el médico que tiene?");
   const alPaciente = ultimoDe("pacienteEnf");
