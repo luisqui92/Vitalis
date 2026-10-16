@@ -222,6 +222,10 @@ const consulta = (id, extra = {}) => ({
     verificar("y nada para cargar al Kardex", JSON.stringify(confirmado?.aplicar?.medicamentos) === "[]" && confirmado?.aplicar?.receta === false);
 
     console.log("\n── 4. Confirmada, se lee como texto ──");
+    // Confirmar vuelve a abrir la consulta: se espera a que termine, si no
+    // esa respuesta puede llegar después y tapar la que se abre acá.
+    await page.waitForLoadState("networkidle");
+    await page.waitForSelector("#btnConfirmarConsulta:not([disabled])", { timeout: 15000 });
     await page.evaluate((id) => renderDetalle(id), CONFIRMADA);
     await page.waitForSelector(".nfe-lista", { timeout: 15000 });
     const leida = await page.$eval(".nfe-lista", (x) => x.closest(".card").innerText);
