@@ -23,11 +23,15 @@ const { log } = require("../config");
 const DIR_MAPAS = path.join(__dirname, "..", "ofuscado-mapas");
 const MAX_MEDICOS = 20;
 
+// El lugar en el código de una pila («consultas.js:1:104213») no se tapa: el
+// JS ofuscado es una sola línea larguísima, y la columna de un error en su
+// segunda mitad pasa de las seis cifras. Tapada como si fuera un teléfono, el
+// error quedaba sin «dónde» (y sin poder traducirse a la línea original).
 function limpiar(texto, largo) {
   return String(texto || "")
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "«correo»")
     .replace(/\b[0-9a-f]{24}\b/gi, ":id")
-    .replace(/\d{6,}/g, "#")
+    .replace(/(\.js:\d+:\d+)|\d{6,}/g, (x, lugar) => lugar || "#")
     .slice(0, largo);
 }
 

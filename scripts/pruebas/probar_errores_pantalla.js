@@ -45,6 +45,10 @@ function postear(cuerpo, ip, token) {
   const { limpiar, primerMarco } = require(path.join(RAIZ, "services", "erroresCliente"));
   const l = limpiar("falló con 59170012345 y ana@mail.com en 0123456789abcdef01234567", 300);
   verificar("teléfonos, correos e ids se tapan", !/59170012345|ana@mail|0123456789abcdef/.test(l) && /#/.test(l) && /«correo»/.test(l) && /:id/.test(l));
+  // El ofuscado es una sola línea: pasada la mitad, la columna tiene seis cifras.
+  const pila = limpiar("TypeError: x\n    at renderDetalle (https://app.symphomed.com/js/consultas.js:1:104213) 59170012345", 300);
+  verificar(`  ...pero no el lugar en el código, aunque la columna tenga seis cifras (${pila.replace(/\n\s*/g, " ")})`,
+    /consultas\.js:1:104213/.test(pila) && !/59170012345/.test(pila) && JSON.stringify(primerMarco(pila)) === JSON.stringify({ archivo: "consultas.js", linea: 1, columna: 104213 }));
   verificar("de la pila se toma el primer lugar de nuestro código", JSON.stringify(primerMarco("at x (https://app.symphomed.com/js/consultas.js:1:48213)")) === JSON.stringify({ archivo: "consultas.js", linea: 1, columna: 48213 }));
 
   const pw = cargarPlaywright();

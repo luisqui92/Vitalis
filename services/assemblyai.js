@@ -20,18 +20,23 @@ const IDIOMAS_CON_MEDICAL_MODE = ["en", "es", "de", "fr"];
 // final reconozcan exactamente el mismo vocabulario).
 const MAX_KEYTERMS = 100;
 
-// Cuántos lugares, como mucho, se llevan los medicamentos del propio médico.
+// Cuántos lugares, como mucho, se llevan los medicamentos del propio médico,
+// y cuántos sus palabras.
 const MAX_KEYTERMS_DEL_MEDICO = 25;
+const MAX_KEYTERMS_PROPIOS = 25;
 
 // Orden = prioridad (si algo se corta al llegar a 100, es lo último):
 //   1. lo que ESTE médico receta (services/vocabularioMedico.js): es lo más
 //      probable que diga, y lo que ninguna lista general va a tener —sus
 //      marcas, sus combinaciones—.
-//   2. su especialidad.
-//   3. el vocabulario general del idioma (incluye cómo se dicta la posología).
-//   4. los fármacos más recetados, hasta llenar.
+//   2. sus palabras (services/adaptacion.js): las que agregó él, las que el
+//      transcriptor le entendió mal y él corrigió, y sus diagnósticos y
+//      estudios de siempre.
+//   3. su especialidad.
+//   4. el vocabulario general del idioma (incluye cómo se dicta la posología).
+//   5. los fármacos más recetados, hasta llenar.
 // Sin repetidos: «Losartana» del médico y «losartana» de la lista son uno.
-function keytermsPara(tipoEspecialidad, idioma, delMedico = []) {
+function keytermsPara(tipoEspecialidad, idioma, delMedico = [], propios = []) {
   const lang = idiomaSoportado(idioma);
   const vistos = new Set();
   const clave = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -49,6 +54,7 @@ function keytermsPara(tipoEspecialidad, idioma, delMedico = []) {
     }
   };
   sumar(Array.isArray(delMedico) ? delMedico : [], MAX_KEYTERMS_DEL_MEDICO);
+  sumar(Array.isArray(propios) ? propios : [], MAX_KEYTERMS_PROPIOS);
   const vocab = perfil(lang).transcripcion;
   sumar(vocab.porEspecialidad[tipoEspecialidad] || []);
   sumar(vocab.generales);
@@ -82,7 +88,7 @@ async function subirAudio(audioBuffer) {
 // multichannel y speaker_labels no van juntos, y está bien que no vayan:
 // pedir diarización sobre un audio donde ya sabés quién es quién es pedirle
 // al modelo que dude de un dato que ya tenés.
-async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false, delMedico = [] } = {}) {
+async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false, delMedico = [], propios = [] } = {}) {
   const lang = idiomaSoportado(idioma);
   const conMedicalMode = IDIOMAS_CON_MEDICAL_MODE.includes(lang);
   if (!conMedicalMode) {
@@ -117,7 +123,7 @@ async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multican
       // Solo donde existe. Mandarlo igual no rompe (la API lo ignora), pero
       // así la petición dice la verdad de lo que va a pasar.
       ...(conMedicalMode ? { domain: "medical-v1" } : {}),
-      keyterms_prompt: keytermsPara(tipoEspecialidad, lang, delMedico),
+      keyterms_prompt: keytermsPara(tipoEspecialidad, lang, delMedico, propios),
     },
     {
       headers: { Authorization: CONFIG.ASSEMBLYAI_API_KEY, "Content-Type": "application/json" },
@@ -165,13 +171,13 @@ function quienSegunCanal(canal) {
   return "";
 }
 
-async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false, delMedico = [] } = {}) {
+async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false, delMedico = [], propios = [] } = {}) {
   if (!CONFIG.ASSEMBLYAI_API_KEY) {
     throw new Error("ASSEMBLYAI_API_KEY no configurado");
   }
 
   const audioUrl = await subirAudio(audioBuffer);
-  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal, delMedico });
+  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal, delMedico, propios });
   const data = await esperarTranscripcion(id);
 
   const segmentos = (data.utterances || []).map(u => ({
@@ -238,4 +244,4 @@ async function transcribirNotaDeVoz(audioBuffer, tipoEspecialidad, idioma) {
 // La vista previa en vivo (el streaming) no está acá: pasa por el servidor,
 // que se conecta con la clave y mide el tiempo (services/vistaPrevia.js).
 
-module.exports = { transcribirConsultaMedica, transcribirNotaDeVoz, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE, MAX_KEYTERMS };
+module.exports = { transcribirConsultaMedica, transcribirNotaDeVoz, keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE, MAX_KEYTERMS, MAX_KEYTERMS_PROPIOS };

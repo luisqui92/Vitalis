@@ -57,6 +57,7 @@ const { sesionVigente } = require("./auth");
 const extensiones = require("./extensiones");
 const { keytermsPara, idiomaSoportado, IDIOMAS_CON_MEDICAL_MODE } = require("./assemblyai");
 const { medicamentosDelMedico } = require("./vocabularioMedico");
+const { vocabularioParaTranscribir } = require("./adaptacion");
 
 const RUTA = "/ws-vista-previa";
 
@@ -87,11 +88,13 @@ const AJUSTES = {
 // Mode donde existe y el vocabulario de la especialidad, para que lo que se
 // ve mientras se habla se parezca a lo que después queda guardado. Las
 // listas van como array JSON (mandarlas repetidas devuelve «Invalid JSON
-// array»: probado contra la API).
+// array»: probado contra la API). Con los medicamentos y las palabras de
+// este médico, como la final.
 async function parametrosDeConexion(medicoPhone) {
-  const [medico, delMedico] = await Promise.all([
+  const [medico, delMedico, propios] = await Promise.all([
     Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean(),
     medicamentosDelMedico(medicoPhone),
+    vocabularioParaTranscribir(medicoPhone),
   ]);
   const idioma = idiomaSoportado(medico?.idioma);
   const p = new URLSearchParams({
@@ -102,7 +105,7 @@ async function parametrosDeConexion(medicoPhone) {
     language_codes: JSON.stringify([idioma]),
   });
   if (IDIOMAS_CON_MEDICAL_MODE.includes(idioma)) p.set("domain", "medical-v1");
-  const keyterms = keytermsPara(medico?.tipoEspecialidad, idioma, delMedico);
+  const keyterms = keytermsPara(medico?.tipoEspecialidad, idioma, delMedico, propios);
   if (keyterms.length) p.set("keyterms_prompt", JSON.stringify(keyterms));
   return p;
 }

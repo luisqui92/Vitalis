@@ -168,6 +168,8 @@ require("./routes/solicitudesCuenta")(app);
 require("./routes/reseteoClave")(app);
 require("./routes/solicitudBaja")(app);
 require("./routes/perfilFoto")(app);
+// «Así escribo yo»: lo que la IA aprendió de cada uno (services/adaptacion.js).
+require("./routes/adaptacion")(app);
 // Receta digital de Brasil. En Brasil una receta necesita firma ICP-Brasil,
 // así que no se receta por Symphomed sino solo por Memed — ver services/memed.js.
 require("./routes/memed")(app);

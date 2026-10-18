@@ -275,7 +275,8 @@ function notaEnVivoHtml(estado, n, noNombrados = [], extras = {}) {
     ${notaEnfermeriaLecturaHtml(n)}
     ${Extensiones.lugar("notaEnVivo", { conNota: true, extras }).html}`;
   }
-  const campo = (clave, valor) => valor ? `<div class="nota-campo"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
+  // lineas: el texto respeta sus renglones (un plan en viñetas).
+  const campo = (clave, valor, lineas) => valor ? `<div class="nota-campo${lineas ? " nota-lineas" : ""}"><b>${t(clave)}</b> ${esc(valor)}</div>` : "";
   // Lo que la IA puso y nadie nombró se marca ya, mientras se graba.
   const meds = (n.medicamentosRecetados || []).map((m, i) => [m?.nombre, m?.dosis, m?.frecuencia].filter(Boolean).join(" ")
     + (noNombrados.includes(i) ? " " + t("vivo.noNombrado") : "")).join("; ");
@@ -287,7 +288,7 @@ function notaEnVivoHtml(estado, n, noNombrados = [], extras = {}) {
     ${campo("nota.antecedentes", n.antecedentesRelevantes)}
     ${campo("nota.diagnostico", n.diagnostico)}
     ${campo("nota.diferenciales", (n.diagnosticosDiferenciales || []).join(", "))}
-    ${campo("nota.plan", n.plan)}
+    ${campo("nota.plan", n.plan, true)}
     ${campo("nota.medicamentos", meds)}
     ${campo("nota.examenes", (n.examenesSolicitados || []).join(", "))}
     ${Extensiones.lugar("notaEnVivo", { conNota: true, extras }).html}`;
@@ -848,7 +849,7 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
             ${n.antecedentesRelevantes ? `<div class="nota-campo"><b>${t("nota.antecedentes")}</b> ${esc(n.antecedentesRelevantes)}</div>` : ""}
             ${n.diagnostico ? `<div class="nota-campo"><b>${t("nota.diagnostico")}</b> ${esc(n.diagnostico)}</div>` : ""}
             ${(n.diagnosticosDiferenciales||[]).length ? `<div class="nota-campo"><b>${t("nota.diferenciales")}</b> ${esc(n.diagnosticosDiferenciales.join(", "))}</div>` : ""}
-            ${n.plan ? `<div class="nota-campo"><b>${t("nota.plan")}</b> ${esc(n.plan)}</div>` : ""}
+            ${n.plan ? `<div class="nota-campo nota-lineas"><b>${t("nota.plan")}</b> ${esc(n.plan)}</div>` : ""}
             ${meds ? `<div class="nota-campo"><b>${t("nota.medicamentos")}</b> ${meds}</div>` : ""}
             ${(n.examenesSolicitados||[]).length ? `<div class="nota-campo"><b>${t("nota.examenes")}</b> ${esc(n.examenesSolicitados.join(", "))}</div>` : ""}
             ${n.proximoControl ? `<div class="nota-campo"><b>${t("nota.proximoControl")}</b> ${esc(n.proximoControl)}</div>` : ""}

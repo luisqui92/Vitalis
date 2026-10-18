@@ -113,6 +113,8 @@ body{
   letter-spacing:.9px;text-transform:uppercase;color:var(--tinta3);
 }
 .rv-campo{color:var(--tinta2)}
+/* Un plan en viñetas se lee con sus renglones. */
+.rv-lineas{white-space:pre-line}
 .rv-aviso-corte{
   margin:12px 0 0;font-size:13.5px;color:var(--tinta2);
   background:#f5f8fa;border-left:3px solid var(--linea);padding:9px 12px;border-radius:0 6px 6px 0;

@@ -249,6 +249,24 @@ function construirContexto(contexto, idioma) {
       contexto.correccionesMedicamentos.map(c => `"${c.dijo}" → "${c.correcto}"`).join("; ") +
       `. Si en la transcripción aparece lo de la izquierda como medicamento, en la nota va lo de la derecha.`);
   }
+  // Lo que aprendió de este profesional (services/adaptacion.js): sus
+  // palabras y su forma de escribir. Sirve para escribir bien y a su manera lo
+  // que SÍ se dijo; nunca para agregar, sacar ni cambiar un dato.
+  const a = contexto?.adaptacion;
+  if (a?.vocabulario?.length) {
+    partes.push(`Palabras que usa este profesional: ${a.vocabulario.join(", ")}. ` +
+      `Si en la transcripción aparece una de estas, o algo que suena muy parecido y el contexto lo confirma, escribila así. ` +
+      `NUNCA agregues una de estas palabras si no se dijo.`);
+  }
+  if (a?.correcciones?.length) {
+    partes.push(`Errores de transcripción que este profesional corrigió en dos consultas o más (lo que salió escrito → lo que quiso decir): ` +
+      a.correcciones.map(c => `"${c.dijo}" → "${c.correcto}"`).join("; ") +
+      `. Si en la transcripción aparece lo de la izquierda, en la nota va lo de la derecha, salvo que el contexto muestre claramente que se dijo lo de la izquierda.`);
+  }
+  if (a?.estilo?.length) {
+    partes.push(`Cómo escribe sus notas este profesional; escribí la nota con su forma: ${a.estilo.join(" ")} ` +
+      `Esto es SOLO la forma: nunca agregues, quites ni cambies un dato clínico por estas preferencias.`);
+  }
   if (contexto?.catalogoTratamientos?.length) {
     partes.push(`Catálogo de tratamientos de este consultorio (para "tratamientosSugeridos"): ${contexto.catalogoTratamientos.join("; ")}`);
   }

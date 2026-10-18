@@ -20,7 +20,8 @@ const { avisarCambio } = require("../services/realtime");
 const { registrarCorreccion } = require("../services/correccionesIA");
 const { estadoDe, movimientosDe, cobrarConsulta } = require("../services/saldo");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
-const { medicamentosDelMedico, correccionesDelMedico, olvidar: olvidarVocabulario } = require("../services/vocabularioMedico");
+const { medicamentosDelMedico, correccionesDelMedico } = require("../services/vocabularioMedico");
+const adaptacion = require("../services/adaptacion");
 const { verificarMedicamento } = require("../services/medicamentosOficiales");
 const { guardarBorrador, borradorDe, extrasDe, compararMedicamentos, medicamentosNoNombrados } = require("../services/notaEnVivo");
 const audioPendiente = require("../services/audioPendiente");
@@ -547,6 +548,10 @@ module.exports = function (app) {
       const textos = ["motivoConsulta", "antecedentesRelevantes", "diagnostico", "plan", "proximoControl"];
       const listas = ["sintomas", "diagnosticosDiferenciales", "examenesSolicitados"];
       let huboCambios = false;
+      // Se esperan (registrarCorreccion nunca tira): de estas aprende la IA de
+      // este profesional (services/adaptacion.js), y tienen que estar
+      // guardadas antes de que se recalcule lo aprendido, más abajo.
+      const correcciones = [];
 
       for (const campo of textos) {
         if (notaEditada[campo] === undefined) continue;
@@ -554,7 +559,7 @@ module.exports = function (app) {
         if (valor !== (n[campo] || "")) {
           // Lo que la IA propuso vs. lo que quedó: alimenta el panel de
           // correcciones, que es como medimos si la IA está mejorando.
-          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: n[campo], valorFinal: valor });
+          correcciones.push(registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: n[campo], valorFinal: valor }));
           n[campo] = valor;
           huboCambios = true;
         }
@@ -563,7 +568,7 @@ module.exports = function (app) {
         if (!Array.isArray(notaEditada[campo])) continue;
         const valor = notaEditada[campo].map(x => String(x).trim()).filter(Boolean);
         if (valor.join("|") !== (n[campo] || []).join("|")) {
-          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: (n[campo] || []).join(", "), valorFinal: valor.join(", ") });
+          correcciones.push(registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: (n[campo] || []).join(", "), valorFinal: valor.join(", ") }));
           n[campo] = valor;
           huboCambios = true;
         }
@@ -575,7 +580,7 @@ module.exports = function (app) {
         const antes = (n.medicamentosRecetados || []).map(m => `${m.nombre}|${m.dosis}|${m.frecuencia}`).join("¬");
         const despues = valor.map(m => `${m.nombre}|${m.dosis}|${m.frecuencia}`).join("¬");
         if (antes !== despues) {
-          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo: "medicamentosRecetados", valorSugerido: antes, valorFinal: despues });
+          correcciones.push(registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo: "medicamentosRecetados", valorSugerido: antes, valorFinal: despues }));
           // Cada nombre que el médico cambió queda como par «la IA escribió
           // X → él escribió Y». Con eso Symphomed aprende sus correcciones
           // (services/vocabularioMedico.js): la próxima vez que aparezca X,
@@ -610,11 +615,12 @@ module.exports = function (app) {
           const antes = JSON.stringify(actual[campo] ?? null);
           const despues = JSON.stringify(candidata[campo] ?? null);
           if (antes === despues) continue;
-          registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: antes, valorFinal: despues });
+          correcciones.push(registrarCorreccion({ medicoPhone, tipo: "nota", consultaId: consulta._id, campo, valorSugerido: antes, valorFinal: despues }));
           n[campo] = candidata[campo];
           huboCambios = true;
         }
       }
+      await Promise.all(correcciones);
       if (huboCambios) {
         consulta.notaEditadaPorMedico = true;
         aplicado.push("Nota clínica corregida");
@@ -791,9 +797,10 @@ module.exports = function (app) {
     consulta.confirmadaEn = new Date();
     await consulta.save();
     await ConsultaMedica.updateOne({ _id: consulta._id }, { $set: { confirmandoDesde: null } }).catch(() => {});
-    // Lo que acaba de confirmar (y lo que corrigió) ya cuenta para su
-    // vocabulario desde la próxima consulta (services/vocabularioMedico.js).
-    olvidarVocabulario(medicoPhone);
+    // Lo que acaba de confirmar (y lo que corrigió) ya cuenta desde la
+    // próxima consulta: su vocabulario y su forma de escribir
+    // (services/vocabularioMedico.js, services/adaptacion.js).
+    adaptacion.olvidar(medicoPhone);
     // El resumen previo del paciente salió de esta nota como borrador: se
     // rehace con la confirmada. Y el hilo, si el médico la corrigió
     // (revisión integral del 11 de octubre de 2026, S03).
@@ -924,10 +931,12 @@ async function contextoDeNota(paciente, medicoPhone) {
   // "hay que hacer un relleno acá") con el ítem correcto.
   const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
   // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
-  // marcas como medicamentos y no repite un error que él ya arregló.
-  const [medicamentosHabituales, correccionesMedicamentos] = await Promise.all([
+  // marcas como medicamentos y no repite un error que él ya arregló. Y lo que
+  // aprendió de él: sus palabras y cómo escribe (services/adaptacion.js).
+  const [medicamentosHabituales, correccionesMedicamentos, deEl] = await Promise.all([
     medicamentosDelMedico(medicoPhone, 60),
     correccionesDelMedico(medicoPhone, 30),
+    adaptacion.paraLaNota(medicoPhone),
   ]);
   let catalogoTratamientos = [];
   if (["odontologia", "estetica"].includes(medico?.tipoEspecialidad)) {
@@ -951,6 +960,7 @@ async function contextoDeNota(paciente, medicoPhone) {
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
       medicamentosHabituales,
       correccionesMedicamentos,
+      adaptacion: deEl,
       catalogoTratamientos,
       estructurasOculares: esOftalmologia ? ESTRUCTURAS_OCULARES : [],
       estadosPiezaDental: esOdontologia ? ESTADOS_PIEZA_DENTAL : [],
@@ -1238,11 +1248,14 @@ async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { mult
   try {
     // La especialidad afina el vocabulario; el idioma decide en qué lengua
     // se transcribe y si hay Medical Mode (ver services/assemblyai.js).
-    // Y lo que este médico receta seguido va primero (services/vocabularioMedico.js).
+    // Y lo que este médico receta seguido va primero (services/vocabularioMedico.js),
+    // con sus palabras: lo que corrigió y sus términos (services/adaptacion.js).
     medicoParaVocabulario = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad idioma").lean();
-    const delMedico = await medicamentosDelMedico(medicoPhone);
+    const [delMedico, propios] = await Promise.all([
+      medicamentosDelMedico(medicoPhone), adaptacion.vocabularioParaTranscribir(medicoPhone),
+    ]);
     const inicioTranscripcion = Date.now();
-    t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico });
+    t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico, propios });
     transcripcionMs = Date.now() - inicioTranscripcion;
     duracionSegundos = t.duracionSegundos;
   } catch (e) {

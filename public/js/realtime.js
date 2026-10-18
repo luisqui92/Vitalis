@@ -73,7 +73,13 @@ function desconectarTiempoReal() {
 // Las pantallas de los módulos (Extensiones.pantalla, más abajo) se suman a
 // esta lista al cargar: una sentada de repaso o un simulacro con reloj
 // repintados en el medio perderían por dónde iban.
-const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle"]);
+//
+// "configuracion" tampoco estaba registrada: cambiar el idioma, la foto o lo
+// de «Así escribo yo» es un POST o un PATCH del propio médico, y el aviso
+// repintaba encima la pantalla anterior —el panel— y lo sacaba de
+// Configuración a los dos segundos de guardar. Cada parte de Configuración
+// se repinta sola después de guardar; no necesita el aviso.
+const PANTALLAS_SIN_REFRESCO = new Set(["editorInforme", "membrete", "salaTele", "dictadoLote", "consultaDetalle", "configuracion"]);
 
 // ═══ UN REPINTADO QUE NO PIDIÓ EL MÉDICO NO PUEDE MOVERLE LA PÁGINA ═══════
 //
@@ -189,6 +195,8 @@ envolverParaTiempoReal("renderEditorInforme", (pacienteId, informeId) => ({ tipo
 envolverParaTiempoReal("renderMembrete", () => ({ tipo: "membrete", params: {} }));
 // La de PANTALLAS_SIN_REFRESCO de más arriba: la consulta.
 envolverParaTiempoReal("renderDetalle", (consultaId) => ({ tipo: "consultaDetalle", params: { consultaId } }));
+// Y Configuración, también de PANTALLAS_SIN_REFRESCO.
+envolverParaTiempoReal("renderSeguridad", () => ({ tipo: "configuracion", params: {} }));
 // Las de los módulos (public/js/extensiones.js): registradas, para que el
 // aviso sepa que el médico ya no está en la pantalla anterior, y sin
 // repintarse solas.

@@ -142,7 +142,7 @@ function rvConsultas(cs, totales) {
       ${c.motivo ? `<h3>${rvEsc(c.motivo)}</h3>` : ""}
       ${c.diagnostico ? `<p class="rv-dx"><span>Diagnóstico</span> ${rvEsc(c.diagnostico)}</p>` : ""}
       ${c.sintomas && c.sintomas.length ? `<p class="rv-campo"><span>Síntomas</span> ${rvEsc(c.sintomas.join(", "))}</p>` : ""}
-      ${c.plan ? `<p class="rv-campo"><span>Plan</span> ${rvEsc(c.plan)}</p>` : ""}
+      ${c.plan ? `<p class="rv-campo rv-lineas"><span>Plan</span> ${rvEsc(c.plan)}</p>` : ""}
       ${c.recetado && c.recetado.length ? `<p class="rv-campo"><span>Recetado</span> ${
         rvEsc(c.recetado.map(r => [r.nombre, r.dosis, r.frecuencia].filter(Boolean).join(" ")).join(" · "))}</p>` : ""}
       ${c.examenes && c.examenes.length ? `<p class="rv-campo"><span>Pidió</span> ${rvEsc(c.examenes.join(", "))}</p>` : ""}

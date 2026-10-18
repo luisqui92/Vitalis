@@ -191,6 +191,9 @@ button.item:focus-visible,.tab:focus-visible,.kardex-mas summary:focus-visible{
 .nota-titulo{font-family:var(--font-marca);font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;}
 .nota-campo{font-size:13px;line-height:1.6;margin-bottom:8px;}
 .nota-campo b{color:var(--text);font-weight:600;}
+/* Un plan en viñetas (como lo escribe el médico, o la IA cuando aprendió que
+   así lo escribe él: services/adaptacion.js) se lee con sus renglones. */
+.nota-lineas{white-space:pre-line;}
 /* Filas de "qué aplicar al confirmar": cada una es una casilla marcada por
    defecto, que el médico desmarca si la IA entendió mal. */
 .conf-fila{padding:10px 0;border-bottom:1px solid var(--border);}
@@ -1236,3 +1239,23 @@ button.kardex-pdf{width:auto;margin:0;padding:8px 14px;font-size:13px;white-spac
   .tabs-inicio .tab:nth-last-child(2):nth-child(3n+1) { grid-column: span 3; }
   .tabs-inicio .tab:last-child:nth-child(3n+2) { grid-column: span 3; }
 }
+
+/* ─── «Así escribo yo», en Configuración (public/js/adaptacion.js) ─────────
+   Lo aprendido va en fichas que se sacan con la cruz; lo de agregar, en una
+   fila que en el celular se parte en dos. */
+.adapt-cuenta{margin:6px 0 2px;}
+.adapt-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px;}
+.adapt-chip{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:4px 4px 4px 11px;border:1px solid var(--border);border-radius:16px;background:var(--bg);font-size:13px;color:var(--text);overflow-wrap:anywhere;}
+.adapt-chip-texto{min-width:0;}
+.adapt-chip b{font-weight:600;}
+button.adapt-quitar{flex:0 0 auto;width:26px;height:26px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--text-muted);font-size:17px;line-height:26px;cursor:pointer;}
+button.adapt-quitar:hover,button.adapt-quitar:focus-visible{background:var(--danger-bg);color:var(--danger);}
+.adapt-vacio{margin:0 0 8px;}
+.adapt-agregar{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;}
+.adapt-agregar input{flex:1 1 140px;min-width:0;padding:9px 11px;font-size:13.5px;}
+.adapt-agregar button.secondary{flex:0 0 auto;width:auto;margin-top:0;padding:9px 14px;}
+.adapt-correcciones{display:flex;flex-direction:column;gap:4px;margin:2px 0 8px;}
+.adapt-corr{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;}
+.adapt-corr-texto{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+.adapt-corr-veces{flex:0 0 auto;margin:0;white-space:nowrap;}
+button.adapt-reiniciar{color:var(--danger);margin-top:16px;}

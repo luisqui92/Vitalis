@@ -2829,10 +2829,11 @@ const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 // Registro de correcciones a sugerencias de la IA: cada vez que un médico
 // cambia lo que la IA propuso (fecha de reconsulta, nombre/pieza de un
 // tratamiento, estado de una estructura ocular) antes de que quede
-// guardado. No es para mostrarle nada al médico — es la materia prima
-// para ver en qué se equivoca más la IA y afinar los prompts (y, con
-// suficiente volumen algún día, para un eventual fine-tuning). Nunca
-// bloquea ni retrasa el flujo real si falla al guardar.
+// guardado. Sirve para ver en qué se equivoca más la IA y afinar los
+// prompts, y de las de tipo "nota" y "medicamento" aprende la IA de cada
+// profesional (services/adaptacion.js, services/vocabularioMedico.js), que
+// él ve en Configuración. Nunca bloquea ni retrasa el flujo real si falla
+// al guardar.
 const correccionIASchema = new mongoose.Schema({
   medicoPhone: { type: String, index: true, required: true },
   // "medicamento": un nombre de fármaco de la nota que el médico corrigió.
@@ -2845,6 +2846,26 @@ const correccionIASchema = new mongoose.Schema({
 }, { timestamps: true });
 correccionIASchema.index({ medicoPhone: 1, tipo: 1, createdAt: -1 });
 const CorreccionIA = mongoose.model("CorreccionIA", correccionIASchema);
+
+// «Así escribo yo» (services/adaptacion.js): lo que cada profesional decidió
+// sobre lo que la IA aprende de él. Lo aprendido NO se guarda acá: se rehace
+// de sus correcciones y sus notas confirmadas, así nunca queda viejo. Acá va
+// solo lo que eligió él en Configuración.
+const adaptacionSchema = new mongoose.Schema({
+  medicoPhone: { type: String, required: true, unique: true },
+  // «Volver a empezar»: lo de antes de esta fecha no se aprende más.
+  desde: { type: Date, default: null },
+  // "" = lo que se aprendió.
+  largo: { type: String, enum: ["", "breve", "normal", "detallado"], default: "" },
+  vinetas: { type: String, enum: ["", "si", "no"], default: "" },
+  // Lo que agregó él.
+  terminos: { type: [String], default: [] },
+  abreviaturas: { type: [{ corto: String, largo: String, _id: false }], default: [] },
+  frases: { type: [String], default: [] },
+  // Lo aprendido que sacó, como «tipo:clave» (par:jolter, termino:holter…).
+  quitados: { type: [String], default: [] },
+}, { timestamps: true });
+const Adaptacion = mongoose.model("Adaptacion", adaptacionSchema);
 
 
 // ─── INVITACIONES AL REPORTE ───────────────────────────────────────────────
@@ -3410,7 +3431,7 @@ const ErrorCliente = mongoose.model("ErrorCliente", errorClienteSchema);
 
 module.exports = { ErrorCliente, LISTAS_DE_LA_NOTA, ResumenCompartido, LlavePaciente, LlaveFinca, SolicitudReseteo, SolicitudBaja, Interesado, Clinica, PersonaClinica, Medico, Paciente, ConsultaMedica, Medicamento, Vacuna, Finca, LoteGanado, EventoLote, NotaVozLote, AnimalGanado, EventoReproductivo, TIPOS_EVENTO_REPRODUCTIVO, RegistroProduccion, ControlLechero, GastoLote, Medicion, Estudio, Receta, Recordatorio, Cita, SesionCitaWA, Vinculacion, SuscripcionPush, MovimientoSaldo, SolicitudRecarga, ConfigPago, Teleconsulta, AuditLog, Odontograma, ESTADOS_PIEZA_DENTAL, PIEZAS_FDI_PERMANENTE, CatalogoTratamiento, TratamientoPlan, ExamenOcular, RecetaOptica, OJOS, ESTRUCTURAS_OCULARES, ESTADOS_ESTRUCTURA_OCULAR,
   ExamenGinecologico, ORGANOS_GINECO, HALLAZGOS_GINECO,
-  MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Embarazo, DESENLACES_EMBARAZO,
+  MapaCorporal, REGIONES_CORPORALES, ESTADOS_LESION, LADOS_CUERPO, CorreccionIA, Adaptacion, Embarazo, DESENLACES_EMBARAZO,
   EquipoRayos, CapturaPendiente, EstudioEntrante,
   PerfilNeuro, ObjetivoNeuro, VigilanciaSalud, InstrumentoAplicado, INSTRUMENTOS_NEURO, Membrete, MembreteEmitido, VistaPrevia, Informe,
   CALIFICACIONES_INSTRUMENTO,

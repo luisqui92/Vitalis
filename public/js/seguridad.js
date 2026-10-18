@@ -26,6 +26,8 @@ async function renderSeguridad() {
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
     pintarFotoPerfil();
+    // «Así escribo yo» (public/js/adaptacion.js), sin await como los demás.
+    if (typeof pintarAdaptacion === "function") pintarAdaptacion();
     // Solo si esta cuenta maneja saldo (public/js/extensiones.js → puede):
     // una cuenta de estudiante, por ejemplo, entra con un código.
     if (puede("saldo")) pintarSaldo();
@@ -57,6 +59,8 @@ function pintarSeguridad(dosFAActivo, eventos) {
     ${notificacionesHtml()}
 
     <div id="backupsBox"></div>
+
+    <div id="adaptacionBox"></div>
 
     <div class="card">
       <div class="seccion-titulo" style="margin-top:0">${t("config.idioma.titulo")}</div>

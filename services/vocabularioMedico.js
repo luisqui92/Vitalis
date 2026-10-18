@@ -32,7 +32,11 @@
 //
 // Todo es POR MÉDICO: lo que corrige uno no le cambia nada a otro. Un error
 // de tipeo de un médico no se contagia a los demás.
-const { Medicamento, ConsultaMedica, CorreccionIA } = require("../db/models");
+//
+// Sus correcciones las ve en Configuración, en «Así escribo yo»
+// (services/adaptacion.js): ahí puede sacar una o volver a empezar, y lo que
+// corrigió antes de esa fecha no se aprende más.
+const { Medicamento, ConsultaMedica, CorreccionIA, Adaptacion } = require("../db/models");
 const { nombreBase, verificarMedicamento } = require("./medicamentosOficiales");
 const { log } = require("../config");
 
@@ -50,14 +54,22 @@ const cache = new Map(); // medicoPhone → { hasta, lista, correcciones }
 // "Losartana 50 mg" → "Losartana" (la dosis de hoy no es la de mañana).
 const sinDosis = (n) => String(n || "").replace(/\s*\d.*$/, "").replace(/\s+/g, " ").trim();
 
+// Con lo que se compara un texto y se lo saca desde Configuración: sin tildes,
+// sin mayúsculas y sin signos («Glucemia.» y «glucemia» son una). La usa
+// también services/adaptacion.js: la clave tiene que ser la misma en los dos.
+const claveDe = (t) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .replace(/[^\p{L}\p{N}/]+/gu, " ").replace(/\s+/g, " ").trim();
+
 async function calcular(medicoPhone) {
+  const ajustes = await Adaptacion.findOne({ medicoPhone }).select("desde quitados").lean();
   const [meds, consultas, corregidos] = await Promise.all([
     Medicamento.find({ medicoPhone }).sort({ createdAt: -1 }).limit(ULTIMOS_MEDICAMENTOS).select("nombre").lean(),
     ConsultaMedica.find({ medicoPhone, confirmadaEn: { $ne: null } }).sort({ createdAt: -1 }).limit(ULTIMAS_CONSULTAS)
       .select("notaClinica.medicamentosRecetados.nombre").lean(),
-    CorreccionIA.find({ medicoPhone, tipo: "medicamento" }).sort({ createdAt: -1 }).limit(ULTIMAS_CORRECCIONES)
-      .select("valorSugerido valorFinal").lean(),
+    CorreccionIA.find({ medicoPhone, tipo: "medicamento", ...(ajustes?.desde ? { createdAt: { $gte: ajustes.desde } } : {}) })
+      .sort({ createdAt: -1 }).limit(ULTIMAS_CORRECCIONES).select("valorSugerido valorFinal").lean(),
   ]);
+  const sacadas = new Set(ajustes?.quitados || []);
   const nombres = [
     ...meds.map(m => m.nombre),
     ...consultas.flatMap(c => (c.notaClinica?.medicamentosRecetados || []).map(m => m?.nombre)),
@@ -93,6 +105,8 @@ async function calcular(medicoPhone) {
     // Lo que la IA escribió era un medicamento real: fue un cambio de idea.
     if (verificarMedicamento(dijo).estado === "ok") continue;
     vistas.add(bDijo);
+    // La sacó él, en Configuración.
+    if (sacadas.has(`med:${claveDe(dijo)}`)) continue;
     correcciones.push({ dijo, correcto });
   }
   return { lista, correcciones };
@@ -126,4 +140,4 @@ async function correccionesDelMedico(medicoPhone, limite = 50) {
 
 function olvidar(medicoPhone) { cache.delete(medicoPhone); }
 
-module.exports = { medicamentosDelMedico, correccionesDelMedico, olvidar };
+module.exports = { medicamentosDelMedico, correccionesDelMedico, olvidar, claveDe };

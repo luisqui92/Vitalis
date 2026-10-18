@@ -79,6 +79,10 @@ const ESCRITURA_PERMITIDA = [
   ["POST", ruta("baja/solicitar")],
   ["POST DELETE", ruta("perfil/foto")],
   ["POST", ruta("push/(suscribir|baja|probar)")],
+  // «Así escribo yo»: lo que la IA aprende de su forma de escribir. Es de su
+  // cuenta y no gasta IA.
+  ["PATCH", ruta("adaptacion")],
+  ["POST", ruta("adaptacion/(agregar|quitar|reiniciar)")],
   // El celular como micrófono de la compu.
   ["POST", ruta("vinculacion/(vincular|comando|estado)")],
   // La ayuda de Symphomed.
