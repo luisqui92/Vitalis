@@ -8,6 +8,8 @@
 //   node scripts/restaurar.js <archivo> --a-prueba   → restaura en una base
 //                                                      aparte, sin tocar nada
 //   node scripts/restaurar.js <archivo> --encima     → PISA la base real
+//   node scripts/restaurar.js <tar> --extraer-archivos → descifra el tar de
+//                                                      los estudios
 //
 // El día que haga falta esto, quien lo corra va a estar nervioso y con poco
 // tiempo. Por eso: sin banderas no hace nada, "--encima" pide escribir una
@@ -26,7 +28,7 @@ const gunzip = promisify(zlib.gunzip);
 // que haya que exportarlas a mano en un momento de apuro.
 try { require("dotenv").config({ path: path.join(__dirname, "..", ".env") }); } catch { /* opcional */ }
 
-const { descifrar, DIR_BACKUPS } = require("../services/backup");
+const { descifrar, descifrarArchivo, DIR_BACKUPS } = require("../services/backup");
 const mongoose = require("mongoose");
 
 const args = process.argv.slice(2);
@@ -124,6 +126,22 @@ async function restaurar(ruta, { encima }) {
   await mongoose.disconnect();
 }
 
+// El tar de los estudios se descifra al lado del original, por pedazos: puede
+// pasar los 2 GiB y entero no se puede leer.
+async function extraerArchivos(ruta) {
+  const destino = ruta.replace(/\.tar\.gz$/, "") + "-descifrado.tar.gz";
+  const r = await descifrarArchivo(ruta, destino);
+  console.log(`
+  ${r.cifrado ? "Descifrado" : "No estaba cifrado: se copió tal cual"} en:
+    ${destino}
+
+  Para poner los estudios en su lugar:
+    tar -xzf ${destino} -C <carpeta de Symphomed>
+
+  Ese archivo está EN CLARO: borralo cuando termines.
+`);
+}
+
 async function confirmar(texto, palabra) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const r = await new Promise(res => rl.question(texto, res));
@@ -138,6 +156,7 @@ async function confirmar(texto, palabra) {
 
   if (banderas.has("--revisar")) return revisar(ruta);
   if (banderas.has("--a-prueba")) return restaurar(ruta, { encima: false });
+  if (banderas.has("--extraer-archivos")) return extraerArchivos(ruta);
 
   if (banderas.has("--encima")) {
     console.log(`
@@ -158,5 +177,8 @@ async function confirmar(texto, palabra) {
     --revisar     ver qué tiene adentro, sin tocar nada
     --a-prueba    restaurarlo en una base aparte para revisarlo (recomendado)
     --encima      reemplazar la base real (pide confirmación)
+
+  Y con el -archivos.tar.gz:
+    --extraer-archivos   descifrarlo para abrirlo con tar
 `);
 })().catch(e => { console.error("\n  ✗", e.message, "\n"); process.exit(1); });

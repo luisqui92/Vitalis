@@ -35,6 +35,11 @@ function humano(bytes) {
   }
   console.log("\n  Haciendo el respaldo (la base entera + uploads/, y verificándolo)…\n");
   const m = await hacerBackup({ verificar: true });
+  // El automático del servidor justo en este momento: no se hace otro encima.
+  if (m?.motivo === "en_curso_otro_proceso") {
+    const desde = m.otro?.desde ? new Date(m.otro.desde).toLocaleString("es-BO") : "?";
+    throw new Error(`ya hay un respaldo en curso (proceso ${m.otro?.pid ?? "?"}, desde ${desde}). Esperá a que termine y volvé a correrlo`);
+  }
   if (m?.salteado) throw new Error(`se salteó: ${m.motivo}`);
 
   const ok = m.verificado === true;

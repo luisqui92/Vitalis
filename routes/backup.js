@@ -51,6 +51,11 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     registrar({ req, medicoPhone, accion: "backup_manual", recurso: "Backup" });
     const manifiesto = await backup.hacerBackup();
+    // Lo está haciendo otro proceso (scripts/respaldar_ahora.js, antes de un
+    // despliegue): la base anda bien, decir que no está disponible es mentir.
+    if (manifiesto.motivo === "en_curso_otro_proceso") {
+      return res.status(409).json({ error: "Ya se está haciendo una copia en este momento. Esperá unos minutos y mirá el estado." });
+    }
     if (manifiesto.salteado) {
       return res.status(503).json({ error: "La base de datos no está disponible en este momento. Probá de nuevo en un minuto." });
     }
