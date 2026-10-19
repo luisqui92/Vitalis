@@ -1319,6 +1319,9 @@ const recetaOpticaSchema = new mongoose.Schema({
   // hora UTC. `fecha` queda para ordenar registros viejos y nuevos.
   fechaCivil: { type: String, default: "" },
   fecha: { type: Date, required: true },
+  // Se anula, no se borra: igual que la receta de medicamentos (ver abajo).
+  anuladaEn: { type: Date, default: null },
+  anuladaMotivo: { type: String, default: "" },
 }, { timestamps: true });
 const RecetaOptica = mongoose.model("RecetaOptica", recetaOpticaSchema);
 
@@ -2464,6 +2467,12 @@ const recetaSchema = new mongoose.Schema({
   // 16 no debe aparecer como del 15 por la zona horaria del navegador.
   fechaCivil: { type: String, default: "" },
   fecha: { type: Date, required: true },
+  // Una receta emitida no se borra: se anula, con el motivo. Ya puede estar
+  // en una farmacia o en manos del paciente, y el registro de qué se recetó
+  // tiene que quedar. Los campos tienen que estar acá: sin ellos, Mongoose
+  // descarta el $set en silencio y la anulación responde 200 sin anular nada.
+  anuladaEn: { type: Date, default: null },
+  anuladaMotivo: { type: String, default: "" },
 
   // ─── De dónde salió esta receta ──────────────────────────────────────
   //

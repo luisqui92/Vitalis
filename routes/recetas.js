@@ -21,6 +21,28 @@ function interpretarFechaCivil(valor) {
   return { fechaCivil: String(valor).trim(), fecha };
 }
 
+// ─── ANULAR (las dos recetas) ─────────────────────────────────────────────
+// Una receta emitida no se borra: ya puede estar en una farmacia o en manos
+// del paciente. Queda, marcada como anulada, y se sigue viendo así en la
+// ficha. El motivo es obligatorio: sin él, el registro dice que la receta
+// dejó de valer pero no por qué, que es lo que hace falta saber después.
+// anuladaEn: null en el filtro hace que dos pedidos a la vez no se pisen el
+// motivo.
+async function anularReceta(req, Modelo, noEncontrada) {
+  const medicoPhone = req.adminUser.usuario;
+  const receta = await obtenerOFallar(Modelo, { _id: req.params.id, medicoPhone }, noEncontrada);
+  if (receta.anuladaEn) throw new ErrorHttp(409, "Esta receta ya estaba anulada");
+  const motivo = String(req.body?.motivo || "").trim().slice(0, 300);
+  if (!motivo) throw new ErrorHttp(400, "Escribí el motivo de la anulación");
+  const anulada = await Modelo.findOneAndUpdate(
+    { _id: receta._id, medicoPhone, anuladaEn: null },
+    { $set: { anuladaEn: new Date(), anuladaMotivo: motivo } },
+    { new: true }
+  );
+  if (!anulada) throw new ErrorHttp(409, "Esta receta ya estaba anulada");
+  return anulada;
+}
+
 module.exports = function (app) {
   // ─── CREAR RECETA ────────────────────────────────────────────────────────
   // Crearla ya es el acto de aprobación del médico (viene de una consulta que
@@ -70,13 +92,13 @@ module.exports = function (app) {
     res.json({ receta, paciente, medico });
   }));
 
-  // ─── ELIMINAR ────────────────────────────────────────────────────────────
+  // ─── ANULAR ──────────────────────────────────────────────────────────────
+  // Sigue siendo el DELETE, que es lo que llama la pantalla y lo que el
+  // módulo de estudiantes bloquea, pero ya no borra (ver anularReceta).
   app.delete("/medico/recetas/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const r = await Receta.deleteOne({ _id: req.params.id, medicoPhone });
-    if (r.deletedCount === 0) throw new ErrorHttp(404, "Receta no encontrada");
-    registrar({ req, medicoPhone, accion: "borrar_receta", recurso: `Receta:${req.params.id}` });
-    res.json({ ok: true });
+    const receta = await anularReceta(req, Receta, "Receta no encontrada");
+    registrar({ req, medicoPhone: receta.medicoPhone, accion: "anular_receta", recurso: `Receta:${receta._id}` });
+    res.json({ ok: true, receta });
   }));
 
   // ─── RECETA ÓPTICA (Symphomed Visión) — esfera/cilindro/eje/adición por ojo,
@@ -144,10 +166,8 @@ module.exports = function (app) {
   }));
 
   app.delete("/medico/recetas-opticas/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const r = await RecetaOptica.deleteOne({ _id: req.params.id, medicoPhone });
-    if (r.deletedCount === 0) throw new ErrorHttp(404, "Receta óptica no encontrada");
-    registrar({ req, medicoPhone, accion: "borrar_receta_optica", recurso: `RecetaOptica:${req.params.id}` });
-    res.json({ ok: true });
+    const receta = await anularReceta(req, RecetaOptica, "Receta óptica no encontrada");
+    registrar({ req, medicoPhone: receta.medicoPhone, accion: "anular_receta_optica", recurso: `RecetaOptica:${receta._id}` });
+    res.json({ ok: true, receta });
   }));
 };

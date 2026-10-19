@@ -29,15 +29,50 @@ function tabRecetasHtml(recetas) {
     </div>
     ${recetas.length === 0 ? `<div class="empty">${t("receta.vacio")}</div>` : ""}
     ${recetas.map(r => `
-      <div class="item" data-ver-receta="${r._id}">
+      <div class="item" data-ver-receta="${r._id}"${r.anuladaEn ? ' style="opacity:.65"' : ""}>
         <div class="top">
-          <div class="nombre">${r.origen === "memed" ? `<span class="badge badge-completado">${t("memed.firmada")}</span> ` : ""}${esc(r.medicamentos.map(m => m.nombre).join(", "))}</div>
-          <button class="link" data-borrar-receta="${r._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
+          <div class="nombre">${marcaAnulada(r)}${r.origen === "memed" ? `<span class="badge badge-completado">${t("memed.firmada")}</span> ` : ""}${esc(r.medicamentos.map(m => m.nombre).join(", "))}</div>
+          ${r.anuladaEn ? "" : `<button class="link" data-anular-receta="${r._id}" data-memed="${r.origen === "memed" ? "1" : ""}" title="${t("receta.anular")}" style="margin:0;width:auto;color:var(--danger)">✕</button>`}
         </div>
         <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>
+        ${motivoAnulada(r)}
       </div>`).join("")}
     ${MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? `<div id="recetaOpticaBox" style="margin-top:18px"></div>` : ""}
   `;
+}
+
+// ─── ANULADAS ────────────────────────────────────────────────────────────
+// Una receta emitida no se borra, se anula: sigue en la lista, marcada, con
+// el motivo, y ya no se puede imprimir desde acá.
+function marcaAnulada(r) {
+  return r.anuladaEn ? `<span class="badge badge-error">${t("receta.anulada")}</span> ` : "";
+}
+function motivoAnulada(r) {
+  return r.anuladaEn ? `<div class="hint">${esc(t("receta.anuladaMotivo", { fecha: fechaCorta(r.anuladaEn), motivo: r.anuladaMotivo || "—" }))}</div>` : "";
+}
+function avisoAnuladaHtml(r) {
+  return r.anuladaEn ? `
+    <div style="border:2px solid var(--danger);color:var(--danger);border-radius:8px;padding:10px;margin-bottom:16px;text-align:center;font-weight:700">
+      ${esc(t("receta.anuladaMotivo", { fecha: fechaCorta(r.anuladaEn), motivo: r.anuladaMotivo || "—" }))}
+    </div>` : "";
+}
+
+// El motivo es obligatorio en el servidor: se pide acá para no hacérselo
+// descubrir con un error después de decidir. Devuelve true si se anuló.
+async function anularRecetaConMotivo(ruta, pregunta) {
+  const motivo = prompt(pregunta);
+  if (motivo === null) return false;
+  if (!motivo.trim()) { alert(t("receta.errMotivo")); return false; }
+  try {
+    await api(ruta, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo: motivo.trim() }),
+    });
+    return true;
+  } catch (e) {
+    alert(e.error || t("receta.errAnular"));
+    return false;
+  }
 }
 
 // ─── RECETA ÓPTICA (Symphomed Visión) — esfera/cilindro/eje/adición por ojo,
@@ -85,12 +120,13 @@ function pintarRecetaOpticaBox(pacienteId, recetas) {
     </div>
     ${recetas.length === 0 ? `<div class="empty">${t("optica.vacio")}</div>` : ""}
     ${recetas.map(r => `
-      <div class="item" data-ver-receta-optica="${r._id}">
+      <div class="item" data-ver-receta-optica="${r._id}"${r.anuladaEn ? ' style="opacity:.65"' : ""}>
         <div class="top">
-          <div class="nombre">OD ${r.od.esfera ?? "—"} / OI ${r.oi.esfera ?? "—"}</div>
-          <button class="link" data-borrar-receta-optica="${r._id}" style="margin:0;width:auto;color:var(--danger)">✕</button>
+          <div class="nombre">${marcaAnulada(r)}OD ${r.od.esfera ?? "—"} / OI ${r.oi.esfera ?? "—"}</div>
+          ${r.anuladaEn ? "" : `<button class="link" data-anular-receta-optica="${r._id}" title="${t("receta.anular")}" style="margin:0;width:auto;color:var(--danger)">✕</button>`}
         </div>
         <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>
+        ${motivoAnulada(r)}
       </div>`).join("")}
   `;
 
@@ -123,12 +159,12 @@ function pintarRecetaOpticaBox(pacienteId, recetas) {
   document.querySelectorAll("[data-ver-receta-optica]").forEach(el => {
     el.onclick = () => renderRecetaOptica(el.dataset.verRecetaOptica);
   });
-  document.querySelectorAll("[data-borrar-receta-optica]").forEach(btn => {
+  document.querySelectorAll("[data-anular-receta-optica]").forEach(btn => {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
-      if (!confirm(t("optica.confirmarBorrar"))) return;
-      await api("/medico/recetas-opticas/" + btn.dataset.borrarRecetaOptica, { method: "DELETE" });
-      renderRecetaOpticaBox(pacienteId);
+      if (await anularRecetaConMotivo("/medico/recetas-opticas/" + btn.dataset.anularRecetaOptica, t("optica.motivoAnular"))) {
+        renderRecetaOpticaBox(pacienteId);
+      }
     };
   });
 }
@@ -155,6 +191,7 @@ async function renderRecetaOptica(id) {
           <div><b>${esc(medico.nombre)}</b>${medico.especialidad ? `<div>${esc(medico.especialidad)}</div>` : ""}</div>
           <div>${fechaCorta(receta.fechaCivil || receta.fecha)}</div>
         </div>
+        ${avisoAnuladaHtml(receta)}
         <div style="font-size:13px;margin-bottom:20px"><b>${t("receta.paciente")}</b> ${esc(paciente.nombre)}${edad != null ? " · " + t("pacientes.anos", { n: edad }) : ""}</div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr><th></th><th style="padding:4px 10px;text-align:left">${t("optica.esfera")}</th><th style="padding:4px 10px;text-align:left">${t("optica.cilindro")}</th><th style="padding:4px 10px;text-align:left">${t("optica.ejeCorto")}</th><th style="padding:4px 10px;text-align:left">${t("optica.adicion")}</th></tr></thead>
@@ -163,10 +200,11 @@ async function renderRecetaOptica(id) {
         ${receta.distanciaPupilar ? `<div style="font-size:13px;margin-top:14px"><b>${t("optica.dpTitulo")}</b> ${receta.distanciaPupilar} mm</div>` : ""}
         ${receta.notas ? `<div style="font-size:13px;margin-top:10px;white-space:pre-wrap">${esc(receta.notas)}</div>` : ""}
       </div>
-      <button class="secondary no-imprimir" id="btnImprimirRecetaOptica">${t("receta.imprimir")}</button>
+      ${receta.anuladaEn ? "" : `<button class="secondary no-imprimir" id="btnImprimirRecetaOptica">${t("receta.imprimir")}</button>`}
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(receta.pacienteId, "recetas");
-    document.getElementById("btnImprimirRecetaOptica").onclick = () => window.print();
+    const btnImprimir = document.getElementById("btnImprimirRecetaOptica");
+    if (btnImprimir) btnImprimir.onclick = () => window.print();
   } catch (e) {
     if (e.status === 401) return logout();
     if (typeof reportarError === "function") reportarError(e, "renderRecetaOptica");
@@ -227,12 +265,15 @@ function wireTabRecetas(p, recetas) {
   document.querySelectorAll("[data-ver-receta]").forEach(el => {
     el.onclick = () => renderReceta(el.dataset.verReceta);
   });
-  document.querySelectorAll("[data-borrar-receta]").forEach(btn => {
+  document.querySelectorAll("[data-anular-receta]").forEach(btn => {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
-      if (!confirm(t("receta.confirmarBorrar"))) return;
-      await api("/medico/recetas/" + btn.dataset.borrarReceta, { method: "DELETE" });
-      renderPacienteDetalle(p._id, "recetas");
+      // La de Memed es un documento firmado que vive allá: anularla acá no
+      // la anula en Memed, y la pregunta lo dice.
+      const pregunta = t(btn.dataset.memed ? "receta.motivoAnularMemed" : "receta.motivoAnular");
+      if (await anularRecetaConMotivo("/medico/recetas/" + btn.dataset.anularReceta, pregunta)) {
+        renderPacienteDetalle(p._id, "recetas");
+      }
     };
   });
 }
@@ -266,6 +307,7 @@ async function renderReceta(id) {
           </div>
           <div>${fechaCorta(receta.fechaCivil || receta.fecha)}</div>
         </div>
+        ${avisoAnuladaHtml(receta)}
         <div style="font-size:13px;margin-bottom:20px">
           <b>${t("receta.paciente")}</b> ${esc(paciente.nombre)}${edad != null ? " · " + t("pacientes.anos", { n: edad }) : ""}${paciente.sexo ? " · " + esc(paciente.sexo) : ""}
         </div>
@@ -285,10 +327,11 @@ async function renderReceta(id) {
           <div class="receta-firma-pie">${t("receta.firma")}</div>
         </div>
       </div>
-      <button class="secondary no-imprimir" id="btnImprimirReceta">${t("receta.imprimir")}</button>
+      ${receta.anuladaEn ? "" : `<button class="secondary no-imprimir" id="btnImprimirReceta">${t("receta.imprimir")}</button>`}
     `;
     document.getElementById("btnBack").onclick = () => renderPacienteDetalle(receta.pacienteId, "recetas");
-    document.getElementById("btnImprimirReceta").onclick = () => window.print();
+    const btnImprimir = document.getElementById("btnImprimirReceta");
+    if (btnImprimir) btnImprimir.onclick = () => window.print();
   } catch (e) {
     if (e.status === 401) return logout();
     if (typeof reportarError === "function") reportarError(e, "renderReceta");
