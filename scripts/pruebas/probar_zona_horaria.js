@@ -429,6 +429,26 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   verificar(`correrlo de nuevo no las corre otra vez (${JSON.stringify(await horas())})`,
     corrida.status === 0 && /Ninguna/.test(corrida.stdout) && JSON.stringify(await horas()) === JSON.stringify(h));
 
+  // ═══ 12. LA FECHA POR DEFECTO DE UNA VACUNA ═════════════════════════════════
+  console.log("\n── 12. La vacuna que se carga al confirmar, sin fecha dicha ──");
+  // Lleva el día de la consulta. Con getTimezoneOffset() del servidor (0 en
+  // UTC), una consulta de las 21:00 en Bolivia la cargaba al día siguiente.
+  const fechaDeLaVacuna = async (med, creada, vacuna) => {
+    const c = await consultaDe(med, { motivoConsulta: "Control", vacunasMencionadas: [vacuna] }, creada);
+    const res = await pedir(puerto, "POST", `/medico/consultas/${c._id}/confirmar`, tk[med], { aplicar: { vacunas: [0] } });
+    const v = await M.Vacuna.findOne({ consultaId: c._id }).lean();
+    return res.estado === 200 && v ? v.fecha.toISOString().slice(0, 10) : `error ${res.estado}`;
+  };
+  const antitetanica = { nombre: "Antitetánica", dosis: "Refuerzo" };
+  let fv = await fechaDeLaVacuna(BO, "2026-10-16T01:00:00Z", antitetanica);
+  verificar(`una consulta del jueves 15 a las 21:00 en La Paz → vacuna del 15 (${fv})`, fv === "2026-10-15");
+  fv = await fechaDeLaVacuna(BO, "2026-10-16T03:30:00Z", antitetanica);
+  verificar(`a las 23:30 en La Paz, todavía el 15 (${fv})`, fv === "2026-10-15");
+  fv = await fechaDeLaVacuna(BR, "2026-10-16T03:30:00Z", antitetanica);
+  verificar(`y a ese mismo instante en São Paulo (00:30 del 16), el 16 (${fv})`, fv === "2026-10-16");
+  fv = await fechaDeLaVacuna(BO, "2026-10-16T01:00:00Z", { ...antitetanica, fecha: "2026-10-01" });
+  verificar(`la fecha que dijo el médico no se toca (${fv})`, fv === "2026-10-01");
+
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();

@@ -14,7 +14,7 @@ const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
-const { localAInstante, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
+const { localAInstante, fechaStrEnZona, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 const { registrar } = require("../services/auditoria");
 const { notificarMedico } = require("../services/push");
 const { avisarCambio } = require("../services/realtime");
@@ -763,11 +763,11 @@ module.exports = function (app) {
       const v = (nota.vacunasMencionadas || [])[Number(i)];
       if (!v?.nombre) continue;
       try {
-        // La fecha se guarda como YYYY-MM-DD en hora local: usar toISOString()
-        // directo adelantaría un día las consultas cargadas de noche en
-        // Bolivia (UTC-4).
-        const base = new Date(consulta.createdAt);
-        const fecha = v.fecha || new Date(base.getTime() - base.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        // La fecha se guarda como YYYY-MM-DD, el día de la consulta en la
+        // zona de la cuenta. getTimezoneOffset() es la zona del servidor (UTC
+        // en producción): una consulta de las 21:00 en Bolivia cargaba la
+        // vacuna con fecha del día siguiente (M6).
+        const fecha = v.fecha || fechaStrEnZona(zona, new Date(consulta.createdAt));
         await crearUnaVez(Vacuna, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: v.nombre, dosis: v.dosis || "", fecha,
