@@ -37,11 +37,40 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref(); // cada 5 min
 
+// ═══ DE QUÉ IP VIENE UN PEDIDO ═════════════════════════════════════════════
+//
+// req.ip, que Express arma según «trust proxy» (index.js: 1 salto, el nginx
+// propio): de X-Forwarded-For toma el ÚLTIMO valor, el que agregó nginx con
+// la IP que vio de verdad. Antes se leía la cabecera a mano y se tomaba el
+// PRIMERO, que lo escribe el cliente: cambiándolo en cada pedido se esquivaba
+// cualquier límite de este archivo (auditoría de QA, M1).
+//
+// Eso vale solo si nginx manda X-Forwarded-For. Si no la manda, todo llega
+// desde 127.0.0.1 y cada límite por IP lo comparte la plataforma entera:
+// ocho contraseñas mal escritas en cualquier consultorio del país, y nadie
+// más entra por diez minutos. Para ese caso quedan dos cosas:
+//   · un aviso en el log, una sola vez, para que alguien arregle nginx;
+//   · X-Real-IP como respaldo, solo si el pedido viene de esta misma máquina
+//     y sin X-Forwarded-For: es justo lo que llega de un nginx que pone una
+//     y no la otra. No abre nada nuevo: con un nginx que no pone ninguna de
+//     las dos, el cliente igual podría escribir X-Forwarded-For y req.ip la
+//     tomaría.
+const DESDE_ESTA_MAQUINA = /^(127\.|::1$|::ffff:127\.)/;
+let avisoSinXff = false;
+
 function getIP(req) {
-  return (req.headers["x-forwarded-for"]?.split(",")[0].trim()) ||
-         req.headers["x-real-ip"] ||
-         req.socket?.remoteAddress ||
-         "unknown";
+  const directa = req.socket?.remoteAddress || "";
+  if (DESDE_ESTA_MAQUINA.test(directa) && !req.headers?.["x-forwarded-for"]) {
+    if (!avisoSinXff) {
+      avisoSinXff = true;
+      log.warn(`[RATE_LIMIT] llegó un pedido desde ${directa} sin X-Forwarded-For (${req.method} ${req.originalUrl || req.url}). ` +
+        "Si pasó por nginx, falta «proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;» y todos los visitantes cuentan como una sola IP. " +
+        "Si fue un curl desde el propio servidor, no hay nada que arreglar.");
+    }
+    const real = String(req.headers?.["x-real-ip"] || "").trim();
+    if (real) return real;
+  }
+  return req.ip || directa || "unknown";
 }
 
 function rateLimit(storeName, max, windowMs, message) {
@@ -115,15 +144,47 @@ const limitVistaPrevia = rateLimitPorClave(
   claveDeMedico
 );
 
-// Login/registro/2FA necesitan un límite mucho más estricto que el resto de
-// la API: 60/min (limitMedico) es razonable para uso normal, pero deja
-// margen de sobra para adivinar contraseñas o códigos de 2FA por fuerza
-// bruta. Acá: 8 intentos cada 10 minutos por IP.
+// ═══ EN LA PUERTA SE CUENTA LO QUE SALE MAL ════════════════════════════════
+//
+// Igual que rateLimit, pero un pedido que termina bien devuelve su lugar.
+//
+// Una clínica de siete consultorios entra por una sola IP (la del router), y
+// con 2FA cada ingreso son dos pedidos. Contando todo, al quinto médico que
+// llegaba a empezar el turno le salía un 429 y se quedaba diez minutos
+// afuera sin haber errado una letra (auditoría de QA, M12). Quien prueba
+// contraseñas, en cambio, solo junta errores: para él el límite es el mismo.
+//
+// El lugar se ocupa AL ENTRAR y se devuelve al terminar bien, no al revés.
+// Contar recién al terminar dejaría pasar mil intentos a la vez: mientras
+// bcrypt piensa el primero, ninguno terminó y el contador sigue en cero.
+function rateLimitFallidos(storeName, max, windowMs, message) {
+  const contarTodo = rateLimit(storeName, max, windowMs, message);
+  return (req, res, next) => {
+    contarTodo(req, res, () => {
+      const registro = almacen(storeName).get(getIP(req));
+      res.on("finish", () => {
+        if (res.statusCode < 400 && registro && registro.count > 0) registro.count--;
+      });
+      next();
+    });
+  };
+}
+
+// Login/2FA necesitan un límite mucho más estricto que el resto de la API:
+// 60/min (limitMedico) es razonable para uso normal, pero deja margen de
+// sobra para adivinar contraseñas o códigos de 2FA por fuerza bruta. Acá: 8
+// intentos FALLIDOS cada 10 minutos por IP.
 //
 // Y acá SÍ va por IP: en el login todavía no hay token, así que no existe
 // el médico al que cobrarle el intento. Es justo el caso que claveDeMedico
 // resuelve cayéndose a la IP.
-const limitAuth = rateLimit("auth", 8, 10 * 60 * 1000, "Demasiados intentos. Esperá unos minutos antes de volver a intentar.");
+const limitAuth = rateLimitFallidos("auth", 8, 10 * 60 * 1000, "Demasiados intentos. Esperá unos minutos antes de volver a intentar.");
+
+// El registro, en cambio, cuenta TODO: ahí lo que hay que frenar es
+// justamente lo que sale bien. Cada solicitud aceptada entra a la fila y le
+// manda un aviso a quien aprueba (routes/medicoAuth.js), y con
+// limitAuth una sola IP podría llenarla sin un solo error.
+const limitRegistro = rateLimit("registro", 8, 10 * 60 * 1000, "Demasiadas solicitudes seguidas. Esperá unos minutos antes de volver a intentar.");
 
 // Página pública de reserva (sin login) — la usa cualquiera que abra el
 // link, así que necesita su propio límite en vez de compartir el de medico.
@@ -163,18 +224,33 @@ function rateLimitPorClave(storeName, max, windowMs, message, keyFn) {
   };
 }
 
-const limitLoginPorCuenta = rateLimitPorClave(
-  "authCuenta", 10, 15 * 60 * 1000,
-  "Demasiados intentos para esta cuenta. Esperá unos minutos antes de volver a intentar.",
-  (req) => {
+function porTelefono(prefijo) {
+  return (req) => {
     // Por los dígitos y no por el texto: el login acepta el número escrito
     // de cualquier forma (services/telefono.js), y si el límite contara
     // «+5511…», «5511…» y «++5511…» por separado, alternarlos daría el
     // triple de intentos contra la misma cuenta.
     const texto = String(req.body?.phone || "").trim();
     const phone = texto.replace(/\D/g, "") || texto;
-    return phone ? `login:${phone}` : null;
-  }
+    return phone ? `${prefijo}:${phone}` : null;
+  };
+}
+
+const limitLoginPorCuenta = rateLimitPorClave(
+  "authCuenta", 10, 15 * 60 * 1000,
+  "Demasiados intentos para esta cuenta. Esperá unos minutos antes de volver a intentar.",
+  porTelefono("login")
+);
+
+// Lo mismo para la puerta de los socios (routes/socio.js), que tenía solo el
+// límite por IP. Y una sesión de socio da de alta médicos ya aprobados, sin
+// pasar por la fila: es la cuenta que menos conviene dejar a la fuerza bruta.
+// Clave aparte de la del médico: un mismo número puede ser las dos cosas, y
+// errar en una puerta no tiene por qué cerrar la otra.
+const limitLoginSocioPorCuenta = rateLimitPorClave(
+  "authCuenta", 10, 15 * 60 * 1000,
+  "Demasiados intentos para esta cuenta. Esperá unos minutos antes de volver a intentar.",
+  porTelefono("socio")
 );
 
 // El código de 2FA se prueba contra un tempToken puntual (vence a los 5
@@ -189,4 +265,4 @@ const limit2faPorSesion = rateLimitPorClave(
   }
 );
 
-module.exports = { rateLimit, rateLimitPorClave, claveDeMedico, limitMedico, limitVistaPrevia, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };
+module.exports = { rateLimit, rateLimitPorClave, rateLimitFallidos, claveDeMedico, limitMedico, limitVistaPrevia, limitAuth, limitRegistro, limitReservaPublica, limitLoginPorCuenta, limitLoginSocioPorCuenta, limit2faPorSesion, getIP };

@@ -34,6 +34,9 @@ function verificar(descripcion, condicion) {
   await mongoose.connect(process.env.MONGODB_URI);
   const express = require("express");
   const app = express();
+  // Como index.js: cada pedido llega «desde nginx» con su propia IP en
+  // X-Forwarded-For (services/ratelimit.js, getIP).
+  app.set("trust proxy", 1);
   app.use(express.json());
   require(path.join(RAIZ, "routes", "solicitudBaja"))(app);
   app.use((err, _q, res, _n) => res.status(err.status || 500).json({ error: err.message }));

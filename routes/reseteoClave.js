@@ -21,7 +21,7 @@
 const crypto = require("crypto");
 const { Medico, Socio, SolicitudReseteo } = require("../db/models");
 const { requireAuth } = require("../services/auth");
-const { rateLimit, rateLimitPorClave, claveDeMedico } = require("../services/ratelimit");
+const { rateLimit, rateLimitPorClave, claveDeMedico, getIP } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { enviarTextoOPlantilla, PLANTILLAS, normalizarDestino } = require("../services/metaWhatsapp");
@@ -163,7 +163,8 @@ module.exports = function (app) {
       try {
         await SolicitudReseteo.create({
           tipo: c.tipo, telefono: c.telefono, nombre: c.nombre,
-          ip: req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "",
+          // La que vio nginx, no la que escribe el cliente (services/ratelimit.js).
+          ip: getIP(req),
         });
       } catch (e) {
         // Choque contra el índice único: dos pedidos llegaron a la vez. El

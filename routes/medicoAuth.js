@@ -8,7 +8,7 @@ const { registrar } = require("../services/auditoria");
 const { todosLosOperadores } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const { log } = require("../config");
-const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
+const { limitMedico, limitAuth, limitRegistro, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
 // El token y los datos de sesión son los mismos entren por donde entren
@@ -46,7 +46,9 @@ async function avisarSolicitudPendiente(medico) {
 
 module.exports = function (app) {
   // ─── REGISTRO ───────────────────────────────────────────────────────────
-  app.post("/medico/registro", limitAuth, asyncRoute(async (req, res) => {
+  // limitRegistro y no limitAuth: acá lo que hay que frenar es lo que sale
+  // bien, porque cada solicitud aceptada entra a la fila (services/ratelimit.js).
+  app.post("/medico/registro", limitRegistro, asyncRoute(async (req, res) => {
     // Se guarda solo con dígitos (services/telefono.js): «++55 11…» queda
     // «5511…», que es como lo escribe todo el sistema y lo que acepta WhatsApp.
     const phone = soloDigitos(req.body?.phone);

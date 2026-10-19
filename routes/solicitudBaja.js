@@ -19,7 +19,7 @@
 const { Medico, SolicitudBaja } = require("../db/models");
 const { requireAuth, hashPassword } = require("../services/auth");
 const crypto = require("crypto");
-const { rateLimit, rateLimitPorClave, claveDeMedico } = require("../services/ratelimit");
+const { rateLimit, rateLimitPorClave, claveDeMedico, getIP } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { esOperador } = require("../services/operadores");
@@ -79,7 +79,8 @@ module.exports = function (app) {
     try {
       await SolicitudBaja.create({
         tipo: "medico", telefono, nombre: medico.nombre, motivo,
-        ip: req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || "",
+        // La que vio nginx, no la que escribe el cliente (services/ratelimit.js).
+        ip: getIP(req),
       });
     } catch (e) {
       // Choque contra el índice único: ya había un pedido pendiente. No es
