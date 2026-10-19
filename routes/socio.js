@@ -71,9 +71,9 @@ module.exports = function (app) {
     if (!phone || !password) throw new ErrorHttp(400, "phone y password son requeridos");
 
     const socio = await Socio.findOne({ phone });
-    const { ok } = socio
-      ? await verificarPassword(password, socio.passwordHash)
-      : { ok: false };
+    // Aunque no haya cuenta: verificarPassword corre bcrypt igual, para que
+    // un teléfono sin cuenta no conteste más rápido (services/auth.js).
+    const { ok } = await verificarPassword(password, socio?.passwordHash);
 
     if (!ok) {
       registrar({ req, medicoPhone: phone, accion: "socio_login_fallido", exito: false });

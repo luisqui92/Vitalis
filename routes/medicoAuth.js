@@ -119,9 +119,9 @@ module.exports = function (app) {
     const medico = await buscarPorTelefono(Medico, escrito);
     // Lo que queda en la auditoría es la cuenta, no cómo se tipeó.
     const phone = medico?.phone || soloDigitos(escrito) || escrito;
-    const { ok, requiereRehash } = medico
-      ? await verificarPassword(password, medico.passwordHash)
-      : { ok: false, requiereRehash: false };
+    // Aunque no haya cuenta: verificarPassword corre bcrypt igual, para que
+    // un teléfono sin cuenta no conteste más rápido (services/auth.js).
+    const { ok, requiereRehash } = await verificarPassword(password, medico?.passwordHash);
 
     if (!ok) {
       registrar({ req, medicoPhone: phone, accion: "login_fallido", exito: false });

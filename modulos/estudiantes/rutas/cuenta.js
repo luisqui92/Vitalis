@@ -32,6 +32,10 @@ function estado(app) {
 // aprobación (lo dio Symphomed a una persona puntual) y se entra al toque.
 // Un código sirve una sola vez: se reclama con un update atómico, así dos
 // personas con el mismo código no pueden quedarse las dos con él.
+//
+// limitAuth cuenta solo lo que sale mal (services/ratelimit.js): lo que sale
+// bien gasta un código de un solo uso, así que no hay nada que frenar, y un
+// curso entero puede registrarse desde la red de su universidad.
 function registro(app) {
   app.post("/medico/registro-estudiante", limitAuth, asyncRoute(async (req, res) => {
     const codigo = normalizarCodigo(req.body?.codigo);
@@ -43,19 +47,30 @@ function registro(app) {
     if (!codigo || !nombre) throw new ErrorHttp(400, "Faltan el código y tu nombre");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
+
+    const ahora = new Date();
+    const libre = { codigo, usadoPor: null, anulado: false, vence: { $gt: ahora } };
+    const codigoInvalido = () => {
+      registrar({ req, medicoPhone: phone, accion: "codigo_estudiante_invalido", exito: false, detalle: codigo });
+      return new ErrorHttp(400, "Ese código no existe, ya se usó o venció. Pedí uno nuevo a Symphomed.");
+    };
+    // El código se mira ANTES que el teléfono, y sin gastarlo. Al revés, con
+    // un código inventado cualquiera se averiguaba qué teléfonos tienen
+    // cuenta en Symphomed: 409 «ya tiene una cuenta» a uno registrado, 400 a
+    // uno libre (auditoría de QA). Sin un código válido no se dice nada del
+    // teléfono.
+    if (!(await CodigoEstudiante.exists(libre))) throw codigoInvalido();
     if (await buscarPorTelefono(Medico, phone, { select: "_id", lean: true })) {
       throw new ErrorHttp(409, "Ese teléfono ya tiene una cuenta. Entrá con tu contraseña.");
     }
 
-    const ahora = new Date();
+    // Recién acá se reclama, atómico: entre la pregunta de arriba y esto,
+    // otra persona con el mismo código pudo haberlo usado.
     const cod = await CodigoEstudiante.findOneAndUpdate(
-      { codigo, usadoPor: null, anulado: false, vence: { $gt: ahora } },
+      libre,
       { $set: { usadoPor: phone, usadoEn: ahora } },
       { new: true });
-    if (!cod) {
-      registrar({ req, medicoPhone: phone, accion: "codigo_estudiante_invalido", exito: false, detalle: codigo });
-      throw new ErrorHttp(400, "Ese código no existe, ya se usó o venció. Pedí uno nuevo a Symphomed.");
-    }
+    if (!cod) throw codigoInvalido();
 
     const hasta = new Date(ahora);
     hasta.setMonth(hasta.getMonth() + cod.meses);

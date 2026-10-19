@@ -20,14 +20,41 @@ function esHashLegacySha256(hash) {
   return typeof hash === "string" && /^[0-9a-f]{64}$/i.test(hash);
 }
 
+// ═══ QUE NO SE NOTE SI LA CUENTA EXISTE ════════════════════════════════════
+//
+// bcrypt tarda a propósito: unos 250 ms con costo 12. Si un teléfono sin
+// cuenta contestaba en 1 ms y uno con cuenta en 250, midiendo el tiempo se
+// armaba la lista de quiénes tienen cuenta, aunque el mensaje fuera el mismo
+// (auditoría de QA, B-L2). Sin cuenta —sin hash—, se compara igual contra el
+// hash de una contraseña al azar que nadie conoce, y da siempre que no.
+//
+// Lo mismo con el hash viejo (SHA-256), que se verifica en microsegundos: sin
+// esto, esas cuentas contestaban MÁS RÁPIDO que un teléfono inexistente, y el
+// oráculo quedaba al revés.
+//
+// El hash de relleno se calcula la primera vez que hace falta, no al cargar
+// el archivo: un script que solo lo requiere no tiene por qué pagar ese
+// cuarto de segundo.
+let rellenoPendiente = null;
+async function compararContraNadie(pwd) {
+  if (!rellenoPendiente) rellenoPendiente = bcrypt.hash(crypto.randomBytes(16).toString("hex"), COSTO_BCRYPT);
+  await bcrypt.compare(String(pwd), await rellenoPendiente);
+}
+
 // Devuelve { ok, requiereRehash } — requiereRehash=true cuando la
 // contraseña era correcta pero el hash guardado todavía es el formato
 // viejo, para que el caller la vuelva a guardar ya en bcrypt sin que el
 // médico tenga que hacer nada (migración transparente en el próximo login).
+//
+// Se llama aunque la cuenta no exista (hashGuardado vacío): ver arriba.
 async function verificarPassword(pwd, hashGuardado) {
-  if (!hashGuardado) return { ok: false, requiereRehash: false };
+  if (!hashGuardado) {
+    await compararContraNadie(pwd);
+    return { ok: false, requiereRehash: false };
+  }
   if (esHashLegacySha256(hashGuardado)) {
     const ok = crypto.createHash("sha256").update(pwd).digest("hex") === hashGuardado;
+    await compararContraNadie(pwd);
     return { ok, requiereRehash: ok };
   }
   const ok = await bcrypt.compare(pwd, hashGuardado);
