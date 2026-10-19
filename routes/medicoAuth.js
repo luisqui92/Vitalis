@@ -10,7 +10,7 @@ const { notificarMedico } = require("../services/push");
 const { log } = require("../config");
 const { limitMedico, limitAuth, limitRegistro, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
+const { soloDigitos, formasDe, buscarPorTelefono } = require("../services/telefono");
 // El token y los datos de sesión son los mismos entren por donde entren
 // (services/sesionMedico.js).
 const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
@@ -97,9 +97,37 @@ module.exports = function (app) {
     // concreto que mirar en vez de un nombre suelto.
     if (!matricula) throw new ErrorHttp(400, "Falta la matrícula profesional");
 
-    // Con o sin «+»: una cuenta vieja guardada como «+5511…» es la misma.
-    const yaExiste = await buscarPorTelefono(Medico, phone, { select: "_id", lean: true });
-    if (yaExiste) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+    // ─── UN TELÉFONO RECHAZADO SE PUEDE VOLVER A PEDIR ──────────────────
+    //
+    // Nadie verifica que el teléfono sea de quien se registra. Una solicitud
+    // con el número de otro médico —por error o a propósito— quedaba en la
+    // base aunque se rechazara, y el dueño real recibía 409 para siempre:
+    // solo se arreglaba a mano, desde el servidor (auditoría de QA, B2).
+    // Ahora una solicitud RECHAZADA deja el número libre: se borra, y la
+    // nueva entra a la fila como cualquier otra.
+    //
+    // Solo la rechazada. Una pendiente no se pisa: quien registrara el mismo
+    // número le cambiaría la contraseña a la solicitud legítima, y quien
+    // aprueba terminaría aprobando la del otro. Y una rechazada nunca estuvo
+    // adentro (rechazar una aprobada da 409, routes/solicitudesCuenta.js): no
+    // tiene pacientes ni nada que la cuenta nueva pueda heredar.
+    //
+    // Con o sin «+»: una cuenta vieja guardada como «+5511…» es la misma. Se
+    // miran TODAS las formas y no solo la primera que aparece: si una es una
+    // cuenta en uso, el número no está libre aunque otra esté rechazada.
+    const yaExisten = await Medico.find({ phone: { $in: formasDe(phone) } })
+      .select("phone estadoCuenta activo solicitud").lean();
+    if (yaExisten.some(c => c.estadoCuenta !== "rechazada" || c.activo !== false)) {
+      throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+    }
+    const passwordHash = await hashPassword(password);
+    if (yaExisten.length) {
+      // Condicionado, por si mientras tanto alguien la tocó: entre dos que
+      // vuelven a pedir el mismo número a la vez, uno borra y el otro no.
+      const borradas = await Medico.deleteMany({ _id: { $in: yaExisten.map(c => c._id) }, estadoCuenta: "rechazada", activo: false });
+      if (borradas.deletedCount !== yaExisten.length) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+    }
+    const anterior = yaExisten[0];
 
     // ─── LA CUENTA NACE APAGADA ─────────────────────────────────────────
     //
@@ -112,15 +140,27 @@ module.exports = function (app) {
     // para dejar entrar o no; "estadoCuenta" es POR QUÉ. Sin el segundo, un
     // médico legítimo esperando aprobación y uno dado de baja se ven igual,
     // y no se les puede decir cosas distintas.
-    const medico = await Medico.create({
-      phone, nombre, especialidad, tipoEspecialidad, idioma,
-      passwordHash: await hashPassword(password),
-      matricula,
-      activo: false,
-      estadoCuenta: "pendiente",
-      solicitud: { pedidaEn: new Date(), mensaje },
-    });
-    registrar({ req, medicoPhone: phone, accion: "solicitud_cuenta", detalle: `matrícula: ${matricula || "(sin matrícula)"}` });
+    let medico;
+    try {
+      medico = await Medico.create({
+        phone, nombre, especialidad, tipoEspecialidad, idioma,
+        passwordHash,
+        matricula,
+        activo: false,
+        estadoCuenta: "pendiente",
+        solicitud: { pedidaEn: new Date(), mensaje },
+      });
+    } catch (e) {
+      // Dos solicitudes del mismo número a la vez: el índice único deja
+      // entrar una, y la otra es el mismo 409 de arriba, no un 500.
+      if (e?.code === 11000) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+      throw e;
+    }
+    // Lo de la rechazada queda dicho acá: la fila ya no la tiene.
+    const reemplaza = anterior
+      ? ` · reemplaza la rechazada${anterior.solicitud?.resueltaPor ? ` por ${anterior.solicitud.resueltaPor}` : ""}: ${anterior.solicitud?.motivo || "sin motivo"}`
+      : "";
+    registrar({ req, medicoPhone: phone, accion: "solicitud_cuenta", detalle: `matrícula: ${matricula || "(sin matrícula)"}${reemplaza}` });
     log.info(`[CUENTAS] nueva solicitud de ${nombre} (${phone}) — matrícula ${matricula || "no declarada"}`);
 
     // Avisar a quien aprueba, sin que la respuesta dependa de eso: si el
