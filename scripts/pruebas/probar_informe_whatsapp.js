@@ -7,6 +7,8 @@
 // 16 de octubre de 2026, B2). Lo que se prueba:
 //   1. Con un teléfono en el pedido, el informe va igual al de la ficha.
 //   2. Sin teléfono en la ficha no sale, aunque el pedido traiga uno.
+//   3. El nombre del centro y el del profesional no llevan enlaces: ni al
+//      editar el membrete, ni al pie de un mensaje con un nombre de antes.
 const path = require("path");
 const http = require("http");
 const RAIZ = path.join(__dirname, "..", "..");
@@ -90,6 +92,35 @@ meta.enviarTextoOPlantilla = async (destino, texto) => { enviados.push({ destino
     r.estado === 400 && /ficha/.test(r.cuerpo?.error || "") && enviados.length === antes);
   const sinCompartir = await M.Informe.findById(id2).lean();
   verificar("  ...y el informe no queda como compartido", !sinCompartir.compartidoEn);
+
+  console.log("\n── 3. El membrete no lleva enlaces ──");
+  const LEGITIMO = { nombreCentro: "Centro Médico 6 de Agosto (S.R.L.)", profesionalNombre: "Dra. María O’Neill, MSc." };
+  r = await P("PATCH", "/medico/membrete", tk, LEGITIMO);
+  verificar("un nombre de verdad, con números, siglas y abreviaturas → se guarda", r.estado === 200);
+  const conEnlace = ["https://phish.example/pago", "Pagos en bit.ly/3xYz", "pagos-clinicasur.com/turno", "wa.me/59170000000",
+    "WWW.CENTRO-SUR.COM", "Centro 10.0.0.7/pago", "Centro Sur\nPara retirarlo deposite al 70000000"];
+  for (const nombre of conEnlace) {
+    const rc = await P("PATCH", "/medico/membrete", tk, { ...LEGITIMO, nombreCentro: `Centro Sur ${nombre}` });
+    const rp = await P("PATCH", "/medico/membrete", tk, { ...LEGITIMO, profesionalNombre: nombre });
+    verificar(`  ${JSON.stringify(nombre)} → 400 en el centro y en el profesional`,
+      rc.estado === 400 && /enlace/.test(rc.cuerpo?.error || "") && rp.estado === 400 && /profesional/.test(rp.cuerpo?.error || ""));
+  }
+  r = await P("PATCH", "/medico/membrete", tk, { ...LEGITIMO, profesionalNombre: "Dra.Ana Pérez" });
+  verificar("un punto pegado a la letra también, y dice cómo escribirlo", r.estado === 400 && /Dra\. Ana/.test(r.cuerpo?.error || ""));
+  const guardado = await M.Membrete.findOne({ medicoPhone: MED }).lean();
+  verificar("  ...y lo rechazado no quedó guardado", guardado.nombreCentro === LEGITIMO.nombreCentro && guardado.profesionalNombre === LEGITIMO.profesionalNombre);
+
+  // Un membrete con un enlace de antes de esta revisión (o el que se arma
+  // solo con el nombre de la cuenta): el informe se firma con él.
+  await M.Membrete.updateOne({ medicoPhone: MED }, { $set: { nombreCentro: "Pague su informe en pagos-clinicasur.com/turno" } });
+  const id3 = await firmado(conTelefono._id);
+  r = await P("POST", `/medico/informes/${id3}/enviar`, tk);
+  verificar("un nombre con enlace de antes: el mensaje sale, pero sin ese nombre al pie",
+    r.estado === 200 && !/pagos-clinicasur/.test(enviados.at(-1)?.texto) && /Su informe ya está disponible/.test(enviados.at(-1)?.texto));
+  await M.Membrete.updateOne({ medicoPhone: MED }, { $set: { nombreCentro: "Centro de Imagen Sur" } });
+  const id4 = await firmado(conTelefono._id);
+  await P("POST", `/medico/informes/${id4}/enviar`, tk);
+  verificar("  ...y uno sin enlace, sí", /\nCentro de Imagen Sur$/.test(enviados.at(-1)?.texto));
 
   servidor.close();
   await mongoose.disconnect();

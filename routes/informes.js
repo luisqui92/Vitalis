@@ -62,6 +62,17 @@ async function membreteDe(medicoPhone) {
   return m;
 }
 
+// El nombre del centro va al pie del WhatsApp del informe, que sale del
+// número oficial, y el del profesional a la verificación pública: ninguno de
+// los dos puede llevar un enlace (informe de QA del 16 de octubre de 2026,
+// B2). Enlace es lo que WhatsApp vuelve tocable: «https://», «www.», una IP o
+// un punto pegado entre letras, como «bit.ly», «wa.me» o «pagos-clinica.com».
+// Por eso «Dra.Ana» tampoco pasa, y «Dra. Ana» sí. Un salto de línea tampoco:
+// con uno, el nombre agrega un párrafo propio al final del mensaje.
+const PARECE_ENLACE = /:\/\/|www\.|[\p{L}\p{N}]\.\p{L}{2,}|\d{1,3}(\.\d{1,3}){3}|[\u0000-\u001f\u007f]/iu;
+const nombreConEnlace = (texto) => PARECE_ENLACE.test(String(texto || ""));
+const NOMBRES_SIN_ENLACE = { nombreCentro: "El nombre del centro", profesionalNombre: "El nombre del profesional" };
+
 // La edad que tenía el paciente en una fecha (la de la firma, en un informe
 // firmado).
 function edadEnFecha(fechaNacimiento, hasta) {
@@ -142,6 +153,12 @@ module.exports = function (app) {
     const m = await membreteDe(medicoPhone);
     for (const campo of ["nombreCentro", "direccion", "telefono", "ciudad", "profesionalNombre", "profesionalTitulo", "profesionalRegistro", "piePagina"]) {
       if (req.body?.[campo] !== undefined) m[campo] = String(req.body[campo]).trim().slice(0, 200);
+    }
+    for (const [campo, quien] of Object.entries(NOMBRES_SIN_ENLACE)) {
+      if (req.body?.[campo] !== undefined && nombreConEnlace(m[campo])) {
+        throw new ErrorHttp(400, `${quien} no puede llevar un enlace ni una dirección web: sale en los mensajes de WhatsApp. ` +
+          "Si es el punto de una abreviatura, dejá un espacio después («Dra. Ana»).");
+      }
     }
     // Logo y firma llegan como data URI. Se acepta solo imagen y con tope de
     // tamaño: un logo de 5 MB haría lenta cada impresión y engordaría el
@@ -295,10 +312,13 @@ module.exports = function (app) {
     const primerNombre = String(paciente?.nombre || "").split(" ")[0];
     const queEstudio = `${informe.titulo || informe.tipoEstudio || "Estudio"} — ${new Date(informe.fechaEstudio).toLocaleDateString("es-BO")}`;
     const enlace = enlaceDe(informe, req);
+    // Un nombre con enlace de antes de que se revisara (o el de la cuenta,
+    // que es el que trae el membrete hasta que alguien lo edita) no sale.
+    const centro = nombreConEnlace(membrete.nombreCentro) ? "" : membrete.nombreCentro || "";
     const texto = `Hola ${primerNombre}. Su informe ya está disponible.\n\n` +
       `${queEstudio}\n\n` +
       `Puede verlo acá:\n${enlace}\n\n` +
-      `El enlace vence en ${DIAS_VALIDEZ_ENLACE} días.\n${membrete.nombreCentro || ""}`;
+      `El enlace vence en ${DIAS_VALIDEZ_ENLACE} días.\n${centro}`;
 
     try {
       // Ni el título del estudio ni nada clínico viajan en la plantilla más
