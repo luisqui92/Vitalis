@@ -177,7 +177,14 @@ async function obtenerHorariosDisponibles(medicoPhone, diasPedidos = 7) {
 // Un horario puntual sigue libre? (se revalida antes de confirmar una
 // reserva, por si se ocupó entre que se mostró la lista y se eligió — ya
 // sea en Symphomed o directo en el Google Calendar del médico).
-async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
+//
+// excluir: al mover una cita que ya existe, { citaId, desde, hasta }. Ella
+// misma no cuenta como ocupación, y tampoco su evento de Google, que hasta
+// que se guarde sigue en la hora vieja (desde–hasta): sin esto, correrla
+// menos de lo que dura daba un choque consigo misma. Ese tramo se le resta
+// al bloque ocupado en vez de sacar el bloque entero, porque Google devuelve
+// en un solo bloque los eventos que se tocan.
+async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos, excluir = null) {
   const inicio = new Date(fecha).getTime();
   const fin = inicio + duracionDe(duracionMinutos) * 60000;
   const margen = 6 * 3600000;
@@ -186,6 +193,7 @@ async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
     Cita.find({
       medicoPhone, estado: "confirmada",
       fecha: { $gte: new Date(inicio - margen), $lte: new Date(fin) },
+      ...(excluir?.citaId ? { _id: { $ne: excluir.citaId } } : {}),
     }).select("fecha duracionMinutos").lean(),
     Medico.findOne({ phone: medicoPhone }).select("googleCalendarId").lean(),
   ]);
@@ -199,7 +207,14 @@ async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos) {
 
   if (medico?.googleCalendarId) {
     const ocupadoCalendar = await obtenerOcupadoEnRango(medico.googleCalendarId, new Date(inicio - margen), new Date(fin + margen));
-    if (ocupadoCalendar.some(b => seSuperponen(inicio, fin, b.inicio.getTime(), b.fin.getTime()))) return false;
+    const propioDesde = excluir?.desde ? new Date(excluir.desde).getTime() : null;
+    const propioHasta = excluir?.hasta ? new Date(excluir.hasta).getTime() : null;
+    const bloques = ocupadoCalendar.flatMap(b => {
+      const bInicio = b.inicio.getTime(), bFin = b.fin.getTime();
+      if (propioDesde === null || propioHasta === null) return [[bInicio, bFin]];
+      return [[bInicio, Math.min(bFin, propioDesde)], [Math.max(bInicio, propioHasta), bFin]].filter(([a, z]) => a < z);
+    });
+    if (bloques.some(([a, z]) => seSuperponen(inicio, fin, a, z))) return false;
   }
   return true;
 }

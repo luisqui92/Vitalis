@@ -4,7 +4,7 @@
 const { Medico, Paciente, Cita } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { obtenerHorariosDisponibles, franjaValida, duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX } = require("../services/agenda");
+const { obtenerHorariosDisponibles, horarioSigueLibre, franjaValida, duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX } = require("../services/agenda");
 const { localAInstante, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 
 // La zona en la que trabaja esta cuenta. Se pregunta a la base y no se
@@ -23,6 +23,33 @@ const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
 const DIAS_VALIDOS = ["confirmada", "cancelada", "completada"];
+const SE_SUPERPONE = "Ese horario se superpone con otra cita confirmada o con tu Google Calendar.";
+
+// ─── AVISOS AL PACIENTE CUANDO EL CONSULTORIO CAMBIA SU CITA ─────────────
+// Antes mover o cancelar una cita desde el panel no le avisaba nada al
+// paciente, que seguía yendo a la hora vieja (auditoría del comité de QA,
+// octubre de 2026, M4). Van sin await y con su propio catch: un WhatsApp
+// caído no puede deshacer un cambio de agenda que ya quedó guardado.
+function avisarCambio(cita, medico) {
+  const primerNombre = String(cita.pacienteNombre || "").split(" ")[0];
+  const quien = medico?.nombre || "el consultorio";
+  const cuando = formatearFechaCompleta(cita.fecha, medico?.zonaHoraria);
+  enviarTextoOPlantilla(cita.pacienteTelefono,
+    `🔁 ${primerNombre}, su cita con ${quien} se cambió para el ${cuando}. Le esperamos.\n\nSi necesita cambiarla o cancelarla, avísenos directo en el consultorio.`,
+    // Fuera de la ventana de 24 h sale la de cita confirmada, con la fecha
+    // nueva: dice lo que importa, cuándo tiene que ir.
+    { plantilla: PLANTILLAS.citaConfirmada, parametros: [primerNombre, quien, cuando], idioma: medico?.idioma })
+    .catch(e => log.error(`[CITAS] no se pudo avisar el cambio por WhatsApp a ${cita.pacienteTelefono}:`, e.message));
+}
+function avisarCancelacion(cita, fecha, medico) {
+  const primerNombre = String(cita.pacienteNombre || "").split(" ")[0];
+  const quien = medico?.nombre || "el consultorio";
+  const cuando = formatearFechaCompleta(fecha, medico?.zonaHoraria);
+  enviarTextoOPlantilla(cita.pacienteTelefono,
+    `❌ ${primerNombre}, su cita con ${quien} del ${cuando} fue cancelada por el consultorio. Si desea una nueva cita, responda a este mensaje.`,
+    { plantilla: PLANTILLAS.citaCancelada, parametros: [primerNombre, quien, cuando], idioma: medico?.idioma })
+    .catch(e => log.error(`[CITAS] no se pudo avisar la cancelación por WhatsApp a ${cita.pacienteTelefono}:`, e.message));
+}
 
 module.exports = function (app) {
   // ─── HORARIO DE ATENCIÓN ─────────────────────────────────────────────────
@@ -114,13 +141,28 @@ module.exports = function (app) {
       throw new ErrorHttp(400, `La duración de la cita tiene que ser de ${DURACION_MIN} a ${DURACION_MAX} minutos.`);
     }
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-    const cita = await Cita.create({
-      medicoPhone, pacienteId, pacienteNombre,
-      pacienteTelefono: String(req.body?.pacienteTelefono || "").trim(),
-      fecha, duracionMinutos: duracionValida(pedida) || duracionDe(medico?.duracionConsultaMinutos),
-      motivo: String(req.body?.motivo || "").trim(),
-      estado: "confirmada", origen: "manual",
-    });
+    const duracionMinutos = duracionValida(pedida) || duracionDe(medico?.duracionConsultaMinutos);
+    // Las citas a mano no revisaban nada: dos solapadas (10:00 y 10:15) se
+    // guardaban las dos, y dos a la misma hora exacta daban un 500 (M4). Se
+    // mira lo mismo que en la reserva del paciente —las otras citas
+    // confirmadas y el Google Calendar del médico—, y el índice único de Cita
+    // sigue frenando dos pedidos a la misma hora exacta. Dos solapados pero no
+    // iguales que lleguen en el mismo instante pasan los dos: es la agenda de
+    // un solo médico cargada a mano, y se acepta.
+    if (!(await horarioSigueLibre(medicoPhone, fecha, duracionMinutos))) throw new ErrorHttp(409, SE_SUPERPONE);
+    let cita;
+    try {
+      cita = await Cita.create({
+        medicoPhone, pacienteId, pacienteNombre,
+        pacienteTelefono: String(req.body?.pacienteTelefono || "").trim(),
+        fecha, duracionMinutos,
+        motivo: String(req.body?.motivo || "").trim(),
+        estado: "confirmada", origen: "manual",
+      });
+    } catch (e) {
+      if (e?.code === 11000) throw new ErrorHttp(409, SE_SUPERPONE);
+      throw e;
+    }
 
     let avisoCalendario = null;
     if (medico?.googleCalendarId) {
@@ -137,7 +179,7 @@ module.exports = function (app) {
       // cargó el médico en su panel, así que el paciente puede no haberle
       // escrito nunca al WhatsApp del consultorio. Sin la plantilla de
       // respaldo, no recibía nada y el médico veía "cita creada ✓".
-      const cuando = formatearFechaCompleta(cita.fecha);
+      const cuando = formatearFechaCompleta(cita.fecha, zona);
       const quien = medico?.nombre || "el consultorio";
       enviarTextoOPlantilla(cita.pacienteTelefono,
         `✅ ${primerNombre}, su cita con ${quien} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,
@@ -181,12 +223,42 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const cita = await obtenerOFallar(Cita, { _id: req.params.id, medicoPhone }, "Cita no encontrada");
 
-    if (req.body?.fecha !== undefined) cita.fecha = localAInstante(await zonaDe(medicoPhone), req.body.fecha);
+    const fechaAntes = new Date(cita.fecha);
+    const estadoAntes = cita.estado;
+    if (req.body?.fecha !== undefined) {
+      const fecha = localAInstante(await zonaDe(medicoPhone), req.body.fecha);
+      // Sin esto, una fecha que no es fecha llegaba a la base y volvía un 500.
+      if (isNaN(fecha.getTime())) throw new ErrorHttp(400, "Fecha inválida");
+      cita.fecha = fecha;
+    }
     if (req.body?.motivo !== undefined) cita.motivo = String(req.body.motivo).trim();
-    if (req.body?.estado !== undefined && DIAS_VALIDOS.includes(req.body.estado)) cita.estado = req.body.estado;
-    await cita.save();
+    if (req.body?.estado !== undefined) {
+      // Antes un estado que no existe se ignoraba en silencio y respondía ok.
+      if (!DIAS_VALIDOS.includes(req.body.estado)) throw new ErrorHttp(400, "Estado inválido");
+      cita.estado = req.body.estado;
+    }
+    // Moverla, o volver a confirmar una cancelada, puede pisar otra (M4).
+    const cambioHorario = cita.fecha.getTime() !== fechaAntes.getTime();
+    if (cita.estado === "confirmada" && (cambioHorario || estadoAntes !== "confirmada")) {
+      const suEvento = estadoAntes === "confirmada" && cita.googleEventId
+        ? { desde: fechaAntes, hasta: new Date(fechaAntes.getTime() + duracionDe(cita.duracionMinutos) * 60000) }
+        : {};
+      if (!(await horarioSigueLibre(medicoPhone, cita.fecha, cita.duracionMinutos, { citaId: cita._id, ...suEvento }))) {
+        throw new ErrorHttp(409, SE_SUPERPONE);
+      }
+    }
+    try {
+      await cita.save();
+    } catch (e) {
+      if (e?.code === 11000) throw new ErrorHttp(409, SE_SUPERPONE);
+      throw e;
+    }
 
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+    if (cita.pacienteTelefono) {
+      if (cita.estado === "confirmada" && cambioHorario && cita.fecha.getTime() > Date.now()) avisarCambio(cita, medico);
+      else if (cita.estado === "cancelada" && estadoAntes === "confirmada" && fechaAntes.getTime() > Date.now()) avisarCancelacion(cita, fechaAntes, medico);
+    }
     // El calendario es un espejo (no la fuente de verdad, ver
     // services/googleCalendar.js) — si esto falla la cita en Symphomed ya
     // quedó bien guardada igual, pero antes el médico nunca se enteraba: el
@@ -208,6 +280,11 @@ module.exports = function (app) {
     const cita = await Cita.findOneAndDelete({ _id: req.params.id, medicoPhone });
     if (!cita) throw new ErrorHttp(404, "Cita no encontrada");
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
+    // Borrar una cita que el paciente tiene por delante también es
+    // cancelársela, y se entera igual.
+    if (cita.pacienteTelefono && cita.estado === "confirmada" && new Date(cita.fecha).getTime() > Date.now()) {
+      avisarCancelacion(cita, cita.fecha, medico);
+    }
     let avisoCalendario = null;
     if (medico?.googleCalendarId && cita.googleEventId) {
       const sincronizo = await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
