@@ -280,8 +280,13 @@ module.exports = function (app) {
     if (informe.estado !== "firmado") throw new ErrorHttp(400, "Firmá el informe antes de enviarlo");
 
     const paciente = await Paciente.findOne({ _id: informe.pacienteId, medicoPhone }).lean();
-    const destino = String(req.body?.telefono || paciente?.telefono || "").replace(/\D/g, "");
-    if (!destino) throw new ErrorHttp(400, "El paciente no tiene teléfono cargado");
+    // Solo al teléfono de la ficha. Antes valía uno que viniera en el pedido,
+    // y con eso el número oficial le mandaba un enlace con el nombre del
+    // centro a cualquier número (informe de QA del 16 de octubre de 2026,
+    // B2). La pantalla nunca lo mandó: si el número está mal, se corrige la
+    // ficha.
+    const destino = String(paciente?.telefono || "").replace(/\D/g, "");
+    if (!destino) throw new ErrorHttp(400, "El paciente no tiene teléfono cargado. Cargalo en la ficha y volvé a enviarlo.");
 
     const { membrete } = await impresoDe(informe);
     // Cero contenido clínico en el mensaje: la vista previa de WhatsApp
