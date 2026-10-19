@@ -94,6 +94,16 @@ async function crearUnaVez(Modelo, datos) {
 }
 const claveDe = (...partes) => partes.map(p => String(p ?? "").trim().toLowerCase()).join("|");
 
+// Lo que dejó un intento anterior de confirmar esta misma consulta, que se
+// cortó a mitad, y que este ya no trae: el médico cambió una dosis o
+// desmarcó algo antes de reintentar. Manda lo último que confirmó; antes
+// quedaban los dos en el Kardex, el de antes y el corregido, y la receta
+// seguía con lo viejo (A1). Se llama con la consulta reclamada y sin
+// confirmar: todo lo que lleva su clave salió de un intento que no terminó.
+function sacarLoQueSobra(Modelo, consultaId, claves, filtro = {}) {
+  return Modelo.deleteMany({ ...filtro, consultaId, claveConfirmacion: { $exists: true, $nin: claves } });
+}
+
 // Los hallazgos para el mapa de la especialidad que el médico dejó marcados
 // al confirmar. Cada cambio queda en el historial de la pieza, estructura u
 // órgano con fuente "voz" y el id de la consulta. Si ya está (una
@@ -641,11 +651,17 @@ module.exports = function (app) {
         }
       }
       await Promise.all(correcciones);
+      // Guardada antes de aplicar nada: si algo de lo que sigue falla y el
+      // médico recarga, ve lo que corrigió y no la nota original de la IA,
+      // que confirmada de nuevo cargaría lo que él ya había cambiado (A1).
+      // Y un reintento compara con esto: no registra dos veces la misma
+      // corrección.
       if (huboCambios) {
         consulta.notaEditadaPorMedico = true;
-        aplicado.push("Nota clínica corregida");
+        await consulta.save();
       }
     }
+    if (consulta.notaEditadaPorMedico) aplicado.push("Nota clínica corregida");
 
     const nota = consulta.notaClinica;
 
@@ -697,10 +713,15 @@ module.exports = function (app) {
 
     // ── 3. Tratamientos sugeridos → presupuesto ──
     const tratamientosPedidos = Array.isArray(aplicar.tratamientos) ? aplicar.tratamientos : [];
+    const clavesTratamientos = [];
+    // Uno de un intento cortado que ya cobró algo o avanzó no se toca.
+    const sinMovimientos = { estado: "pendiente", "pagos.0": { $exists: false } };
     for (const item of (nota.tratamientosSugeridos || [])) {
       if (item.estado !== "pendiente") continue;
       const pedido = tratamientosPedidos.find(t => String(t?.itemId) === String(item._id));
       if (!pedido) { item.estado = "descartado"; continue; }
+      const clave = claveDe("trat", item._id);
+      clavesTratamientos.push(clave);
       try {
         const nombre = String(pedido.nombre || item.catalogoNombreSugerido || item.itemMencionado || "").trim();
         if (!nombre) throw new Error("falta el nombre");
@@ -712,34 +733,46 @@ module.exports = function (app) {
         registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "nombre", valorSugerido: item.catalogoNombreSugerido, valorFinal: nombre });
         registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "piezaFdi", valorSugerido: item.piezaFdi, valorFinal: piezaFdi });
 
-        await crearUnaVez(TratamientoPlan, {
+        const creado = await crearUnaVez(TratamientoPlan, {
           pacienteId: consulta.pacienteId, medicoPhone, nombre, precio,
           piezaFdi: piezaFdi ?? null, estado: "pendiente",
-          consultaId: consulta._id, claveConfirmacion: claveDe("trat", item._id),
+          consultaId: consulta._id, claveConfirmacion: clave,
         });
+        // Ya estaba, de un intento cortado: con el nombre y el precio de ahora.
+        if (!creado) {
+          await TratamientoPlan.updateOne({ ...sinMovimientos, consultaId: consulta._id, claveConfirmacion: clave },
+            { $set: { nombre, precio, piezaFdi: piezaFdi ?? null } });
+        }
         item.estado = "agregado";
         aplicado.push(`Tratamiento al presupuesto: ${nombre}`);
       } catch (e) {
         fallado.push(`No se pudo agregar el tratamiento "${item.itemMencionado}": ${e.message}`);
       }
     }
+    await sacarLoQueSobra(TratamientoPlan, consulta._id, clavesTratamientos, sinMovimientos);
 
     // ── 4. Medicación al Kardex ──
+    // La clave es el contenido: si el médico cambió la dosis antes de
+    // reintentar, es otro medicamento, y el de antes sale (sacarLoQueSobra).
     const medsPedidos = Array.isArray(aplicar.medicamentos) ? aplicar.medicamentos : [];
+    const clavesMeds = [];
     for (const i of medsPedidos) {
       const m = (nota.medicamentosRecetados || [])[Number(i)];
       if (!m?.nombre) continue;
+      const clave = claveDe("med", m.nombre, m.dosis, m.frecuencia);
+      clavesMeds.push(clave);
       try {
         await crearUnaVez(Medicamento, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "",
-          consultaId: consulta._id, claveConfirmacion: claveDe("med", m.nombre, m.dosis, m.frecuencia),
+          consultaId: consulta._id, claveConfirmacion: clave,
         });
         aplicado.push(`Medicación: ${m.nombre}`);
       } catch (e) {
         fallado.push(`No se pudo cargar el medicamento "${m.nombre}": ${e.message}`);
       }
     }
+    await sacarLoQueSobra(Medicamento, consulta._id, clavesMeds);
 
     // ── 5. Antecedentes y vacunas ──
     for (const i of (Array.isArray(aplicar.antecedentesPersonales) ? aplicar.antecedentesPersonales : [])) {
@@ -759,6 +792,7 @@ module.exports = function (app) {
     }
     await paciente.save();
 
+    const clavesVacunas = [];
     for (const i of (Array.isArray(aplicar.vacunas) ? aplicar.vacunas : [])) {
       const v = (nota.vacunasMencionadas || [])[Number(i)];
       if (!v?.nombre) continue;
@@ -768,16 +802,19 @@ module.exports = function (app) {
         // en producción): una consulta de las 21:00 en Bolivia cargaba la
         // vacuna con fecha del día siguiente (M6).
         const fecha = v.fecha || fechaStrEnZona(zona, new Date(consulta.createdAt));
+        const clave = claveDe("vac", v.nombre, v.dosis, fecha);
+        clavesVacunas.push(clave);
         await crearUnaVez(Vacuna, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: v.nombre, dosis: v.dosis || "", fecha,
-          consultaId: consulta._id, claveConfirmacion: claveDe("vac", v.nombre, v.dosis, fecha),
+          consultaId: consulta._id, claveConfirmacion: clave,
         });
         aplicado.push(`Vacuna: ${v.nombre}`);
       } catch (e) {
         fallado.push(`No se pudo cargar la vacuna "${v.nombre}": ${e.message}`);
       }
     }
+    await sacarLoQueSobra(Vacuna, consulta._id, clavesVacunas);
 
     // ── 5b. Lo que la IA entendió para el mapa, lo que el médico dejó marcado ──
     // Solo números enteros: Number(null) es 0, y un índice vacío cargaba el primero.
@@ -805,13 +842,19 @@ module.exports = function (app) {
             nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "", duracion: "",
           })),
         };
-        // Una sola por consulta: si ya salió en una confirmación que se cortó, es esa.
+        // Una sola por consulta: si ya salió en una confirmación que se cortó,
+        // es esa, con los medicamentos de ahora (el médico pudo corregirlos).
         recetaId = (await crearUnaVez(Receta, datosReceta))?._id
-          || (await Receta.findOne({ consultaId: consulta._id, claveConfirmacion: "receta" }).select("_id").lean())?._id || null;
+          || (await Receta.findOneAndUpdate({ consultaId: consulta._id, claveConfirmacion: "receta" },
+            { $set: { medicamentos: datosReceta.medicamentos } }, { new: true }).select("_id").lean())?._id || null;
         aplicado.push("Receta generada");
       } catch (e) {
         fallado.push("No se pudo generar la receta: " + e.message);
       }
+    } else {
+      // Esta vez no la pidió (o ya no quedan medicamentos): la de un intento
+      // cortado no queda.
+      await sacarLoQueSobra(Receta, consulta._id, []);
     }
 
     consulta.confirmadaEn = new Date();

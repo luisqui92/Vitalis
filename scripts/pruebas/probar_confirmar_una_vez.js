@@ -10,6 +10,10 @@
 //   2. Falla el guardado final: error, y al reintentar no se duplica nada
 //      (ni el WhatsApp al paciente).
 //   3. El reclamo de una confirmación cortada vence; uno vigente frena.
+//   4. Falla a mitad y el médico corrige antes de reintentar (A1): al
+//      recargar ve lo que corrigió, y lo que queda es lo último que
+//      confirmó (el Kardex y la receta dicen lo mismo, sin lo del intento
+//      cortado). Lo que ya tiene un pago no se borra.
 const path = require("path");
 const http = require("http");
 const RAIZ = path.join(__dirname, "..", "..");
@@ -42,6 +46,8 @@ const enviados = [];
 meta.enviarTextoOPlantilla = async (telefono, texto) => { enviados.push({ telefono, texto }); return { ok: true }; };
 // Ni la IA del resumen previo, que se rehace al confirmar (probar_resumen_al_confirmar.js).
 require(path.join(RAIZ, "services", "briefClinico")).regenerarBriefClinico = async () => {};
+// Ni la del hilo, que se rehace cuando el médico corrigió la nota.
+require(path.join(RAIZ, "services", "hiloClinico")).generarHilo = async () => {};
 
 (async () => {
   let MongoMemoryServer;
@@ -142,6 +148,63 @@ require(path.join(RAIZ, "services", "briefClinico")).regenerarBriefClinico = asy
   verificar("si quedó colgada hace minutos (el proceso se cayó) → se puede confirmar", r.estado === 200 && igual(await cuantos(c3._id), UNA_VEZ));
   r = await P(`/medico/consultas/${c3._id}/confirmar`, cuerpo(c3));
   verificar("ya confirmada → 409 «ya fue confirmada»", r.estado === 409 && /ya fue confirmada/.test(r.cuerpo?.error || ""));
+
+  console.log("\n── 4. Falla a mitad, y el médico corrige antes de reintentar (A1) ──");
+  // El guardado final falla una vez, como en el 2.
+  const conGuardadoQueFalla = async (fn) => {
+    let queda = 1;
+    M.ConsultaMedica.prototype.save = function (...a) {
+      if (queda > 0 && this.confirmadaEn) { queda--; return Promise.reject(new Error("la base no contestó")); }
+      return saveOriginal.apply(this, a);
+    };
+    try { return await fn(); } finally { M.ConsultaMedica.prototype.save = saveOriginal; }
+  };
+  // Lo que manda la pantalla con el Ibuprofeno corregido a mano.
+  const corregido = (c, dosis, cambios = {}) => {
+    const b = cuerpo(c);
+    b.nota = { medicamentosRecetados: [
+      { nombre: "Amoxicilina", dosis: "500 mg", frecuencia: "cada 8 horas", origen: 0 },
+      { nombre: "Ibuprofeno", dosis, frecuencia: "cada 8 horas", origen: 1 },
+    ] };
+    Object.assign(b.aplicar, cambios);
+    return b;
+  };
+  const c4 = await nueva();
+  const enviadosAntes = enviados.length;
+  r = await conGuardadoQueFalla(() => P(`/medico/consultas/${c4._id}/confirmar`, corregido(c4, "600 mg")));
+  verificar(`corrige el Ibuprofeno a 600 mg y el guardado final falla → error (${r.estado})`, r.estado === 500);
+  const recargada = (await pedir(servidor.address().port, "GET", `/medico/consultas/${c4._id}`, tk)).cuerpo?.consulta;
+  verificar(`  ...al recargar, la nota dice lo que corrigió, no lo de la IA (${recargada?.notaClinica?.medicamentosRecetados?.[1]?.dosis})`,
+    recargada?.notaClinica?.medicamentosRecetados?.[1]?.dosis === "600 mg" && !recargada?.confirmadaEn);
+  // Antes de reintentar cambia otra vez: 800 mg, sin la vacuna, y la restauración a 300.
+  const item4 = String(c4.notaClinica.tratamientosSugeridos[0]._id);
+  r = await P(`/medico/consultas/${c4._id}/confirmar`, corregido(c4, "800 mg",
+    { vacunas: [], tratamientos: [{ itemId: item4, nombre: "Restauración", precio: 300 }] }));
+  verificar("el reintento → 200, confirmada", r.estado === 200 && !!(await M.ConsultaMedica.findById(c4._id).lean()).confirmadaEn);
+  const kardex = await M.Medicamento.find({ consultaId: c4._id }).lean();
+  verificar(`  ...el Kardex tiene lo último que confirmó, sin lo del intento cortado (${kardex.map(m => `${m.nombre} ${m.dosis}`).join(", ")})`,
+    kardex.length === 2 && kardex.some(m => m.nombre === "Ibuprofeno" && m.dosis === "800 mg") && kardex.some(m => m.nombre === "Amoxicilina"));
+  const recetas4 = await M.Receta.find({ consultaId: c4._id }).lean();
+  verificar(`  ...una sola receta, la que devuelve, y dice lo mismo que el Kardex (${recetas4.map(x => x.medicamentos[1]?.dosis).join(", ")})`,
+    recetas4.length === 1 && String(recetas4[0]._id) === String(r.cuerpo?.recetaId) && recetas4[0].medicamentos[1]?.dosis === "800 mg");
+  verificar("  ...la vacuna que desmarcó ya no figura", (await M.Vacuna.countDocuments({ consultaId: c4._id })) === 0);
+  const planes4 = await M.TratamientoPlan.find({ consultaId: c4._id }).lean();
+  verificar(`  ...la restauración, una vez y con el precio nuevo (${planes4.map(x => x.precio).join(", ")})`, planes4.length === 1 && planes4[0].precio === 300);
+  verificar("  ...la nota confirmada es la última que corrigió", (await M.ConsultaMedica.findById(c4._id).lean()).notaClinica.medicamentosRecetados[1].dosis === "800 mg");
+  verificar("  ...y el paciente recibió un solo WhatsApp", enviados.length === enviadosAntes + 1);
+
+  const c5 = await nueva();
+  r = await conGuardadoQueFalla(() => P(`/medico/consultas/${c5._id}/confirmar`, cuerpo(c5)));
+  verificar(`otra que falla al final, con todo aplicado (${r.estado})`, r.estado === 500 && igual(await cuantos(c5._id), UNA_VEZ));
+  // Mientras tanto la restauración ya recibió un pago.
+  await M.TratamientoPlan.updateOne({ consultaId: c5._id }, { $push: { pagos: { monto: 50 } } });
+  r = await P(`/medico/consultas/${c5._id}/confirmar`, { aplicar: { ...cuerpo(c5).aplicar, medicamentos: [0], receta: false, tratamientos: [] } });
+  verificar("al reintentar desmarca el Ibuprofeno y la receta → 200, y salen los del intento cortado",
+    r.estado === 200 && (await M.Medicamento.countDocuments({ consultaId: c5._id })) === 1
+    && (await M.Medicamento.countDocuments({ consultaId: c5._id, nombre: "Ibuprofeno" })) === 0
+    && (await M.Receta.countDocuments({ consultaId: c5._id })) === 0 && !r.cuerpo?.recetaId);
+  verificar("  ...pero la restauración que ya tenía un pago no se borra", (await M.TratamientoPlan.countDocuments({ consultaId: c5._id })) === 1);
+  verificar("  ...y lo de las otras consultas sigue igual", igual(await cuantos(c1._id), UNA_VEZ) && igual(await cuantos(c2._id), UNA_VEZ));
 
   servidor.close();
   await mongoose.disconnect();
