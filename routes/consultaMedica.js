@@ -14,6 +14,7 @@ const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
+const { ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 const { registrar } = require("../services/auditoria");
 const { notificarMedico } = require("../services/push");
 const { avisarCambio } = require("../services/realtime");
@@ -929,7 +930,7 @@ async function contextoDeNota(paciente, medicoPhone) {
   // catálogo de precios del consultorio para que la IA pueda
   // emparejar tratamientos mencionados ("hay que sellar esto",
   // "hay que hacer un relleno acá") con el ítem correcto.
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad zonaHoraria").lean();
   // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
   // marcas como medicamentos y no repite un error que él ya arregló. Y lo que
   // aprendió de él: sus palabras y cómo escribe (services/adaptacion.js).
@@ -955,6 +956,9 @@ async function contextoDeNota(paciente, medicoPhone) {
     contexto: {
       // La nota de enfermería en vez de la médica (services/notaClinica.js).
       enfermeria: medico?.tipoEspecialidad === "enfermeria",
+      // El "hoy" que se le da a la IA y la hora de la reconsulta que
+      // devuelve son de la zona de la cuenta, no del servidor.
+      zona: medico?.zonaHoraria || ZONA_POR_DEFECTO,
       antecedentesPersonales: paciente.antecedentesPersonales || [],
       antecedentesFamiliares: paciente.antecedentesFamiliares || [],
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
@@ -980,6 +984,9 @@ async function contextoDeNota(paciente, medicoPhone) {
 async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, notaHecha } = {}) {
   try {
     const { contexto } = await contextoDeNota(paciente, medicoPhone);
+    // "El sábado" es el que sigue a la consulta, aunque la nota se escriba
+    // días después (volver a generarla, retomarla al arrancar).
+    contexto.fechaReferencia = consulta.createdAt;
     // El mismo idioma con el que se transcribió: una nota en español
     // sobre una consulta en portugués obliga al médico a traducir de
     // vuelta lo que él mismo dijo.
