@@ -382,7 +382,8 @@ function normalizarNota(crudo) {
     else if (nota[c] != null && typeof nota[c] !== "string") nota[c] = String(nota[c]);
   }
   for (const c of CAMPOS_LISTA_TEXTO) {
-    if (typeof nota[c] === "string") nota[c] = nota[c].split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
+    // La coma decimal no corta: «fiebre de 38,5 °C» es uno solo.
+    if (typeof nota[c] === "string") nota[c] = nota[c].split(/[;\n]|(?<!\d),|,(?!\d)/).map(x => x.trim()).filter(Boolean);
   }
   for (const c of ["medicamentosRecetados", "antecedentesFamiliaresNuevos", "vacunasMencionadas"]) {
     if (Array.isArray(nota[c])) nota[c] = nota[c].map(normalizarSubobjeto);
