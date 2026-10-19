@@ -2963,6 +2963,9 @@ const socioSchema = new mongoose.Schema({
   email: { type: String, default: "" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
+  // Como en Medico: las sesiones abiertas antes de esta fecha ya no valen
+  // (services/auth.js, sesionVigente). Se pone al cambiarle la contraseña.
+  sesionesDesde: { type: Date, default: null },
 
   pais: { type: String, default: "BO" },
   moneda: { type: String, default: "BOB" },

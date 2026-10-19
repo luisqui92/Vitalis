@@ -76,6 +76,7 @@ const ESCRITURA_PERMITIDA = [
   // Su cuenta.
   ["PATCH", ruta("idioma")],
   ["POST", ruta("2fa/(iniciar|confirmar|desactivar)")],
+  ["POST", ruta("sesiones/cerrar-todas")],
   ["POST", ruta("baja/solicitar")],
   ["POST DELETE", ruta("perfil/foto")],
   ["POST", ruta("push/(suscribir|baja|probar)")],
@@ -168,7 +169,8 @@ const gastaIA = (metodo, rutaPedida) => Boolean(reglaDe(metodo, rutaPedida)?.ia)
 async function middlewareEstudiantes(req, res, next) {
   const r = normalizar(req.path);
   if (r !== "/medico" && !r.startsWith("/medico/")) return next();
-  const token = req.headers.authorization?.replace("Bearer ", "") || req.query?.token;
+  // Solo por cabecera, como requireAuth (services/auth.js).
+  const token = req.headers.authorization?.replace("Bearer ", "");
   const payload = token ? verificarToken(token) : null;
   if (!payload?.estudiante) return next();
   const regla = reglaDe(req.method, req.path);

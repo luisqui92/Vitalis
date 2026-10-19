@@ -206,7 +206,8 @@ module.exports = function (app) {
     cuenta.passwordHash = await hashPassword(password);
     // Las sesiones que estaban abiertas se cortan: si alguien entró con la
     // contraseña vieja, esto es justamente lo que lo saca (services/auth.js).
-    if (s.tipo === "medico") cuenta.sesionesDesde = new Date();
+    // Las del socio también: antes se cortaban solo las del médico.
+    cuenta.sesionesDesde = new Date();
     await cuenta.save();
 
     // El token queda muerto en el mismo acto: si alguien más tiene una

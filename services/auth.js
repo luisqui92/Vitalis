@@ -93,11 +93,15 @@ function verificarToken(token) {
 // seguían entrando, y pidiéndole cosas a la IA, hasta que vencía el token
 // (segunda revisión de QA del 9 de octubre de 2026, R02).
 //
-// Ahora, en cada pedido de una sesión de médico o de administrativo, se mira
-// la cuenta: que exista, que no esté desactivada, y que la sesión no sea de
-// antes de «sesionesDesde» (se pone al cambiar la contraseña, dar de baja o
-// cambiar los permisos: db/models.js). Es una lectura chica por pedido, por
-// el teléfono, que tiene índice.
+// Ahora, en cada pedido de una sesión de médico, de administrativo o de
+// socio, se mira la cuenta: que exista, que no esté desactivada, y que la
+// sesión no sea de antes de «sesionesDesde» (se pone al cambiar la
+// contraseña, dar de baja, cambiar los permisos o cerrar todas las sesiones:
+// db/models.js). Es una lectura chica por pedido, por un campo con índice.
+//
+// El socio tiene su propia cuenta (Socio, no Medico) y la busca por el
+// socioId del token. Antes no se miraba: un socio suspendido o con la clave
+// cambiada seguía entrando con su token hasta que vencía.
 //
 // Las cuentas viejas no tienen «activo» ni «sesionesDesde» (y con lean() no
 // hay valores por defecto): por eso «activo === false» y no «!activo».
@@ -105,18 +109,33 @@ const ROLES_DE_CUENTA = ["medico", "admin"];
 const SESION_CORTADA = "Tu sesión ya no es válida. Volvé a iniciar sesión.";
 
 async function sesionVigente(payload) {
-  if (!ROLES_DE_CUENTA.includes(payload.rol)) return true;
-  const { Medico } = require("../db/models");
-  const cuenta = await Medico.findOne({ phone: payload.usuario }).select("activo sesionesDesde").lean();
+  const { Medico, Socio } = require("../db/models");
+  let cuenta;
+  if (payload.rol === "socio") {
+    cuenta = await Socio.findById(payload.socioId).select("activo sesionesDesde").lean();
+  } else if (ROLES_DE_CUENTA.includes(payload.rol)) {
+    cuenta = await Medico.findOne({ phone: payload.usuario }).select("activo sesionesDesde").lean();
+  } else {
+    return true;
+  }
   if (!cuenta || cuenta.activo === false) return false;
   return !(cuenta.sesionesDesde && Number(payload.iat) < new Date(cuenta.sesionesDesde).getTime());
+}
+
+// El token viaja SOLO en la cabecera Authorization. Antes también se
+// aceptaba como ?token= en la URL, y una URL queda escrita en el log de
+// nginx, en el historial del navegador y en el Referer (auditoría de QA,
+// M9). La pantalla ya no lo usaba: todo pasa por api() o por fetch con la
+// cabecera. El WebSocket es la única excepción —el navegador no le deja
+// poner cabeceras— y valida aparte (services/realtime.js).
+function tokenDeCabecera(req) {
+  return req.headers["authorization"]?.replace("Bearer ", "");
 }
 
 // Middleware para proteger endpoints de médico
 function requireAuth(rolesPermitidos = ["medico"]) {
   return async (req, res, next) => {
-    const token = req.headers["authorization"]?.replace("Bearer ", "") ||
-                  req.query.token;
+    const token = tokenDeCabecera(req);
     const payload = verificarToken(token);
     if (!payload) {
       return res.status(401).json({ error: "No autorizado — iniciá sesión" });
@@ -142,7 +161,7 @@ function requireAuth(rolesPermitidos = ["medico"]) {
 // /admin debe aceptar un clinicaId que venga del cliente: sale del token o
 // no sale.
 async function requireAdmin(req, res, next) {
-  const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
+  const token = tokenDeCabecera(req);
   const payload = verificarToken(token);
   if (!payload) return res.status(401).json({ error: "No autorizado — iniciá sesión" });
   if (!payload.admin) return res.status(403).json({ error: "No tenés permiso para esta acción" });
@@ -170,12 +189,19 @@ async function requireAdmin(req, res, next) {
 //
 // Un socio es un vendedor. Ve cuántas cuentas tiene, cuánto consumen y
 // cuánto debe. No ve un solo paciente, y no hay ruta que se lo permita.
-function requireSocio(req, res, next) {
-  const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
+async function requireSocio(req, res, next) {
+  const token = tokenDeCabecera(req);
   const payload = verificarToken(token);
   if (!payload) return res.status(401).json({ error: "No autorizado — iniciá sesión" });
   if (payload.rol !== "socio" || !payload.socioId) {
     return res.status(403).json({ error: "No tenés permiso para esta acción" });
+  }
+  // Como las de médico: suspendido o con la clave cambiada, la sesión que
+  // ya tenía abierta deja de valer (sesionVigente, más arriba).
+  try {
+    if (!(await sesionVigente(payload))) return res.status(401).json({ error: SESION_CORTADA });
+  } catch (e) {
+    return next(e);
   }
   req.adminUser = payload;
   // Igual que clinicaId en requireAdmin: sale del token o no sale. Un

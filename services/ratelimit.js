@@ -113,7 +113,8 @@ function rateLimit(storeName, max, windowMs, message) {
 // a nombre de otro médico y dejarlo sin cuota — un ataque barato y difícil
 // de diagnosticar desde el lado del médico bloqueado.
 function claveDeMedico(req) {
-  const token = req.headers["authorization"]?.replace("Bearer ", "") || req.query.token;
+  // Solo por cabecera, como requireAuth (services/auth.js).
+  const token = req.headers["authorization"]?.replace("Bearer ", "");
   const payload = verificarToken(token);
   if (payload?.usuario) return `medico:${payload.usuario}`;
   // Sin token válido no hay a quién cobrarle el pedido. Se cae a la IP, que

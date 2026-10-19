@@ -229,9 +229,14 @@ module.exports = function (app) {
     medico.dosFA.secreto = medico.dosFA.secretoPendiente;
     medico.dosFA.secretoPendiente = "";
     medico.dosFA.activo = true;
+    // Quien activa el segundo factor casi siempre lo hace porque alguien pudo
+    // haber visto su contraseña: las sesiones que se abrieron sin él dejan
+    // de valer (services/auth.js, sesionVigente). La de quien lo activa
+    // sigue, con un token nuevo que la pantalla guarda.
+    medico.sesionesDesde = new Date();
     await medico.save();
     registrar({ req, medicoPhone: medico.phone, accion: "2fa_activado" });
-    res.json({ ok: true });
+    res.json({ ok: true, token: tokenDeMedico(medico) });
   }));
 
   app.post("/medico/2fa/desactivar", limitAuth, requireMedico, asyncRoute(async (req, res) => {
@@ -243,6 +248,29 @@ module.exports = function (app) {
     await medico.save();
     registrar({ req, medicoPhone: medico.phone, accion: "2fa_desactivado" });
     res.json({ ok: true });
+  }));
+
+  // ─── CERRAR TODAS LAS SESIONES ──────────────────────────────────────────
+  // Para un celular perdido o una compu prestada: toda sesión abierta antes
+  // de este momento deja de valer (services/auth.js, sesionVigente), también
+  // el tiempo real de los otros aparatos, que la vuelve a mirar en cada
+  // latido (services/realtime.js). Antes no había forma: salir solo borraba
+  // el token de ESE navegador.
+  //
+  // La sesión de quien lo pide sigue, con un token nuevo emitido igual que
+  // en el login (services/sesionMedico.js). Con generarToken a secas, un
+  // director perdía la administración de su clínica y una cuenta
+  // administrativa quedaba con rol de médico.
+  app.post("/medico/sesiones/cerrar-todas", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    // El token nuevo es de este milisegundo o de uno posterior, y
+    // sesionVigente corta solo los de ANTES: no hace falta esperar nada.
+    const medico = await Medico.findOneAndUpdate(
+      { phone: req.adminUser.usuario },
+      { $set: { sesionesDesde: new Date() } },
+      { new: true });
+    if (!medico) throw new ErrorHttp(404, "Médico no encontrado");
+    registrar({ req, medicoPhone: medico.phone, accion: "cerrar_todas_las_sesiones" });
+    res.json({ ok: true, token: tokenDeMedico(medico) });
   }));
 
   // ─── AUDITORÍA: últimos accesos de esta cuenta ──────────────────────────

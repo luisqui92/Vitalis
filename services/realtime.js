@@ -11,11 +11,15 @@
 // momento (ver public/js/realtime.js).
 const { WebSocketServer } = require("ws");
 const { registrarWs } = require("./wsRuteo");
-const { verificarToken } = require("./auth");
+const { verificarToken, sesionVigente } = require("./auth");
 const { log } = require("../config");
 
 // medicoPhone -> Set de sockets abiertos (uno por pestaña/dispositivo).
 const conexionesPorMedico = new Map();
+
+// Las pruebas lo achican; en producción no se toca. Va antes de iniciar el
+// servidor: el latido se arma una vez, al arrancar.
+const AJUSTES = { LATIDO_MS: 30 * 1000 };
 
 function iniciarServidorTiempoReal(httpServer) {
   // noServer + registrarWs, NO { server, path }: dos WebSocketServer colgados
@@ -24,26 +28,81 @@ function iniciarServidorTiempoReal(httpServer) {
   const wss = registrarWs(httpServer, "/ws", new WebSocketServer({ noServer: true }));
 
   wss.on("connection", (socket, req) => {
+    // El token va en la URL solo acá: el navegador no deja ponerle cabeceras
+    // a un WebSocket (services/auth.js).
     const url = new URL(req.url, "http://localhost");
     const payload = verificarToken(url.searchParams.get("token"));
     if (!payload || payload.rol !== "medico") {
       socket.close(4001, "No autorizado");
       return;
     }
-    const medicoPhone = payload.usuario;
-    if (!conexionesPorMedico.has(medicoPhone)) conexionesPorMedico.set(medicoPhone, new Set());
-    conexionesPorMedico.get(medicoPhone).add(socket);
-
-    socket.on("close", () => {
-      const set = conexionesPorMedico.get(medicoPhone);
-      if (!set) return;
-      set.delete(socket);
-      if (set.size === 0) conexionesPorMedico.delete(medicoPhone);
-    });
     socket.on("error", () => {}); // se limpia solo con el "close" que sigue
+    // Antes de la consulta de abajo: el latido puede pasar mientras tanto.
+    socket.vivo = true;
+    socket.on("pong", () => { socket.vivo = true; });
+    socket.sesion = payload;
+
+    // La misma regla que requireAuth: una cuenta dada de baja, o una sesión
+    // de antes de «cerrar todas» o de un cambio de clave, no abre el canal.
+    // Mientras se consulta, el socket ya está abierto pero no recibe nada.
+    sesionVigente(payload).then((vigente) => {
+      if (socket.readyState !== socket.OPEN) return; // se fue mientras tanto
+      if (!vigente) { socket.close(4001, "Sesión no válida"); return; }
+      registrarSocket(socket, payload.usuario);
+    }, () => socket.close(1011, "No se pudo verificar la sesión"));
   });
 
+  // ═══ EL LATIDO ═══════════════════════════════════════════════════════════
+  //
+  // Un celular que pierde la señal no manda "close": su socket quedaba para
+  // siempre en conexionesPorMedico (auditoría de QA, B-L4). Cada LATIDO_MS se
+  // le hace ping a cada uno, y el que no contestó el anterior se corta (eso
+  // dispara el "close" que lo limpia). De paso nginx no corta /ws por callado.
+  //
+  // Y se vuelve a mirar la sesión. Revisarla solo al conectar dejaba abierto,
+  // en el aparato perdido, el socket que ya estaba abierto antes de «cerrar
+  // todas» o de la baja, recibiendo avisos hasta que se reconectara. También
+  // corta el token que venció mientras el socket seguía abierto.
+  const latido = setInterval(() => {
+    for (const socket of wss.clients) {
+      if (!socket.vivo) { socket.terminate(); continue; }
+      socket.vivo = false;
+      try { socket.ping(); } catch { /* se corta en la próxima vuelta */ }
+      revisarSesion(socket);
+    }
+  }, AJUSTES.LATIDO_MS);
+  latido.unref();
+  wss.on("close", () => clearInterval(latido));
+
   return wss;
+}
+
+function registrarSocket(socket, medicoPhone) {
+  socket.registrado = true;
+  if (!conexionesPorMedico.has(medicoPhone)) conexionesPorMedico.set(medicoPhone, new Set());
+  conexionesPorMedico.get(medicoPhone).add(socket);
+
+  socket.on("close", () => {
+    const set = conexionesPorMedico.get(medicoPhone);
+    if (!set) return;
+    set.delete(socket);
+    if (set.size === 0) conexionesPorMedico.delete(medicoPhone);
+  });
+}
+
+async function revisarSesion(socket) {
+  if (!socket.registrado || socket.revisando) return;
+  socket.revisando = true;
+  try {
+    const vale = Number(socket.sesion.exp) > Date.now() && await sesionVigente(socket.sesion);
+    if (!vale && socket.readyState === socket.OPEN) socket.close(4001, "Sesión no válida");
+  } catch (e) {
+    // La base no contestó: no se corta a todos por eso. Se vuelve a mirar
+    // en el próximo latido.
+    log.warn("[TIEMPO_REAL] no se pudo revisar una sesión:", e.message);
+  } finally {
+    socket.revisando = false;
+  }
 }
 
 // Avisa a TODAS las conexiones abiertas de ese médico (incluida la que
@@ -93,4 +152,4 @@ function middlewareAvisarCambios(req, res, next) {
   next();
 }
 
-module.exports = { iniciarServidorTiempoReal, middlewareAvisarCambios, avisarCambio, sinCambios };
+module.exports = { AJUSTES, iniciarServidorTiempoReal, middlewareAvisarCambios, avisarCambio, sinCambios };
