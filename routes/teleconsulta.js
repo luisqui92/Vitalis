@@ -30,7 +30,7 @@
 const crypto = require("crypto");
 const { Paciente, Teleconsulta } = require("../db/models");
 const { requireAuth } = require("../services/auth");
-const { limitMedico, rateLimit } = require("../services/ratelimit");
+const { limitMedico, rateLimit, getIP } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const video = require("../services/video");
@@ -197,7 +197,8 @@ module.exports = function (app) {
     if (!t.consentimiento?.aceptado) {
       t.consentimiento = {
         aceptado: true, fecha: new Date(),
-        ip: String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").split(",")[0].trim(),
+        // La que vio nginx, no la que escribe el cliente (services/ratelimit.js).
+        ip: getIP(req),
         texto: TEXTO_CONSENTIMIENTO,
       };
       await t.save();

@@ -120,6 +120,8 @@ async function main() {
     // Cambiarle la contraseña a alguien es sacarlo de su cuenta hasta que se
     // entere de la nueva: tiene que poder reconstruirse quién y cuándo.
     socio.passwordHash = await hashPassword(claveNueva);
+    // Y las sesiones que tenía abiertas se cortan (services/auth.js).
+    socio.sesionesDesde = new Date();
     await socio.save();
     registrar({
       medicoPhone: "script", accion: "cambiar_clave_socio",

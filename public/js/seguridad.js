@@ -6,12 +6,30 @@ const ACCION_LABEL = {
   login: "🔓 Inicio de sesión",
   login_fallido: "⛔ Intento de inicio de sesión fallido",
   login_2fa_fallido: "⛔ Código 2FA incorrecto",
+  login_2fa_repetido: "⛔ Código 2FA ya usado",
   registro: "🆕 Cuenta creada",
   ver_paciente: "👤 Vio la ficha de un paciente",
   ver_consulta: "🎙️ Vio la transcripción de una consulta",
   "2fa_activado": "🔐 2FA activado",
   "2fa_desactivado": "🔓 2FA desactivado",
+  cerrar_todas_las_sesiones: "🚪 Cerró las sesiones de los otros aparatos",
 };
+
+// Cerrar las demás sesiones y activar el 2FA cortan TODAS las sesiones
+// anteriores, también la de esta pantalla: el servidor manda un token nuevo
+// para seguir, y hay que guardarlo donde lo busca todo lo demás (TOKEN y
+// salud_token, public/js/estado.js). Sin esto, el pedido siguiente daba 401
+// y sacaba al médico de su propia cuenta. El tiempo real se reconecta con el
+// token nuevo: el socket de antes lo corta el servidor en el próximo latido.
+function guardarTokenNuevo(token) {
+  if (!token) return;
+  TOKEN = token;
+  localStorage.setItem("salud_token", TOKEN);
+  if (typeof desconectarTiempoReal === "function" && typeof conectarTiempoReal === "function") {
+    desconectarTiempoReal();
+    conectarTiempoReal();
+  }
+}
 
 async function renderSeguridad() {
   detenerPolling();
@@ -89,6 +107,13 @@ function pintarSeguridad(dosFAActivo, eventos) {
     </div>
 
     <div class="card">
+      <div class="seccion-titulo" style="margin-top:0">🚪 Sesiones abiertas</div>
+      <div class="hint" style="margin-bottom:10px">Si perdiste el celular o entraste desde una compu prestada, esto cierra tu sesión en todos los otros aparatos. En este seguís adentro.</div>
+      <div id="segErrSesiones"></div>
+      <button class="secondary" id="btnCerrarSesiones">Cerrar las sesiones de los otros aparatos</button>
+    </div>
+
+    <div class="card">
       <div class="seccion-titulo" style="margin-top:0">📋 Actividad reciente de la cuenta</div>
       ${eventos.length === 0 ? `<div class="hint">Todavía no hay actividad registrada.</div>` : eventos.map(ev => `
         <div class="item" style="cursor:default">
@@ -141,6 +166,19 @@ function pintarSeguridad(dosFAActivo, eventos) {
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo desactivar")}</div>`;
     }
   };
+
+  document.getElementById("btnCerrarSesiones").onclick = async () => {
+    const errBox = document.getElementById("segErrSesiones");
+    errBox.innerHTML = "";
+    if (!confirm("¿Cerrar tu sesión en todos los otros aparatos? Vas a tener que volver a entrar en cada uno.")) return;
+    try {
+      const r = await api("/medico/sesiones/cerrar-todas", { method: "POST" });
+      guardarTokenNuevo(r.token);
+      renderSeguridad();
+    } catch (e) {
+      errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudieron cerrar las sesiones")}</div>`;
+    }
+  };
 }
 
 async function iniciarActivacion2FA() {
@@ -161,7 +199,8 @@ async function iniciarActivacion2FA() {
       errBox.innerHTML = "";
       const codigo = document.getElementById("seg2faCodigo").value.trim();
       try {
-        await api("/medico/2fa/confirmar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ codigo }) });
+        const r = await api("/medico/2fa/confirmar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ codigo }) });
+        guardarTokenNuevo(r.token);
         renderSeguridad();
       } catch (e) {
         errBox.innerHTML = `<div class="error">${esc(e.error || "Código incorrecto")}</div>`;

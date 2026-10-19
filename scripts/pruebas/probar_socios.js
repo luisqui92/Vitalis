@@ -180,8 +180,13 @@ function verificar(descripcion, condicion) {
 
   // ═══ 5. UN SOCIO SUSPENDIDO NO OPERA ═════════════════════════════════════
   console.log("\n── 5. Un socio suspendido no opera ──");
+  // 401 y no 403: la sesión de un socio suspendido se corta en la puerta
+  // (services/auth.js, sesionVigente), como la de un médico dado de baja, y
+  // en TODAS sus rutas — antes solo las que pasaban por socioDeLaSesion. El
+  // motivo se lo dice el login cuando vuelve a entrar.
   const suspendido = await pedir("/socio/resumen", tkApagado);
-  verificar("un socio desactivado no entra aunque tenga token válido", suspendido.estado === 403);
+  verificar("un socio desactivado no entra aunque tenga token válido", suspendido.estado === 401);
+  verificar("  ...ni a su cartera, que no pasaba por la revisión de la cuenta", (await pedir("/socio/cuentas", tkApagado)).estado === 401);
 
   // ═══ 6. LOS INSUMOS ══════════════════════════════════════════════════════
   console.log("\n── 6. El stock es la suma de los movimientos ──");

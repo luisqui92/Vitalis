@@ -366,6 +366,11 @@ const medicoSchema = new mongoose.Schema({
     activo: { type: Boolean, default: false },
     secreto: { type: String, default: "" },
     secretoPendiente: { type: String, default: "" },
+    // El último paso de 30 s con el que se entró: un código sirve una sola
+    // vez (routes/medicoAuth.js). Tiene que estar en el esquema: si no,
+    // mongoose descarta en silencio el $set que lo guarda y nadie con 2FA
+    // podría entrar.
+    ultimoPaso: { type: Number, default: 0 },
   },
 }, { timestamps: true });
 // Una cuenta que viaja como JSON (una respuesta, un log) nunca lleva la
@@ -2973,6 +2978,9 @@ const socioSchema = new mongoose.Schema({
   email: { type: String, default: "" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
+  // Como en Medico: las sesiones abiertas antes de esta fecha ya no valen
+  // (services/auth.js, sesionVigente). Se pone al cambiarle la contraseña.
+  sesionesDesde: { type: Date, default: null },
 
   pais: { type: String, default: "BO" },
   moneda: { type: String, default: "BOB" },

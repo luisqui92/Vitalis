@@ -8,9 +8,9 @@ const { registrar } = require("../services/auditoria");
 const { todosLosOperadores } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const { log } = require("../config");
-const { limitMedico, limitAuth, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
+const { limitMedico, limitAuth, limitRegistro, limitLoginPorCuenta, limit2faPorSesion } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
+const { soloDigitos, formasDe, buscarPorTelefono } = require("../services/telefono");
 // El token y los datos de sesión son los mismos entren por donde entren
 // (services/sesionMedico.js).
 const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
@@ -25,6 +25,28 @@ const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
 // /medico/2fa/iniciar le contestaba 403. Quedaba trabada para siempre en
 // "activá el 2FA" sin ninguna pantalla que se lo permitiera.
 const requireMedico = requireAuth(["medico", "admin"]);
+
+// ═══ EL NOMBRE SALE EN LOS WHATSAPP ════════════════════════════════════════
+//
+// El nombre de la cuenta va en los mensajes que los pacientes reciben desde
+// el número oficial (el pie del informe, la cita, la reserva) y en el aviso
+// que les llega a quienes aprueban. Sin tope ni filtro, quien se registraba
+// podía poner un enlace —«Dr. Pérez: pagá tu turno en pagos-clinica.com»— o
+// seis megas de texto, que además viajaban enteros en el aviso y en el log
+// (auditoría de QA, B2).
+//
+// Un nombre de persona son letras de cualquier idioma, espacios, puntos,
+// comas, apóstrofos, guiones y paréntesis («Dra. Fulana Pérez (veterinaria)»,
+// el ejemplo de la pantalla). Lista de lo que se acepta y no de lo que se
+// prohíbe: «bit.ly/3xYz» o «wa.me/591…» pasaban un filtro de «https» y
+// «www». La especialidad admite más cosas («Ginecología/Obstetricia»), así
+// que a ella se le mira solo que no parezca un enlace.
+//
+// «.algo» pegado, con dos letras o más después del punto, es como WhatsApp
+// reconoce un dominio sin «https»: «clinica.com», «bit.ly», «wa.me». «Dra.
+// Ana» o «J.C. Pérez» no lo son.
+const NOMBRE_DE_PERSONA = /^[\p{L}\p{M} .,'’´()-]{2,80}$/u;
+const PARECE_ENLACE = /https?:|www\.|:\/\/|\.\p{L}{2,}/iu;
 
 // Le avisa a quien aprueba que hay alguien esperando. Sin esto la fila
 // existe pero nadie la mira, y el médico que pidió cuenta se queda sin
@@ -46,12 +68,16 @@ async function avisarSolicitudPendiente(medico) {
 
 module.exports = function (app) {
   // ─── REGISTRO ───────────────────────────────────────────────────────────
-  app.post("/medico/registro", limitAuth, asyncRoute(async (req, res) => {
+  // limitRegistro y no limitAuth: acá lo que hay que frenar es lo que sale
+  // bien, porque cada solicitud aceptada entra a la fila (services/ratelimit.js).
+  app.post("/medico/registro", limitRegistro, asyncRoute(async (req, res) => {
     // Se guarda solo con dígitos (services/telefono.js): «++55 11…» queda
     // «5511…», que es como lo escribe todo el sistema y lo que acepta WhatsApp.
     const phone = soloDigitos(req.body?.phone);
-    const nombre = String(req.body?.nombre || "").trim();
-    const especialidad = String(req.body?.especialidad || "").trim();
+    // Los saltos de línea y tabulados, como un espacio: el nombre va adentro
+    // de mensajes, y un renglón de más es un mensaje falso abajo del de verdad.
+    const nombre = String(req.body?.nombre || "").replace(/\s+/g, " ").trim();
+    const especialidad = String(req.body?.especialidad || "").replace(/\s+/g, " ").trim().slice(0, 80);
     const tipoEspecialidad = ["odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
     const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
     const password = String(req.body?.password || "");
@@ -59,6 +85,11 @@ module.exports = function (app) {
     const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
+    if (nombre.length > 80) throw new ErrorHttp(400, "El nombre no puede pasar de 80 caracteres");
+    if (!NOMBRE_DE_PERSONA.test(nombre) || PARECE_ENLACE.test(nombre)) {
+      throw new ErrorHttp(400, "Escribí tu nombre con letras, espacios y puntos, como «Dra. Fulana Pérez» (con un espacio después del punto): sin números ni enlaces.");
+    }
+    if (PARECE_ENLACE.test(especialidad)) throw new ErrorHttp(400, "La especialidad no puede tener enlaces");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
     // No se verifica contra ningún registro —no hay una API del colegio
     // médico— así que exigirla no prueba nada por sí sola. Pero obliga a
@@ -66,9 +97,37 @@ module.exports = function (app) {
     // concreto que mirar en vez de un nombre suelto.
     if (!matricula) throw new ErrorHttp(400, "Falta la matrícula profesional");
 
-    // Con o sin «+»: una cuenta vieja guardada como «+5511…» es la misma.
-    const yaExiste = await buscarPorTelefono(Medico, phone, { select: "_id", lean: true });
-    if (yaExiste) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+    // ─── UN TELÉFONO RECHAZADO SE PUEDE VOLVER A PEDIR ──────────────────
+    //
+    // Nadie verifica que el teléfono sea de quien se registra. Una solicitud
+    // con el número de otro médico —por error o a propósito— quedaba en la
+    // base aunque se rechazara, y el dueño real recibía 409 para siempre:
+    // solo se arreglaba a mano, desde el servidor (auditoría de QA, B2).
+    // Ahora una solicitud RECHAZADA deja el número libre: se borra, y la
+    // nueva entra a la fila como cualquier otra.
+    //
+    // Solo la rechazada. Una pendiente no se pisa: quien registrara el mismo
+    // número le cambiaría la contraseña a la solicitud legítima, y quien
+    // aprueba terminaría aprobando la del otro. Y una rechazada nunca estuvo
+    // adentro (rechazar una aprobada da 409, routes/solicitudesCuenta.js): no
+    // tiene pacientes ni nada que la cuenta nueva pueda heredar.
+    //
+    // Con o sin «+»: una cuenta vieja guardada como «+5511…» es la misma. Se
+    // miran TODAS las formas y no solo la primera que aparece: si una es una
+    // cuenta en uso, el número no está libre aunque otra esté rechazada.
+    const yaExisten = await Medico.find({ phone: { $in: formasDe(phone) } })
+      .select("phone estadoCuenta activo solicitud").lean();
+    if (yaExisten.some(c => c.estadoCuenta !== "rechazada" || c.activo !== false)) {
+      throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+    }
+    const passwordHash = await hashPassword(password);
+    if (yaExisten.length) {
+      // Condicionado, por si mientras tanto alguien la tocó: entre dos que
+      // vuelven a pedir el mismo número a la vez, uno borra y el otro no.
+      const borradas = await Medico.deleteMany({ _id: { $in: yaExisten.map(c => c._id) }, estadoCuenta: "rechazada", activo: false });
+      if (borradas.deletedCount !== yaExisten.length) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+    }
+    const anterior = yaExisten[0];
 
     // ─── LA CUENTA NACE APAGADA ─────────────────────────────────────────
     //
@@ -81,15 +140,27 @@ module.exports = function (app) {
     // para dejar entrar o no; "estadoCuenta" es POR QUÉ. Sin el segundo, un
     // médico legítimo esperando aprobación y uno dado de baja se ven igual,
     // y no se les puede decir cosas distintas.
-    const medico = await Medico.create({
-      phone, nombre, especialidad, tipoEspecialidad, idioma,
-      passwordHash: await hashPassword(password),
-      matricula,
-      activo: false,
-      estadoCuenta: "pendiente",
-      solicitud: { pedidaEn: new Date(), mensaje },
-    });
-    registrar({ req, medicoPhone: phone, accion: "solicitud_cuenta", detalle: `matrícula: ${matricula || "(sin matrícula)"}` });
+    let medico;
+    try {
+      medico = await Medico.create({
+        phone, nombre, especialidad, tipoEspecialidad, idioma,
+        passwordHash,
+        matricula,
+        activo: false,
+        estadoCuenta: "pendiente",
+        solicitud: { pedidaEn: new Date(), mensaje },
+      });
+    } catch (e) {
+      // Dos solicitudes del mismo número a la vez: el índice único deja
+      // entrar una, y la otra es el mismo 409 de arriba, no un 500.
+      if (e?.code === 11000) throw new ErrorHttp(409, "Ese teléfono ya está registrado");
+      throw e;
+    }
+    // Lo de la rechazada queda dicho acá: la fila ya no la tiene.
+    const reemplaza = anterior
+      ? ` · reemplaza la rechazada${anterior.solicitud?.resueltaPor ? ` por ${anterior.solicitud.resueltaPor}` : ""}: ${anterior.solicitud?.motivo || "sin motivo"}`
+      : "";
+    registrar({ req, medicoPhone: phone, accion: "solicitud_cuenta", detalle: `matrícula: ${matricula || "(sin matrícula)"}${reemplaza}` });
     log.info(`[CUENTAS] nueva solicitud de ${nombre} (${phone}) — matrícula ${matricula || "no declarada"}`);
 
     // Avisar a quien aprueba, sin que la respuesta dependa de eso: si el
@@ -117,9 +188,9 @@ module.exports = function (app) {
     const medico = await buscarPorTelefono(Medico, escrito);
     // Lo que queda en la auditoría es la cuenta, no cómo se tipeó.
     const phone = medico?.phone || soloDigitos(escrito) || escrito;
-    const { ok, requiereRehash } = medico
-      ? await verificarPassword(password, medico.passwordHash)
-      : { ok: false, requiereRehash: false };
+    // Aunque no haya cuenta: verificarPassword corre bcrypt igual, para que
+    // un teléfono sin cuenta no conteste más rápido (services/auth.js).
+    const { ok, requiereRehash } = await verificarPassword(password, medico?.passwordHash);
 
     if (!ok) {
       registrar({ req, medicoPhone: phone, accion: "login_fallido", exito: false });
@@ -173,9 +244,23 @@ module.exports = function (app) {
       throw new ErrorHttp(401, "Sesión de login expirada, iniciá sesión de nuevo");
     }
     const medico = await Medico.findOne({ phone: payload.usuario, activo: true });
-    if (!medico?.dosFA?.activo || !verificarCodigo(medico.dosFA.secreto, codigo)) {
+    const paso = medico?.dosFA?.activo ? verificarCodigo(medico.dosFA.secreto, codigo, 1, { devolverPaso: true }) : null;
+    if (paso === null) {
       registrar({ req, medicoPhone: payload.usuario, accion: "login_2fa_fallido", exito: false });
       throw new ErrorHttp(401, "Código incorrecto");
+    }
+    // Un código sirve UNA vez. Sin esto, dentro de su ventana de un minuto
+    // el mismo código —visto por encima del hombro, o leído de una pantalla—
+    // entraba de nuevo, con este pase o con otro (auditoría de QA, B-L3).
+    // Atómico: de dos pedidos con el mismo código a la vez, entra uno. Y un
+    // paso anterior al último usado tampoco sirve. «$not $gte» y no «$lt»:
+    // las cuentas de antes no tienen el campo, y $lt no las encontraría.
+    const tomado = await Medico.updateOne(
+      { _id: medico._id, "dosFA.ultimoPaso": { $not: { $gte: paso } } },
+      { $set: { "dosFA.ultimoPaso": paso } });
+    if (tomado.modifiedCount === 0) {
+      registrar({ req, medicoPhone: medico.phone, accion: "login_2fa_repetido", exito: false });
+      throw new ErrorHttp(401, "Ese código ya se usó. Esperá a que la app muestre el siguiente.");
     }
     registrar({ req, medicoPhone: medico.phone, accion: "login" });
     const token = tokenDeMedico(medico);
@@ -223,13 +308,21 @@ module.exports = function (app) {
     const codigo = String(req.body?.codigo || "").trim();
     const medico = await Medico.findOne({ phone: req.adminUser.usuario });
     if (!medico.dosFA?.secretoPendiente) throw new ErrorHttp(400, "No hay una activación de 2FA en curso");
-    if (!verificarCodigo(medico.dosFA.secretoPendiente, codigo)) throw new ErrorHttp(401, "Código incorrecto");
+    const paso = verificarCodigo(medico.dosFA.secretoPendiente, codigo, 1, { devolverPaso: true });
+    if (paso === null) throw new ErrorHttp(401, "Código incorrecto");
     medico.dosFA.secreto = medico.dosFA.secretoPendiente;
     medico.dosFA.secretoPendiente = "";
     medico.dosFA.activo = true;
+    // El código con que se activó queda usado: no sirve además para entrar.
+    medico.dosFA.ultimoPaso = paso;
+    // Quien activa el segundo factor casi siempre lo hace porque alguien pudo
+    // haber visto su contraseña: las sesiones que se abrieron sin él dejan
+    // de valer (services/auth.js, sesionVigente). La de quien lo activa
+    // sigue, con un token nuevo que la pantalla guarda.
+    medico.sesionesDesde = new Date();
     await medico.save();
     registrar({ req, medicoPhone: medico.phone, accion: "2fa_activado" });
-    res.json({ ok: true });
+    res.json({ ok: true, token: tokenDeMedico(medico) });
   }));
 
   app.post("/medico/2fa/desactivar", limitAuth, requireMedico, asyncRoute(async (req, res) => {
@@ -241,6 +334,29 @@ module.exports = function (app) {
     await medico.save();
     registrar({ req, medicoPhone: medico.phone, accion: "2fa_desactivado" });
     res.json({ ok: true });
+  }));
+
+  // ─── CERRAR TODAS LAS SESIONES ──────────────────────────────────────────
+  // Para un celular perdido o una compu prestada: toda sesión abierta antes
+  // de este momento deja de valer (services/auth.js, sesionVigente), también
+  // el tiempo real de los otros aparatos, que la vuelve a mirar en cada
+  // latido (services/realtime.js). Antes no había forma: salir solo borraba
+  // el token de ESE navegador.
+  //
+  // La sesión de quien lo pide sigue, con un token nuevo emitido igual que
+  // en el login (services/sesionMedico.js). Con generarToken a secas, un
+  // director perdía la administración de su clínica y una cuenta
+  // administrativa quedaba con rol de médico.
+  app.post("/medico/sesiones/cerrar-todas", limitMedico, requireMedico, asyncRoute(async (req, res) => {
+    // El token nuevo es de este milisegundo o de uno posterior, y
+    // sesionVigente corta solo los de ANTES: no hace falta esperar nada.
+    const medico = await Medico.findOneAndUpdate(
+      { phone: req.adminUser.usuario },
+      { $set: { sesionesDesde: new Date() } },
+      { new: true });
+    if (!medico) throw new ErrorHttp(404, "Médico no encontrado");
+    registrar({ req, medicoPhone: medico.phone, accion: "cerrar_todas_las_sesiones" });
+    res.json({ ok: true, token: tokenDeMedico(medico) });
   }));
 
   // ─── AUDITORÍA: últimos accesos de esta cuenta ──────────────────────────
