@@ -262,10 +262,20 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   meta.enviarTextoOPlantilla = async (telefono, texto) => { enviados.push({ telefono, texto }); return { ok: true }; };
   require(path.join(RAIZ, "services", "briefClinico")).regenerarBriefClinico = async () => {};
 
+  // El asistente de la pantalla, sin la IA: se mira con qué números le
+  // preguntaría.
+  let datosDelAsistente = null;
+  require(path.join(RAIZ, "services", "asistenteSymphomed")).preguntarASymphomed = async (_p, { datos }) => {
+    datosDelAsistente = datos;
+    return "ok";
+  };
+
   const express = require("express");
   const app = express();
   app.use(express.json());
   require(path.join(RAIZ, "routes", "consultaMedica"))(app);
+  require(path.join(RAIZ, "routes", "asistenteSymphomed"))(app);
+  require(path.join(RAIZ, "routes", "dashboardEscritorio"))(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
   await new Promise((ok) => servidor.listen(0, "127.0.0.1", ok));
@@ -448,6 +458,57 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   verificar(`y a ese mismo instante en São Paulo (00:30 del 16), el 16 (${fv})`, fv === "2026-10-16");
   fv = await fechaDeLaVacuna(BO, "2026-10-16T01:00:00Z", { ...antitetanica, fecha: "2026-10-01" });
   verificar(`la fecha que dijo el médico no se toca (${fv})`, fv === "2026-10-01");
+
+  // ═══ 13. «HOY» Y «EL MES» DEL CONSULTORIO ═══════════════════════════════════
+  console.log("\n── 13. Las citas de hoy del asistente, y los meses del reporte ──");
+  // Cuentas aparte: lo de las secciones de arriba no se mezcla en los números.
+  const BO2 = "70088003", BR2 = "70088004";
+  await M.Medico.create({ phone: BO2, nombre: "Dr. La Paz", passwordHash: "x", activo: true, zonaHoraria: "America/La_Paz" });
+  await M.Medico.create({ phone: BR2, nombre: "Dr. São Paulo", passwordHash: "x", activo: true, zonaHoraria: "America/Sao_Paulo" });
+  tk[BO2] = generarToken(BO2, "medico", UN_ANIO);
+  tk[BR2] = generarToken(BR2, "medico", UN_ANIO);
+  const cita = (med, iso) => M.Cita.create({ medicoPhone: med, pacienteNombre: "Paciente", fecha: new DateReal(iso), estado: "confirmada" });
+  const citasDeHoy = async (med, ahora) => {
+    relojEn(ahora);
+    try {
+      const res = await pedir(puerto, "POST", "/medico/asistente", tk[med], { pregunta: "¿Qué tengo hoy?" });
+      return res.estado === 200 ? datosDelAsistente.citasHoy : `error ${res.estado}`;
+    } finally { relojReal(); }
+  };
+  await cita(BO2, "2026-10-16T01:00:00Z"); // jueves 15, 21:00 en La Paz
+  await cita(BO2, "2026-10-16T03:00:00Z"); // jueves 15, 23:00
+  await cita(BO2, "2026-10-16T14:00:00Z"); // viernes 16, 10:00
+  let n = await citasDeHoy(BO2, "2026-10-15T14:00:00Z");
+  verificar(`a las 10:00 del jueves en La Paz, las de la noche son de hoy: 2 (${n})`, n === 2);
+  n = await citasDeHoy(BO2, "2026-10-16T01:30:00Z");
+  verificar(`a las 21:30, la de las 23:00 es de hoy y la del viernes no: 1 (${n})`, n === 1);
+  await cita(BR2, "2026-10-16T02:45:00Z"); // jueves 15, 23:45 en São Paulo
+  await cita(BR2, "2026-10-16T03:30:00Z"); // viernes 16, 00:30
+  n = await citasDeHoy(BR2, "2026-10-16T02:30:00Z");
+  verificar(`a las 23:30 en São Paulo, la de las 00:30 ya es de mañana: 1 (${n})`, n === 1);
+
+  // El reporte de 6 meses, pedido el jueves 15 de octubre a las 21:00 de La Paz.
+  const consultaCreada = async (med, iso) => {
+    const c = await M.ConsultaMedica.create({ medicoPhone: med, pacienteId: pacientes[BO]._id, estado: "completado" });
+    await M.ConsultaMedica.collection.updateOne({ _id: c._id }, { $set: { createdAt: new DateReal(iso) } });
+  };
+  await consultaCreada(BO2, "2026-10-01T01:00:00Z"); // 30/9, 21:00 en La Paz
+  await consultaCreada(BO2, "2026-05-01T02:00:00Z"); // 30/4, 22:00: fuera de los 6 meses
+  await consultaCreada(BO2, "2026-05-01T05:00:00Z"); // 1/5, 01:00
+  await consultaCreada(BO2, "2026-10-16T00:30:00Z"); // 15/10, 20:30
+  await consultaCreada(BR2, "2026-10-01T03:30:00Z"); // 1/10, 00:30 en São Paulo (30/9 en La Paz)
+  const porMesDe = async (med) => {
+    relojEn("2026-10-16T01:00:00Z");
+    try {
+      const res = await pedir(puerto, "GET", "/medico/reportes/resumen", tk[med]);
+      return res.estado === 200 ? JSON.stringify(Object.fromEntries(Object.entries(res.cuerpo.consultasPorMes).sort())) : `error ${res.estado}`;
+    } finally { relojReal(); }
+  };
+  let pm = await porMesDe(BO2);
+  verificar(`La Paz: cada consulta en su mes, desde el 1/5 a las 00:00 de La Paz (${pm})`,
+    pm === JSON.stringify({ "2026-05": 1, "2026-09": 1, "2026-10": 1 }));
+  pm = await porMesDe(BR2);
+  verificar(`São Paulo: las 00:30 del 1/10 son de octubre (${pm})`, pm === JSON.stringify({ "2026-10": 1 }));
 
   servidor.close();
   await mongoose.disconnect();

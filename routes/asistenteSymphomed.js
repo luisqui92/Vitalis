@@ -8,6 +8,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { preguntarASymphomed } = require("../services/asistenteSymphomed");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { sinCambios } = require("../services/realtime");
+const { hoyEnZona, instanteEnZona, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -32,13 +33,19 @@ module.exports = function (app) {
     if (!pregunta) throw new ErrorHttp(400, "Escribí una pregunta");
     if (pregunta.length > 800) throw new ErrorHttp(400, "La pregunta es demasiado larga");
 
-    const medico = await Medico.findOne({ phone: medicoPhone }).select("nombre tipoEspecialidad").lean();
+    const medico = await Medico.findOne({ phone: medicoPhone }).select("nombre tipoEspecialidad zonaHoraria").lean();
 
     // Números propios del consultorio, para poder responder "¿cuántos
     // pacientes tengo?" o "¿qué tengo hoy?" sin que la IA los invente.
     const ahora = new Date();
     const hace30 = new Date(ahora.getTime() - 30 * 24 * 3600 * 1000);
-    const finHoy = new Date(ahora); finHoy.setHours(23, 59, 59, 999);
+    // El fin del día del consultorio, en la zona de la cuenta: setHours()
+    // usa la del servidor (UTC), y a las 10:00 de Bolivia el día terminaba a
+    // las 19:59 (las citas de la noche no contaban) y a las 21:00 contaba las
+    // de mañana como de hoy (M10).
+    const zona = medico?.zonaHoraria || ZONA_POR_DEFECTO;
+    const h = hoyEnZona(zona, ahora);
+    const finHoy = new Date(instanteEnZona(zona, h.anio, h.mesIndex, h.dia + 1, 0, 0).getTime() - 1);
     const en7 = new Date(ahora.getTime() + 7 * 24 * 3600 * 1000);
 
     const [pacientes, consultasMes, citasHoy, citasProximas, recordatorios] = await Promise.all([
