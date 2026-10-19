@@ -152,14 +152,20 @@ verificar("una zona inválida cae a la de siempre en vez de explotar",
 // ═══ EL RELOJ DEL SERVIDOR ══════════════════════════════════════════════════
 // Para probar "a las 21:30 de Bolivia" sin esperar a que lo sea: el reloj
 // arranca en el instante pedido y sigue andando, así la base y los timers no
-// notan nada raro.
+// notan nada raro. Devuelve fechas de verdad y no de una subclase: el driver
+// de Mongo guarda una subclase de Date como un número.
 const DateReal = Date;
 function relojEn(iso) {
   const corrimiento = DateReal.parse(iso) - DateReal.now();
-  global.Date = class extends DateReal {
-    constructor(...a) { if (a.length) super(...a); else super(DateReal.now() + corrimiento); }
-    static now() { return DateReal.now() + corrimiento; }
-  };
+  function DateCorrida(...a) {
+    if (!new.target) return DateReal(...a);
+    return a.length ? new DateReal(...a) : new DateReal(DateReal.now() + corrimiento);
+  }
+  DateCorrida.prototype = DateReal.prototype;
+  DateCorrida.now = () => DateReal.now() + corrimiento;
+  DateCorrida.parse = DateReal.parse;
+  DateCorrida.UTC = DateReal.UTC;
+  global.Date = DateCorrida;
 }
 function relojReal() { global.Date = DateReal; }
 
@@ -203,6 +209,34 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
     verificar(`con la fecha de la consulta, el «hoy» es el de la consulta (${hoyQueRecibe()})`,
       hoyQueRecibe() === "Hoy es lunes 2026-10-12.");
   } finally { relojReal(); }
+
+  // ═══ 8. LA HORA DE LA RECONSULTA QUE DEVUELVE LA IA ══════════════════════
+  console.log("\n── 8. La reconsulta que escribe la IA ──");
+  // La IA contesta "2026-10-17T10:00", sin zona: son las 10 del consultorio.
+  // new Date() la tomaba como hora del servidor (UTC) y el paciente leía
+  // "06:00" en el WhatsApp.
+  const { formatearFechaCompleta } = require(path.join(RAIZ, "services", "reservaCitas"));
+  const reconsultaDe = async (fechaHora, zona) => {
+    respuestaIA = { motivoConsulta: "Control", reconsultaSugerida: { fechaHora, textoOriginal: "nos vemos el sábado a las diez" } };
+    return (await NC.generarNotaClinica("Control de rutina.", zona ? { zona } : {}, "es")).reconsultaSugerida.fechaHora;
+  };
+  let fh = await reconsultaDe("2026-10-17T10:00", "America/La_Paz");
+  verificar(`las 10:00 de La Paz se guardan como las 14:00 UTC (${fh?.toISOString?.() || fh})`,
+    fh instanceof DateReal && fh.toISOString() === "2026-10-17T14:00:00.000Z");
+  verificar(`  ...y el paciente lee las 10:00 (${formatearFechaCompleta(fh, "America/La_Paz")})`,
+    /10:00/.test(formatearFechaCompleta(fh, "America/La_Paz")));
+  fh = await reconsultaDe("2026-10-17T10:00", "America/Sao_Paulo");
+  verificar(`las 10:00 de São Paulo, como las 13:00 UTC (${fh?.toISOString?.() || fh})`,
+    fh instanceof DateReal && fh.toISOString() === "2026-10-17T13:00:00.000Z");
+  fh = await reconsultaDe("2026-10-17T10:00", null);
+  verificar("una cuenta sin zona usa la de siempre", fh?.toISOString?.() === "2026-10-17T14:00:00.000Z");
+  fh = await reconsultaDe("2026-10-17 10:00", "America/La_Paz");
+  verificar("con un espacio en vez de la T también se entiende", fh?.toISOString?.() === "2026-10-17T14:00:00.000Z");
+  fh = await reconsultaDe("2026-10-17T10:00:00Z", "America/La_Paz");
+  verificar("con una Z de más, se toma la hora que dijo (la IA no razona en UTC)", fh?.toISOString?.() === "2026-10-17T14:00:00.000Z");
+  verificar("sin hora no se inventa una: queda en null", (await reconsultaDe("2026-10-17", "America/La_Paz")) === null);
+  verificar("en texto libre, null como antes", (await reconsultaDe("el sábado", "America/La_Paz")) === null);
+  verificar("una hora imposible (25:00), null como antes", (await reconsultaDe("2026-10-17T25:00", "America/La_Paz")) === null);
 
   // ═══ DE ACÁ EN ADELANTE, CON LA BASE ════════════════════════════════════════
   let MongoMemoryServer;
@@ -269,11 +303,11 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
     return null;
   };
 
-  // ═══ 8. LA NOTA QUE SE VUELVE A GENERAR ═════════════════════════════════════
-  console.log("\n── 8. «Volver a generar la nota», días después ──");
+  // ═══ 9. LA NOTA QUE SE VUELVE A GENERAR ═════════════════════════════════════
+  console.log("\n── 9. «Volver a generar la nota», días después ──");
   // La consulta fue el jueves 15 a las 21:00 en São Paulo (00:00Z del 16); la
   // nota se vuelve a generar el lunes 19. "El sábado" es el 17, no el 24.
-  respuestaIA = { motivoConsulta: "Controle" };
+  respuestaIA = { motivoConsulta: "Controle", reconsultaSugerida: { fechaHora: "2026-10-17T10:00", textoOriginal: "até sábado às dez" } };
   const regenerada = await consultaDe(BR, {}, "2026-10-16T00:00:00Z", { notaClinicaEstado: "error" });
   relojEn("2026-10-19T14:00:00Z");
   let r;
@@ -284,6 +318,59 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   verificar(`se vuelve a generar (${r.estado})`, r.estado === 202);
   verificar(`la IA recibe el día de la consulta, en la zona de la cuenta: jueves 15 (${hoyQueRecibe()})`,
     hoyQueRecibe() === "Hoy es quinta-feira 2026-10-15.");
+  const guardadaBR = (await M.ConsultaMedica.findById(regenerada._id).lean()).notaClinica.reconsultaSugerida;
+  verificar(`la reconsulta queda guardada a las 10:00 de São Paulo, 13:00 UTC (${guardadaBR.fechaHora?.toISOString()})`,
+    guardadaBR.fechaHora?.toISOString() === "2026-10-17T13:00:00.000Z");
+
+  // ═══ 10. CONFIRMAR LA RECONSULTA ════════════════════════════════════════════
+  console.log("\n── 10. El médico confirma la reconsulta ──");
+  // La pantalla le muestra la sugerencia en un datetime-local y, al
+  // confirmar, manda lo que quedó ahí: "2026-10-24T10:00", sin zona. new
+  // Date() la volvía a tomar en UTC y el WhatsApp salía otra hora.
+  const reconsultaPendiente = (fechaHora) => ({
+    motivoConsulta: "Control", reconsultaSugerida: { fechaHora, textoOriginal: "el sábado a las diez", estado: "pendiente" },
+  });
+  const confirmar = (med, c, reconsulta) => pedir(puerto, "POST", `/medico/consultas/${c._id}/confirmar`, tk[med], { aplicar: { reconsulta } });
+  const reconsultaGuardada = async (c) => (await M.ConsultaMedica.findById(c._id).lean()).notaClinica.reconsultaSugerida;
+
+  let c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  enviados.length = 0;
+  r = await confirmar(BR, c, { activo: true, fechaHora: "2026-10-24T10:00" });
+  let rg = await reconsultaGuardada(c);
+  verificar(`São Paulo: lo que muestra el formulario (10:00) se agenda a las 10:00, 13:00 UTC (${r.estado}, ${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.estado === "confirmada" && rg.fechaHora?.toISOString() === "2026-10-24T13:00:00.000Z");
+  verificar(`  ...y el WhatsApp dice las 10:00 (${enviados[0]?.texto.match(/consulta para el ([^.]+)\./)?.[1]})`,
+    enviados.length === 1 && /sábado, 24\/10, 10:00/.test(enviados[0].texto));
+
+  c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  enviados.length = 0;
+  r = await confirmar(BR, c, { activo: true });
+  verificar(`sin tocar la fecha, el WhatsApp de una cuenta de São Paulo dice su hora, no la de La Paz (${enviados[0]?.texto.match(/consulta para el ([^.]+)\./)?.[1]})`,
+    r.estado === 200 && /sábado, 24\/10, 10:00/.test(enviados[0]?.texto || ""));
+
+  c = await consultaDe(BO, reconsultaPendiente(new DateReal("2026-10-24T14:00:00Z")));
+  enviados.length = 0;
+  r = await confirmar(BO, c, { activo: true, fechaHora: "2026-10-24T10:00" });
+  rg = await reconsultaGuardada(c);
+  verificar(`La Paz: las 10:00 del formulario quedan a las 14:00 UTC, no a las 10:00 UTC (${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.fechaHora?.toISOString() === "2026-10-24T14:00:00.000Z" && /sábado, 24\/10, 10:00/.test(enviados[0]?.texto || ""));
+
+  // La otra ruta, la de confirmar solo la reconsulta.
+  c = await consultaDe(BO, reconsultaPendiente(new DateReal("2026-10-24T14:00:00Z")));
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BO], { fechaHora: "2026-10-24T11:30" });
+  rg = await reconsultaGuardada(c);
+  verificar(`/reconsulta/confirmar: las 11:30 de La Paz, 15:30 UTC, y así en el WhatsApp (${r.estado}, ${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.fechaHora?.toISOString() === "2026-10-24T15:30:00.000Z" && /sábado, 24\/10, 11:30/.test(enviados[0]?.texto || ""));
+  c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BR], { fechaHora: "2026-10-24T15:00:00.000Z" });
+  rg = await reconsultaGuardada(c);
+  verificar(`con zona explícita (ISO con Z) se respeta: 15:00 UTC son las 12:00 de São Paulo (${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.fechaHora?.toISOString() === "2026-10-24T15:00:00.000Z" && /sábado, 24\/10, 12:00/.test(enviados[0]?.texto || ""));
+  c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BR], { fechaHora: "cualquier cosa" });
+  verificar(`una fecha que no es fecha → 400 (${r.estado})`, r.estado === 400);
 
   servidor.close();
   await mongoose.disconnect();

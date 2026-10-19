@@ -14,7 +14,7 @@ const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
-const { ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
+const { localAInstante, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 const { registrar } = require("../services/auditoria");
 const { notificarMedico } = require("../services/push");
 const { avisarCambio } = require("../services/realtime");
@@ -38,6 +38,22 @@ const MAX_TEXTO_EN_VIVO = 150000;
 const PALABRAS_MINIMAS_BORRADOR = 15;
 
 const requireMedico = requireAuth(["medico"]);
+
+// La zona en la que trabaja esta cuenta (services/zonaHoraria.js).
+async function zonaDe(medicoPhone) {
+  const m = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  return m?.zonaHoraria || ZONA_POR_DEFECTO;
+}
+
+// La fecha de la reconsulta que confirma el médico. El <input
+// type="datetime-local"> manda "YYYY-MM-DDTHH:mm" sin zona: es hora de pared
+// de quien la tipeó, y la zona la pone la cuenta. new Date() la tomaba como
+// hora del servidor (UTC) y el paciente recibía otra hora (A2). Si llega con
+// zona explícita (ISO con Z u offset), se respeta.
+function fechaReconsulta(valor, zona) {
+  const s = String(valor || "");
+  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? new Date(s) : localAInstante(zona, s);
+}
 
 // Acepta el audio como body crudo (no JSON): el cliente manda
 // Content-Type: audio/ogg (o wav/mp3/m4a/webm) y el archivo tal cual.
@@ -541,6 +557,9 @@ module.exports = function (app) {
     const aplicar = { ...(req.body?.aplicar || {}), ...extensiones.sumar("consulta.alConfirmar", req) };
     const aplicado = [];
     const fallado = [];
+    // La hora de la reconsulta y el día de las vacunas son los de la cuenta,
+    // no los del servidor (que corre en UTC).
+    const zona = await zonaDe(medicoPhone);
 
     // ── 1. Guardar la nota con las correcciones del médico ──
     const notaEditada = req.body?.nota;
@@ -637,7 +656,7 @@ module.exports = function (app) {
       if (pedidoReconsulta?.activo) {
         try {
           if (pedidoReconsulta.fechaHora) {
-            const f = new Date(pedidoReconsulta.fechaHora);
+            const f = fechaReconsulta(pedidoReconsulta.fechaHora, zona);
             if (isNaN(f.getTime())) throw new Error("La fecha de la reconsulta no es válida");
             registrarCorreccion({
               medicoPhone, tipo: "reconsulta", consultaId: consulta._id, campo: "fechaHora",
@@ -653,7 +672,7 @@ module.exports = function (app) {
           const primerNombre = String(paciente.nombre || "").split(" ")[0];
           // Pasan días entre que se cierra la consulta y el paciente escribió
           // por última vez, así que esto cae fuera de la ventana casi siempre.
-          const cuando = formatearFechaCompleta(sugerida.fechaHora);
+          const cuando = formatearFechaCompleta(sugerida.fechaHora, zona);
           const quien = medico?.nombre || "Su médico";
           const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
           await enviarTextoOPlantilla(paciente.telefono, texto,
@@ -825,8 +844,9 @@ module.exports = function (app) {
     // El médico pudo haber ajustado la fecha/hora antes de confirmar —
     // guardamos la que propuso la IA para poder comparar después.
     const fechaOriginal = sugerida.fechaHora;
+    const zona = await zonaDe(medicoPhone);
     if (req.body?.fechaHora) {
-      const f = new Date(req.body.fechaHora);
+      const f = fechaReconsulta(req.body.fechaHora, zona);
       if (isNaN(f.getTime())) throw new ErrorHttp(400, "Fecha inválida");
       sugerida.fechaHora = f;
     }
@@ -843,7 +863,7 @@ module.exports = function (app) {
     const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
     const primerNombre = String(paciente.nombre || "").split(" ")[0];
 
-    const cuando = formatearFechaCompleta(sugerida.fechaHora);
+    const cuando = formatearFechaCompleta(sugerida.fechaHora, zona);
     const quien = medico?.nombre || "Su médico";
     const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
     await enviarTextoOPlantilla(paciente.telefono, texto,

@@ -7,7 +7,7 @@ const axios = require("axios");
 const { CONFIG, log } = require("../config");
 // La fecha de hoy y la hora de la reconsulta, en la zona de la cuenta
 // (contexto.zona): hay consultorios en Bolivia y en Brasil.
-const { hoyEnZona, fechaStrEnZona, ZONA_POR_DEFECTO } = require("./zonaHoraria");
+const { hoyEnZona, fechaStrEnZona, localAInstante, ZONA_POR_DEFECTO } = require("./zonaHoraria");
 
 // El idioma sale de la cuenta del médico, igual que en la transcripción.
 // Acá no alcanza con traducir el prompt: hay que decirle explícitamente que
@@ -484,7 +484,7 @@ async function generarNotaClinica(transcripcion, contexto, idioma) {
       throw new Error("La IA devolvió una nota vacía. Probá generarla de nuevo.");
     }
   }
-  return sanearNota(r.nota);
+  return sanearNota(r.nota, contexto?.zona);
 }
 
 // La IA a veces no respeta el formato pedido en el prompt para los dos
@@ -495,10 +495,20 @@ async function generarNotaClinica(transcripcion, contexto, idioma) {
 // ni el propio manejo de errores puede recuperar (el documento queda con
 // el valor inválido pegado). Mejor limpiarlo acá, con la IA todavía fresca
 // en el flujo, que descubrirlo como un 500 en producción.
-function sanearNota(nota) {
+function sanearNota(nota, zona) {
   if (nota?.reconsultaSugerida?.fechaHora) {
-    const d = new Date(nota.reconsultaSugerida.fechaHora);
-    if (isNaN(d.getTime())) nota.reconsultaSugerida.fechaHora = null;
+    // La IA devuelve "YYYY-MM-DDTHH:mm" SIN zona, y es hora de pared del
+    // consultorio (el «hoy» que le dimos es el de su zona). new Date() la
+    // tomaba como hora del servidor (UTC): la reconsulta le llegaba al
+    // paciente 4 horas antes, y 8 si el médico la confirmaba sin tocarla
+    // (auditoría del comité de QA, A2). Se toman la fecha y la hora tal cual,
+    // aunque vengan con un espacio en vez de la T o con algo más al final: la
+    // IA no razona en UTC. Sin hora no se inventa una: queda en null, como
+    // el texto libre, y el médico la carga a mano.
+    const m = String(nota.reconsultaSugerida.fechaHora).trim().match(/^(\d{4}-\d{2}-\d{2})[T ]([01]\d|2[0-3]):([0-5]\d)/);
+    const d = m ? localAInstante(zona || ZONA_POR_DEFECTO, `${m[1]}T${m[2]}:${m[3]}`) : null;
+    if (!d || isNaN(d.getTime())) log.warn("[NOTA_CLINICA] la reconsulta vino sin fecha y hora reconocibles: se descarta");
+    nota.reconsultaSugerida.fechaHora = d && !isNaN(d.getTime()) ? d : null;
   }
   if (Array.isArray(nota?.tratamientosSugeridos)) {
     for (const t of nota.tratamientosSugeridos) {
