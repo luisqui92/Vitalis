@@ -135,7 +135,10 @@ module.exports = function (app) {
       // cargó el médico en su panel, así que el paciente puede no haberle
       // escrito nunca al WhatsApp del consultorio. Sin la plantilla de
       // respaldo, no recibía nada y el médico veía "cita creada ✓".
-      const cuando = formatearFechaCompleta(cita.fecha);
+      // En la zona de la cuenta, la misma con que se leyó lo que tipeó el
+      // médico: sin ella cae a La Paz y un paciente de São Paulo leía una
+      // hora menos.
+      const cuando = formatearFechaCompleta(cita.fecha, zona);
       const quien = medico?.nombre || "el consultorio";
       enviarTextoOPlantilla(cita.pacienteTelefono,
         `✅ ${primerNombre}, su cita con ${quien} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,

@@ -119,7 +119,7 @@ async function agendarCita(medicoPhoneFijo, { fechaHora, pacienteNombre, pacient
       medicoPhone, medico, pacienteTelefono: telefono, pacienteNombre: nombre,
       fecha, motivo: String(motivo || "").trim(), origen: "voz",
     });
-    return `Listo, la cita quedó confirmada para ${formatearFechaCompleta(cita.fecha)} a nombre de ${cita.pacienteNombre}.`;
+    return `Listo, la cita quedó confirmada para ${formatearFechaCompleta(cita.fecha, medico.zonaHoraria)} a nombre de ${cita.pacienteNombre}.`;
   } catch (e) {
     if (e.horarioOcupado) {
       return "Ese horario se acaba de ocupar. Volvé a consultar la disponibilidad y ofrecele al paciente otro horario.";
@@ -139,8 +139,12 @@ async function consultarMisCitas(medicoPhoneFijo, { pacienteTelefono, especialid
   }).sort({ fecha: 1 }).lean();
 
   if (!citas.length) return "No encontré ninguna cita próxima confirmada con ese número de teléfono.";
+  // Cada cita en la hora de su consultorio: con el súper número pueden ser de
+  // cuentas de zonas distintas, y sin zona caía a la de La Paz.
+  const zonas = new Map((await Medico.find({ phone: { $in: [...new Set(citas.map(c => c.medicoPhone))] } })
+    .select("phone zonaHoraria").lean()).map(m => [m.phone, m.zonaHoraria]));
   return citas
-    .map(c => `Cita el ${formatearFechaCompleta(c.fecha)} a nombre de ${c.pacienteNombre} (citaId: ${c._id}).`)
+    .map(c => `Cita el ${formatearFechaCompleta(c.fecha, zonas.get(c.medicoPhone))} a nombre de ${c.pacienteNombre} (citaId: ${c._id}).`)
     .join(" ");
 }
 
@@ -167,13 +171,13 @@ async function cancelarCita(medicoPhoneFijo, { citaId, pacienteTelefono, especia
     return "No encontré ninguna cita próxima confirmada para cancelar. Verificá el número de teléfono, o pedile al paciente el citaId si lo consultaste antes.";
   }
 
-  const medico = await Medico.findOne({ phone: cita.medicoPhone }).select("googleCalendarId").lean();
+  const medico = await Medico.findOne({ phone: cita.medicoPhone }).select("googleCalendarId zonaHoraria").lean();
   cita.estado = "cancelada";
   await cita.save();
   if (medico?.googleCalendarId && cita.googleEventId) {
     await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
   }
-  return `Listo, cancelé la cita del ${formatearFechaCompleta(cita.fecha)}.`;
+  return `Listo, cancelé la cita del ${formatearFechaCompleta(cita.fecha, medico?.zonaHoraria)}.`;
 }
 
 module.exports = { listarEspecialidades, consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita };

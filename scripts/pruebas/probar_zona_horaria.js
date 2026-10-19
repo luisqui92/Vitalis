@@ -281,6 +281,8 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   require(path.join(RAIZ, "routes", "dashboardEscritorio"))(app);
   require(path.join(RAIZ, "routes", "admin"))(app);
   require(path.join(RAIZ, "routes", "operadorSaldo"))(app);
+  require(path.join(RAIZ, "routes", "citas"))(app);
+  require(path.join(RAIZ, "routes", "reservaPublica"))(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
   await new Promise((ok) => servidor.listen(0, "127.0.0.1", ok));
@@ -582,6 +584,43 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
     r.estado === 200 && r.cuerpo.cargasHoy?.[0]?.n === 2);
   verificar(`  ...y 2 en octubre: la del 30/9 a las 21:00 es de septiembre (${r.cuerpo?.cargasMes?.[0]?.n})`,
     r.cuerpo?.cargasMes?.[0]?.n === 2);
+
+  // ═══ 15. LO QUE SE LE DICE AL PACIENTE ══════════════════════════════════════
+  console.log("\n── 15. La hora de la cita en el WhatsApp y en la voz ──");
+  // La confirmación de una cita cargada a mano, la de la reserva por link y
+  // las respuestas del asistente de voz llamaban a formatearFechaCompleta sin
+  // zona, que cae a la de La Paz: a un paciente de São Paulo le decían una
+  // hora menos que la de su turno.
+  const confirmadaPara = (t) => t?.match(/confirmada para el ([^.]+)\./)?.[1];
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", "/medico/citas", tk[BR], { fecha: "2026-10-24T10:00", pacienteNombre: "Maria Souza", pacienteTelefono: "5511970088012" });
+  verificar(`cita a mano a las 10:00 de São Paulo → el WhatsApp dice las 10:00 (${r.estado}, ${confirmadaPara(enviados[0]?.texto)})`,
+    r.estado === 201 && enviados.length === 1 && confirmadaPara(enviados[0].texto) === "sábado, 24/10, 10:00");
+
+  const { CONFIG } = require(path.join(RAIZ, "config"));
+  CONFIG.SALUD_WHATSAPP_MEDICO_PHONE = BR;
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", "/reserva-publica/confirmar", null, {
+    token: generarToken("5511970088099", "reserva_publica", UN_ANIO), pacienteNombre: "Ana Lima", fecha: "2026-10-24T14:00:00.000Z",
+  });
+  CONFIG.SALUD_WHATSAPP_MEDICO_PHONE = "";
+  verificar(`reserva por link a las 11:00 de São Paulo → el WhatsApp dice las 11:00 (${r.estado}, ${confirmadaPara(enviados[0]?.texto)})`,
+    r.estado === 200 && enviados.length === 1 && confirmadaPara(enviados[0].texto) === "sábado, 24/10, 11:00");
+
+  // La voz: agendar, «mis citas» y cancelar, el lunes 19 (la cita es futura).
+  const vapi = require(path.join(RAIZ, "services", "vapiHerramientas"));
+  const telVoz = "5511970088098";
+  let agendada, misCitas, cancelada;
+  relojEn("2026-10-19T12:00:00Z");
+  try {
+    agendada = await vapi.agendarCita(BR, { fechaHora: "2026-10-24T15:00:00.000Z", pacienteNombre: "João Lima", pacienteTelefono: telVoz });
+    misCitas = await vapi.consultarMisCitas(BR, { pacienteTelefono: telVoz });
+    const citaId = misCitas.match(/citaId: ([a-f0-9]{24})/)?.[1];
+    cancelada = await vapi.cancelarCita(BR, { citaId, pacienteTelefono: telVoz });
+  } finally { relojReal(); }
+  verificar(`voz, al agendar a las 12:00 de São Paulo: «${agendada}»`, /para sábado, 24\/10, 12:00 /.test(agendada));
+  verificar(`voz, «mis citas»: «${misCitas}»`, /^Cita el sábado, 24\/10, 12:00 /.test(misCitas));
+  verificar(`voz, al cancelar: «${cancelada}»`, cancelada === "Listo, cancelé la cita del sábado, 24/10, 12:00.");
 
   servidor.close();
   await mongoose.disconnect();

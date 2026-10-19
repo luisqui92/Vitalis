@@ -86,7 +86,9 @@ module.exports = function (app) {
     // Reservó desde la PÁGINA, no por WhatsApp: es muy probable que nunca le
     // haya escrito al consultorio, así que casi siempre cae fuera de la
     // ventana de 24 h y va por la plantilla.
-    const cuando = formatearFechaCompleta(cita.fecha);
+    // La hora del consultorio, no la de La Paz: es la que el paciente eligió
+    // en la página.
+    const cuando = formatearFechaCompleta(cita.fecha, medico.zonaHoraria);
     enviarTextoOPlantilla(numero,
       `✅ ${primerNombre}, su cita con ${medico.nombre} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,
       { plantilla: PLANTILLAS.citaConfirmada, parametros: [primerNombre, medico.nombre, cuando], idioma: medico.idioma })
