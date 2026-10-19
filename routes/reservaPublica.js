@@ -19,10 +19,20 @@ const { CONFIG, log } = require("../config");
 // no hace falta ninguna dirección especial para poder escribirle de vuelta
 // más adelante — a diferencia de Baileys, que a veces identificaba al
 // paciente con un LID en vez del número real).
+//
+// El consultorio también viaja firmado: es el del médico que mandó la
+// reconsulta (routes/consultaMedica.js). Antes se usaba siempre
+// SALUD_WHATSAPP_MEDICO_PHONE, y la cita quedaba en la agenda de otro médico
+// —o el link daba 404 si esa variable estaba vacía— (auditoría del comité de
+// QA, octubre de 2026, A12). Un link de antes, sin consultorio, sigue yendo
+// al fijo hasta que venza.
 function datosDesdeToken(token) {
   const payload = verificarToken(token);
   if (!payload || payload.rol !== "reserva_publica") return null;
-  return { numero: payload.usuario };
+  return {
+    numero: payload.usuario,
+    medicoPhone: payload.medicoPhone || CONFIG.SALUD_WHATSAPP_MEDICO_PHONE,
+  };
 }
 
 module.exports = function (app) {
@@ -42,7 +52,7 @@ module.exports = function (app) {
     const datos = datosDesdeToken(String(req.query.token || ""));
     if (!datos) throw new ErrorHttp(401, "Este link venció o no es válido. Escribile de nuevo al WhatsApp del consultorio para conseguir uno nuevo.");
 
-    const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
+    const { medicoPhone } = datos;
     const medico = await Medico.findOne({ phone: medicoPhone, activo: true }).lean();
     if (!medico) throw new ErrorHttp(404, "No encontramos el consultorio.");
 
@@ -53,9 +63,8 @@ module.exports = function (app) {
   app.post("/reserva-publica/confirmar", limitReservaPublica, asyncRoute(async (req, res) => {
     const datos = datosDesdeToken(String(req.body?.token || ""));
     if (!datos) throw new ErrorHttp(401, "Este link venció o no es válido. Escribile de nuevo al WhatsApp del consultorio para conseguir uno nuevo.");
-    const { numero } = datos;
+    const { numero, medicoPhone } = datos;
 
-    const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
     const medico = await Medico.findOne({ phone: medicoPhone, activo: true }).lean();
     if (!medico) throw new ErrorHttp(404, "No encontramos el consultorio.");
 
@@ -86,7 +95,8 @@ module.exports = function (app) {
     // Reservó desde la PÁGINA, no por WhatsApp: es muy probable que nunca le
     // haya escrito al consultorio, así que casi siempre cae fuera de la
     // ventana de 24 h y va por la plantilla.
-    const cuando = formatearFechaCompleta(cita.fecha);
+    // En la hora del consultorio: ahora la cita puede ser de uno de Brasil.
+    const cuando = formatearFechaCompleta(cita.fecha, medico.zonaHoraria);
     enviarTextoOPlantilla(numero,
       `✅ ${primerNombre}, su cita con ${medico.nombre} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,
       { plantilla: PLANTILLAS.citaConfirmada, parametros: [primerNombre, medico.nombre, cuando], idioma: medico.idioma })
