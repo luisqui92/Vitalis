@@ -7,16 +7,20 @@ const { Paciente, Cita } = require("../db/models");
 const { crearEvento } = require("./googleCalendar");
 const { horarioSigueLibre, duracionDe } = require("./agenda");
 const { notificarMedico } = require("./push");
+const { desfaseMs, zonaValida } = require("./zonaHoraria");
 const { log } = require("../config");
 
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 // "jueves 21 de agosto, 15:30" — la fecha se guarda en UTC, así que se pasa
-// a hora de Bolivia (UTC-4) antes de leerla, o el aviso llega con la hora
-// corrida y el médico se presenta cuatro horas tarde.
-function cuandoEnBolivia(fecha) {
-  const b = new Date(new Date(fecha).getTime() - 4 * 3600000);
+// a la hora del consultorio (la zona de su cuenta) antes de leerla, o el
+// aviso llega con la hora corrida y el médico se presenta cuatro horas tarde.
+// Con las −4 horas fijas de Bolivia, a una cuenta de São Paulo le avisaba una
+// hora menos. Ver services/zonaHoraria.js.
+function cuandoEnZona(fecha, zona) {
+  const t = new Date(fecha);
+  const b = new Date(t.getTime() + desfaseMs(zonaValida(zona), t));
   const hh = String(b.getUTCHours()).padStart(2, "0");
   const mm = String(b.getUTCMinutes()).padStart(2, "0");
   return `${DIAS[b.getUTCDay()]} ${b.getUTCDate()} de ${MESES[b.getUTCMonth()]}, ${hh}:${mm}`;
@@ -73,7 +77,7 @@ async function crearCitaConfirmada({ medicoPhone, medico, pacienteTelefono, paci
   // ajeno no puede hacer que el paciente vea un error de reserva.
   notificarMedico(medicoPhone, {
     titulo: "Nueva reserva",
-    cuerpo: `${pacienteNombre} — ${cuandoEnBolivia(fecha)}${motivo ? ` · ${motivo}` : ""}`,
+    cuerpo: `${pacienteNombre} — ${cuandoEnZona(fecha, medico.zonaHoraria)}${motivo ? ` · ${motivo}` : ""}`,
     url: "/",
   }).catch(e => log.error("[CREAR_CITA] no se pudo notificar la reserva:", e.message));
 

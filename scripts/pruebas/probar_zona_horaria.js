@@ -181,6 +181,11 @@ axios.post = async (_url, cuerpo) => {
   return { data: { choices: [{ message: { content: JSON.stringify(respuestaIA) } }] } };
 };
 const NC = require(path.join(RAIZ, "services", "notaClinica"));
+// Los avisos push al médico, de mentira: se guarda lo que se le avisó. Antes
+// de cargar las rutas y services/reservaCitas.js (sección 8), que traen
+// services/crearCita.js: se queda con la función al cargarse.
+const avisosPush = [];
+require(path.join(RAIZ, "services", "push")).notificarMedico = async (phone, aviso) => { avisosPush.push({ phone, ...aviso }); };
 const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy es [^.]+\./) || [""])[0];
 
 (async () => {
@@ -621,6 +626,28 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   verificar(`voz, al agendar a las 12:00 de São Paulo: «${agendada}»`, /para sábado, 24\/10, 12:00 /.test(agendada));
   verificar(`voz, «mis citas»: «${misCitas}»`, /^Cita el sábado, 24\/10, 12:00 /.test(misCitas));
   verificar(`voz, al cancelar: «${cancelada}»`, cancelada === "Listo, cancelé la cita del sábado, 24/10, 12:00.");
+
+  // ═══ 16. EL AVISO PUSH AL MÉDICO ════════════════════════════════════════════
+  console.log("\n── 16. El aviso «Nueva reserva» al médico ──");
+  // Restaba las 4 horas fijas de Bolivia: a una cuenta de São Paulo le
+  // avisaba una hora menos que la de la reserva.
+  const { crearCitaConfirmada } = require(path.join(RAIZ, "services", "crearCita"));
+  const avisoDe = async (medico, iso) => {
+    avisosPush.length = 0;
+    await crearCitaConfirmada({
+      medicoPhone: medico.phone, medico, pacienteTelefono: "59170088097", pacienteNombre: "Paciente Push",
+      fecha: new DateReal(iso), motivo: "", origen: "whatsapp",
+    });
+    return avisosPush[0]?.cuerpo;
+  };
+  const cuentaBR = await M.Medico.findOne({ phone: BR }).lean();
+  const cuentaBO = await M.Medico.findOne({ phone: BO }).lean();
+  let aviso = await avisoDe(cuentaBR, "2026-10-24T17:00:00Z"); // 14:00 en São Paulo
+  verificar(`São Paulo, a las 14:00: «${aviso}»`, aviso === "Paciente Push — sábado 24 de octubre, 14:00");
+  aviso = await avisoDe(cuentaBO, "2026-10-25T03:30:00Z"); // sábado 24, 23:30 en La Paz
+  verificar(`La Paz, como siempre: «${aviso}»`, aviso === "Paciente Push — sábado 24 de octubre, 23:30");
+  aviso = await avisoDe({ ...cuentaBO, zonaHoraria: undefined }, "2026-10-25T14:00:00Z");
+  verificar(`una cuenta sin zona, la de siempre: «${aviso}»`, aviso === "Paciente Push — domingo 25 de octubre, 10:00");
 
   servidor.close();
   await mongoose.disconnect();
