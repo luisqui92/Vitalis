@@ -34,8 +34,7 @@ function tabRecetasHtml(recetas) {
           <div class="nombre">${marcaAnulada(r)}${r.origen === "memed" ? `<span class="badge badge-completado">${t("memed.firmada")}</span> ` : ""}${esc(r.medicamentos.map(m => m.nombre).join(", "))}</div>
           ${r.anuladaEn ? "" : `<button class="link" data-anular-receta="${r._id}" data-memed="${r.origen === "memed" ? "1" : ""}" title="${t("receta.anular")}" style="margin:0;width:auto;color:var(--danger)">✕</button>`}
         </div>
-        <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>
-        ${motivoAnulada(r)}
+        <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>${motivoAnulada(r)}
       </div>`).join("")}
     ${MEDICO_TIPO_ESPECIALIDAD === "oftalmologia" ? `<div id="recetaOpticaBox" style="margin-top:18px"></div>` : ""}
   `;
@@ -125,8 +124,7 @@ function pintarRecetaOpticaBox(pacienteId, recetas) {
           <div class="nombre">${marcaAnulada(r)}OD ${r.od.esfera ?? "—"} / OI ${r.oi.esfera ?? "—"}</div>
           ${r.anuladaEn ? "" : `<button class="link" data-anular-receta-optica="${r._id}" title="${t("receta.anular")}" style="margin:0;width:auto;color:var(--danger)">✕</button>`}
         </div>
-        <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>
-        ${motivoAnulada(r)}
+        <div class="fecha">${fechaCorta(r.fechaCivil || r.fecha)}</div>${motivoAnulada(r)}
       </div>`).join("")}
   `;
 

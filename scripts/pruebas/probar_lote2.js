@@ -87,7 +87,11 @@ const sinCajasNuevas = (html) => html
   // El id que le da nombre a la caja de la receta de Symphomed, para poder
   // sacarla cuando la cuenta receta por Memed. Es un id, no un cambio de
   // dibujo: no se ve.
-  .replace(/<div class="card" id="recetaNuevaBox">/g, '<div class="card">');
+  .replace(/<div class="card" id="recetaNuevaBox">/g, '<div class="card">')
+  // La ✕ de una receta ya no la borra: la anula, con un motivo (auditoría de
+  // QA, M8). Cambia el atributo y suma un title, a propósito; el resto de la
+  // fila tiene que seguir igual.
+  .replace(/data-anular-receta="([^"]*)" data-memed="[^"]*" title="[^"]*"/g, 'data-borrar-receta="$1"');
 
 let fallos = 0;
 function comparar(nombre, viejoBruto, nuevoBruto) {
