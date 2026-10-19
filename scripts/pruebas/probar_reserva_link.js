@@ -1,17 +1,26 @@
-// Symphomed — La reserva por link: en el consultorio que mandó el link.
+// Symphomed — La reserva por link: el consultorio que mandó el link, uno de
+// los horarios que ofrece, y una sola cita por link.
 //
 // El link de la reconsulta (routes/consultaMedica.js) abre la página de
-// reserva sin login (routes/reservaPublica.js). El token solo traía el
-// teléfono del paciente, y la cita quedaba siempre en la agenda de
-// SALUD_WHATSAPP_MEDICO_PHONE, aunque la reconsulta la hubiera mandado otro
-// médico. Con esa variable vacía, el link daba 404 (auditoría del comité de
-// QA, octubre de 2026, A12). Y una que trae el arreglo: la confirmación le
-// dice al paciente que responda «cancelar» al WhatsApp, y el WhatsApp buscaba
-// la cita solo en su propio consultorio.
+// reserva sin login (routes/reservaPublica.js). La auditoría del comité de QA
+// (octubre de 2026) encontró dos cosas:
+//   · A12: el token solo traía el teléfono del paciente, y la cita quedaba
+//     siempre en la agenda de SALUD_WHATSAPP_MEDICO_PHONE, aunque la
+//     reconsulta la hubiera mandado otro médico. Con esa variable vacía, el
+//     link daba 404.
+//   · A4: se aceptaba cualquier instante que no chocara con otra cita —un
+//     domingo a las 3 de la mañana, una fecha pasada, las 10:07, un día dentro
+//     de dos años—, y con un solo link se reservaban todos los horarios.
+// Y una que trae el arreglo de A12: la confirmación le dice al paciente que
+// responda «cancelar» al WhatsApp, y el WhatsApp buscaba la cita solo en su
+// propio consultorio.
 //
 // Lo que se prueba: el link reserva en el consultorio que lo firmó y la
-// confirmación sale con SU hora; un link viejo sigue yendo al consultorio
-// fijo; y el «cancelar» del WhatsApp encuentra la cita reservada por link.
+// confirmación sale con SU hora; solo entra un horario de la lista; un link
+// sirve para una cita, aunque se manden cinco pedidos a la vez, y vuelve a
+// servir si esa cita se cancela; un link viejo sigue yendo al consultorio
+// fijo; el «cancelar» del WhatsApp encuentra la cita reservada por link; y
+// reservar por WhatsApp, eligiendo de la lista, anda igual que siempre.
 const path = require("path");
 const http = require("http");
 const RAIZ = path.join(__dirname, "..", "..");
@@ -21,13 +30,15 @@ process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
 // ─── El reloj, fijo ────────────────────────────────────────────────────────
 // Qué horarios se ofrecen depende de la hora: la prueba arranca siempre el
 // lunes 6 de mayo de 2030 a las 08:00 de Bolivia (09:00 en São Paulo), y
-// desde ahí el reloj corre.
+// desde ahí el reloj corre. pasarUnMinuto() lo adelanta, para que el límite
+// de pedidos por minuto de la página no se meta en la prueba.
 const FechaReal = Date;
-const DESFASE = FechaReal.UTC(2030, 4, 6, 12, 0, 0) - FechaReal.now();
+let desfase = FechaReal.UTC(2030, 4, 6, 12, 0, 0) - FechaReal.now();
 global.Date = class Date extends FechaReal {
-  constructor(...a) { if (a.length) super(...a); else super(FechaReal.now() + DESFASE); }
-  static now() { return FechaReal.now() + DESFASE; }
+  constructor(...a) { if (a.length) super(...a); else super(FechaReal.now() + desfase); }
+  static now() { return FechaReal.now() + desfase; }
 };
+const pasarUnMinuto = () => { desfase += 61000; };
 
 let fallos = 0;
 function verificar(descripcion, condicion) {
@@ -128,8 +139,19 @@ function pedir(puerto, metodo, ruta, cuerpo, token) {
   verificar("el link que manda la reconsulta de la Dra. B también abre su agenda", r.estado === 200
     && abierto.estado === 200 && abierto.cuerpo?.medicoNombre === "Dra. Reconsulta");
 
-  console.log("\n── 2. La cita queda en el consultorio del link ──");
+  console.log("\n── 2. Solo un horario de la lista ──");
   const ofrecido = martes?.slots?.[2]; // martes 10:00 en São Paulo, tal como lo devuelve la página
+  for (const [que, fecha] of [
+    ["el domingo a las 03:00", instanteEnZona("America/Sao_Paulo", 2030, 4, 12, 3, 0)],
+    ["un lunes de hace cuatro semanas, a las 10:00", instanteEnZona("America/Sao_Paulo", 2030, 3, 8, 10, 0)],
+    ["un horario de la lista corrido 7 minutos (10:07)", new FechaReal(new FechaReal(ofrecido).getTime() + 7 * 60000)],
+    ["un miércoles a las 10:00 dentro de dos años", instanteEnZona("America/Sao_Paulo", 2032, 4, 5, 10, 0)],
+  ]) {
+    r = await confirmar(link1, fecha.toISOString());
+    verificar(`${que} → 409, y no se agenda`, r.estado === 409 && (await citasDe(B)) === 0);
+  }
+
+  console.log("\n── 3. Uno de la lista entra, en el consultorio del link ──");
   enviados.length = 0;
   r = await confirmar(link1, ofrecido);
   const cita1 = await M.Cita.findOne({ medicoPhone: B }).lean();
@@ -141,7 +163,39 @@ function pedir(puerto, metodo, ruta, cuerpo, token) {
     enviados.length === 1 && enviados[0].texto.includes(enSuHora) && enviados[0].respaldo?.parametros?.[2] === enSuHora
     && enSuHora !== fechaCompletaEnZona("America/La_Paz", new FechaReal(ofrecido)));
 
-  console.log("\n── 3. Los links de antes y sin consultorio fijo ──");
+  console.log("\n── 4. Un link, una cita ──");
+  const otroOfrecido = martes?.slots?.[4];
+  r = await confirmar(link1, otroOfrecido);
+  verificar("el mismo link otra vez → 409, y sigue habiendo una sola", r.estado === 409 && /ya reservaste/.test(r.cuerpo?.error || "") && (await citasDe(B)) === 1);
+  r = await disponibilidad(link1);
+  verificar("  ...y la página ya lo dice al abrirlo", r.estado === 409 && /ya reservaste/.test(r.cuerpo?.error || ""));
+  // La firma vale igual escrita de otra forma (services/auth.js): no puede
+  // contar como otro link.
+  const [cuerpoLink1, firmaLink1] = link1.split(".");
+  for (const [que, variante] of [["con algo pegado al final", link1 + ".x"], ["con la firma en mayúsculas", `${cuerpoLink1}.${firmaLink1.toUpperCase()}`]]) {
+    r = await confirmar(variante, otroOfrecido);
+    verificar(`  ...ni escrito ${que}`, r.estado === 409 && /ya reservaste/.test(r.cuerpo?.error || "") && (await citasDe(B)) === 1);
+  }
+  pasarUnMinuto();
+  // Una madre con dos hijos recibe dos reconsultas: cada link sirve para la suya.
+  const link2 = linkDe(B);
+  r = await confirmar(link2, otroOfrecido, "Hijo Paciente");
+  verificar("otro link al mismo número (el segundo hijo) → su cita entra", r.estado === 200 && (await citasDe(B)) === 2);
+
+  pasarUnMinuto();
+  const link3 = linkDe(B);
+  const miercoles = dias.find(d => d.fecha === "2030-05-08")?.slots || [];
+  const respuestas = await Promise.all(miercoles.slice(0, 5).map(s => confirmar(link3, s)));
+  const entraron = respuestas.filter(x => x.estado === 200).length;
+  verificar(`cinco pedidos a la vez con un mismo link → entra uno solo (entraron ${entraron})`, entraron === 1
+    && respuestas.every(x => x.estado === 200 || x.estado === 409) && (await citasDe(B)) === 3);
+
+  const deLink2 = await M.Cita.findOne({ medicoPhone: B, pacienteNombre: "Hijo Paciente" });
+  if (deLink2) { deLink2.estado = "cancelada"; await deLink2.save(); }
+  r = await confirmar(link2, martes?.slots?.[5], "Hijo Paciente");
+  verificar("si la cita de un link se cancela, ese link vuelve a servir mientras no venza", Boolean(deLink2) && r.estado === 200);
+
+  console.log("\n── 5. Los links de antes y sin consultorio fijo ──");
   r = await disponibilidad(linkDe(null));
   verificar("un link de antes (sin consultorio adentro) → sigue yendo al consultorio fijo", r.estado === 200 && r.cuerpo?.medicoNombre === "Dr. Fijo");
   CONFIG.SALUD_WHATSAPP_MEDICO_PHONE = "";
@@ -150,7 +204,7 @@ function pedir(puerto, metodo, ruta, cuerpo, token) {
   CONFIG.SALUD_WHATSAPP_MEDICO_PHONE = A;
   servidor.close();
 
-  console.log("\n── 4. «cancelar» por el WhatsApp encuentra la cita del link ──");
+  console.log("\n── 6. «cancelar» por el WhatsApp encuentra la cita del link ──");
   const { procesarMensajeEntrante: bot } = require(path.join(RAIZ, "services", "reservaCitas"));
   const WA = "59170002222";
   // Como la deja la reserva por link: en la agenda de la Dra. B, con su evento de Google.
@@ -171,6 +225,21 @@ function pedir(puerto, metodo, ruta, cuerpo, token) {
   await bot(WA, "rol_paciente", "");
   r = await bot(WA, "pac_cancelar", "");
   verificar("la que la Dra. B cargó a mano no la ofrece el número oficial", /No encontré/.test(r?.texto || ""));
+
+  console.log("\n── 7. Por WhatsApp, el horario elegido de la lista entra igual ──");
+  // La revisión de «uno de los horarios que se ofrecen» está en
+  // crearCitaConfirmada, por donde pasa también el WhatsApp: el horario que
+  // el paciente toca en la lista tiene que seguir entrando.
+  const WA2 = "59170003333";
+  await bot(WA2, "rol_paciente", "");
+  await bot(WA2, "pac_reservar", "");
+  await bot(WA2, "dia_0", "");
+  await bot(WA2, "hora_0", "");
+  await bot(WA2, "Carla Paciente", "");
+  r = await bot(WA2, "ninguno", "");
+  const porWhatsapp = await M.Cita.findOne({ medicoPhone: A, pacienteTelefono: WA2, estado: "confirmada" }).lean();
+  verificar("día y hora de la lista, nombre y motivo → la cita queda confirmada en el consultorio fijo",
+    /quedó confirmada/.test(r?.texto || "") && porWhatsapp?.origen === "whatsapp");
 
   await mongoose.disconnect();
   await mongod.stop();

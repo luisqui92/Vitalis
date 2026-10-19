@@ -24,6 +24,11 @@ const { CONFIG } = require("../config");
 // Meta ya verificó el número del paciente.
 const SIN_NUMERO_VERIFICADO = "No puedo ver ni cancelar citas en esta llamada: no tengo el número desde el que llama (pasa, por ejemplo, cuando llama desde la página web). No le pidas que te dicte un número. Decile que para ver o cancelar su cita escriba \"cancelar\" al WhatsApp del consultorio, o que llame desde el teléfono con el que reservó.";
 
+// Por voz no hay un link que se gaste (routes/reservaPublica.js): el número
+// lo dicta quien llama. Como mucho estas citas futuras por voz por número y
+// consultorio, para que una sola llamada no pueda llenar la agenda (A4).
+const CITAS_VOZ_POR_TELEFONO = 3;
+
 // "Súper número" de voz: la misma idea que el súper número de WhatsApp
 // (mismo WHATSAPP_ESPECIALIDADES_MEDICOS), pero acá no hay una sesión
 // guardada — Vapi no la necesita, porque el LLM que conduce la llamada ya
@@ -122,6 +127,12 @@ async function agendarCita(medicoPhoneFijo, { fechaHora, pacienteNombre, pacient
   if (fecha.getTime() <= Date.now()) {
     return "Esa fecha ya pasó — elegí un horario futuro de la disponibilidad.";
   }
+  const yaTiene = await Cita.countDocuments({
+    medicoPhone, pacienteTelefono: { $in: formasDe(telefono) }, origen: "voz", estado: "confirmada", fecha: { $gte: new Date() },
+  });
+  if (yaTiene >= CITAS_VOZ_POR_TELEFONO) {
+    return `Ese número ya tiene ${yaTiene} citas próximas agendadas por teléfono, que es lo máximo por esta vía. No agendes otra: decile que, si necesita más, se comunique directo con la clínica o por WhatsApp.`;
+  }
 
   try {
     const cita = await crearCitaConfirmada({
@@ -130,8 +141,11 @@ async function agendarCita(medicoPhoneFijo, { fechaHora, pacienteNombre, pacient
     });
     return `Listo, la cita quedó confirmada para ${formatearFechaCompleta(cita.fecha)} a nombre de ${cita.pacienteNombre}.`;
   } catch (e) {
+    // crearCitaConfirmada solo acepta uno de los horarios que se ofrecen: si
+    // el asistente armó la fecha por su cuenta en vez de copiar la de una
+    // opción, también cae acá.
     if (e.horarioOcupado) {
-      return "Ese horario se acaba de ocupar. Volvé a consultar la disponibilidad y ofrecele al paciente otro horario.";
+      return "Ese horario no está disponible (o se acaba de ocupar). Volvé a consultar la disponibilidad, ofrecele al paciente otro horario y usá el valor exacto de 'fechaHora' de la opción que elija.";
     }
     throw e;
   }

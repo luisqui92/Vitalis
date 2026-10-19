@@ -219,7 +219,27 @@ async function horarioSigueLibre(medicoPhone, fecha, duracionMinutos, excluir = 
   return true;
 }
 
+// ¿Ese instante es uno de los horarios que se ofrecen? Que esté libre no
+// alcanza: la reserva por link, la de voz y la de WhatsApp confirmaban
+// cualquier fecha que no chocara con otra cita, y así entraban un domingo a
+// las 3 de la mañana, una fecha pasada, las 10:07 o un día dentro de dos años
+// (auditoría del comité de QA, octubre de 2026, A4). Se arma la misma lista
+// que ve el paciente, hasta el día de esa fecha, y se busca ese horario
+// exacto en ella: así también queda revisado que siga libre.
+async function esHorarioOfrecido(medicoPhone, fecha) {
+  const instante = new Date(fecha).getTime();
+  if (!Number.isFinite(instante) || instante <= Date.now()) return false;
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  const zona = medico?.zonaHoraria || ZONA_POR_DEFECTO;
+  const hoy = hoyEnZona(zona);
+  const elDia = hoyEnZona(zona, new Date(instante));
+  const dias = Math.round((Date.UTC(elDia.anio, elDia.mesIndex, elDia.dia) - Date.UTC(hoy.anio, hoy.mesIndex, hoy.dia)) / 86400000) + 1;
+  if (dias > DIAS_MAX) return false;
+  const disponibles = await obtenerHorariosDisponibles(medicoPhone, dias);
+  return disponibles.some(d => d.slots.some(s => s.getTime() === instante));
+}
+
 module.exports = {
-  obtenerHorariosDisponibles, horarioSigueLibre, franjaValida,
+  obtenerHorariosDisponibles, horarioSigueLibre, esHorarioOfrecido, franjaValida,
   duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX,
 };

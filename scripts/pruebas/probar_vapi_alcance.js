@@ -15,6 +15,8 @@
 //     el de la cita;
 //   · en el webhook manda el caller ID, no lo que dicta quien llama; sin
 //     caller ID (la llamada desde la página web) se deriva al WhatsApp;
+//   · al agendar, solo un horario de los que se ofrecen, y un tope por número
+//     (A4);
 //   · lo de siempre sigue igual (por id o por teléfono, del propio consultorio).
 const path = require("path");
 const http = require("http");
@@ -22,7 +24,7 @@ const RAIZ = path.join(__dirname, "..", "..");
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 
 // ─── El reloj, fijo ────────────────────────────────────────────────────────
-// Que una cita sea «próxima» depende de la hora: la prueba arranca siempre el
+// Qué horarios se ofrecen depende de la hora: la prueba arranca siempre el
 // lunes 6 de mayo de 2030 a las 08:00 de Bolivia, y desde ahí el reloj corre.
 const FechaReal = Date;
 const DESFASE = FechaReal.UTC(2030, 4, 6, 12, 0, 0) - FechaReal.now();
@@ -64,17 +66,19 @@ function pedir(puerto, ruta, cuerpo) {
   const mongoose = require("mongoose");
   await mongoose.connect(process.env.MONGODB_URI);
   const M = require(path.join(RAIZ, "db", "models"));
-  const { cancelarCita, consultarMisCitas } = require(path.join(RAIZ, "services", "vapiHerramientas"));
+  const { cancelarCita, consultarMisCitas, consultarDisponibilidad, agendarCita } = require(path.join(RAIZ, "services", "vapiHerramientas"));
   const { instanteEnZona } = require(path.join(RAIZ, "services", "zonaHoraria"));
   await mongoose.connection.dropDatabase();
   await M.Cita.syncIndexes();
 
+  // Los tres atienden de lunes a viernes de 8 a 17, de a media hora (lo que
+  // trae una cuenta nueva).
   const A = "70095101", B = "70095102", C = "70095103";
   for (const [phone, tipoEspecialidad] of [[A, "medicina_general"], [B, "odontologia"], [C, "oftalmologia"]]) {
     await M.Medico.create({ phone, nombre: "Consultorio " + phone, passwordHash: "x", activo: true, tipoEspecialidad });
   }
-  // Mañana martes desde las 07:00, una por minuto: la base no deja dos a la
-  // misma hora.
+  // Mañana martes desde las 07:00, antes de que abra: no le quitan horarios
+  // a nadie. Una por minuto, porque la base no deja dos a la misma hora.
   let minuto = 0;
   const cita = (medicoPhone, pacienteTelefono) => M.Cita.create({ medicoPhone, pacienteNombre: "Paciente " + pacienteTelefono, pacienteTelefono,
     fecha: instanteEnZona("America/La_Paz", 2030, 4, 7, 7, minuto++), estado: "confirmada" });
@@ -140,6 +144,32 @@ function pedir(puerto, ruta, cuerpo) {
   verificar("...y tampoco cancela", /WhatsApp/.test(r) && (await estado(victima)) === "confirmada");
   r = await herramienta("consultar_mis_citas", {}, "+59170006666");
   verificar("la dueña, llamando desde su teléfono → ve su cita", r.includes(String(victima._id)));
+
+  console.log("\n── Al agendar: un horario de los que se ofrecen, y con tope ──");
+  const opciones = async () => [...(await consultarDisponibilidad(A, {})).matchAll(/fechaHora: ([^)]+)\)/g)].map(m => m[1]);
+  const agendar = (fechaHora, pacienteTelefono = "59170008888") => agendarCita(A, { fechaHora, pacienteNombre: "Quien Llama", pacienteTelefono });
+  const cuantas = (tel) => M.Cita.countDocuments({ medicoPhone: A, pacienteTelefono: tel, estado: "confirmada" });
+  for (const [que, fecha] of [
+    ["el domingo a las 03:00", instanteEnZona("America/La_Paz", 2030, 4, 12, 3, 0)],
+    ["un miércoles a las 10:07, fuera de la grilla", instanteEnZona("America/La_Paz", 2030, 4, 8, 10, 7)],
+    ["un miércoles a las 10:00 dentro de dos años", instanteEnZona("America/La_Paz", 2032, 4, 5, 10, 0)],
+  ]) {
+    r = await agendar(fecha.toISOString());
+    verificar(`${que} → no se agenda`, /no está disponible/.test(r) && (await cuantas("59170008888")) === 0);
+  }
+  let ofrecidas = await opciones();
+  r = await agendar(ofrecidas[0]);
+  verificar("una de las opciones que dio la disponibilidad → se agenda", /quedó confirmada/.test(r) && (await cuantas("59170008888")) === 1);
+  ofrecidas = await opciones();
+  await agendar(ofrecidas[0]);
+  ofrecidas = await opciones();
+  await agendar(ofrecidas[0]);
+  ofrecidas = await opciones();
+  r = await agendar(ofrecidas[0]);
+  verificar("la cuarta cita por voz para el mismo número → no se agenda", /lo máximo/.test(r) && (await cuantas("59170008888")) === 3);
+  ofrecidas = await opciones();
+  r = await herramienta("agendar_cita", { fechaHora: ofrecidas[0], pacienteNombre: "Hija de Quien Llama", pacienteTelefono: "59170007777" }, "+59179999999");
+  verificar("al agendar sí vale otro número (reservar para un familiar)", /quedó confirmada/.test(r) && (await cuantas("59170007777")) === 1);
 
   servidor.close();
   await mongoose.disconnect();
