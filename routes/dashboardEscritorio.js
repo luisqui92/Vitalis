@@ -14,7 +14,7 @@ module.exports = function (app) {
   app.get("/medico/recetas", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const recetas = await Receta.find({ medicoPhone })
-      .select("indicaciones medicamentos fecha pacienteId")
+      .select("indicaciones medicamentos fecha pacienteId anuladaEn")
       .populate("pacienteId", "nombre")
       .sort({ fecha: -1 })
       .limit(50)

@@ -283,9 +283,13 @@ function bloquesDelKardex({ contenido: c, paciente, recetas, consultasSinConfirm
       if (i > 0) B.push({ tipo: "separador" });
       const dia = f.dia(r.fechaCivil ? `${r.fechaCivil}T12:00:00Z` : r.fecha);
       const continuacion = T.continuacion(dia);
-      B.push({ tipo: "subtitulo", texto: dia, extra: r.origen === "memed" ? T.recetas.memed : "" });
+      // Una receta anulada no se borra (routes/recetas.js): sale, dicha como
+      // lo que es, con el motivo.
+      const extra = [r.anuladaEn ? T.recetas.anulada : "", r.origen === "memed" ? T.recetas.memed : ""].filter(Boolean).join(" · ");
+      B.push({ tipo: "subtitulo", texto: dia, extra, colorExtra: r.anuladaEn ? COLORES.peligro : undefined });
       B.push({ tipo: "lista", items: (r.medicamentos || []).filter(m => m?.nombre).map(m => [m.nombre, m.dosis, m.frecuencia, m.duracion].filter(Boolean).join(" — ")), continuacion });
       B.push({ tipo: "campo", etiqueta: T.recetas.indicaciones, valor: r.indicaciones, continuacion });
+      if (r.anuladaEn) B.push({ tipo: "campo", etiqueta: T.recetas.motivoAnulacion, valor: r.anuladaMotivo, continuacion });
     });
   }
 
