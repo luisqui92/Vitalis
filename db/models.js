@@ -2529,8 +2529,18 @@ const citaSchema = new mongoose.Schema({
   estado: { type: String, enum: ["confirmada", "cancelada", "completada"], default: "confirmada" },
   origen: { type: String, enum: ["whatsapp", "whatsapp_web", "manual", "voz"], default: "manual" },
   googleEventId: { type: String, default: null }, // id del evento en Google Calendar, para poder editarlo/cancelarlo
+  // El link de reserva que la creó: un resumen del token, nunca el token
+  // (routes/reservaPublica.js). Solo lo tienen las reservadas por link.
+  reservaLink: { type: String },
 }, { timestamps: true });
 citaSchema.index({ medicoPhone: 1, fecha: 1 });
+// Un link de reserva sirve para UNA cita confirmada: con uno solo se llenaba
+// la agenda de tres semanas. Si esa cita se cancela, el link vuelve a servir
+// mientras no venza.
+citaSchema.index(
+  { reservaLink: 1 },
+  { unique: true, partialFilterExpression: { reservaLink: { $exists: true }, estado: "confirmada" }, name: "cita_link_reserva_unico" }
+);
 // Índice adicional aparte (nombre propio para no chocar con el de arriba,
 // que ya puede existir en producción con otras opciones): entre citas
 // CONFIRMADAS no permite dos con el mismo médico+horario exacto — último

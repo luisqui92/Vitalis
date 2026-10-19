@@ -28,6 +28,7 @@ const { requireAuth } = require("../services/auth");
 const { limitMedico, rateLimit } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { siguienteCodigo } = require("../services/codigos");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { SECCIONES, normalizarSecciones, armarContenido, seccionesPorDefecto } = require("../services/resumenCompartido");
 const { leerKardex } = require("../services/kardexDatos");
@@ -393,6 +394,9 @@ module.exports = (app) => {
     const deDonde = r.firmaCentro || r.firmaNombre || "otro consultorio";
     const paciente = await Paciente.create({
       medicoPhone, nombre,
+      // Con código desde el alta, como cualquier otra ficha: sin él, la Caja
+      // DICOM no le puede archivar los estudios solos (M11).
+      codigo: await siguienteCodigo(Paciente, medicoPhone, "P"),
       fechaNacimiento: ident.fechaNacimiento ? new Date(ident.fechaNacimiento) : null,
       sexo: ident.sexo || "",
       // Las alergias entran como antecedente porque esta ficha todavía no

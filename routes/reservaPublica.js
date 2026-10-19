@@ -5,9 +5,10 @@
 // médicos) con el número de WhatsApp del paciente adentro — así no hace
 // falta pedir contraseña ni guardar una sesión aparte: todo se resuelve en
 // esta única pantalla.
-const { Medico } = require("../db/models");
+const crypto = require("crypto");
+const { Medico, Cita } = require("../db/models");
 const { generarToken, verificarToken } = require("../services/auth");
-const { obtenerHorariosDisponibles, horarioSigueLibre, duracionDe } = require("../services/agenda");
+const { obtenerHorariosDisponibles } = require("../services/agenda");
 const { crearCitaConfirmada } = require("../services/crearCita");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
@@ -19,11 +20,34 @@ const { CONFIG, log } = require("../config");
 // no hace falta ninguna dirección especial para poder escribirle de vuelta
 // más adelante — a diferencia de Baileys, que a veces identificaba al
 // paciente con un LID en vez del número real).
+//
+// El consultorio también viaja firmado: es el del médico que mandó la
+// reconsulta (routes/consultaMedica.js). Antes se usaba siempre
+// SALUD_WHATSAPP_MEDICO_PHONE, y la cita quedaba en la agenda de otro médico
+// —o el link daba 404 si esa variable estaba vacía— (auditoría del comité de
+// QA, octubre de 2026, A12). Un link de antes, sin consultorio, sigue yendo
+// al fijo hasta que venza.
+//
+// link: un resumen del token, para saber si ese link ya se usó. El token
+// entero no se guarda: con él se podría volver a entrar. Y se resume solo lo
+// firmado (lo de antes del punto), no el texto tal cual llega: la firma vale
+// igual en mayúsculas o con algo pegado al final (services/auth.js), y cada
+// una de esas formas contaría como un link nuevo.
 function datosDesdeToken(token) {
   const payload = verificarToken(token);
   if (!payload || payload.rol !== "reserva_publica") return null;
-  return { numero: payload.usuario };
+  return {
+    numero: payload.usuario,
+    medicoPhone: payload.medicoPhone || CONFIG.SALUD_WHATSAPP_MEDICO_PHONE,
+    link: crypto.createHash("sha256").update(token.split(".")[0]).digest("hex").slice(0, 32),
+  };
 }
+
+// Un link sirve para una cita: con uno solo se reservaban todos los horarios
+// de tres semanas (A4). Si el paciente la cancela, el link vuelve a servir
+// mientras no venza.
+const LINK_USADO = "Con este link ya reservaste tu cita. Si necesitás otra, escribile al WhatsApp del consultorio.";
+const linkYaUsado = (link) => Cita.exists({ reservaLink: link, estado: "confirmada" });
 
 module.exports = function (app) {
   // Datos para la llamada de voz por navegador (sin número de teléfono) —
@@ -41,8 +65,9 @@ module.exports = function (app) {
   app.get("/reserva-publica/disponibilidad", limitReservaPublica, asyncRoute(async (req, res) => {
     const datos = datosDesdeToken(String(req.query.token || ""));
     if (!datos) throw new ErrorHttp(401, "Este link venció o no es válido. Escribile de nuevo al WhatsApp del consultorio para conseguir uno nuevo.");
+    if (await linkYaUsado(datos.link)) throw new ErrorHttp(409, LINK_USADO);
 
-    const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
+    const { medicoPhone } = datos;
     const medico = await Medico.findOne({ phone: medicoPhone, activo: true }).lean();
     if (!medico) throw new ErrorHttp(404, "No encontramos el consultorio.");
 
@@ -53,9 +78,9 @@ module.exports = function (app) {
   app.post("/reserva-publica/confirmar", limitReservaPublica, asyncRoute(async (req, res) => {
     const datos = datosDesdeToken(String(req.body?.token || ""));
     if (!datos) throw new ErrorHttp(401, "Este link venció o no es válido. Escribile de nuevo al WhatsApp del consultorio para conseguir uno nuevo.");
-    const { numero } = datos;
+    const { numero, medicoPhone, link } = datos;
+    if (await linkYaUsado(link)) throw new ErrorHttp(409, LINK_USADO);
 
-    const medicoPhone = CONFIG.SALUD_WHATSAPP_MEDICO_PHONE;
     const medico = await Medico.findOne({ phone: medicoPhone, activo: true }).lean();
     if (!medico) throw new ErrorHttp(404, "No encontramos el consultorio.");
 
@@ -66,19 +91,19 @@ module.exports = function (app) {
     const fecha = new Date(String(req.body?.fecha || ""));
     if (isNaN(fecha.getTime())) throw new ErrorHttp(400, "Horario inválido.");
 
-    const libre = await horarioSigueLibre(medicoPhone, fecha, duracionDe(medico.duracionConsultaMinutos));
-    if (!libre) throw new ErrorHttp(409, "Ups, ese horario se acaba de ocupar. Elegí otro.");
-
     let cita;
     try {
       cita = await crearCitaConfirmada({
-        medicoPhone, medico, pacienteTelefono: numero, pacienteNombre, fecha, motivo, origen: "whatsapp_web",
+        medicoPhone, medico, pacienteTelefono: numero, pacienteNombre, fecha, motivo, origen: "whatsapp_web", reservaLink: link,
       });
     } catch (e) {
-      // crearCitaConfirmada revalida por su cuenta (más cerca del guardado
-      // real que la revisión de arriba) — si perdió la carrera contra otra
-      // reserva casi simultánea, cae acá en vez de un 500 genérico.
-      if (e.horarioOcupado) throw new ErrorHttp(409, "Ups, ese horario se acaba de ocupar. Elegí otro.");
+      // crearCitaConfirmada es la que revisa que sea uno de los horarios
+      // que se ofrecen y que siga libre (antes acá había una revisión más,
+      // que solo miraba si chocaba con otra cita y le sumaba una consulta a
+      // Google). Si no lo es, o si perdió la carrera contra otra reserva casi
+      // simultánea, cae acá en vez de un 500 genérico.
+      if (e.horarioOcupado) throw new ErrorHttp(409, "Ese horario ya no está disponible. Elegí otro de la lista.");
+      if (e.linkUsado) throw new ErrorHttp(409, LINK_USADO);
       throw e;
     }
 
@@ -86,7 +111,8 @@ module.exports = function (app) {
     // Reservó desde la PÁGINA, no por WhatsApp: es muy probable que nunca le
     // haya escrito al consultorio, así que casi siempre cae fuera de la
     // ventana de 24 h y va por la plantilla.
-    const cuando = formatearFechaCompleta(cita.fecha);
+    // En la hora del consultorio: ahora la cita puede ser de uno de Brasil.
+    const cuando = formatearFechaCompleta(cita.fecha, medico.zonaHoraria);
     enviarTextoOPlantilla(numero,
       `✅ ${primerNombre}, su cita con ${medico.nombre} quedó confirmada para el ${cuando}. Le esperamos.\n\nSi necesita cancelarla, responda "cancelar" a este mensaje, o avísenos directo en el consultorio.`,
       { plantilla: PLANTILLAS.citaConfirmada, parametros: [primerNombre, medico.nombre, cuando], idioma: medico.idioma })

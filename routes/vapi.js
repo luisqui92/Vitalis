@@ -59,6 +59,8 @@ module.exports = function (app) {
   // entrada y de salida — sin ningún envoltorio. El teléfono de quien
   // llama se manda como campo estático de la herramienta en Vapi
   // ({{customer.number}} → pacienteTelefono), no hace falta extraerlo acá.
+  // En consultar_mis_citas y cancelar_cita TIENE que ser ese campo fijo:
+  // acá no hay forma de saber si el número lo dictó quien llama (A5).
   app.post("/vapi/api-tool/:medicoPhone/:herramienta", async (req, res) => {
     try {
       const resuelto = await autorizarYResolverMedico(req, res);
@@ -109,8 +111,16 @@ module.exports = function (app) {
         const args = { ...(llamada.arguments || llamada.parameters || {}) };
         // El teléfono de quien llama ya lo sabemos por el caller ID — no
         // hace falta que el asistente se lo tenga que preguntar al
-        // paciente, salvo que esté agendando/cancelando a nombre de otro.
-        if (!args.pacienteTelefono && numeroLlamante) args.pacienteTelefono = numeroLlamante;
+        // paciente, salvo que esté agendando a nombre de otro.
+        //
+        // Para VER o CANCELAR citas manda siempre el caller ID, nunca lo que
+        // diga quien llama: dictando el número de otra persona se escuchaban
+        // sus citas y se las cancelaba (auditoría del comité de QA, octubre
+        // de 2026, A5). Sin caller ID —todas las llamadas desde la página
+        // web— va vacío, y la herramienta deriva al WhatsApp. Solo al
+        // AGENDAR se acepta otro número: reservar para un familiar es normal.
+        if (nombre === "consultar_mis_citas" || nombre === "cancelar_cita") args.pacienteTelefono = numeroLlamante || "";
+        else if (!args.pacienteTelefono && numeroLlamante) args.pacienteTelefono = numeroLlamante;
 
         const handler = HERRAMIENTAS[nombre];
         let resultado;

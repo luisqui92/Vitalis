@@ -685,17 +685,31 @@ async function pedirMotivo(medicoPhone, numero, textoOriginal, datos, medico) {
 }
 
 async function iniciarCancelacion(medicoPhone, numero) {
-  const cita = await Cita.findOne({ medicoPhone, pacienteTelefono: numero, estado: "confirmada", fecha: { $gte: new Date() } }).sort({ fecha: 1 });
-  // Esta es la única del flujo que no recibe el médico ya cargado, así que
-  // acá sí hay que preguntar la zona.
-  const zona = await zonaDelMedico(medicoPhone);
+  // Además de las de este consultorio, las que el paciente reservó por link
+  // (origen whatsapp_web). El link lo firma el médico que mandó la
+  // reconsulta, que puede ser otro (routes/reservaPublica.js), pero la
+  // confirmación sale de este número y le dice que responda «cancelar»: sin
+  // esto, le contestaba que no tenía ninguna cita. Son solo las de este
+  // número de WhatsApp, que Meta ya verificó.
+  const cita = await Cita.findOne({
+    pacienteTelefono: numero, estado: "confirmada", fecha: { $gte: new Date() },
+    $or: [{ medicoPhone }, { origen: "whatsapp_web" }],
+  }).sort({ fecha: 1 });
   if (!cita) {
     await limpiarSesion(numero);
     return comoTexto("No encontré ninguna cita próxima a tu nombre. Si querés agendar una, escribí «menú».");
   }
+  // Esta es la única del flujo que no recibe el médico ya cargado, así que
+  // acá sí hay que preguntar la zona: la del consultorio de la cita.
+  const zona = await zonaDelMedico(cita.medicoPhone);
+  // Si es de otro consultorio, se dice de cuál: si no, el paciente no sabe
+  // qué está cancelando.
+  const otro = cita.medicoPhone !== medicoPhone
+    ? await Medico.findOne({ phone: cita.medicoPhone }).select("nombre").lean()
+    : null;
   await guardarSesion(numero, "confirmar_cancelacion", { medicoPhone, citaId: String(cita._id) });
   return comoBotones(
-    `Tenés una cita para el ${formatearFechaCompleta(cita.fecha, zona)}. ¿Confirmás que querés cancelarla?`,
+    `Tenés una cita${otro?.nombre ? ` con ${otro.nombre}` : ""} para el ${formatearFechaCompleta(cita.fecha, zona)}. ¿Confirmás que querés cancelarla?`,
     [{ id: "si_cancelar", title: "Sí, cancelar" }, { id: "no_cancelar", title: "No" }],
   );
 }
@@ -715,8 +729,13 @@ async function confirmarCancelacion(medicoPhone, numero, t, texto, datos, medico
   if (cita) {
     cita.estado = "cancelada";
     await cita.save();
-    if (medico?.googleCalendarId && cita.googleEventId) {
-      await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
+    // El calendario es el del consultorio de la cita, que en una reservada
+    // por link puede no ser este.
+    const calendario = cita.medicoPhone === medico?.phone
+      ? medico?.googleCalendarId
+      : (await Medico.findOne({ phone: cita.medicoPhone }).select("googleCalendarId").lean())?.googleCalendarId;
+    if (calendario && cita.googleEventId) {
+      await eliminarEvento(calendario, cita.googleEventId);
     }
   }
   await limpiarSesion(numero);

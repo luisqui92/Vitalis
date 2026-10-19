@@ -647,7 +647,7 @@ module.exports = function (app) {
           if (!paciente.telefono) throw new Error("El paciente no tiene teléfono cargado");
 
           const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-          const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
+          const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000, { medicoPhone });
           const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
           const primerNombre = String(paciente.nombre || "").split(" ")[0];
           // Pasan días entre que se cierra la consulta y el paciente escribió
@@ -838,7 +838,7 @@ module.exports = function (app) {
     if (!paciente.telefono) throw new ErrorHttp(400, "Este paciente no tiene teléfono cargado — no se le puede escribir por WhatsApp.");
 
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-    const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
+    const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000, { medicoPhone });
     const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
     const primerNombre = String(paciente.nombre || "").split(" ")[0];
 
