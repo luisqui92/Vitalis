@@ -4,7 +4,7 @@
 const { Medico, Paciente, Cita } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { obtenerHorariosDisponibles, duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX } = require("../services/agenda");
+const { obtenerHorariosDisponibles, franjaValida, duracionValida, duracionDe, DURACION_MIN, DURACION_MAX, FRANJAS_MAX } = require("../services/agenda");
 const { localAInstante, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 
 // La zona en la que trabaja esta cuenta. Se pregunta a la base y no se
@@ -44,9 +44,9 @@ module.exports = function (app) {
       const franjas = req.body.horarioAtencion
         .map(h => ({ diaSemana: Number(h?.diaSemana), horaInicio: String(h?.horaInicio || ""), horaFin: String(h?.horaFin || "") }))
         .filter(h => h.horaInicio && h.horaFin);
-      const hora = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
-      const mal = franjas.find(h => !Number.isInteger(h.diaSemana) || h.diaSemana < 0 || h.diaSemana > 6
-        || !hora.test(h.horaInicio) || !hora.test(h.horaFin) || h.horaInicio >= h.horaFin);
+      // La regla es la misma con la que se arman los horarios
+      // (services/agenda.js, franjaValida).
+      const mal = franjas.find(h => !franjaValida(h));
       if (mal || franjas.length > FRANJAS_MAX) {
         throw new ErrorHttp(400, "Revisá el horario: cada día necesita una hora de inicio y una de fin (HH:MM), y el fin después del inicio.");
       }
@@ -73,7 +73,9 @@ module.exports = function (app) {
   }));
 
   // ─── HORARIOS DISPONIBLES (para armar una cita a mano desde la web) ─────
-  app.get("/medico/citas/disponibilidad", requireMedico, asyncRoute(async (req, res) => {
+  // Con limitMedico, como las que escriben en la agenda: de todas, es la que
+  // más le cuesta al servidor.
+  app.get("/medico/citas/disponibilidad", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const dias = await obtenerHorariosDisponibles(req.adminUser.usuario, Number(req.query.dias) || 14);
     res.json({ dias });
   }));

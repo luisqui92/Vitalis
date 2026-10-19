@@ -6,12 +6,15 @@
 // millones de vueltas: el proceso entero quedaba colgado, para todos. Lo
 // podía provocar cualquier cuenta guardando ese número en su horario, o el
 // asistente de voz pidiendo mil millones de días (revisión integral del 11
-// de octubre de 2026, S07). Lo que se prueba:
+// de octubre de 2026, S07). Y aun con valores que se aceptaban, 50 franjas
+// repetidas y unas miles de citas trababan el proceso varios segundos por
+// pedido (auditoría del comité de QA, octubre de 2026, B3). Lo que se prueba:
 //   1. El cálculo, con lo que ya pudiera estar guardado mal, termina y usa
 //      valores sanos. Corre en otro proceso con un tiempo máximo: si se
 //      colgara, la prueba lo dice en vez de colgarse ella también.
 //   2. Al guardar el horario: una duración o un horario imposibles → 400.
 //   3. Al crear una cita a mano: una duración imposible → 400.
+//   4. Pedir la disponibilidad tiene el mismo límite por minuto que el resto.
 const path = require("path");
 const http = require("http");
 const { spawnSync } = require("child_process");
@@ -43,7 +46,7 @@ function pedir(puerto, metodo, ruta, token, cuerpo) {
 // ─── 1. El cálculo, en otro proceso y con reloj ─────────────────────────────
 // Un médico como podría haber quedado guardado antes del arreglo: la base de
 // mentira devuelve lo que se le pida.
-function calcular(medico, dias, extra = "") {
+function calcular(medico, dias, extra = "", antes = "") {
   const codigo = `
     const path = require("path");
     const M = require(path.join(${JSON.stringify(RAIZ)}, "db", "models"));
@@ -53,11 +56,16 @@ function calcular(medico, dias, extra = "") {
     M.Medico.findOne = () => ({ lean: async () => medico, select: () => ({ lean: async () => medico }) });
     M.Cita.find = () => ({ select: () => ({ lean: async () => [] }) });
     const agenda = require(path.join(${JSON.stringify(RAIZ)}, "services", "agenda"));
+    const zh = require(path.join(${JSON.stringify(RAIZ)}, "services", "zonaHoraria"));
     (async () => {
+      ${antes}
+      const t0 = Date.now();
       const dias = await agenda.obtenerHorariosDisponibles(medico.phone, ${JSON.stringify(dias)});
+      const msCalculo = Date.now() - t0;
       const slots = dias.flatMap(d => d.slots.map(s => new Date(s).getTime()));
       const saltos = slots.slice(1).map((s, i) => s - slots[i]).filter(x => x > 0);
-      const resultado = { dias: dias.length, slots: slots.length, salto: saltos.length ? Math.min(...saltos) / 60000 : null };
+      const resultado = { dias: dias.length, slots: slots.length, salto: saltos.length ? Math.min(...saltos) / 60000 : null, msCalculo,
+        repetidos: slots.length - new Set(slots).size, pisados: slots.slice(1).filter((s, i) => s - slots[i] < (medico.duracionConsultaMinutos || 30) * 60000).length };
       ${extra}
       console.log("@@" + JSON.stringify(resultado));
       process.exit(0);
@@ -92,6 +100,35 @@ r = calcular({ ...base, duracionConsultaMinutos: -30 }, 7, `
       M.Cita.find = () => ({ select: () => ({ lean: async () => [{ fecha: momento, duracionMinutos: 30 }] }) });
       resultado.libre = await agenda.horarioSigueLibre(medico.phone, momento, -30);`);
 verificar("un horario ya ocupado, preguntado con duración negativa → ocupado (usa media hora)", !r.colgado && r.libre === false);
+
+// B3: valores que la API acepta, pero que multiplicaban el trabajo. 50
+// franjas de todo el día (la misma, repetida) con consultas de 5 minutos y
+// 2.000 citas por delante: antes armaba cada horario siete veces y lo
+// comparaba contra las 2.000 citas, y pedir 60 días tardaba segundos.
+const TODO_EL_DIA = Array.from({ length: 50 }, (_, i) => ({ diaSemana: i % 7, horaInicio: "00:00", horaFin: "23:59" }));
+r = calcular({ ...base, horarioAtencion: TODO_EL_DIA, duracionConsultaMinutos: 5 }, 60, "", `
+      const desde = Date.now() + 3600000;
+      const citas = Array.from({ length: 2000 }, (_, i) => ({ fecha: new Date(desde + i * 43 * 60000), duracionMinutos: 5 }));
+      M.Cita.find = () => ({ select: () => ({ lean: async () => citas }) });`);
+verificar(`50 franjas repetidas, de 5 minutos, con 2.000 citas, a 60 días → ${r.colgado ? "no terminó en 15 s" : `${r.msCalculo} ms y ${r.slots} horarios`} (como mucho los que entran en 60 días)`,
+  !r.colgado && r.slots > 0 && r.slots <= 60 * 288 && r.repetidos === 0 && r.msCalculo < 1500);
+r = calcular({ ...base, duracionConsultaMinutos: 45, horarioAtencion: [0, 1, 2, 3, 4, 5, 6].flatMap(d => [
+  { diaSemana: d, horaInicio: "08:00", horaFin: "12:00" }, { diaSemana: d, horaInicio: "10:00", horaFin: "14:00" }]) }, 3);
+verificar("dos franjas que se pisan el mismo día (8 a 12 y 10 a 14) → una sola grilla, sin dos horarios que se pisen",
+  !r.colgado && r.slots > 0 && r.repetidos === 0 && r.pisados === 0);
+r = calcular({ ...base, horarioAtencion: [0, 1, 2, 3, 4, 5, 6].flatMap(d => [
+  { diaSemana: d, horaInicio: "00:00", horaFin: "99999:00" }, { diaSemana: d, horaInicio: "08:00", horaFin: "09:00" }]) }, 14);
+verificar(`una franja vieja de «00:00» a «99999:00», guardada antes de validar → no se usa (${r.colgado ? "no terminó en 15 s" : `${r.slots} horarios, ${r.msCalculo} ms`})`,
+  !r.colgado && r.slots > 0 && r.slots <= 14 * 2);
+r = calcular({ ...base, duracionConsultaMinutos: 30 }, 4, `
+      const libres = new Set(dias.flatMap(d => d.slots.map(s => new Date(s).getTime())));
+      resultado.ofrece = ["09:30", "10:00", "10:30", "11:00"].map(h => libres.has(hora(h)));`, `
+      // Pasado mañana a las 10:00 de Bolivia, una cita de 45 minutos.
+      const hoy = zh.hoyEnZona("America/La_Paz");
+      const hora = (h) => zh.instanteEnZona("America/La_Paz", hoy.anio, hoy.mesIndex, hoy.dia + 2, Number(h.slice(0, 2)), Number(h.slice(3))).getTime();
+      M.Cita.find = () => ({ select: () => ({ lean: async () => [{ fecha: new Date(hora("10:00")), duracionMinutos: 45 }, { fecha: new Date(hora("23:00")), duracionMinutos: 30 }] }) });`);
+verificar("una cita de 45 minutos a las 10:00 → se ofrecen las 9:30 y las 11:00, no las 10:00 ni las 10:30",
+  !r.colgado && JSON.stringify(r.ofrece) === JSON.stringify([true, false, false, true]));
 
 (async () => {
   let MongoMemoryServer;
@@ -153,6 +190,11 @@ verificar("un horario ya ocupado, preguntado con duración negativa → ocupado 
   verificar("con 20 minutos → se guarda con 20", r.estado === 201 && (await M.Cita.findOne().sort({ _id: -1 }).lean())?.duracionMinutos === 20);
   r = await cita({ fecha: "2030-05-06T11:00" });
   verificar("sin duración → la del médico (45)", r.estado === 201 && (await M.Cita.findOne().sort({ _id: -1 }).lean())?.duracionMinutos === 45);
+
+  console.log("\n── 4. La disponibilidad, con límite por minuto ──");
+  let limitada = false;
+  for (let i = 0; i < 70 && !limitada; i++) limitada = (await P("GET", "/medico/citas/disponibilidad?dias=60")).estado === 429;
+  verificar("pedir la disponibilidad sin parar → en algún momento 429, como el resto de la agenda", limitada);
 
   servidor.close();
   await mongoose.disconnect();
