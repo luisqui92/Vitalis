@@ -16,15 +16,39 @@
 // Un turno corrido una hora no tira ningún error: es un paciente que llega
 // tarde, o un médico que lo esperó. Por eso se prueba con conversiones de ida
 // y vuelta y no leyendo el código.
+//
+// El servidor de producción corre en UTC, y es ahí donde se nota: de 20:00 a
+// 24:00 en Bolivia el servidor ya está en el día siguiente. Se fija acá para
+// que la prueba dé lo mismo en cualquier máquina.
+process.env.TZ = "UTC";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
+process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
+// La cuenta del operador de pagos de la sección 14. Se lee una sola vez, al
+// cargar services/operadores.js: tiene que estar antes de cualquier require.
+process.env.OPERADORES_SALDO = "70088009";
 
 const path = require("path");
+const http = require("http");
 const RAIZ = path.join(__dirname, "..", "..");
 
 let fallos = 0;
 function verificar(descripcion, condicion) {
   console.log(`${condicion ? "✅" : "❌"} ${descripcion}`);
   if (!condicion) fallos++;
+}
+function pedir(puerto, metodo, ruta, token, cuerpo) {
+  return new Promise((resolve) => {
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const datos = cuerpo === undefined ? null : JSON.stringify(cuerpo);
+    if (datos) { headers["content-type"] = "application/json"; headers["content-length"] = Buffer.byteLength(datos); }
+    const req = http.request({ host: "127.0.0.1", port: puerto, method: metodo, path: ruta, headers }, (res) => {
+      let t = ""; res.on("data", (c) => { t += c; });
+      res.on("end", () => { let j = null; try { j = JSON.parse(t); } catch { /* no era JSON */ } resolve({ estado: res.statusCode, cuerpo: j }); });
+    });
+    req.on("error", () => resolve({ estado: 0 }));
+    if (datos) req.write(datos);
+    req.end();
+  });
 }
 
 const z = require(path.join(RAIZ, "services", "zonaHoraria"));
@@ -128,5 +152,514 @@ verificar("y por omisión es la de siempre, así que nada cambia para las cuenta
 verificar("una zona inválida cae a la de siempre en vez de explotar",
   z.zonaValida("Marte/Olympus") === "America/La_Paz");
 
-console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
-process.exit(fallos === 0 ? 0 : 1);
+// ═══ EL RELOJ DEL SERVIDOR ══════════════════════════════════════════════════
+// Para probar "a las 21:30 de Bolivia" sin esperar a que lo sea: el reloj
+// arranca en el instante pedido y sigue andando, así la base y los timers no
+// notan nada raro. Devuelve fechas de verdad y no de una subclase: el driver
+// de Mongo guarda una subclase de Date como un número.
+const DateReal = Date;
+function relojEn(iso) {
+  const corrimiento = DateReal.parse(iso) - DateReal.now();
+  function DateCorrida(...a) {
+    if (!new.target) return DateReal(...a);
+    return a.length ? new DateReal(...a) : new DateReal(DateReal.now() + corrimiento);
+  }
+  DateCorrida.prototype = DateReal.prototype;
+  DateCorrida.now = () => DateReal.now() + corrimiento;
+  DateCorrida.parse = DateReal.parse;
+  DateCorrida.UTC = DateReal.UTC;
+  global.Date = DateCorrida;
+}
+function relojReal() { global.Date = DateReal; }
+
+// La IA de mentira: guarda lo que se le manda y contesta lo que se le pida.
+const axios = require(path.join(RAIZ, "node_modules", "axios"));
+const pedidosIA = [];
+let respuestaIA = {};
+axios.post = async (_url, cuerpo) => {
+  pedidosIA.push(cuerpo);
+  return { data: { choices: [{ message: { content: JSON.stringify(respuestaIA) } }] } };
+};
+const NC = require(path.join(RAIZ, "services", "notaClinica"));
+// Los avisos push al médico, de mentira: se guarda lo que se le avisó. Antes
+// de cargar las rutas y services/reservaCitas.js (sección 8), que traen
+// services/crearCita.js: se queda con la función al cargarse.
+const avisosPush = [];
+require(path.join(RAIZ, "services", "push")).notificarMedico = async (phone, aviso) => { avisosPush.push({ phone, ...aviso }); };
+const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy es [^.]+\./) || [""])[0];
+
+(async () => {
+  // ═══ 7. QUÉ DÍA ES HOY PARA LA IA ═════════════════════════════════════════
+  console.log("\n── 7. El «hoy» que recibe la IA de la nota ──");
+  // La IA resuelve "nos vemos el sábado" contando desde lo que le decimos que
+  // es hoy. Con el día de la semana del servidor y la fecha de Bolivia, a las
+  // 21:30 del jueves le llegaba "viernes 2026-10-15".
+  respuestaIA = { motivoConsulta: "Control" };
+  relojEn("2026-10-16T01:30:00Z"); // jueves 15, 21:30 en Bolivia
+  try {
+    await NC.generarNotaClinica("Control de rutina.", { zona: "America/La_Paz" }, "es");
+    verificar(`a las 21:30 del jueves en Bolivia la IA recibe «jueves 2026-10-15» (${hoyQueRecibe()})`,
+      hoyQueRecibe() === "Hoy es jueves 2026-10-15.");
+    await NC.generarNotaClinica("Control de rutina.", {}, "es");
+    verificar("una cuenta sin zona usa la de siempre", hoyQueRecibe() === "Hoy es jueves 2026-10-15.");
+  } finally { relojReal(); }
+  // A las 00:30 de São Paulo ya es viernes; en Bolivia, todavía jueves. Con la
+  // fecha de Bolivia fija, la cuenta brasileña recibía la de ayer.
+  relojEn("2026-10-16T03:30:00Z");
+  try {
+    await NC.generarNotaClinica("Controle de rotina.", { zona: "America/Sao_Paulo" }, "pt");
+    verificar(`a las 00:30 de São Paulo la IA recibe el viernes 16, no la fecha de Bolivia (${hoyQueRecibe()})`,
+      hoyQueRecibe() === "Hoy es sexta-feira 2026-10-16.");
+    await NC.generarNotaClinica("Control de rutina.", { zona: "America/La_Paz" }, "es");
+    verificar("y en Bolivia, a la misma hora (23:30), sigue siendo jueves 15", hoyQueRecibe() === "Hoy es jueves 2026-10-15.");
+    // Una nota que se escribe días después cuenta desde el día de la consulta.
+    await NC.generarNotaClinica("Control de rutina.", { zona: "America/La_Paz", fechaReferencia: new DateReal("2026-10-12T15:00:00Z") }, "es");
+    verificar(`con la fecha de la consulta, el «hoy» es el de la consulta (${hoyQueRecibe()})`,
+      hoyQueRecibe() === "Hoy es lunes 2026-10-12.");
+  } finally { relojReal(); }
+
+  // ═══ 8. LA HORA DE LA RECONSULTA QUE DEVUELVE LA IA ══════════════════════
+  console.log("\n── 8. La reconsulta que escribe la IA ──");
+  // La IA contesta "2026-10-17T10:00", sin zona: son las 10 del consultorio.
+  // new Date() la tomaba como hora del servidor (UTC) y el paciente leía
+  // "06:00" en el WhatsApp.
+  const { formatearFechaCompleta } = require(path.join(RAIZ, "services", "reservaCitas"));
+  const reconsultaDe = async (fechaHora, zona) => {
+    respuestaIA = { motivoConsulta: "Control", reconsultaSugerida: { fechaHora, textoOriginal: "nos vemos el sábado a las diez" } };
+    return (await NC.generarNotaClinica("Control de rutina.", zona ? { zona } : {}, "es")).reconsultaSugerida.fechaHora;
+  };
+  let fh = await reconsultaDe("2026-10-17T10:00", "America/La_Paz");
+  verificar(`las 10:00 de La Paz se guardan como las 14:00 UTC (${fh?.toISOString?.() || fh})`,
+    fh instanceof DateReal && fh.toISOString() === "2026-10-17T14:00:00.000Z");
+  verificar(`  ...y el paciente lee las 10:00 (${formatearFechaCompleta(fh, "America/La_Paz")})`,
+    /10:00/.test(formatearFechaCompleta(fh, "America/La_Paz")));
+  fh = await reconsultaDe("2026-10-17T10:00", "America/Sao_Paulo");
+  verificar(`las 10:00 de São Paulo, como las 13:00 UTC (${fh?.toISOString?.() || fh})`,
+    fh instanceof DateReal && fh.toISOString() === "2026-10-17T13:00:00.000Z");
+  fh = await reconsultaDe("2026-10-17T10:00", null);
+  verificar("una cuenta sin zona usa la de siempre", fh?.toISOString?.() === "2026-10-17T14:00:00.000Z");
+  fh = await reconsultaDe("2026-10-17 10:00", "America/La_Paz");
+  verificar("con un espacio en vez de la T también se entiende", fh?.toISOString?.() === "2026-10-17T14:00:00.000Z");
+  fh = await reconsultaDe("2026-10-17T10:00:00Z", "America/La_Paz");
+  verificar("con una Z de más, se toma la hora que dijo (la IA no razona en UTC)", fh?.toISOString?.() === "2026-10-17T14:00:00.000Z");
+  verificar("sin hora no se inventa una: queda en null", (await reconsultaDe("2026-10-17", "America/La_Paz")) === null);
+  verificar("en texto libre, null como antes", (await reconsultaDe("el sábado", "America/La_Paz")) === null);
+  verificar("una hora imposible (25:00), null como antes", (await reconsultaDe("2026-10-17T25:00", "America/La_Paz")) === null);
+
+  // ═══ DE ACÁ EN ADELANTE, CON LA BASE ════════════════════════════════════════
+  let MongoMemoryServer;
+  for (const m of ["mongodb-memory-server", path.join(RAIZ, "node_modules", "mongodb-memory-server")]) {
+    try { ({ MongoMemoryServer } = require(m)); break; } catch { /* seguimos */ }
+  }
+  if (!MongoMemoryServer) {
+    console.log("\n⏭️  Rutas SALTEADAS: no hay base de prueba. Esto NO es un ✅.");
+    process.exit(fallos === 0 ? 0 : 1);
+  }
+  const mongod = await MongoMemoryServer.create();
+  process.env.MONGODB_URI = mongod.getUri() + "zona_horaria";
+  require(path.join(RAIZ, "config")).CONFIG.MONGODB_URI = process.env.MONGODB_URI;
+  const mongoose = require("mongoose");
+  await mongoose.connect(process.env.MONGODB_URI);
+  const M = require(path.join(RAIZ, "db", "models"));
+  const { generarToken } = require(path.join(RAIZ, "services", "auth"));
+  await mongoose.connection.dropDatabase();
+
+  // El WhatsApp al paciente, de mentira: se guarda lo que se le escribió.
+  const meta = require(path.join(RAIZ, "services", "metaWhatsapp"));
+  const enviados = [];
+  meta.enviarTextoOPlantilla = async (telefono, texto) => { enviados.push({ telefono, texto }); return { ok: true }; };
+  require(path.join(RAIZ, "services", "briefClinico")).regenerarBriefClinico = async () => {};
+
+  // El asistente de la pantalla, sin la IA: se mira con qué números le
+  // preguntaría.
+  let datosDelAsistente = null;
+  require(path.join(RAIZ, "services", "asistenteSymphomed")).preguntarASymphomed = async (_p, { datos }) => {
+    datosDelAsistente = datos;
+    return "ok";
+  };
+
+  const express = require("express");
+  const app = express();
+  app.use(express.json());
+  require(path.join(RAIZ, "routes", "consultaMedica"))(app);
+  require(path.join(RAIZ, "routes", "asistenteSymphomed"))(app);
+  require(path.join(RAIZ, "routes", "dashboardEscritorio"))(app);
+  require(path.join(RAIZ, "routes", "admin"))(app);
+  require(path.join(RAIZ, "routes", "operadorSaldo"))(app);
+  require(path.join(RAIZ, "routes", "citas"))(app);
+  require(path.join(RAIZ, "routes", "reservaPublica"))(app);
+  app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  const servidor = http.createServer(app);
+  await new Promise((ok) => servidor.listen(0, "127.0.0.1", ok));
+  const puerto = servidor.address().port;
+
+  // Dos consultorios iguales salvo la zona.
+  const BO = "70088001", BR = "70088002";
+  await M.Medico.create({ phone: BO, nombre: "Dra. La Paz", passwordHash: "x", activo: true, zonaHoraria: "America/La_Paz" });
+  await M.Medico.create({ phone: BR, nombre: "Dra. São Paulo", passwordHash: "x", activo: true, zonaHoraria: "America/Sao_Paulo", idioma: "pt" });
+  // Largos: el reloj de la prueba se corre unos días para atrás y para
+  // adelante, y un token de una hora vencería en el camino.
+  const UN_ANIO = 365 * 864e5;
+  const tk = { [BO]: generarToken(BO, "medico", UN_ANIO), [BR]: generarToken(BR, "medico", UN_ANIO) };
+  const pacientes = {
+    [BO]: await M.Paciente.create({ medicoPhone: BO, nombre: "Juana Pérez", telefono: "59170088011" }),
+    [BR]: await M.Paciente.create({ medicoPhone: BR, nombre: "Maria Souza", telefono: "5511970088012" }),
+  };
+  // Una consulta como la deja la transcripción, con la fecha de creación que
+  // se pida: es la que manda en el «hoy» de una nota que se vuelve a generar.
+  const consultaDe = async (med, notaClinica, creada, extra = {}) => {
+    const c = await M.ConsultaMedica.create({
+      medicoPhone: med, pacienteId: pacientes[med]._id, estado: "completado",
+      transcripcionCompleta: "El médico le dice al paciente que vuelva a control.",
+      notaClinicaEstado: "completado", notaClinica, ...extra,
+    });
+    if (creada) await M.ConsultaMedica.collection.updateOne({ _id: c._id }, { $set: { createdAt: new DateReal(creada) } });
+    return M.ConsultaMedica.findById(c._id);
+  };
+  const esperarNota = async (id) => {
+    for (let i = 0; i < 100; i++) {
+      const c = await M.ConsultaMedica.findById(id).lean();
+      if (c.notaClinicaEstado !== "pendiente") return c;
+      await new Promise((ok) => setTimeout(ok, 50));
+    }
+    return null;
+  };
+
+  // ═══ 9. LA NOTA QUE SE VUELVE A GENERAR ═════════════════════════════════════
+  console.log("\n── 9. «Volver a generar la nota», días después ──");
+  // La consulta fue el jueves 15 a las 21:00 en São Paulo (00:00Z del 16); la
+  // nota se vuelve a generar el lunes 19. "El sábado" es el 17, no el 24.
+  respuestaIA = { motivoConsulta: "Controle", reconsultaSugerida: { fechaHora: "2026-10-17T10:00", textoOriginal: "até sábado às dez" } };
+  const regenerada = await consultaDe(BR, {}, "2026-10-16T00:00:00Z", { notaClinicaEstado: "error" });
+  relojEn("2026-10-19T14:00:00Z");
+  let r;
+  try {
+    r = await pedir(puerto, "POST", `/medico/consultas/${regenerada._id}/nota/regenerar`, tk[BR]);
+    await esperarNota(regenerada._id);
+  } finally { relojReal(); }
+  verificar(`se vuelve a generar (${r.estado})`, r.estado === 202);
+  verificar(`la IA recibe el día de la consulta, en la zona de la cuenta: jueves 15 (${hoyQueRecibe()})`,
+    hoyQueRecibe() === "Hoy es quinta-feira 2026-10-15.");
+  const guardadaBR = (await M.ConsultaMedica.findById(regenerada._id).lean()).notaClinica.reconsultaSugerida;
+  verificar(`la reconsulta queda guardada a las 10:00 de São Paulo, 13:00 UTC (${guardadaBR.fechaHora?.toISOString()})`,
+    guardadaBR.fechaHora?.toISOString() === "2026-10-17T13:00:00.000Z");
+
+  // ═══ 10. CONFIRMAR LA RECONSULTA ════════════════════════════════════════════
+  console.log("\n── 10. El médico confirma la reconsulta ──");
+  // La pantalla le muestra la sugerencia en un datetime-local y, al
+  // confirmar, manda lo que quedó ahí: "2026-10-24T10:00", sin zona. new
+  // Date() la volvía a tomar en UTC y el WhatsApp salía otra hora.
+  const reconsultaPendiente = (fechaHora) => ({
+    motivoConsulta: "Control", reconsultaSugerida: { fechaHora, textoOriginal: "el sábado a las diez", estado: "pendiente" },
+  });
+  const confirmar = (med, c, reconsulta) => pedir(puerto, "POST", `/medico/consultas/${c._id}/confirmar`, tk[med], { aplicar: { reconsulta } });
+  const reconsultaGuardada = async (c) => (await M.ConsultaMedica.findById(c._id).lean()).notaClinica.reconsultaSugerida;
+
+  let c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  enviados.length = 0;
+  r = await confirmar(BR, c, { activo: true, fechaHora: "2026-10-24T10:00" });
+  let rg = await reconsultaGuardada(c);
+  verificar(`São Paulo: lo que muestra el formulario (10:00) se agenda a las 10:00, 13:00 UTC (${r.estado}, ${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.estado === "confirmada" && rg.fechaHora?.toISOString() === "2026-10-24T13:00:00.000Z");
+  verificar(`  ...y el WhatsApp dice las 10:00 (${enviados[0]?.texto.match(/consulta para el ([^.]+)\./)?.[1]})`,
+    enviados.length === 1 && /sábado, 24\/10, 10:00/.test(enviados[0].texto));
+
+  c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  enviados.length = 0;
+  r = await confirmar(BR, c, { activo: true });
+  verificar(`sin tocar la fecha, el WhatsApp de una cuenta de São Paulo dice su hora, no la de La Paz (${enviados[0]?.texto.match(/consulta para el ([^.]+)\./)?.[1]})`,
+    r.estado === 200 && /sábado, 24\/10, 10:00/.test(enviados[0]?.texto || ""));
+
+  c = await consultaDe(BO, reconsultaPendiente(new DateReal("2026-10-24T14:00:00Z")));
+  enviados.length = 0;
+  r = await confirmar(BO, c, { activo: true, fechaHora: "2026-10-24T10:00" });
+  rg = await reconsultaGuardada(c);
+  verificar(`La Paz: las 10:00 del formulario quedan a las 14:00 UTC, no a las 10:00 UTC (${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.fechaHora?.toISOString() === "2026-10-24T14:00:00.000Z" && /sábado, 24\/10, 10:00/.test(enviados[0]?.texto || ""));
+
+  // La otra ruta, la de confirmar solo la reconsulta.
+  c = await consultaDe(BO, reconsultaPendiente(new DateReal("2026-10-24T14:00:00Z")));
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BO], { fechaHora: "2026-10-24T11:30" });
+  rg = await reconsultaGuardada(c);
+  verificar(`/reconsulta/confirmar: las 11:30 de La Paz, 15:30 UTC, y así en el WhatsApp (${r.estado}, ${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.fechaHora?.toISOString() === "2026-10-24T15:30:00.000Z" && /sábado, 24\/10, 11:30/.test(enviados[0]?.texto || ""));
+  c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BR], { fechaHora: "2026-10-24T15:00:00.000Z" });
+  rg = await reconsultaGuardada(c);
+  verificar(`con zona explícita (ISO con Z) se respeta: 15:00 UTC son las 12:00 de São Paulo (${rg.fechaHora?.toISOString()})`,
+    r.estado === 200 && rg.fechaHora?.toISOString() === "2026-10-24T15:00:00.000Z" && /sábado, 24\/10, 12:00/.test(enviados[0]?.texto || ""));
+  c = await consultaDe(BR, reconsultaPendiente(new DateReal("2026-10-24T13:00:00Z")));
+  r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BR], { fechaHora: "cualquier cosa" });
+  verificar(`una fecha que no es fecha → 400 (${r.estado})`, r.estado === 400);
+
+  // ═══ 11. LAS RECONSULTAS QUE YA ESTABAN GUARDADAS ══════════════════════════
+  console.log("\n── 11. Las pendientes de antes del arreglo (scripts/migrar_reconsultas_zona.js) ──");
+  // El código viejo guardaba las 10:00 que dijo la IA como 10:00 UTC. Se
+  // arreglan las pendientes; lo confirmado, lo descartado y lo que se escribió
+  // después del despliegue no se toca. Fechas de 2020 y 2021 a propósito: el
+  // script no acepta un --hasta en el futuro, y así no depende de qué día se
+  // corra la prueba.
+  const HASTA = "2021-01-01T00:00:00Z";
+  const vieja = async (med, reconsulta, { modificada = "2020-12-31T12:00:00Z", confirmada = null } = {}) => {
+    const c = await M.ConsultaMedica.create({
+      medicoPhone: med, pacienteId: pacientes[med]._id, estado: "completado", notaClinicaEstado: "completado",
+      notaClinica: { motivoConsulta: "Control" },
+    });
+    await M.ConsultaMedica.collection.updateOne({ _id: c._id }, { $set: {
+      "notaClinica.reconsultaSugerida": reconsulta, confirmadaEn: confirmada ? new DateReal(confirmada) : null, updatedAt: new DateReal(modificada),
+    } });
+    return c._id;
+  };
+  const las10UTC = new DateReal("2026-10-24T10:00:00Z");
+  const ids = {
+    bo: await vieja(BO, { fechaHora: las10UTC, textoOriginal: "el sábado a las diez", estado: "pendiente" }),
+    br: await vieja(BR, { fechaHora: las10UTC, textoOriginal: "sábado às dez" }), // sin estado: es pendiente
+    confirmada: await vieja(BO, { fechaHora: las10UTC, estado: "confirmada" }, { confirmada: "2020-12-31T13:00:00Z" }),
+    descartada: await vieja(BO, { fechaHora: las10UTC, estado: "descartada" }),
+    nueva: await vieja(BO, { fechaHora: new DateReal("2026-10-24T14:00:00Z"), estado: "pendiente" }, { modificada: "2021-01-02T00:00:00Z" }),
+  };
+  // En otro proceso y sin bloquear este: la base de prueba corre colgada de
+  // este proceso, y un spawnSync la deja sin contestar.
+  const { spawn } = require("child_process");
+  const migrar = (...args) => new Promise((resolve) => {
+    const hijo = spawn(process.execPath, [path.join(RAIZ, "scripts", "migrar_reconsultas_zona.js"), ...args],
+      { cwd: RAIZ, env: { ...process.env, MONGODB_URI: process.env.MONGODB_URI } });
+    let stdout = "", stderr = "";
+    hijo.stdout.on("data", (d) => { stdout += d; });
+    hijo.stderr.on("data", (d) => { stderr += d; });
+    const corte = setTimeout(() => hijo.kill(), 60000);
+    hijo.on("exit", (status) => { clearTimeout(corte); resolve({ status, stdout, stderr }); });
+  });
+  const horas = async () => Object.fromEntries(await Promise.all(Object.entries(ids).map(async ([k, id]) =>
+    [k, (await M.ConsultaMedica.findById(id).lean()).notaClinica.reconsultaSugerida.fechaHora.toISOString().slice(11, 16)])));
+
+  let corrida = await migrar(`--hasta=${HASTA}`);
+  verificar(`sin --zona-servidor no hace nada y lo dice (${corrida.status})`, corrida.status === 1 && /zona-servidor/.test(corrida.stderr));
+  corrida = await migrar(`--hasta=${HASTA}`, "--zona-servidor=UTC");
+  let h = await horas();
+  verificar(`el plan muestra las dos que hay que corregir, y no toca nada (${JSON.stringify(h)})`,
+    corrida.status === 0 && /: 2\b/.test(corrida.stdout) && Object.values(h).filter(x => x === "10:00").length === 4 && h.nueva === "14:00");
+  corrida = await migrar(`--hasta=${HASTA}`, "--zona-servidor=UTC", "--hacelo");
+  h = await horas();
+  verificar(`con --hacelo: La Paz queda a las 14:00 UTC y São Paulo a las 13:00 UTC (${JSON.stringify(h)})`,
+    corrida.status === 0 && h.bo === "14:00" && h.br === "13:00");
+  verificar("  ...y la confirmada, la descartada y la escrita después del despliegue, como estaban",
+    h.confirmada === "10:00" && h.descartada === "10:00" && h.nueva === "14:00");
+  corrida = await migrar(`--hasta=${HASTA}`, "--zona-servidor=UTC", "--hacelo");
+  verificar(`correrlo de nuevo no las corre otra vez (${JSON.stringify(await horas())})`,
+    corrida.status === 0 && /Ninguna/.test(corrida.stdout) && JSON.stringify(await horas()) === JSON.stringify(h));
+
+  // ═══ 12. LA FECHA POR DEFECTO DE UNA VACUNA ═════════════════════════════════
+  console.log("\n── 12. La vacuna que se carga al confirmar, sin fecha dicha ──");
+  // Lleva el día de la consulta. Con getTimezoneOffset() del servidor (0 en
+  // UTC), una consulta de las 21:00 en Bolivia la cargaba al día siguiente.
+  const fechaDeLaVacuna = async (med, creada, vacuna) => {
+    const c = await consultaDe(med, { motivoConsulta: "Control", vacunasMencionadas: [vacuna] }, creada);
+    const res = await pedir(puerto, "POST", `/medico/consultas/${c._id}/confirmar`, tk[med], { aplicar: { vacunas: [0] } });
+    const v = await M.Vacuna.findOne({ consultaId: c._id }).lean();
+    return res.estado === 200 && v ? v.fecha.toISOString().slice(0, 10) : `error ${res.estado}`;
+  };
+  const antitetanica = { nombre: "Antitetánica", dosis: "Refuerzo" };
+  let fv = await fechaDeLaVacuna(BO, "2026-10-16T01:00:00Z", antitetanica);
+  verificar(`una consulta del jueves 15 a las 21:00 en La Paz → vacuna del 15 (${fv})`, fv === "2026-10-15");
+  fv = await fechaDeLaVacuna(BO, "2026-10-16T03:30:00Z", antitetanica);
+  verificar(`a las 23:30 en La Paz, todavía el 15 (${fv})`, fv === "2026-10-15");
+  fv = await fechaDeLaVacuna(BR, "2026-10-16T03:30:00Z", antitetanica);
+  verificar(`y a ese mismo instante en São Paulo (00:30 del 16), el 16 (${fv})`, fv === "2026-10-16");
+  fv = await fechaDeLaVacuna(BO, "2026-10-16T01:00:00Z", { ...antitetanica, fecha: "2026-10-01" });
+  verificar(`la fecha que dijo el médico no se toca (${fv})`, fv === "2026-10-01");
+
+  // ═══ 13. «HOY» Y «EL MES» DEL CONSULTORIO ═══════════════════════════════════
+  console.log("\n── 13. Las citas de hoy del asistente, y los meses del reporte ──");
+  // Cuentas aparte: lo de las secciones de arriba no se mezcla en los números.
+  const BO2 = "70088003", BR2 = "70088004";
+  await M.Medico.create({ phone: BO2, nombre: "Dr. La Paz", passwordHash: "x", activo: true, zonaHoraria: "America/La_Paz" });
+  await M.Medico.create({ phone: BR2, nombre: "Dr. São Paulo", passwordHash: "x", activo: true, zonaHoraria: "America/Sao_Paulo" });
+  tk[BO2] = generarToken(BO2, "medico", UN_ANIO);
+  tk[BR2] = generarToken(BR2, "medico", UN_ANIO);
+  const cita = (med, iso) => M.Cita.create({ medicoPhone: med, pacienteNombre: "Paciente", fecha: new DateReal(iso), estado: "confirmada" });
+  const citasDeHoy = async (med, ahora) => {
+    relojEn(ahora);
+    try {
+      const res = await pedir(puerto, "POST", "/medico/asistente", tk[med], { pregunta: "¿Qué tengo hoy?" });
+      return res.estado === 200 ? datosDelAsistente.citasHoy : `error ${res.estado}`;
+    } finally { relojReal(); }
+  };
+  await cita(BO2, "2026-10-16T01:00:00Z"); // jueves 15, 21:00 en La Paz
+  await cita(BO2, "2026-10-16T03:00:00Z"); // jueves 15, 23:00
+  await cita(BO2, "2026-10-16T14:00:00Z"); // viernes 16, 10:00
+  let n = await citasDeHoy(BO2, "2026-10-15T14:00:00Z");
+  verificar(`a las 10:00 del jueves en La Paz, las de la noche son de hoy: 2 (${n})`, n === 2);
+  n = await citasDeHoy(BO2, "2026-10-16T01:30:00Z");
+  verificar(`a las 21:30, la de las 23:00 es de hoy y la del viernes no: 1 (${n})`, n === 1);
+  await cita(BR2, "2026-10-16T02:45:00Z"); // jueves 15, 23:45 en São Paulo
+  await cita(BR2, "2026-10-16T03:30:00Z"); // viernes 16, 00:30
+  n = await citasDeHoy(BR2, "2026-10-16T02:30:00Z");
+  verificar(`a las 23:30 en São Paulo, la de las 00:30 ya es de mañana: 1 (${n})`, n === 1);
+
+  // El reporte de 6 meses, pedido el jueves 15 de octubre a las 21:00 de La Paz.
+  const consultaCreada = async (med, iso) => {
+    const c = await M.ConsultaMedica.create({ medicoPhone: med, pacienteId: pacientes[BO]._id, estado: "completado" });
+    await M.ConsultaMedica.collection.updateOne({ _id: c._id }, { $set: { createdAt: new DateReal(iso) } });
+  };
+  await consultaCreada(BO2, "2026-10-01T01:00:00Z"); // 30/9, 21:00 en La Paz
+  await consultaCreada(BO2, "2026-05-01T02:00:00Z"); // 30/4, 22:00: fuera de los 6 meses
+  await consultaCreada(BO2, "2026-05-01T05:00:00Z"); // 1/5, 01:00
+  await consultaCreada(BO2, "2026-10-16T00:30:00Z"); // 15/10, 20:30
+  await consultaCreada(BR2, "2026-10-01T03:30:00Z"); // 1/10, 00:30 en São Paulo (30/9 en La Paz)
+  const porMesDe = async (med) => {
+    relojEn("2026-10-16T01:00:00Z");
+    try {
+      const res = await pedir(puerto, "GET", "/medico/reportes/resumen", tk[med]);
+      return res.estado === 200 ? JSON.stringify(Object.fromEntries(Object.entries(res.cuerpo.consultasPorMes).sort())) : `error ${res.estado}`;
+    } finally { relojReal(); }
+  };
+  let pm = await porMesDe(BO2);
+  verificar(`La Paz: cada consulta en su mes, desde el 1/5 a las 00:00 de La Paz (${pm})`,
+    pm === JSON.stringify({ "2026-05": 1, "2026-09": 1, "2026-10": 1 }));
+  pm = await porMesDe(BR2);
+  verificar(`São Paulo: las 00:30 del 1/10 son de octubre (${pm})`, pm === JSON.stringify({ "2026-10": 1 }));
+
+  // ═══ 14. EL PANEL DE LA CLÍNICA Y EL DE PAGOS ═══════════════════════════════
+  console.log("\n── 14. «Hoy» y «el mes» del panel de la clínica y del de pagos ──");
+  // Los dos armaban el día y el mes con setHours() del servidor (UTC). A las
+  // 21:30 del jueves en Bolivia el servidor ya está en el viernes: el panel
+  // contaba las citas de mañana como de hoy y el operador veía las cargas del
+  // día en cero. La zona es la de la cuenta que mira el panel.
+  const clinicaBO = await M.Clinica.create({ nombre: "Clínica La Paz" });
+  const clinicaBR = await M.Clinica.create({ nombre: "Clínica São Paulo" });
+  const ADM_BO = "70088005", MED_BO = "70088006", ADM_BR = "70088007", MED_BR = "70088008", OPER = "70088009";
+  // La administración de La Paz, sin zona guardada: la de siempre.
+  await M.Medico.create({ phone: ADM_BO, nombre: "Administración La Paz", passwordHash: "x", activo: true, rol: "admin", clinicaId: clinicaBO._id });
+  await M.Medico.create({ phone: MED_BO, nombre: "Dra. Clínica La Paz", passwordHash: "x", activo: true, clinicaId: clinicaBO._id, vinculo: "empleado" });
+  await M.Medico.create({ phone: ADM_BR, nombre: "Administração São Paulo", passwordHash: "x", activo: true, rol: "admin", clinicaId: clinicaBR._id, zonaHoraria: "America/Sao_Paulo" });
+  await M.Medico.create({ phone: MED_BR, nombre: "Dra. Clínica São Paulo", passwordHash: "x", activo: true, clinicaId: clinicaBR._id, vinculo: "empleado", zonaHoraria: "America/Sao_Paulo" });
+  tk.admBO = generarToken(ADM_BO, "admin", UN_ANIO, { admin: true, clinicaId: String(clinicaBO._id) });
+  tk.admBR = generarToken(ADM_BR, "admin", UN_ANIO, { admin: true, clinicaId: String(clinicaBR._id) });
+  await cita(MED_BO, "2026-10-16T01:00:00Z"); // jueves 15, 21:00 en La Paz
+  await cita(MED_BO, "2026-10-16T14:00:00Z"); // viernes 16, 10:00
+  await consultaCreada(MED_BO, "2026-10-01T01:00:00Z"); // 30/9, 21:00: es de septiembre
+  await consultaCreada(MED_BO, "2026-10-15T15:00:00Z"); // 15/10, 11:00
+  await cita(MED_BR, "2026-10-16T02:45:00Z"); // jueves 15, 23:45 en São Paulo
+  await cita(MED_BR, "2026-10-16T03:30:00Z"); // viernes 16, 00:30
+  const panel = async (token, ruta, ahora) => {
+    relojEn(ahora);
+    try { return await pedir(puerto, "GET", ruta, token); } finally { relojReal(); }
+  };
+  const JUEVES_2130_BO = "2026-10-16T01:30:00Z";
+  r = await panel(tk.admBO, "/admin/resumen", JUEVES_2130_BO);
+  verificar(`resumen a las 21:30 del jueves en La Paz: 1 cita hoy, no la del viernes (${r.estado}, ${r.cuerpo?.totales?.citasHoy})`,
+    r.estado === 200 && r.cuerpo.totales.citasHoy === 1);
+  verificar(`  ...1 consulta en octubre: la del 30/9 a las 21:00 es de septiembre (${r.cuerpo?.totales?.consultasMes}, ${JSON.stringify(r.cuerpo?.consultasPorMes)})`,
+    r.cuerpo?.totales?.consultasMes === 1 && JSON.stringify(Object.fromEntries(Object.entries(r.cuerpo.consultasPorMes).sort())) === JSON.stringify({ "2026-09": 1, "2026-10": 1 }));
+  r = await panel(tk.admBO, "/admin/ocupacion?dias=7", JUEVES_2130_BO);
+  const porDia = Object.fromEntries(Object.entries(r.cuerpo?.salas?.find(x => x.phone === MED_BO)?.porDia || {}).sort());
+  verificar(`ocupación: la de las 21:00 es del jueves 15 y la de las 10:00, del viernes 16 (${JSON.stringify(porDia)})`,
+    r.estado === 200 && JSON.stringify(porDia) === JSON.stringify({ "2026-10-15": 1, "2026-10-16": 1 }));
+  r = await panel(tk.admBO, "/admin/agenda", JUEVES_2130_BO);
+  verificar(`agenda sin fecha: la de hoy jueves 15, con 1 cita (${r.cuerpo?.fecha}, ${r.cuerpo?.total})`,
+    r.estado === 200 && r.cuerpo.fecha === "2026-10-15" && r.cuerpo.total === 1);
+  r = await panel(tk.admBO, "/admin/agenda?fecha=2026-10-16", JUEVES_2130_BO);
+  verificar(`agenda del viernes 16: de 00:00 a 00:00 de La Paz, 1 cita (${r.cuerpo?.fecha}, ${r.cuerpo?.total})`,
+    r.estado === 200 && r.cuerpo.fecha === "2026-10-16" && r.cuerpo.total === 1);
+  r = await panel(tk.admBO, "/admin/agenda?fecha=2026-02-31", JUEVES_2130_BO);
+  verificar(`un día que no existe (31/2) → 400, no la agenda de otro día (${r.estado})`, r.estado === 400);
+  const JUEVES_2330_BR = "2026-10-16T02:30:00Z"; // 22:30 en La Paz
+  r = await panel(tk.admBR, "/admin/resumen", JUEVES_2330_BR);
+  verificar(`São Paulo a las 23:30: la de las 00:30 ya es de mañana, 1 cita hoy (${r.cuerpo?.totales?.citasHoy})`,
+    r.estado === 200 && r.cuerpo.totales.citasHoy === 1);
+  r = await panel(tk.admBR, "/admin/agenda", JUEVES_2330_BR);
+  verificar(`  ...y su agenda de hoy es la del jueves 15, con 1 (${r.cuerpo?.fecha}, ${r.cuerpo?.total})`,
+    r.estado === 200 && r.cuerpo.fecha === "2026-10-15" && r.cuerpo.total === 1);
+
+  // El operador de pagos, en La Paz (sin zona guardada).
+  await M.Medico.create({ phone: OPER, nombre: "Pagos", passwordHash: "x", activo: true, rol: "admin", dosFA: { activo: true } });
+  tk.oper = generarToken(OPER, "admin", UN_ANIO);
+  const carga = async (iso, referencia) => {
+    const mov = await M.MovimientoSaldo.create({ medicoPhone: MED_BO, tipo: "carga", montoCentavos: 10000, moneda: "BOB", referencia, acreditadoPor: OPER });
+    await M.MovimientoSaldo.collection.updateOne({ _id: mov._id }, { $set: { createdAt: new DateReal(iso) } });
+  };
+  await carga("2026-10-01T01:00:00Z", "QR 1"); // 30/9, 21:00 en La Paz
+  await carga("2026-10-15T15:00:00Z", "QR 2"); // jueves 15, 11:00
+  await carga("2026-10-16T01:00:00Z", "QR 3"); // jueves 15, 21:00
+  r = await panel(tk.oper, "/medico/operador/resumen", JUEVES_2130_BO);
+  verificar(`pagos a las 21:30 del jueves: las 2 cargas de hoy (${r.estado}, ${r.cuerpo?.cargasHoy?.[0]?.n})`,
+    r.estado === 200 && r.cuerpo.cargasHoy?.[0]?.n === 2);
+  verificar(`  ...y 2 en octubre: la del 30/9 a las 21:00 es de septiembre (${r.cuerpo?.cargasMes?.[0]?.n})`,
+    r.cuerpo?.cargasMes?.[0]?.n === 2);
+
+  // ═══ 15. LO QUE SE LE DICE AL PACIENTE ══════════════════════════════════════
+  console.log("\n── 15. La hora de la cita en el WhatsApp y en la voz ──");
+  // La confirmación de una cita cargada a mano, la de la reserva por link y
+  // las respuestas del asistente de voz llamaban a formatearFechaCompleta sin
+  // zona, que cae a la de La Paz: a un paciente de São Paulo le decían una
+  // hora menos que la de su turno.
+  const confirmadaPara = (t) => t?.match(/confirmada para el ([^.]+)\./)?.[1];
+  // El lunes 19 de octubre de 2026, con las citas del sábado 24 todavía por
+  // venir; y el sábado en el horario de la cuenta: la reserva por link, la
+  // voz y WhatsApp solo aceptan un horario de los que se ofrecen
+  // (services/crearCita.js), no cualquier instante libre.
+  relojEn("2026-10-19T12:00:00Z");
+  await M.Medico.updateOne({ phone: BR }, { horarioAtencion: [{ diaSemana: 6, horaInicio: "08:00", horaFin: "18:00" }] });
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", "/medico/citas", tk[BR], { fecha: "2026-10-24T10:00", pacienteNombre: "Maria Souza", pacienteTelefono: "5511970088012" });
+  verificar(`cita a mano a las 10:00 de São Paulo → el WhatsApp dice las 10:00 (${r.estado}, ${confirmadaPara(enviados[0]?.texto)})`,
+    r.estado === 201 && enviados.length === 1 && confirmadaPara(enviados[0].texto) === "sábado, 24/10, 10:00");
+
+  const { CONFIG } = require(path.join(RAIZ, "config"));
+  CONFIG.SALUD_WHATSAPP_MEDICO_PHONE = BR;
+  enviados.length = 0;
+  r = await pedir(puerto, "POST", "/reserva-publica/confirmar", null, {
+    token: generarToken("5511970088099", "reserva_publica", UN_ANIO), pacienteNombre: "Ana Lima", fecha: "2026-10-24T14:00:00.000Z",
+  });
+  CONFIG.SALUD_WHATSAPP_MEDICO_PHONE = "";
+  verificar(`reserva por link a las 11:00 de São Paulo → el WhatsApp dice las 11:00 (${r.estado}, ${confirmadaPara(enviados[0]?.texto)})`,
+    r.estado === 200 && enviados.length === 1 && confirmadaPara(enviados[0].texto) === "sábado, 24/10, 11:00");
+
+  // La voz: agendar, «mis citas» y cancelar, el lunes 19 (la cita es futura).
+  const vapi = require(path.join(RAIZ, "services", "vapiHerramientas"));
+  const telVoz = "5511970088098";
+  const agendada = await vapi.agendarCita(BR, { fechaHora: "2026-10-24T15:00:00.000Z", pacienteNombre: "João Lima", pacienteTelefono: telVoz });
+  const misCitas = await vapi.consultarMisCitas(BR, { pacienteTelefono: telVoz });
+  const citaId = misCitas.match(/citaId: ([a-f0-9]{24})/)?.[1];
+  const cancelada = await vapi.cancelarCita(BR, { citaId, pacienteTelefono: telVoz });
+  verificar(`voz, al agendar a las 12:00 de São Paulo: «${agendada}»`, /para sábado, 24\/10, 12:00 /.test(agendada));
+  verificar(`voz, «mis citas»: «${misCitas}»`, /^Cita el sábado, 24\/10, 12:00 /.test(misCitas));
+  verificar(`voz, al cancelar: «${cancelada}»`, cancelada === "Listo, cancelé la cita del sábado, 24/10, 12:00.");
+
+  // ═══ 16. EL AVISO PUSH AL MÉDICO ════════════════════════════════════════════
+  console.log("\n── 16. El aviso «Nueva reserva» al médico ──");
+  // Restaba las 4 horas fijas de Bolivia: a una cuenta de São Paulo le
+  // avisaba una hora menos que la de la reserva.
+  const { crearCitaConfirmada } = require(path.join(RAIZ, "services", "crearCita"));
+  const avisoDe = async (medico, iso) => {
+    avisosPush.length = 0;
+    await crearCitaConfirmada({
+      medicoPhone: medico.phone, medico, pacienteTelefono: "59170088097", pacienteNombre: "Paciente Push",
+      fecha: new DateReal(iso), motivo: "", origen: "whatsapp",
+    });
+    return avisosPush[0]?.cuerpo;
+  };
+  // La Paz: el sábado hasta las 23:59 y el domingo a la mañana, de a 15
+  // minutos, para que las 23:30 sean un horario que se ofrece.
+  await M.Medico.updateOne({ phone: BO }, { duracionConsultaMinutos: 15, horarioAtencion: [
+    { diaSemana: 6, horaInicio: "23:00", horaFin: "23:59" }, { diaSemana: 0, horaInicio: "09:00", horaFin: "12:00" },
+  ] });
+  const cuentaBR = await M.Medico.findOne({ phone: BR }).lean();
+  const cuentaBO = await M.Medico.findOne({ phone: BO }).lean();
+  let aviso = await avisoDe(cuentaBR, "2026-10-24T17:00:00Z"); // 14:00 en São Paulo
+  verificar(`São Paulo, a las 14:00: «${aviso}»`, aviso === "Paciente Push — sábado 24 de octubre, 14:00");
+  aviso = await avisoDe(cuentaBO, "2026-10-25T03:30:00Z"); // sábado 24, 23:30 en La Paz
+  verificar(`La Paz, como siempre: «${aviso}»`, aviso === "Paciente Push — sábado 24 de octubre, 23:30");
+  aviso = await avisoDe({ ...cuentaBO, zonaHoraria: undefined }, "2026-10-25T14:00:00Z");
+  verificar(`una cuenta sin zona, la de siempre: «${aviso}»`, aviso === "Paciente Push — domingo 25 de octubre, 10:00");
+  relojReal();
+
+  servidor.close();
+  await mongoose.disconnect();
+  await mongod.stop();
+  console.log(fallos === 0 ? "\n🏁 TODO BIEN" : `\n💥 ${fallos} problema(s)`);
+  process.exit(fallos === 0 ? 0 : 1);
+})().catch((e) => { relojReal(); console.error("💥", e); process.exit(1); });

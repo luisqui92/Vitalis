@@ -64,7 +64,7 @@ function pintarIndicacionesEscritorio(recetas) {
             return `
               <div class="escr-lista-item escr-lista-item-click" data-paciente-id="${r.pacienteId?._id || ""}">
                 <div>
-                  <div class="escr-lista-titulo">${esc(r.pacienteId?.nombre || t("pacienteEliminado"))}</div>
+                  <div class="escr-lista-titulo">${r.anuladaEn ? `<span class="badge badge-error">${t("receta.anulada")}</span> ` : ""}${esc(r.pacienteId?.nombre || t("pacienteEliminado"))}</div>
                   <div class="escr-lista-sub">${esc(new Date(r.fecha).toLocaleDateString(localeActual()))}${meds ? " · " + meds : ""}${r.indicaciones ? " · " + esc(r.indicaciones.slice(0, 80)) : ""}</div>
                 </div>
               </div>`;

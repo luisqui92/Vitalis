@@ -221,6 +221,7 @@ function tabEvolucionHtml(mediciones) {
       <input id="medValor2" type="number" step="any" placeholder="${t("evo.diastolicaPlaceholder")}" style="margin-top:8px;${tipo.doble ? "" : "display:none"}">
       <label>${t("evo.fecha")}</label>
       <input id="medFecha" type="date" value="${new Date().toISOString().slice(0, 10)}">
+      <div id="medErr"></div>
       <button class="secondary" id="btnAgregarMedicion">${t("evo.btnAgregar")}</button>
     </div>
 
@@ -289,6 +290,8 @@ function wireTabEvolucion(p, mediciones) {
     const valor = parseFloat(valor1Input.value);
     const valorSecundario = meta.doble ? parseFloat(valor2Input.value) : null;
     const fecha = document.getElementById("medFecha").value;
+    const errBox = document.getElementById("medErr");
+    errBox.innerHTML = "";
     if (Number.isNaN(valor) || !fecha || (meta.doble && Number.isNaN(valorSecundario))) return;
     try {
       await api("/medico/pacientes/" + p._id + "/mediciones", {
@@ -297,7 +300,12 @@ function wireTabEvolucion(p, mediciones) {
       });
       evolucionTipoActivo = tipo;
       renderPacienteDetalle(p._id, "evolucion");
-    } catch (e) { /* se queda en la pantalla, el médico puede reintentar */ }
+    } catch (e) {
+      // Se queda en la pantalla para reintentar, pero diciendo qué no le
+      // cerró al servidor (un valor fuera de rango, una fecha futura): antes
+      // el botón no hacía nada y nadie sabía por qué.
+      errBox.innerHTML = `<div class="error">${esc(e.error || t("evo.errGuardar"))}</div>`;
+    }
   };
 
   document.querySelectorAll("[data-borrar-medicion]").forEach(btn => {

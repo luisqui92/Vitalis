@@ -6,15 +6,16 @@ Meta deja mandar texto libre **solo dentro de las 24 h** desde el último
 mensaje del paciente. Fuera de esa ventana, únicamente plantillas aprobadas
 de antemano.
 
-De los doce lugares donde Symphomed manda algo por WhatsApp, el único que
+De los trece lugares donde Symphomed manda algo por WhatsApp, el único que
 siempre cae adentro es la respuesta del bot de reservas — ahí el paciente
-acaba de escribir. Los otros nueve los inicia la plataforma, y la persona
+acaba de escribir. Los otros doce los inicia la plataforma, y la persona
 puede no haber escrito nunca:
 
 | Qué manda | Dónde | Cae fuera de la ventana |
 |---|---|---|
 | Respuestas del bot de reservas | `routes/whatsappSalud.js` | nunca |
 | Confirmación de cita (la carga el médico) | `routes/citas.js` | casi siempre |
+| Cita movida o cancelada por el consultorio | `routes/citas.js` | casi siempre |
 | Confirmación de cita (reserva desde la web) | `routes/reservaPublica.js` | casi siempre |
 | Aviso de reconsulta | `routes/consultaMedica.js` | casi siempre |
 | Informe al paciente | `routes/informes.js` | a menudo |
@@ -392,6 +393,34 @@ Brasil, con el mismo orden de variables:
 Olá {{1}}. Este é o acesso à fazenda {{2}} no Symphomed.
 …
 ```
+
+---
+
+### 12. `cita_cancelada`
+
+Cuerpo:
+
+```
+Hola {{1}}, su cita con {{2}} del {{3}} fue cancelada por el consultorio.
+
+Si desea una nueva cita, responda a este mensaje.
+```
+
+| Variable | Es | Ejemplo para Meta |
+|---|---|---|
+| `{{1}}` | primer nombre del paciente | `María` |
+| `{{2}}` | nombre del médico o del consultorio | `Dra. Camacho` |
+| `{{3}}` | fecha y hora de la cita que se canceló | `lunes 15 de septiembre a las 10:30` |
+
+La manda `routes/citas.js` cuando el médico cancela o borra desde su panel
+una cita que el paciente tenía por delante. Antes el paciente no se enteraba y
+se presentaba igual. Si el médico la **mueve** de hora no hace falta otra
+plantilla: sale `cita_confirmada` con la fecha nueva.
+
+Hasta que Meta la apruebe, el aviso llega solo dentro de la ventana de 24 h;
+fuera de ella el log muestra `132001` y la cancelación queda hecha igual.
+Necesita también la versión en portugués (`pt_BR`), con el mismo orden de
+variables.
 
 ---
 

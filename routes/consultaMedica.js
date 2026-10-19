@@ -14,6 +14,7 @@ const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
+const { localAInstante, fechaStrEnZona, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 const { registrar } = require("../services/auditoria");
 const { notificarMedico } = require("../services/push");
 const { avisarCambio } = require("../services/realtime");
@@ -37,6 +38,22 @@ const MAX_TEXTO_EN_VIVO = 150000;
 const PALABRAS_MINIMAS_BORRADOR = 15;
 
 const requireMedico = requireAuth(["medico"]);
+
+// La zona en la que trabaja esta cuenta (services/zonaHoraria.js).
+async function zonaDe(medicoPhone) {
+  const m = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  return m?.zonaHoraria || ZONA_POR_DEFECTO;
+}
+
+// La fecha de la reconsulta que confirma el médico. El <input
+// type="datetime-local"> manda "YYYY-MM-DDTHH:mm" sin zona: es hora de pared
+// de quien la tipeó, y la zona la pone la cuenta. new Date() la tomaba como
+// hora del servidor (UTC) y el paciente recibía otra hora (A2). Si llega con
+// zona explícita (ISO con Z u offset), se respeta.
+function fechaReconsulta(valor, zona) {
+  const s = String(valor || "");
+  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? new Date(s) : localAInstante(zona, s);
+}
 
 // Acepta el audio como body crudo (no JSON): el cliente manda
 // Content-Type: audio/ogg (o wav/mp3/m4a/webm) y el archivo tal cual.
@@ -76,6 +93,16 @@ async function crearUnaVez(Modelo, datos) {
   }
 }
 const claveDe = (...partes) => partes.map(p => String(p ?? "").trim().toLowerCase()).join("|");
+
+// Lo que dejó un intento anterior de confirmar esta misma consulta, que se
+// cortó a mitad, y que este ya no trae: el médico cambió una dosis o
+// desmarcó algo antes de reintentar. Manda lo último que confirmó; antes
+// quedaban los dos en el Kardex, el de antes y el corregido, y la receta
+// seguía con lo viejo (A1). Se llama con la consulta reclamada y sin
+// confirmar: todo lo que lleva su clave salió de un intento que no terminó.
+function sacarLoQueSobra(Modelo, consultaId, claves, filtro = {}) {
+  return Modelo.deleteMany({ ...filtro, consultaId, claveConfirmacion: { $exists: true, $nin: claves } });
+}
 
 // Los hallazgos para el mapa de la especialidad que el médico dejó marcados
 // al confirmar. Cada cambio queda en el historial de la pieza, estructura u
@@ -540,6 +567,9 @@ module.exports = function (app) {
     const aplicar = { ...(req.body?.aplicar || {}), ...extensiones.sumar("consulta.alConfirmar", req) };
     const aplicado = [];
     const fallado = [];
+    // La hora de la reconsulta y el día de las vacunas son los de la cuenta,
+    // no los del servidor (que corre en UTC).
+    const zona = await zonaDe(medicoPhone);
 
     // ── 1. Guardar la nota con las correcciones del médico ──
     const notaEditada = req.body?.nota;
@@ -621,11 +651,17 @@ module.exports = function (app) {
         }
       }
       await Promise.all(correcciones);
+      // Guardada antes de aplicar nada: si algo de lo que sigue falla y el
+      // médico recarga, ve lo que corrigió y no la nota original de la IA,
+      // que confirmada de nuevo cargaría lo que él ya había cambiado (A1).
+      // Y un reintento compara con esto: no registra dos veces la misma
+      // corrección.
       if (huboCambios) {
         consulta.notaEditadaPorMedico = true;
-        aplicado.push("Nota clínica corregida");
+        await consulta.save();
       }
     }
+    if (consulta.notaEditadaPorMedico) aplicado.push("Nota clínica corregida");
 
     const nota = consulta.notaClinica;
 
@@ -636,7 +672,7 @@ module.exports = function (app) {
       if (pedidoReconsulta?.activo) {
         try {
           if (pedidoReconsulta.fechaHora) {
-            const f = new Date(pedidoReconsulta.fechaHora);
+            const f = fechaReconsulta(pedidoReconsulta.fechaHora, zona);
             if (isNaN(f.getTime())) throw new Error("La fecha de la reconsulta no es válida");
             registrarCorreccion({
               medicoPhone, tipo: "reconsulta", consultaId: consulta._id, campo: "fechaHora",
@@ -647,12 +683,12 @@ module.exports = function (app) {
           if (!paciente.telefono) throw new Error("El paciente no tiene teléfono cargado");
 
           const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-          const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
+          const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000, { medicoPhone });
           const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
           const primerNombre = String(paciente.nombre || "").split(" ")[0];
           // Pasan días entre que se cierra la consulta y el paciente escribió
           // por última vez, así que esto cae fuera de la ventana casi siempre.
-          const cuando = formatearFechaCompleta(sugerida.fechaHora);
+          const cuando = formatearFechaCompleta(sugerida.fechaHora, zona);
           const quien = medico?.nombre || "Su médico";
           const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
           await enviarTextoOPlantilla(paciente.telefono, texto,
@@ -677,10 +713,15 @@ module.exports = function (app) {
 
     // ── 3. Tratamientos sugeridos → presupuesto ──
     const tratamientosPedidos = Array.isArray(aplicar.tratamientos) ? aplicar.tratamientos : [];
+    const clavesTratamientos = [];
+    // Uno de un intento cortado que ya cobró algo o avanzó no se toca.
+    const sinMovimientos = { estado: "pendiente", "pagos.0": { $exists: false } };
     for (const item of (nota.tratamientosSugeridos || [])) {
       if (item.estado !== "pendiente") continue;
       const pedido = tratamientosPedidos.find(t => String(t?.itemId) === String(item._id));
       if (!pedido) { item.estado = "descartado"; continue; }
+      const clave = claveDe("trat", item._id);
+      clavesTratamientos.push(clave);
       try {
         const nombre = String(pedido.nombre || item.catalogoNombreSugerido || item.itemMencionado || "").trim();
         if (!nombre) throw new Error("falta el nombre");
@@ -692,34 +733,46 @@ module.exports = function (app) {
         registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "nombre", valorSugerido: item.catalogoNombreSugerido, valorFinal: nombre });
         registrarCorreccion({ medicoPhone, tipo: "tratamiento", consultaId: consulta._id, campo: "piezaFdi", valorSugerido: item.piezaFdi, valorFinal: piezaFdi });
 
-        await crearUnaVez(TratamientoPlan, {
+        const creado = await crearUnaVez(TratamientoPlan, {
           pacienteId: consulta.pacienteId, medicoPhone, nombre, precio,
           piezaFdi: piezaFdi ?? null, estado: "pendiente",
-          consultaId: consulta._id, claveConfirmacion: claveDe("trat", item._id),
+          consultaId: consulta._id, claveConfirmacion: clave,
         });
+        // Ya estaba, de un intento cortado: con el nombre y el precio de ahora.
+        if (!creado) {
+          await TratamientoPlan.updateOne({ ...sinMovimientos, consultaId: consulta._id, claveConfirmacion: clave },
+            { $set: { nombre, precio, piezaFdi: piezaFdi ?? null } });
+        }
         item.estado = "agregado";
         aplicado.push(`Tratamiento al presupuesto: ${nombre}`);
       } catch (e) {
         fallado.push(`No se pudo agregar el tratamiento "${item.itemMencionado}": ${e.message}`);
       }
     }
+    await sacarLoQueSobra(TratamientoPlan, consulta._id, clavesTratamientos, sinMovimientos);
 
     // ── 4. Medicación al Kardex ──
+    // La clave es el contenido: si el médico cambió la dosis antes de
+    // reintentar, es otro medicamento, y el de antes sale (sacarLoQueSobra).
     const medsPedidos = Array.isArray(aplicar.medicamentos) ? aplicar.medicamentos : [];
+    const clavesMeds = [];
     for (const i of medsPedidos) {
       const m = (nota.medicamentosRecetados || [])[Number(i)];
       if (!m?.nombre) continue;
+      const clave = claveDe("med", m.nombre, m.dosis, m.frecuencia);
+      clavesMeds.push(clave);
       try {
         await crearUnaVez(Medicamento, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "",
-          consultaId: consulta._id, claveConfirmacion: claveDe("med", m.nombre, m.dosis, m.frecuencia),
+          consultaId: consulta._id, claveConfirmacion: clave,
         });
         aplicado.push(`Medicación: ${m.nombre}`);
       } catch (e) {
         fallado.push(`No se pudo cargar el medicamento "${m.nombre}": ${e.message}`);
       }
     }
+    await sacarLoQueSobra(Medicamento, consulta._id, clavesMeds);
 
     // ── 5. Antecedentes y vacunas ──
     for (const i of (Array.isArray(aplicar.antecedentesPersonales) ? aplicar.antecedentesPersonales : [])) {
@@ -739,25 +792,29 @@ module.exports = function (app) {
     }
     await paciente.save();
 
+    const clavesVacunas = [];
     for (const i of (Array.isArray(aplicar.vacunas) ? aplicar.vacunas : [])) {
       const v = (nota.vacunasMencionadas || [])[Number(i)];
       if (!v?.nombre) continue;
       try {
-        // La fecha se guarda como YYYY-MM-DD en hora local: usar toISOString()
-        // directo adelantaría un día las consultas cargadas de noche en
-        // Bolivia (UTC-4).
-        const base = new Date(consulta.createdAt);
-        const fecha = v.fecha || new Date(base.getTime() - base.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        // La fecha se guarda como YYYY-MM-DD, el día de la consulta en la
+        // zona de la cuenta. getTimezoneOffset() es la zona del servidor (UTC
+        // en producción): una consulta de las 21:00 en Bolivia cargaba la
+        // vacuna con fecha del día siguiente (M6).
+        const fecha = v.fecha || fechaStrEnZona(zona, new Date(consulta.createdAt));
+        const clave = claveDe("vac", v.nombre, v.dosis, fecha);
+        clavesVacunas.push(clave);
         await crearUnaVez(Vacuna, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: v.nombre, dosis: v.dosis || "", fecha,
-          consultaId: consulta._id, claveConfirmacion: claveDe("vac", v.nombre, v.dosis, fecha),
+          consultaId: consulta._id, claveConfirmacion: clave,
         });
         aplicado.push(`Vacuna: ${v.nombre}`);
       } catch (e) {
         fallado.push(`No se pudo cargar la vacuna "${v.nombre}": ${e.message}`);
       }
     }
+    await sacarLoQueSobra(Vacuna, consulta._id, clavesVacunas);
 
     // ── 5b. Lo que la IA entendió para el mapa, lo que el médico dejó marcado ──
     // Solo números enteros: Number(null) es 0, y un índice vacío cargaba el primero.
@@ -785,13 +842,19 @@ module.exports = function (app) {
             nombre: m.nombre, dosis: m.dosis || "", frecuencia: m.frecuencia || "", duracion: "",
           })),
         };
-        // Una sola por consulta: si ya salió en una confirmación que se cortó, es esa.
+        // Una sola por consulta: si ya salió en una confirmación que se cortó,
+        // es esa, con los medicamentos de ahora (el médico pudo corregirlos).
         recetaId = (await crearUnaVez(Receta, datosReceta))?._id
-          || (await Receta.findOne({ consultaId: consulta._id, claveConfirmacion: "receta" }).select("_id").lean())?._id || null;
+          || (await Receta.findOneAndUpdate({ consultaId: consulta._id, claveConfirmacion: "receta" },
+            { $set: { medicamentos: datosReceta.medicamentos } }, { new: true }).select("_id").lean())?._id || null;
         aplicado.push("Receta generada");
       } catch (e) {
         fallado.push("No se pudo generar la receta: " + e.message);
       }
+    } else {
+      // Esta vez no la pidió (o ya no quedan medicamentos): la de un intento
+      // cortado no queda.
+      await sacarLoQueSobra(Receta, consulta._id, []);
     }
 
     consulta.confirmadaEn = new Date();
@@ -824,8 +887,9 @@ module.exports = function (app) {
     // El médico pudo haber ajustado la fecha/hora antes de confirmar —
     // guardamos la que propuso la IA para poder comparar después.
     const fechaOriginal = sugerida.fechaHora;
+    const zona = await zonaDe(medicoPhone);
     if (req.body?.fechaHora) {
-      const f = new Date(req.body.fechaHora);
+      const f = fechaReconsulta(req.body.fechaHora, zona);
       if (isNaN(f.getTime())) throw new ErrorHttp(400, "Fecha inválida");
       sugerida.fechaHora = f;
     }
@@ -838,11 +902,11 @@ module.exports = function (app) {
     if (!paciente.telefono) throw new ErrorHttp(400, "Este paciente no tiene teléfono cargado — no se le puede escribir por WhatsApp.");
 
     const medico = await Medico.findOne({ phone: medicoPhone }).lean();
-    const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000);
+    const token = generarToken(paciente.telefono, "reserva_publica", 45 * 60 * 1000, { medicoPhone });
     const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
     const primerNombre = String(paciente.nombre || "").split(" ")[0];
 
-    const cuando = formatearFechaCompleta(sugerida.fechaHora);
+    const cuando = formatearFechaCompleta(sugerida.fechaHora, zona);
     const quien = medico?.nombre || "Su médico";
     const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
     await enviarTextoOPlantilla(paciente.telefono, texto,
@@ -929,7 +993,7 @@ async function contextoDeNota(paciente, medicoPhone) {
   // catálogo de precios del consultorio para que la IA pueda
   // emparejar tratamientos mencionados ("hay que sellar esto",
   // "hay que hacer un relleno acá") con el ítem correcto.
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad zonaHoraria").lean();
   // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
   // marcas como medicamentos y no repite un error que él ya arregló. Y lo que
   // aprendió de él: sus palabras y cómo escribe (services/adaptacion.js).
@@ -955,6 +1019,9 @@ async function contextoDeNota(paciente, medicoPhone) {
     contexto: {
       // La nota de enfermería en vez de la médica (services/notaClinica.js).
       enfermeria: medico?.tipoEspecialidad === "enfermeria",
+      // El "hoy" que se le da a la IA y la hora de la reconsulta que
+      // devuelve son de la zona de la cuenta, no del servidor.
+      zona: medico?.zonaHoraria || ZONA_POR_DEFECTO,
       antecedentesPersonales: paciente.antecedentesPersonales || [],
       antecedentesFamiliares: paciente.antecedentesFamiliares || [],
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
@@ -980,6 +1047,9 @@ async function contextoDeNota(paciente, medicoPhone) {
 async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, notaHecha } = {}) {
   try {
     const { contexto } = await contextoDeNota(paciente, medicoPhone);
+    // "El sábado" es el que sigue a la consulta, aunque la nota se escriba
+    // días después (volver a generarla, retomarla al arrancar).
+    contexto.fechaReferencia = consulta.createdAt;
     // El mismo idioma con el que se transcribió: una nota en español
     // sobre una consulta en portugués obliga al médico a traducir de
     // vuelta lo que él mismo dijo.
@@ -1139,7 +1209,18 @@ async function intentarVerificar(consultaId) {
     set = { "verificacion.estado": "error" };
   }
   const verificacionMs = Date.now() - inicio;
-  await ConsultaMedica.updateOne({ _id: c._id }, { $set: { ...set, "tiempos.verificacionMs": verificacionMs } });
+  try {
+    await ConsultaMedica.updateOne({ _id: c._id }, { $set: { ...set, "tiempos.verificacionMs": verificacionMs } });
+  } catch (e) {
+    // Que no quede «verificando»: confirmar espera a que termine, y nada más
+    // lo vuelve a mover hasta el próximo arranque. Con error, el médico
+    // confirma igual, con el aviso de que no se comparó con el audio.
+    log.error(`[NOTA_EN_VIVO] no se pudo guardar la verificación de ${c._id}:`, e.message);
+    set = { "verificacion.estado": "error" };
+    await conReintentos(() => ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": "verificando" }, { $set: set }),
+      AJUSTES_AUDIO.GUARDAR_ESPERAS_MS)
+      .catch(e2 => log.error(`[NOTA_EN_VIVO] tampoco se pudo dejar en error la verificación de ${c._id}:`, e2.message));
+  }
   log.info(`[TIEMPOS] consulta ${c._id}: verificación ${Math.round(verificacionMs / 1000)} s → ${set["verificacion.estado"]}${set["verificacion.diferencias"]?.length ? ` (${set["verificacion.diferencias"].length} diferencia(s))` : ""}`);
   avisarCambio(c.medicoPhone);
   if (set["verificacion.estado"] === "diferencias") {
@@ -1348,12 +1429,18 @@ async function marcarTranscripcionFallida(consultaId, medicoPhone, motivo, { avi
 //   · Una consulta «procesando» con su audio en disco: se transcribe de nuevo.
 //     AssemblyAI cobra esa transcripción otra vez: es lo que cuesta no
 //     perderla. Si el mismo audio se corta una y otra vez (un audio que tira
-//     el servidor), a la tercera queda en error en vez de intentarlo siempre.
+//     el servidor), a la tercera queda en error en vez de intentarlo siempre,
+//     con el audio guardado para volver a transcribirlo a mano.
 //   · Una «procesando» sin audio (se subió antes de que el audio se guardara
 //     en disco): no hay con qué seguir. Queda en error, con el motivo, en vez
 //     de «procesando» para siempre.
 //   · Una nota que se estaba escribiendo: se escribe de nuevo, de la
 //     transcripción o del texto en vivo, que sí están guardados.
+//   · Una nota en vivo que se estaba verificando con la transcripción
+//     completa, o que se cortó justo antes: se verifica de nuevo. Confirmar
+//     espera a que termine y nada más la movía: quedaba sin poder
+//     confirmarse nunca (A6). La de hace días queda con la verificación en
+//     error, y se confirma con ese aviso.
 //   · Un audio en disco sin consulta en curso: sobró. Se borra. Salvo el de
 //     una consulta que falló varias veces por algo pasajero: ese se guarda
 //     a propósito hasta «audioRetenidoHasta», para reintentar a mano.
@@ -1366,15 +1453,23 @@ const NOTA_INTERRUMPIDA = "Se interrumpió mientras se escribía (el servidor se
 
 async function retomarConsultas(arranque = ARRANQUE) {
   const reciente = (c) => arranque - new Date(c.createdAt) < RETOMAR_HASTA_MS;
-  const resumen = { transcripciones: 0, sinAudio: 0, notas: 0, sobras: 0 };
+  const resumen = { transcripciones: 0, sinAudio: 0, notas: 0, verificaciones: 0, sobras: 0 };
   const enDisco = new Set(await audioPendiente.guardados(arranque));
-  // Las dos listas antes de tocar nada: marcar una consulta le cambia la
-  // fecha de modificación, y la sacaría de la segunda.
-  const enCurso = await ConsultaMedica.find({ estado: "procesando", createdAt: { $lt: arranque } }).select("_id medicoPhone pacienteId createdAt").lean();
+  // Las listas antes de tocar nada: marcar una consulta le cambia la fecha
+  // de modificación, y la sacaría de las que siguen.
+  const enCurso = await ConsultaMedica.find({ estado: "procesando", createdAt: { $lt: arranque } })
+    .select("_id medicoPhone pacienteId createdAt reintentosAudio").sort({ createdAt: 1 }).lean();
   const notas = await ConsultaMedica.find({
     notaClinicaEstado: "pendiente", confirmadaEn: null, updatedAt: { $lt: arranque },
     $or: [{ estado: "completado", notaFuente: { $in: ["", null, "audio"] } }, { notaFuente: "vivo" }],
   });
+  // Las que están «procesando» o con la nota a medio escribir se verifican
+  // solas al terminar eso (arriba): estas son las que ya no tienen quién.
+  const verificaciones = await ConsultaMedica.find({
+    notaFuente: "vivo", confirmadaEn: null, updatedAt: { $lt: arranque },
+    estado: { $ne: "procesando" }, notaClinicaEstado: { $in: ["completado", "error"] },
+    "verificacion.estado": { $in: ["pendiente", "verificando"] },
+  }).select("_id createdAt").lean();
 
   const aTranscribir = [];
   for (const c of enCurso) {
@@ -1386,17 +1481,23 @@ async function retomarConsultas(arranque = ARRANQUE) {
         "El servidor se reinició mientras se transcribía esta consulta, y el audio no había quedado guardado.", { avisar: reciente(c) });
       continue;
     }
-    const intento = await ConsultaMedica.findOneAndUpdate({ _id: c._id, estado: "procesando" }, { $inc: { reintentosAudio: 1 } }, { new: true });
-    const paciente = intento && await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
-    if (!intento || !paciente || intento.reintentosAudio > MAX_REINTENTOS_AUDIO) {
+    const paciente = await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
+    if (!paciente) {
       await audioPendiente.borrar(id).catch(() => {});
-      if (intento) {
-        await marcarTranscripcionFallida(c._id, c.medicoPhone,
-          "No se pudo transcribir: el servidor se reinició varias veces mientras lo intentaba.", { avisar: reciente(c) });
-      }
+      await marcarTranscripcionFallida(c._id, c.medicoPhone, "El paciente de esta consulta ya no está.", { avisar: reciente(c) });
       continue;
     }
-    aTranscribir.push({ consulta: intento, paciente });
+    // Cortada cada vez que se retomó: no se intenta otra vez sola. El audio
+    // no se borra: puede no ser el audio sino tres reinicios seguidos (un
+    // despliegue y dos arreglos), y el médico lo vuelve a transcribir a mano.
+    if ((c.reintentosAudio || 0) >= MAX_REINTENTOS_AUDIO) {
+      await ConsultaMedica.updateOne({ _id: c._id, estado: "procesando" },
+        { $set: { audioRetenidoHasta: new Date(Date.now() + AJUSTES_AUDIO.RETENER_MS) } });
+      await marcarTranscripcionFallida(c._id, c.medicoPhone,
+        "No se pudo transcribir: el servidor se reinició varias veces mientras lo intentaba.", { avisar: reciente(c) });
+      continue;
+    }
+    aTranscribir.push({ consulta: c, paciente });
   }
   const retenidos = await ConsultaMedica.find({ _id: { $in: [...enDisco] }, estado: "error", audioRetenidoHasta: { $gt: new Date() } })
     .select("_id").lean();
@@ -1422,6 +1523,16 @@ async function retomarConsultas(arranque = ARRANQUE) {
     aEscribir.push({ consulta: c, paciente, vivo, texto });
   }
 
+  const aVerificar = [];
+  for (const c of verificaciones) {
+    if (!reciente(c)) {
+      await ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": { $in: ["pendiente", "verificando"] } },
+        { $set: { "verificacion.estado": "error" } });
+      continue;
+    }
+    aVerificar.push(c);
+  }
+
   // De a una por vez, en dos filas: un audio de una hora pesa en memoria, y
   // las notas no tienen por qué esperar a las transcripciones.
   await Promise.all([
@@ -1432,10 +1543,17 @@ async function retomarConsultas(arranque = ARRANQUE) {
           await marcarTranscripcionFallida(consulta._id, consulta.medicoPhone, "No se pudo leer el audio guardado.", { avisar: reciente(consulta) });
           continue;
         }
+        // El reintento se cuenta recién acá, cuando de verdad se intenta. Antes
+        // se contaba al arrancar: las que esperaban su turno en esta fila
+        // cuando el servidor se volvió a reiniciar no habían llegado a
+        // AssemblyAI y gastaban uno igual, y a la tercera perdían el audio.
+        const intento = await ConsultaMedica.findOneAndUpdate({ _id: consulta._id, estado: "procesando" }, { $inc: { reintentosAudio: 1 } }, { new: true })
+          .catch(e => log.error(`[CONSULTA_MEDICA] no se pudo retomar la transcripción de ${consulta._id}:`, e.message));
+        if (!intento) continue;
         resumen.transcripciones++;
         log.info(`[CONSULTA_MEDICA] retomando la transcripción de ${consulta._id} (se cortó al reiniciar)`);
-        const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }));
-        await transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal, intento: consulta.intentosTranscripcion || 0 })
+        const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }).catch(() => false));
+        await transcribirEnSegundoPlano(intento, paciente, audio, { multicanal, intento: intento.intentosTranscripcion || 0 })
           .catch(e => log.error(`[CONSULTA_MEDICA] no se pudo retomar la transcripción de ${consulta._id}:`, e.message));
       }
     })(),
@@ -1452,6 +1570,18 @@ async function retomarConsultas(arranque = ARRANQUE) {
           if (vivo) await intentarVerificar(consulta._id);
         } catch (e) {
           log.error(`[CONSULTA_MEDICA] no se pudo retomar la nota de ${consulta._id}:`, e.message);
+        }
+      }
+      for (const c of aVerificar) {
+        resumen.verificaciones++;
+        log.info(`[CONSULTA_MEDICA] retomando la verificación de ${c._id} (se cortó al reiniciar)`);
+        try {
+          // «verificando» era del proceso de antes: se suelta para que
+          // intentarVerificar la pueda reclamar.
+          await ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": "verificando" }, { $set: { "verificacion.estado": "pendiente" } });
+          await intentarVerificar(c._id);
+        } catch (e) {
+          log.error(`[CONSULTA_MEDICA] no se pudo retomar la verificación de ${c._id}:`, e.message);
         }
       }
     })(),

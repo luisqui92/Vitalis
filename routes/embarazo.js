@@ -7,7 +7,7 @@ const { Paciente, Embarazo, DESENLACES_EMBARAZO } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { registrar } = require("../services/auditoria");
-const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar, fechaCivilValida } = require("../services/httpHelpers");
 
 const requireMedico = requireAuth(["medico"]);
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
@@ -100,10 +100,13 @@ module.exports = function (app) {
 
     const desenlace = String(req.body?.desenlace || "");
     if (!DESENLACES_EMBARAZO.includes(desenlace)) throw new ErrorHttp(400, "Desenlace inválido");
+    // El día del <input type="date">. Sin revisarla, una fecha que no era
+    // fecha llegaba al save() y respondía "Error interno".
+    const fechaFin = req.body?.fechaFin ? fechaCivilValida(req.body.fechaFin, "La fecha de finalización") : new Date();
 
     embarazo.activo = false;
     embarazo.desenlace = desenlace;
-    embarazo.fechaFin = req.body?.fechaFin ? new Date(req.body.fechaFin) : new Date();
+    embarazo.fechaFin = fechaFin;
     if (req.body?.notas != null) embarazo.notas = String(req.body.notas).trim();
     await embarazo.save();
 

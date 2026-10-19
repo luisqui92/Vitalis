@@ -103,6 +103,10 @@ function normalizarDestino(destino, pais = "BO") {
 // y la plantilla queda de red para cuando no hay otra forma.
 const PLANTILLAS = {
   citaConfirmada: "cita_confirmada",
+  // Cuando el consultorio cancela (o borra) una cita desde su panel
+  // (routes/citas.js). Cae fuera de la ventana casi siempre: el paciente no
+  // le escribió al consultorio, el que tocó algo fue el médico.
+  citaCancelada: "cita_cancelada",
   reconsulta: "reconsulta_sugerida",
   informeListo: "informe_listo",
   // El informe de avance para la familia de un chico en seguimiento de

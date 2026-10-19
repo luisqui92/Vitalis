@@ -34,6 +34,11 @@
 // Borra todo lo que toca. Por eso se niega a correr contra cualquier base
 // cuyo nombre no diga que es de prueba, y contra la MONGODB_URI configurada.
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
+// El panel cuenta «hoy» y «el mes» en la zona de la clínica (la de La Paz,
+// la de siempre), no en la del servidor. La prueba arma sus citas con la hora
+// local del proceso, así que se fija la misma zona: si no, entre las 00:00 y
+// las 04:00 UTC sus citas de «hoy» caerían en el día siguiente de La Paz.
+process.env.TZ = "America/La_Paz";
 
 const path = require("path");
 const http = require("http");

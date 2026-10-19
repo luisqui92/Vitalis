@@ -366,6 +366,11 @@ const medicoSchema = new mongoose.Schema({
     activo: { type: Boolean, default: false },
     secreto: { type: String, default: "" },
     secretoPendiente: { type: String, default: "" },
+    // El último paso de 30 s con el que se entró: un código sirve una sola
+    // vez (routes/medicoAuth.js). Tiene que estar en el esquema: si no,
+    // mongoose descarta en silencio el $set que lo guarda y nadie con 2FA
+    // podría entrar.
+    ultimoPaso: { type: Number, default: 0 },
   },
 }, { timestamps: true });
 // Una cuenta que viaja como JSON (una respuesta, un log) nunca lleva la
@@ -1319,6 +1324,9 @@ const recetaOpticaSchema = new mongoose.Schema({
   // hora UTC. `fecha` queda para ordenar registros viejos y nuevos.
   fechaCivil: { type: String, default: "" },
   fecha: { type: Date, required: true },
+  // Se anula, no se borra: igual que la receta de medicamentos (ver abajo).
+  anuladaEn: { type: Date, default: null },
+  anuladaMotivo: { type: String, default: "" },
 }, { timestamps: true });
 const RecetaOptica = mongoose.model("RecetaOptica", recetaOpticaSchema);
 
@@ -2439,6 +2447,20 @@ const informeSchema = new mongoose.Schema({
     type: new mongoose.Schema({ nombre: String, codigo: String, sexo: String, edad: Number }, { _id: false }),
     default: null,
   },
+  // Las imágenes como estaban al firmar: cómo se veían en el visor y lo que
+  // se midió encima. El contraste de una placa se vuelve a tocar para otra
+  // consulta, y el informe que ya tiene el paciente no puede cambiar por eso.
+  // El archivo no se copia: es el mismo, y no se puede borrar mientras esté
+  // en un informe firmado (routes/estudios.js). Sin copia es undefined y no
+  // una lista vacía: así se distingue un firmado de antes de esto, que hay
+  // que congelar, de uno firmado sin imágenes.
+  estudiosEmitidos: {
+    type: [new mongoose.Schema({
+      estudioId: mongoose.Schema.Types.ObjectId, nombre: String, tipo: String, fecha: Date,
+      ajustesVisor: mongoose.Schema.Types.Mixed, mediciones: mongoose.Schema.Types.Mixed, calibracion: mongoose.Schema.Types.Mixed,
+    }, { _id: false })],
+    default: undefined,
+  },
 }, { timestamps: true });
 informeSchema.index({ medicoPhone: 1, codigo: 1 }, { unique: true });
 const Informe = mongoose.model("Informe", informeSchema);
@@ -2464,6 +2486,12 @@ const recetaSchema = new mongoose.Schema({
   // 16 no debe aparecer como del 15 por la zona horaria del navegador.
   fechaCivil: { type: String, default: "" },
   fecha: { type: Date, required: true },
+  // Una receta emitida no se borra: se anula, con el motivo. Ya puede estar
+  // en una farmacia o en manos del paciente, y el registro de qué se recetó
+  // tiene que quedar. Los campos tienen que estar acá: sin ellos, Mongoose
+  // descarta el $set en silencio y la anulación responde 200 sin anular nada.
+  anuladaEn: { type: Date, default: null },
+  anuladaMotivo: { type: String, default: "" },
 
   // ─── De dónde salió esta receta ──────────────────────────────────────
   //
@@ -2529,8 +2557,18 @@ const citaSchema = new mongoose.Schema({
   estado: { type: String, enum: ["confirmada", "cancelada", "completada"], default: "confirmada" },
   origen: { type: String, enum: ["whatsapp", "whatsapp_web", "manual", "voz"], default: "manual" },
   googleEventId: { type: String, default: null }, // id del evento en Google Calendar, para poder editarlo/cancelarlo
+  // El link de reserva que la creó: un resumen del token, nunca el token
+  // (routes/reservaPublica.js). Solo lo tienen las reservadas por link.
+  reservaLink: { type: String },
 }, { timestamps: true });
 citaSchema.index({ medicoPhone: 1, fecha: 1 });
+// Un link de reserva sirve para UNA cita confirmada: con uno solo se llenaba
+// la agenda de tres semanas. Si esa cita se cancela, el link vuelve a servir
+// mientras no venza.
+citaSchema.index(
+  { reservaLink: 1 },
+  { unique: true, partialFilterExpression: { reservaLink: { $exists: true }, estado: "confirmada" }, name: "cita_link_reserva_unico" }
+);
 // Índice adicional aparte (nombre propio para no chocar con el de arriba,
 // que ya puede existir en producción con otras opciones): entre citas
 // CONFIRMADAS no permite dos con el mismo médico+horario exacto — último
@@ -2963,6 +3001,9 @@ const socioSchema = new mongoose.Schema({
   email: { type: String, default: "" },
   passwordHash: { type: String, required: true },
   activo: { type: Boolean, default: true },
+  // Como en Medico: las sesiones abiertas antes de esta fecha ya no valen
+  // (services/auth.js, sesionVigente). Se pone al cambiarle la contraseña.
+  sesionesDesde: { type: Date, default: null },
 
   pais: { type: String, default: "BO" },
   moneda: { type: String, default: "BOB" },

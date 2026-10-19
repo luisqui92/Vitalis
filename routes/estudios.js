@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
-const { Paciente, Estudio } = require("../db/models");
+const { Paciente, Estudio, Informe } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
@@ -30,6 +30,10 @@ module.exports = function (app) {
     const nombre = String(req.query.nombre || "").trim();
     const fecha = req.query.fecha ? new Date(req.query.fecha) : null;
     if (!nombre || !fecha) throw new ErrorHttp(400, "nombre y fecha son requeridos");
+    // Antes de escribir el archivo: si la fecha no sirve, el Estudio.create
+    // de abajo falla y el archivo (hasta 20 MB) quedaba en disco sin nadie
+    // que lo apunte ni lo borre.
+    if (Number.isNaN(fecha.getTime())) throw new ErrorHttp(400, "fecha no es válida");
     const tipo = String(req.query.tipo || "otro").trim();
 
     const mime = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim();
@@ -167,6 +171,11 @@ module.exports = function (app) {
   // ─── ELIMINAR ────────────────────────────────────────────────────────────
   app.delete("/medico/estudios/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
+    // Una imagen que va en un informe firmado no se borra: el paciente ya
+    // tiene ese informe, y sin el archivo le quedan imágenes que no cargan
+    // (informe de QA del 16 de octubre de 2026, A11). La de un borrador sí.
+    const firmado = await Informe.findOne({ medicoPhone, estado: "firmado", estudiosIncluidos: req.params.id }).select("codigo").lean();
+    if (firmado) throw new ErrorHttp(409, `Esta imagen va en el informe firmado ${firmado.codigo} y no se puede borrar: el paciente ya lo tiene.`);
     const estudio = await Estudio.findOneAndDelete({ _id: req.params.id, medicoPhone });
     if (!estudio) throw new ErrorHttp(404, "Estudio no encontrado");
     fs.unlink(path.join(DIR_ESTUDIOS, estudio.archivoNombre), () => {});

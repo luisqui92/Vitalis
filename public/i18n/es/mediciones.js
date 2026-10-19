@@ -38,6 +38,7 @@ Object.assign(I18N.es, {
   "evo.legendaSistolica": "Sistólica",
   "evo.legendaDiastolica": "Diastólica",
   "evo.confirmarBorrar": "¿Eliminar esta medición?",
+  "evo.errGuardar": "No se pudo guardar la medición",
   "evo.alertaUmbral": "Último valor ({valor} {unidad}) por encima de lo esperado ({umbral} {unidad}).",
   "evo.alertaAlza": "Tendencia en alza en las últimas 3 mediciones: {valores} {unidad}.",
 });

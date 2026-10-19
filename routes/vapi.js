@@ -8,6 +8,7 @@
 // Formato del webhook (ver docs.vapi.ai/tools/custom-tools):
 //   entra:  { message: { type: "tool-calls", call, toolCallList: [{id,name,arguments}] } }
 //   sale:   { results: [{ toolCallId, result }] }
+const crypto = require("crypto");
 const { CONFIG, log } = require("../config");
 const { Medico } = require("../db/models");
 const { listarEspecialidades, consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita } = require("../services/vapiHerramientas");
@@ -32,7 +33,12 @@ async function autorizarYResolverMedico(req, res) {
     return null;
   }
   const secretoRecibido = req.get("x-vapi-secret") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (secretoRecibido !== CONFIG.VAPI_SERVER_SECRET) {
+  // En tiempo constante, como la firma del webhook de WhatsApp: con !== se
+  // puede medir cuántos caracteres del principio coinciden (auditoría de QA,
+  // M9). El largo se compara antes porque timingSafeEqual tira si difiere.
+  const a = Buffer.from(String(secretoRecibido));
+  const b = Buffer.from(String(CONFIG.VAPI_SERVER_SECRET));
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     res.status(401).json({ error: "No autorizado" });
     return null;
   }
@@ -59,6 +65,8 @@ module.exports = function (app) {
   // entrada y de salida — sin ningún envoltorio. El teléfono de quien
   // llama se manda como campo estático de la herramienta en Vapi
   // ({{customer.number}} → pacienteTelefono), no hace falta extraerlo acá.
+  // En consultar_mis_citas y cancelar_cita TIENE que ser ese campo fijo:
+  // acá no hay forma de saber si el número lo dictó quien llama (A5).
   app.post("/vapi/api-tool/:medicoPhone/:herramienta", async (req, res) => {
     try {
       const resuelto = await autorizarYResolverMedico(req, res);
@@ -109,8 +117,16 @@ module.exports = function (app) {
         const args = { ...(llamada.arguments || llamada.parameters || {}) };
         // El teléfono de quien llama ya lo sabemos por el caller ID — no
         // hace falta que el asistente se lo tenga que preguntar al
-        // paciente, salvo que esté agendando/cancelando a nombre de otro.
-        if (!args.pacienteTelefono && numeroLlamante) args.pacienteTelefono = numeroLlamante;
+        // paciente, salvo que esté agendando a nombre de otro.
+        //
+        // Para VER o CANCELAR citas manda siempre el caller ID, nunca lo que
+        // diga quien llama: dictando el número de otra persona se escuchaban
+        // sus citas y se las cancelaba (auditoría del comité de QA, octubre
+        // de 2026, A5). Sin caller ID —todas las llamadas desde la página
+        // web— va vacío, y la herramienta deriva al WhatsApp. Solo al
+        // AGENDAR se acepta otro número: reservar para un familiar es normal.
+        if (nombre === "consultar_mis_citas" || nombre === "cancelar_cita") args.pacienteTelefono = numeroLlamante || "";
+        else if (!args.pacienteTelefono && numeroLlamante) args.pacienteTelefono = numeroLlamante;
 
         const handler = HERRAMIENTAS[nombre];
         let resultado;

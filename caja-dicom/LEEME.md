@@ -93,6 +93,11 @@ Cuando llega una imagen, Symphomed decide de quién es en este orden:
    camino bueno y para eso existe el código.
 2. **Hay una ventana de captura abierta** — el médico entró a la ficha y tocó
    *Capturar radiografía*. Es el flujo del consultorio con un sillón.
+   Si el *Patient ID* trae algo con forma de código (`P-0147`, `p0147`) que
+   no es de un solo paciente —el técnico se equivocó al tipearlo, o es de dos
+   pacientes de antes de que fueran únicos—, la ventana no cuenta y va a la
+   bandeja: adivinar pondría la placa de uno en la ficha de otro. Lo que el
+   equipo pone solo en ese campo (su propio número) no apaga la ventana.
 3. **Nadie sabe** → va a la bandeja de entrada, con el nombre que el técnico
    escribió, y el médico lo asigna desde Symphomed.
 

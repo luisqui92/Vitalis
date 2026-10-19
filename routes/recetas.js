@@ -5,7 +5,7 @@
 const { Paciente, Medico, Receta, RecetaOptica } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar, fechaCivilValida } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
@@ -17,15 +17,30 @@ function interpretarFechaCivil(valor) {
   if (valor === undefined || valor === null || valor === "") {
     return { fechaCivil: "", fecha: new Date() };
   }
-  const fechaCivil = String(valor).trim();
-  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaCivil);
-  if (!partes) throw new ErrorHttp(400, "fecha debe tener formato AAAA-MM-DD");
-  const [anio, mes, dia] = partes.slice(1).map(Number);
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia, 12));
-  if (fecha.getUTCFullYear() !== anio || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {
-    throw new ErrorHttp(400, "fecha no es válida");
-  }
-  return { fechaCivil, fecha };
+  const fecha = fechaCivilValida(valor);
+  return { fechaCivil: String(valor).trim(), fecha };
+}
+
+// ─── ANULAR (las dos recetas) ─────────────────────────────────────────────
+// Una receta emitida no se borra: ya puede estar en una farmacia o en manos
+// del paciente. Queda, marcada como anulada, y se sigue viendo así en la
+// ficha. El motivo es obligatorio: sin él, el registro dice que la receta
+// dejó de valer pero no por qué, que es lo que hace falta saber después.
+// anuladaEn: null en el filtro hace que dos pedidos a la vez no se pisen el
+// motivo.
+async function anularReceta(req, Modelo, noEncontrada) {
+  const medicoPhone = req.adminUser.usuario;
+  const receta = await obtenerOFallar(Modelo, { _id: req.params.id, medicoPhone }, noEncontrada);
+  if (receta.anuladaEn) throw new ErrorHttp(409, "Esta receta ya estaba anulada");
+  const motivo = String(req.body?.motivo || "").trim().slice(0, 300);
+  if (!motivo) throw new ErrorHttp(400, "Escribí el motivo de la anulación");
+  const anulada = await Modelo.findOneAndUpdate(
+    { _id: receta._id, medicoPhone, anuladaEn: null },
+    { $set: { anuladaEn: new Date(), anuladaMotivo: motivo } },
+    { new: true }
+  );
+  if (!anulada) throw new ErrorHttp(409, "Esta receta ya estaba anulada");
+  return anulada;
 }
 
 module.exports = function (app) {
@@ -36,6 +51,10 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
 
+    // La dosis, la frecuencia y la duración son texto libre, y es una
+    // decisión: se escriben como se prescriben ("1 comp. cada 8 h", "5 ml si
+    // hay fiebre"), y el sistema NO las controla contra el peso, las alergias
+    // ni las dosis máximas. Esa revisión es de quien firma la receta.
     const medicamentos = (Array.isArray(req.body?.medicamentos) ? req.body.medicamentos : [])
       .map(m => ({
         nombre: String(m?.nombre || "").trim(),
@@ -73,37 +92,52 @@ module.exports = function (app) {
     res.json({ receta, paciente, medico });
   }));
 
-  // ─── ELIMINAR ────────────────────────────────────────────────────────────
+  // ─── ANULAR ──────────────────────────────────────────────────────────────
+  // Sigue siendo el DELETE, que es lo que llama la pantalla y lo que el
+  // módulo de estudiantes bloquea, pero ya no borra (ver anularReceta).
   app.delete("/medico/recetas/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const r = await Receta.deleteOne({ _id: req.params.id, medicoPhone });
-    if (r.deletedCount === 0) throw new ErrorHttp(404, "Receta no encontrada");
-    registrar({ req, medicoPhone, accion: "borrar_receta", recurso: `Receta:${req.params.id}` });
-    res.json({ ok: true });
+    const receta = await anularReceta(req, Receta, "Receta no encontrada");
+    registrar({ req, medicoPhone: receta.medicoPhone, accion: "anular_receta", recurso: `Receta:${receta._id}` });
+    res.json({ ok: true, receta });
   }));
 
   // ─── RECETA ÓPTICA (Symphomed Visión) — esfera/cilindro/eje/adición por ojo,
   // distinta a una receta de medicamentos. Mismo criterio: crearla ya es la
   // aprobación del médico. ──────────────────────────────────────────────
-  function ladoOjoDesdeBody(body) {
-    const num = (v) => (v === "" || v === undefined || v === null ? null : Number(v));
-    return {
-      esfera: num(body?.esfera), cilindro: num(body?.cilindro),
-      eje: num(body?.eje), adicion: num(body?.adicion),
+  // Rangos de lo que existe, no de lo habitual: esfera ±30 D, cilindro
+  // ±10 D, eje 0–180°, adición 0–10 D (las de baja visión pasan de 4). Fuera
+  // de eso es un error de tipeo que termina en un lente. El eje solo tenía
+  // el min/max del HTML, que el navegador no hace cumplir.
+  function ladoOjoDesdeBody(body, ojo) {
+    const num = (v, campo, min, max) => {
+      if (v === "" || v === undefined || v === null) return null;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < min || n > max) throw new ErrorHttp(400, `${ojo}: ${campo} tiene que estar entre ${min} y ${max}`);
+      return n;
     };
+    const lado = {
+      esfera: num(body?.esfera, "esfera", -30, 30), cilindro: num(body?.cilindro, "cilindro", -10, 10),
+      eje: num(body?.eje, "eje", 0, 180), adicion: num(body?.adicion, "adición", 0, 10),
+    };
+    if (lado.cilindro !== null && lado.cilindro !== 0 && lado.eje === null) throw new ErrorHttp(400, `${ojo}: con cilindro hace falta el eje`);
+    return lado;
   }
 
   app.post("/medico/pacientes/:pacienteId/recetas-opticas", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
 
-    const od = ladoOjoDesdeBody(req.body?.od);
-    const oi = ladoOjoDesdeBody(req.body?.oi);
+    const od = ladoOjoDesdeBody(req.body?.od, "OD");
+    const oi = ladoOjoDesdeBody(req.body?.oi, "OI");
     const hayDatos = [od.esfera, od.cilindro, oi.esfera, oi.cilindro].some(v => v !== null);
     if (!hayDatos) throw new ErrorHttp(400, "Cargá al menos esfera o cilindro de algún ojo");
 
     const { fechaCivil, fecha } = interpretarFechaCivil(req.body?.fecha);
     const distanciaPupilar = req.body?.distanciaPupilar ? Number(req.body.distanciaPupilar) : null;
+    // 30–85 mm: la de un lactante ronda los 38–42, y Visión también atiende chicos.
+    if (distanciaPupilar !== null && (!Number.isFinite(distanciaPupilar) || distanciaPupilar < 30 || distanciaPupilar > 85)) {
+      throw new ErrorHttp(400, "La distancia pupilar tiene que estar entre 30 y 85 mm");
+    }
 
     const receta = await RecetaOptica.create({
       pacienteId: paciente._id, medicoPhone, consultaId: req.body?.consultaId || null,
@@ -132,10 +166,8 @@ module.exports = function (app) {
   }));
 
   app.delete("/medico/recetas-opticas/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
-    const medicoPhone = req.adminUser.usuario;
-    const r = await RecetaOptica.deleteOne({ _id: req.params.id, medicoPhone });
-    if (r.deletedCount === 0) throw new ErrorHttp(404, "Receta óptica no encontrada");
-    registrar({ req, medicoPhone, accion: "borrar_receta_optica", recurso: `RecetaOptica:${req.params.id}` });
-    res.json({ ok: true });
+    const receta = await anularReceta(req, RecetaOptica, "Receta óptica no encontrada");
+    registrar({ req, medicoPhone: receta.medicoPhone, accion: "anular_receta_optica", recurso: `RecetaOptica:${receta._id}` });
+    res.json({ ok: true, receta });
   }));
 };

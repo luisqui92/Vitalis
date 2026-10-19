@@ -233,6 +233,9 @@ function verificar(descripcion, condicion) {
   const nueva = await Paciente.findById(importado.cuerpo.pacienteId).lean();
   verificar("  ...y la ficha queda en SU consultorio, no en el de origen", nueva.medicoPhone === "70000002");
   verificar("  ...con el nombre y la fecha de nacimiento", nueva.nombre === "Carla Mendoza" && Boolean(nueva.fechaNacimiento));
+  // Sin código, la Caja DICOM no le puede archivar los estudios solos
+  // (auditoría del comité de QA, octubre de 2026, M11).
+  verificar("  ...y con su código de paciente, como un alta normal", /^P-\d{4}$/.test(nueva.codigo || ""));
   verificar("  ...y las alergias, que es el dato que hace falta antes de recetar",
     nueva.antecedentesPersonales.some(a => /Penicilina/.test(a)));
   // Las consultas de otro consultorio no son las de este: copiadas adentro

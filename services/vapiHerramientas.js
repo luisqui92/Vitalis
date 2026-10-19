@@ -13,7 +13,21 @@ const { crearCitaConfirmada } = require("./crearCita");
 const { eliminarEvento } = require("./googleCalendar");
 const { formatearFechaCompleta } = require("./reservaCitas");
 const { ZONA_POR_DEFECTO } = require("./zonaHoraria");
+const { formasDe } = require("./telefono");
 const { CONFIG } = require("../config");
+
+// Para ver o cancelar citas el número tiene que ser el de la llamada (el
+// caller ID, routes/vapi.js), nunca uno que diga quien llama: dictando el de
+// otra persona se escuchaban sus citas y se las cancelaba (auditoría del
+// comité de QA, octubre de 2026, A5). Sin ese número —una llamada desde la
+// página web no lo trae— no se busca nada y se deriva al WhatsApp, donde
+// Meta ya verificó el número del paciente.
+const SIN_NUMERO_VERIFICADO = "No puedo ver ni cancelar citas en esta llamada: no tengo el número desde el que llama (pasa, por ejemplo, cuando llama desde la página web). No le pidas que te dicte un número. Decile que para ver o cancelar su cita escriba \"cancelar\" al WhatsApp del consultorio, o que llame desde el teléfono con el que reservó.";
+
+// Por voz no hay un link que se gaste (routes/reservaPublica.js): el número
+// lo dicta quien llama. Como mucho estas citas futuras por voz por número y
+// consultorio, para que una sola llamada no pueda llenar la agenda (A4).
+const CITAS_VOZ_POR_TELEFONO = 3;
 
 // "Súper número" de voz: la misma idea que el súper número de WhatsApp
 // (mismo WHATSAPP_ESPECIALIDADES_MEDICOS), pero acá no hay una sesión
@@ -113,16 +127,25 @@ async function agendarCita(medicoPhoneFijo, { fechaHora, pacienteNombre, pacient
   if (fecha.getTime() <= Date.now()) {
     return "Esa fecha ya pasó — elegí un horario futuro de la disponibilidad.";
   }
+  const yaTiene = await Cita.countDocuments({
+    medicoPhone, pacienteTelefono: { $in: formasDe(telefono) }, origen: "voz", estado: "confirmada", fecha: { $gte: new Date() },
+  });
+  if (yaTiene >= CITAS_VOZ_POR_TELEFONO) {
+    return `Ese número ya tiene ${yaTiene} citas próximas agendadas por teléfono, que es lo máximo por esta vía. No agendes otra: decile que, si necesita más, se comunique directo con la clínica o por WhatsApp.`;
+  }
 
   try {
     const cita = await crearCitaConfirmada({
       medicoPhone, medico, pacienteTelefono: telefono, pacienteNombre: nombre,
       fecha, motivo: String(motivo || "").trim(), origen: "voz",
     });
-    return `Listo, la cita quedó confirmada para ${formatearFechaCompleta(cita.fecha)} a nombre de ${cita.pacienteNombre}.`;
+    return `Listo, la cita quedó confirmada para ${formatearFechaCompleta(cita.fecha, medico.zonaHoraria)} a nombre de ${cita.pacienteNombre}.`;
   } catch (e) {
+    // crearCitaConfirmada solo acepta uno de los horarios que se ofrecen: si
+    // el asistente armó la fecha por su cuenta en vez de copiar la de una
+    // opción, también cae acá.
     if (e.horarioOcupado) {
-      return "Ese horario se acaba de ocupar. Volvé a consultar la disponibilidad y ofrecele al paciente otro horario.";
+      return "Ese horario no está disponible (o se acaba de ocupar). Volvé a consultar la disponibilidad, ofrecele al paciente otro horario y usá el valor exacto de 'fechaHora' de la opción que elija.";
     }
     throw e;
   }
@@ -132,19 +155,33 @@ async function consultarMisCitas(medicoPhoneFijo, { pacienteTelefono, especialid
   const medicoPhones = await resolverMedicoPhones(medicoPhoneFijo, especialidad);
   if (!medicoPhones.length) return "No pude identificar el consultorio — preguntale primero qué especialidad busca (usá listar_especialidades si hace falta).";
   const telefono = String(pacienteTelefono || "").trim();
-  if (!telefono) return "Necesito el número de teléfono del paciente para buscar sus citas.";
+  if (!telefono) return SIN_NUMERO_VERIFICADO;
 
+  // formasDe: el caller ID llega con «+» y el WhatsApp guarda solo dígitos
+  // (services/telefono.js). Comparado tal cual, quien reservó por WhatsApp
+  // no encontraba su cita llamando desde ese mismo teléfono.
   const citas = await Cita.find({
-    medicoPhone: { $in: medicoPhones }, pacienteTelefono: telefono, estado: "confirmada", fecha: { $gte: new Date() },
+    medicoPhone: { $in: medicoPhones }, pacienteTelefono: { $in: formasDe(telefono) }, estado: "confirmada", fecha: { $gte: new Date() },
   }).sort({ fecha: 1 }).lean();
 
   if (!citas.length) return "No encontré ninguna cita próxima confirmada con ese número de teléfono.";
+  // Cada cita en la hora de su consultorio: con el súper número pueden ser de
+  // cuentas de zonas distintas, y sin zona caía a la de La Paz.
+  const zonas = new Map((await Medico.find({ phone: { $in: [...new Set(citas.map(c => c.medicoPhone))] } })
+    .select("phone zonaHoraria").lean()).map(m => [m.phone, m.zonaHoraria]));
   return citas
-    .map(c => `Cita el ${formatearFechaCompleta(c.fecha)} a nombre de ${c.pacienteNombre} (citaId: ${c._id}).`)
+    .map(c => `Cita el ${formatearFechaCompleta(c.fecha, zonas.get(c.medicoPhone))} a nombre de ${c.pacienteNombre} (citaId: ${c._id}).`)
     .join(" ");
 }
 
 async function cancelarCita(medicoPhoneFijo, { citaId, pacienteTelefono, especialidad } = {}) {
+  // El número de la llamada es obligatorio siempre, también con el citaId:
+  // con el id solo, desde cualquier teléfono, se cancelaba la cita de otra
+  // persona (A5).
+  const telefono = String(pacienteTelefono || "").trim();
+  if (!telefono) return SIN_NUMERO_VERIFICADO;
+  const suya = { pacienteTelefono: { $in: formasDe(telefono) }, estado: "confirmada", fecha: { $gte: new Date() } };
+
   let cita = null;
   if (citaId) {
     // El id viene de un consultar_mis_citas anterior en esta misma llamada,
@@ -154,26 +191,24 @@ async function cancelarCita(medicoPhoneFijo, { citaId, pacienteTelefono, especia
     // cancelaba la cita de cualquiera (informe de QA del 9 de octubre de 2026).
     const alcance = medicoPhoneFijo ? [medicoPhoneFijo] : CONFIG.WHATSAPP_ESPECIALIDADES_MEDICOS;
     if (mongoose.isValidObjectId(citaId)) {
-      cita = await Cita.findOne({ _id: citaId, medicoPhone: { $in: alcance }, estado: "confirmada" });
+      cita = await Cita.findOne({ ...suya, _id: citaId, medicoPhone: { $in: alcance } });
     }
-  } else if (pacienteTelefono) {
+  } else {
     const medicoPhones = await resolverMedicoPhones(medicoPhoneFijo, especialidad);
     if (!medicoPhones.length) return "No pude identificar el consultorio — preguntale qué especialidad busca, o pedile el citaId si ya lo consultaste antes.";
-    cita = await Cita.findOne({
-      medicoPhone: { $in: medicoPhones }, pacienteTelefono: String(pacienteTelefono).trim(), estado: "confirmada", fecha: { $gte: new Date() },
-    }).sort({ fecha: 1 });
+    cita = await Cita.findOne({ ...suya, medicoPhone: { $in: medicoPhones } }).sort({ fecha: 1 });
   }
   if (!cita) {
-    return "No encontré ninguna cita próxima confirmada para cancelar. Verificá el número de teléfono, o pedile al paciente el citaId si lo consultaste antes.";
+    return "No encontré ninguna cita próxima confirmada para cancelar con el número desde el que llama. Si la reservó con otro número, decile que escriba \"cancelar\" al WhatsApp del consultorio desde ese número.";
   }
 
-  const medico = await Medico.findOne({ phone: cita.medicoPhone }).select("googleCalendarId").lean();
+  const medico = await Medico.findOne({ phone: cita.medicoPhone }).select("googleCalendarId zonaHoraria").lean();
   cita.estado = "cancelada";
   await cita.save();
   if (medico?.googleCalendarId && cita.googleEventId) {
     await eliminarEvento(medico.googleCalendarId, cita.googleEventId);
   }
-  return `Listo, cancelé la cita del ${formatearFechaCompleta(cita.fecha)}.`;
+  return `Listo, cancelé la cita del ${formatearFechaCompleta(cita.fecha, medico?.zonaHoraria)}.`;
 }
 
 module.exports = { listarEspecialidades, consultarDisponibilidad, agendarCita, consultarMisCitas, cancelarCita };

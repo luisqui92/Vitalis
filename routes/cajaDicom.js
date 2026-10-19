@@ -138,6 +138,10 @@ function calibracionDesde(meta) {
   };
 }
 
+// La forma de un código de paciente de Symphomed (services/codigos.js), como
+// se tipea en un equipo: P-0147, p0147 o P 0147.
+const CODIGO_SYMPHOMED = /^p[-\s]?\d+$/i;
+
 function nombreEstudio(meta) {
   return [meta.descripcionEstudio, meta.descripcionSerie].filter(Boolean).join(" · ")
     || meta.modalidad || "Estudio";
@@ -179,7 +183,8 @@ module.exports = function (app) {
     //    nada, y es exactamente para lo que existe ese código.
     //    Solo si el código es de UN paciente: con dos iguales (de antes de
     //    que fueran únicos, revisión integral del 11 de octubre de 2026,
-    //    S06) se archivaba en cualquiera de los dos. Así sigue al paso 2.
+    //    S06) se archivaba en cualquiera de los dos. Si no es de uno solo,
+    //    tampoco se adivina con la ventana: ver el paso 2.
     if (meta.pacienteIdDicom) {
       const conEseCodigo = await Paciente.find({
         medicoPhone,
@@ -191,8 +196,14 @@ module.exports = function (app) {
 
     // 2. Hay una ventana de captura abierta (el flujo del consultorio: el
     //    médico abrió la ficha y tocó "Capturar").
+    //    Salvo que el equipo haya mandado un código de Symphomed que no es de
+    //    un solo paciente: el técnico tipeó un código, y si se equivocó,
+    //    adivinar con la ventana pone la placa de uno en la ficha de otro
+    //    (informe de QA del 16 de octubre de 2026, A10). Solo cuenta lo que
+    //    tiene forma de código: muchos equipos llenan el Patient ID solos,
+    //    con su propio número, y eso no puede apagar la ventana.
     let captura = null;
-    if (!paciente) {
+    if (!paciente && !CODIGO_SYMPHOMED.test(meta.pacienteIdDicom)) {
       captura = await CapturaPendiente.findOne({ medicoPhone });
       if (capturaVigente(captura)) {
         paciente = await Paciente.findOne({ _id: captura.pacienteId, medicoPhone }).lean();

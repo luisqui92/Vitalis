@@ -25,7 +25,7 @@ const app = document.getElementById("app");
 const btnSalir = document.getElementById("btnSalir");
 
 function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // El dinero se guarda en centavos en toda la plataforma. Acá solo se muestra.

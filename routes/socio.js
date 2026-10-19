@@ -14,7 +14,7 @@
 // La regla de qué puede ver vive en services/socios.js, no acá.
 const { Socio, Clinica, Medico, LoteCupos } = require("../db/models");
 const { requireSocio, generarToken, verificarPassword, hashPassword } = require("../services/auth");
-const { limitAuth, limitMedico } = require("../services/ratelimit");
+const { limitAuth, limitLoginSocioPorCuenta, limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 const { cuposDe, exigirCupoLibre, clinicaDelSocio, medicoDelSocio, socioDeLaSesion } = require("../services/socios");
@@ -62,15 +62,18 @@ module.exports = function (app) {
   // Mismo orden que el login del médico: primero se verifica la contraseña y
   // RECIÉN DESPUÉS se mira si la cuenta está activa. Al revés, cualquiera
   // podría averiguar qué teléfonos son socios de Symphomed probando números.
-  app.post("/socio/login", limitAuth, asyncRoute(async (req, res) => {
+  //
+  // Y con los mismos dos límites: por IP y por cuenta. Con el de IP solo,
+  // quien tiene muchas IPs prueba contraseñas contra UN socio sin tope.
+  app.post("/socio/login", limitAuth, limitLoginSocioPorCuenta, asyncRoute(async (req, res) => {
     const phone = String(req.body?.phone || "").trim();
     const password = String(req.body?.password || "");
     if (!phone || !password) throw new ErrorHttp(400, "phone y password son requeridos");
 
     const socio = await Socio.findOne({ phone });
-    const { ok } = socio
-      ? await verificarPassword(password, socio.passwordHash)
-      : { ok: false };
+    // Aunque no haya cuenta: verificarPassword corre bcrypt igual, para que
+    // un teléfono sin cuenta no conteste más rápido (services/auth.js).
+    const { ok } = await verificarPassword(password, socio?.passwordHash);
 
     if (!ok) {
       registrar({ req, medicoPhone: phone, accion: "socio_login_fallido", exito: false });

@@ -5,7 +5,9 @@
 // de la transcripción en sí.
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
-const { fechaStrBolivia } = require("./utils");
+// La fecha de hoy y la hora de la reconsulta, en la zona de la cuenta
+// (contexto.zona): hay consultorios en Bolivia y en Brasil.
+const { hoyEnZona, fechaStrEnZona, localAInstante, ZONA_POR_DEFECTO } = require("./zonaHoraria");
 
 // El idioma sale de la cuenta del médico, igual que en la transcripción.
 // Acá no alcanza con traducir el prompt: hay que decirle explícitamente que
@@ -222,9 +224,20 @@ hallazgo): esos van tal cual figuran en la lista.${cfg.reglasExtra}`;
 
 function construirContexto(contexto, idioma) {
   const partes = [];
-  const hoy = new Date();
+  // El día de la semana y la fecha salen del mismo instante y en la zona de
+  // la cuenta. Con getDay() del server (UTC) y la fecha de Bolivia, de 20:00
+  // a 24:00 la IA recibía "viernes" con la fecha del jueves y resolvía "el
+  // sábado" al día equivocado; y con Bolivia fija, un consultorio de São
+  // Paulo recibía la fecha de ayer entre las 00:00 y la 01:00.
+  //
+  // fechaReferencia: el día de la consulta, cuando la nota se escribe
+  // después (volver a generarla, retomarla al arrancar). "El sábado" es el
+  // que sigue a la consulta, no al día en que se regenera.
+  const zona = contexto?.zona || ZONA_POR_DEFECTO;
+  const referencia = contexto?.fechaReferencia ? new Date(contexto.fechaReferencia) : null;
+  const hoy = referencia && !isNaN(referencia.getTime()) ? referencia : new Date();
   const dias = notaDe(idioma).dias;
-  partes.push(`Hoy es ${dias[hoy.getDay()]} ${fechaStrBolivia(hoy)}.`);
+  partes.push(`Hoy es ${dias[hoyEnZona(zona, hoy).diaSemana]} ${fechaStrEnZona(zona, hoy)}.`);
   if (contexto?.veterinaria) {
     partes.push(`Esta consulta es de medicina VETERINARIA — el paciente es un animal, no una persona${contexto.especie ? ` (${contexto.especie}${contexto.raza ? ", raza " + contexto.raza : ""})` : ""}. Interpretá "el paciente"/"el/la ${contexto.especie || "animal"}" en ese sentido, y las dosis de medicamentos en relación al peso del animal si se menciona.`);
   }
@@ -472,7 +485,7 @@ async function generarNotaClinica(transcripcion, contexto, idioma) {
       throw new Error("La IA devolvió una nota vacía. Probá generarla de nuevo.");
     }
   }
-  return sanearNota(r.nota);
+  return sanearNota(r.nota, contexto?.zona);
 }
 
 // La IA a veces no respeta el formato pedido en el prompt para los dos
@@ -483,10 +496,20 @@ async function generarNotaClinica(transcripcion, contexto, idioma) {
 // ni el propio manejo de errores puede recuperar (el documento queda con
 // el valor inválido pegado). Mejor limpiarlo acá, con la IA todavía fresca
 // en el flujo, que descubrirlo como un 500 en producción.
-function sanearNota(nota) {
+function sanearNota(nota, zona) {
   if (nota?.reconsultaSugerida?.fechaHora) {
-    const d = new Date(nota.reconsultaSugerida.fechaHora);
-    if (isNaN(d.getTime())) nota.reconsultaSugerida.fechaHora = null;
+    // La IA devuelve "YYYY-MM-DDTHH:mm" SIN zona, y es hora de pared del
+    // consultorio (el «hoy» que le dimos es el de su zona). new Date() la
+    // tomaba como hora del servidor (UTC): la reconsulta le llegaba al
+    // paciente 4 horas antes, y 8 si el médico la confirmaba sin tocarla
+    // (auditoría del comité de QA, A2). Se toman la fecha y la hora tal cual,
+    // aunque vengan con un espacio en vez de la T o con algo más al final: la
+    // IA no razona en UTC. Sin hora no se inventa una: queda en null, como
+    // el texto libre, y el médico la carga a mano.
+    const m = String(nota.reconsultaSugerida.fechaHora).trim().match(/^(\d{4}-\d{2}-\d{2})[T ]([01]\d|2[0-3]):([0-5]\d)/);
+    const d = m ? localAInstante(zona || ZONA_POR_DEFECTO, `${m[1]}T${m[2]}:${m[3]}`) : null;
+    if (!d || isNaN(d.getTime())) log.warn("[NOTA_CLINICA] la reconsulta vino sin fecha y hora reconocibles: se descarta");
+    nota.reconsultaSugerida.fechaHora = d && !isNaN(d.getTime()) ? d : null;
   }
   if (Array.isArray(nota?.tratamientosSugeridos)) {
     for (const t of nota.tratamientosSugeridos) {

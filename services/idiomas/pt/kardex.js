@@ -85,6 +85,8 @@ module.exports = {
   recetas: {
     indicaciones: "Orientações",
     memed: "emitida pela Memed",
+    anulada: "ANULADA",
+    motivoAnulacion: "Motivo da anulação",
   },
 
   informes: {
