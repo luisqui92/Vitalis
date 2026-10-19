@@ -12,6 +12,13 @@ const crypto = require("crypto");
 const axios = require("axios");
 const { CONFIG, log } = require("../config");
 
+// Sin timeout, axios espera para siempre: si Google no contestaba, la reserva
+// por link, la de voz y la de WhatsApp quedaban colgadas esperando el
+// calendario, y también la agenda del médico (auditoría del comité de QA,
+// octubre de 2026, A7). A los 10 segundos se sigue sin él: cada función ya
+// ataja su error y responde como si Google no estuviera configurado.
+const TIMEOUT_GOOGLE = 10000;
+
 let credencial = null;
 function cargarCredencial() {
   if (credencial !== null) return credencial; // cache (incluye el caso "no configurado" = false)
@@ -48,7 +55,7 @@ async function obtenerAccessToken() {
   const res = await axios.post("https://oauth2.googleapis.com/token", new URLSearchParams({
     grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
     assertion: jwt,
-  }));
+  }), { timeout: TIMEOUT_GOOGLE });
   tokenCache = { valor: res.data.access_token, expiraEn: Date.now() + (res.data.expires_in - 60) * 1000 };
   return tokenCache.valor;
 }
@@ -72,7 +79,7 @@ async function crearEvento(calendarId, cita) {
     const res = await axios.post(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
       eventoDesdeCita(cita),
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, timeout: TIMEOUT_GOOGLE }
     );
     return res.data.id;
   } catch (e) {
@@ -95,7 +102,7 @@ async function actualizarEvento(calendarId, eventId, cita) {
     await axios.patch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
       eventoDesdeCita(cita),
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, timeout: TIMEOUT_GOOGLE }
     );
     return true;
   } catch (e) {
@@ -111,7 +118,7 @@ async function eliminarEvento(calendarId, eventId) {
     if (!token) return false;
     await axios.delete(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, timeout: TIMEOUT_GOOGLE }
     );
     return true;
   } catch (e) {
@@ -133,7 +140,7 @@ async function obtenerOcupadoEnRango(calendarId, desde, hasta) {
     const res = await axios.post(
       "https://www.googleapis.com/calendar/v3/freeBusy",
       { timeMin: new Date(desde).toISOString(), timeMax: new Date(hasta).toISOString(), items: [{ id: calendarId }] },
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, timeout: TIMEOUT_GOOGLE }
     );
     const busy = res.data.calendars?.[calendarId]?.busy || [];
     return busy.map(b => ({ inicio: new Date(b.start), fin: new Date(b.end) }));
