@@ -12,7 +12,8 @@
 //   2. Al arrancar (en el mismo proceso, con AssemblyAI de mentira): lo que
 //      quedó a medias se retoma —la transcripción y la nota—, lo que no tiene
 //      audio queda en error con el motivo, lo viejo no avisa, un audio que se
-//      corta siempre no se reintenta para siempre, lo sobrante se borra y lo
+//      corta siempre no se reintenta para siempre (pero no se pierde), el
+//      reintento se cuenta cuando de verdad se intenta, lo sobrante se borra y lo
 //      que llegó después del arranque no se toca. Una nota en vivo que se
 //      estaba verificando se verifica de nuevo, en vez de quedar sin poder
 //      confirmarse (A6).
@@ -225,6 +226,9 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   // C. Un audio que ya cortó el servidor dos veces.
   const terca = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "procesando", reintentosAudio: 2 });
   await audioPendiente.guardar(terca._id, Buffer.from("AUDIO-QUE-TIRA-EL-SERVIDOR"));
+  // H. Otra cortada, ya retomada una vez, que espera su turno detrás de la A.
+  const enFila = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "procesando", reintentosAudio: 1 });
+  await audioPendiente.guardar(enFila._id, Buffer.from("AUDIO-EN-FILA"));
   // D. Notas que se estaban escribiendo: de la transcripción, del texto en
   // vivo, y una de hace días.
   const notaAudio = await M.ConsultaMedica.create({ medicoPhone: MED, pacienteId: paciente._id, estado: "completado", notaFuente: "audio",
@@ -273,7 +277,14 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
   const retomado = rutas.retomarConsultas(arranque);
   const retomada = await transcripcionDe("AUDIO-CORTADO", 2);
   verificar("A. la consulta cortada se vuelve a transcribir, con el audio guardado en disco", !!retomada);
+  // Si el servidor se volviera a reiniciar ahora, la de la fila no llegó a
+  // AssemblyAI: no puede haber gastado un reintento (antes, sí).
+  verificar("H. la que espera su turno en la fila todavía no gastó un reintento; la que se está transcribiendo, sí",
+    (await leer(enFila._id)).reintentosAudio === 1 && (await leer(idCortada)).reintentosAudio === 1);
   if (retomada) terminar(retomada, "Texto de la consulta retomada");
+  const enSuTurno = await transcripcionDe("AUDIO-EN-FILA");
+  verificar("  ...cuando le toca, se transcribe con su audio, y ahí se cuenta", !!enSuTurno && (await leer(enFila._id)).reintentosAudio === 2);
+  if (enSuTurno) terminar(enSuTurno, "Texto de la que esperaba");
   const resumen = (await aTiempo(retomado)) || {};
   M.ConsultaMedica.updateOne = updateOneDeLaBase;
   c = await leer(idCortada);
@@ -281,14 +292,20 @@ push.notificarMedico = async (medicoPhone, aviso) => { avisos.push({ medicoPhone
     c.estado === "completado" && c.transcripcionCompleta === "Texto de la consulta retomada" && c.notaClinicaEstado === "completado"
     && !hayAudio(idCortada) && (await M.MovimientoSaldo.countDocuments({ consultaId: idCortada })) === 1);
   verificar(`  ...el resumen dice qué retomó (${JSON.stringify(resumen)})`,
-    resumen.transcripciones === 1 && resumen.sinAudio === 2 && resumen.notas === 2 && resumen.verificaciones === 2 && resumen.sobras === 1);
+    resumen.transcripciones === 2 && resumen.sinAudio === 2 && resumen.notas === 2 && resumen.verificaciones === 2 && resumen.sobras === 1);
+  verificar("  ...y la de la fila también termina completa", (await leer(enFila._id)).estado === "completado" && !hayAudio(enFila._id));
   c = await leer(sinAudio._id);
   verificar("B. una «procesando» sin audio → en error, con el motivo, en vez de «procesando» para siempre",
     c.estado === "error" && /reinició/.test(c.error) && avisos.slice(avisosAntes).some(a => a.url.includes(String(sinAudio._id))));
   verificar("  ...la de hace días también, pero sin avisarle al médico", (await leer(vieja._id)).estado === "error" && !avisos.some(a => a.url.includes(String(vieja._id))));
   c = await leer(terca._id);
-  verificar("C. un audio que ya cortó el servidor dos veces no se intenta otra vez: error, y el audio se borra",
-    c.estado === "error" && /varias veces/.test(c.error) && !hayAudio(terca._id) && !transcripciones.some(t => t.audio === "AUDIO-QUE-TIRA-EL-SERVIDOR"));
+  verificar("C. un audio que ya cortó el servidor dos veces no se intenta otra vez solo: error, sin pasar por AssemblyAI",
+    c.estado === "error" && /varias veces/.test(c.error) && !transcripciones.some(t => t.audio === "AUDIO-QUE-TIRA-EL-SERVIDOR"));
+  verificar("  ...pero el audio no se pierde: queda guardado unos días (antes se borraba)", hayAudio(terca._id) && new Date(c.audioRetenidoHasta) > new Date());
+  verificar("  ...y el médico lo puede volver a transcribir a mano", (await reintentar(terca._id)).estado === 202);
+  const aManoTerca = await transcripcionDe("AUDIO-QUE-TIRA-EL-SERVIDOR");
+  if (aManoTerca) terminar(aManoTerca, "Texto de la que se cortaba");
+  verificar("  ...y termina completa", await hasta(async () => (await leer(terca._id)).notaClinicaEstado === "completado") && !hayAudio(terca._id));
   c = await leer(notaAudio._id);
   verificar("D. la nota que se estaba escribiendo se escribe de nuevo, de la transcripción",
     c.notaClinicaEstado === "completado" && c.notaClinica?.diagnostico === "Sano" && alaIA.slice(iaAntes).some(x => x.includes("NOTA_CORTADA_AUDIO")));

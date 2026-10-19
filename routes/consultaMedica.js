@@ -1429,7 +1429,8 @@ async function marcarTranscripcionFallida(consultaId, medicoPhone, motivo, { avi
 //   · Una consulta «procesando» con su audio en disco: se transcribe de nuevo.
 //     AssemblyAI cobra esa transcripción otra vez: es lo que cuesta no
 //     perderla. Si el mismo audio se corta una y otra vez (un audio que tira
-//     el servidor), a la tercera queda en error en vez de intentarlo siempre.
+//     el servidor), a la tercera queda en error en vez de intentarlo siempre,
+//     con el audio guardado para volver a transcribirlo a mano.
 //   · Una «procesando» sin audio (se subió antes de que el audio se guardara
 //     en disco): no hay con qué seguir. Queda en error, con el motivo, en vez
 //     de «procesando» para siempre.
@@ -1456,7 +1457,8 @@ async function retomarConsultas(arranque = ARRANQUE) {
   const enDisco = new Set(await audioPendiente.guardados(arranque));
   // Las listas antes de tocar nada: marcar una consulta le cambia la fecha
   // de modificación, y la sacaría de las que siguen.
-  const enCurso = await ConsultaMedica.find({ estado: "procesando", createdAt: { $lt: arranque } }).select("_id medicoPhone pacienteId createdAt").lean();
+  const enCurso = await ConsultaMedica.find({ estado: "procesando", createdAt: { $lt: arranque } })
+    .select("_id medicoPhone pacienteId createdAt reintentosAudio").sort({ createdAt: 1 }).lean();
   const notas = await ConsultaMedica.find({
     notaClinicaEstado: "pendiente", confirmadaEn: null, updatedAt: { $lt: arranque },
     $or: [{ estado: "completado", notaFuente: { $in: ["", null, "audio"] } }, { notaFuente: "vivo" }],
@@ -1479,17 +1481,23 @@ async function retomarConsultas(arranque = ARRANQUE) {
         "El servidor se reinició mientras se transcribía esta consulta, y el audio no había quedado guardado.", { avisar: reciente(c) });
       continue;
     }
-    const intento = await ConsultaMedica.findOneAndUpdate({ _id: c._id, estado: "procesando" }, { $inc: { reintentosAudio: 1 } }, { new: true });
-    const paciente = intento && await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
-    if (!intento || !paciente || intento.reintentosAudio > MAX_REINTENTOS_AUDIO) {
+    const paciente = await Paciente.findOne({ _id: c.pacienteId, medicoPhone: c.medicoPhone });
+    if (!paciente) {
       await audioPendiente.borrar(id).catch(() => {});
-      if (intento) {
-        await marcarTranscripcionFallida(c._id, c.medicoPhone,
-          "No se pudo transcribir: el servidor se reinició varias veces mientras lo intentaba.", { avisar: reciente(c) });
-      }
+      await marcarTranscripcionFallida(c._id, c.medicoPhone, "El paciente de esta consulta ya no está.", { avisar: reciente(c) });
       continue;
     }
-    aTranscribir.push({ consulta: intento, paciente });
+    // Cortada cada vez que se retomó: no se intenta otra vez sola. El audio
+    // no se borra: puede no ser el audio sino tres reinicios seguidos (un
+    // despliegue y dos arreglos), y el médico lo vuelve a transcribir a mano.
+    if ((c.reintentosAudio || 0) >= MAX_REINTENTOS_AUDIO) {
+      await ConsultaMedica.updateOne({ _id: c._id, estado: "procesando" },
+        { $set: { audioRetenidoHasta: new Date(Date.now() + AJUSTES_AUDIO.RETENER_MS) } });
+      await marcarTranscripcionFallida(c._id, c.medicoPhone,
+        "No se pudo transcribir: el servidor se reinició varias veces mientras lo intentaba.", { avisar: reciente(c) });
+      continue;
+    }
+    aTranscribir.push({ consulta: c, paciente });
   }
   const retenidos = await ConsultaMedica.find({ _id: { $in: [...enDisco] }, estado: "error", audioRetenidoHasta: { $gt: new Date() } })
     .select("_id").lean();
@@ -1535,10 +1543,17 @@ async function retomarConsultas(arranque = ARRANQUE) {
           await marcarTranscripcionFallida(consulta._id, consulta.medicoPhone, "No se pudo leer el audio guardado.", { avisar: reciente(consulta) });
           continue;
         }
+        // El reintento se cuenta recién acá, cuando de verdad se intenta. Antes
+        // se contaba al arrancar: las que esperaban su turno en esta fila
+        // cuando el servidor se volvió a reiniciar no habían llegado a
+        // AssemblyAI y gastaban uno igual, y a la tercera perdían el audio.
+        const intento = await ConsultaMedica.findOneAndUpdate({ _id: consulta._id, estado: "procesando" }, { $inc: { reintentosAudio: 1 } }, { new: true })
+          .catch(e => log.error(`[CONSULTA_MEDICA] no se pudo retomar la transcripción de ${consulta._id}:`, e.message));
+        if (!intento) continue;
         resumen.transcripciones++;
         log.info(`[CONSULTA_MEDICA] retomando la transcripción de ${consulta._id} (se cortó al reiniciar)`);
-        const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }));
-        await transcribirEnSegundoPlano(consulta, paciente, audio, { multicanal, intento: consulta.intentosTranscripcion || 0 })
+        const multicanal = Boolean(await Teleconsulta.exists({ consultaId: consulta._id }).catch(() => false));
+        await transcribirEnSegundoPlano(intento, paciente, audio, { multicanal, intento: intento.intentosTranscripcion || 0 })
           .catch(e => log.error(`[CONSULTA_MEDICA] no se pudo retomar la transcripción de ${consulta._id}:`, e.message));
       }
     })(),
