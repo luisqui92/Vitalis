@@ -17,6 +17,7 @@
 //      calibración quedan como al firmar, y una imagen de un firmado no se
 //      borra (informe de QA del 16 de octubre de 2026, A11). Los firmados
 //      con el membrete ya congelado reciben sus imágenes al arrancar.
+//   6. Un cambio del borrador que se cruza con la firma no cambia lo firmado.
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
@@ -210,7 +211,53 @@ const FIRMA = "data:image/png;base64," + Buffer.from("firma").toString("base64")
   verificar(`al arrancar se le congelan (${n5}), con las que mostraba; después ya no cambian`,
     n5 === 1 && r.cuerpo?.estudios?.[0]?.ajustesVisor?.contraste === 300 && r.cuerpo.estudios[0]._id === String(placa._id));
   verificar("  ...y arrancar otra vez no congela nada más", (await rutas.congelarInformesFirmados()) === 0);
-  fs.rmSync(path.join(DIR_ESTUDIOS, placa.archivoNombre), { force: true });
+
+  console.log("\n── 6. Un cambio del borrador que se cruza con la firma ──");
+  // El PATCH lee el informe, busca las imágenes que le mandaron y recién ahí
+  // guarda. Se lo frena en esa búsqueda y se firma en el medio: es tocar una
+  // miniatura mientras el «firmar» está en vuelo, o firmar en otra pestaña.
+  const findOriginal = M.Estudio.find;
+  let freno = null;
+  M.Estudio.find = function (filtro, ...resto) {
+    const q = findOriginal.call(this, filtro, ...resto);
+    if (freno && filtro?.pacienteId) {
+      const f = freno; freno = null;
+      const exec = q.exec.bind(q);
+      q.exec = async (...a) => { f.llego(); await f.soltar; return exec(...a); };
+    }
+    return q;
+  };
+  const cruce = async (cuerpo) => {
+    const id = await nuevoInforme("Conclusión que se firmó.");
+    await P("PATCH", `/medico/informes/${id}`, tk, { estudiosIncluidos: [placa._id] });
+    let llego, soltar;
+    freno = { llego: null, soltar: new Promise(r => { soltar = r; }) };
+    const enElMedio = new Promise(r => { llego = r; });
+    freno.llego = llego;
+    const patch = P("PATCH", `/medico/informes/${id}`, tk, { conclusion: "Otra conclusión.", hallazgos: "Otros hallazgos.", ...cuerpo });
+    await enElMedio;
+    const firma = await P("POST", `/medico/informes/${id}/firmar`, tk);
+    soltar();
+    return { id, firma, patch: await patch, guardado: await M.Informe.findById(id).lean() };
+  };
+  const otraPlaca = await nuevaImagen("Tórax oblicua");
+  let c = await cruce({ estudiosIncluidos: [placa._id, otraPlaca._id] });
+  verificar(`cambiando también las imágenes: firma (${c.firma.estado}) y el cambio que llega tarde → 409 (${c.patch.estado})`,
+    c.firma.estado === 200 && c.patch.estado === 409);
+  verificar("  ...el firmado sigue con su conclusión, sus hallazgos y su lista de imágenes",
+    c.guardado.estado === "firmado" && c.guardado.conclusion === "Conclusión que se firmó." && !c.guardado.hallazgos
+    && c.guardado.estudiosIncluidos.map(String).join() === String(placa._id) && c.guardado.estudiosEmitidos.length === 1);
+  r = await P("GET", `/informe-publico/${c.firma.cuerpo.enlace.split("/informe/")[1]}`);
+  verificar("  ...y es lo que ve el paciente", r.cuerpo?.informe?.conclusion === "Conclusión que se firmó." && r.cuerpo.estudios.length === 1);
+  c = await cruce({ estudiosIncluidos: [placa._id] });
+  verificar(`solo el texto (la misma lista): también 409 (${c.patch.estado}), y lo firmado no cambia`,
+    c.firma.estado === 200 && c.patch.estado === 409 && c.guardado.conclusion === "Conclusión que se firmó.");
+  M.Estudio.find = findOriginal;
+  const bor6 = await nuevoInforme();
+  r = await P("PATCH", `/medico/informes/${bor6}`, tk, { conclusion: "Un borrador se sigue editando.", estudiosIncluidos: [placa._id] });
+  verificar("un borrador, sin nadie firmando, se sigue editando", r.estado === 200 && r.cuerpo.informe.conclusion === "Un borrador se sigue editando.");
+
+  for (const e of [placa, otraPlaca]) fs.rmSync(path.join(DIR_ESTUDIOS, e.archivoNombre), { force: true });
 
   servidor.close();
   await mongoose.disconnect();

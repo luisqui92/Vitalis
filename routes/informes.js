@@ -236,9 +236,8 @@ module.exports = function (app) {
   app.patch("/medico/informes/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const informe = await obtenerOFallar(Informe, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
-    if (informe.estado === "firmado") {
-      throw new ErrorHttp(409, "Este informe ya está firmado y no se puede editar. Creá uno nuevo que lo corrija.");
-    }
+    const YA_FIRMADO = "Este informe ya está firmado y no se puede editar. Creá uno nuevo que lo corrija.";
+    if (informe.estado === "firmado") throw new ErrorHttp(409, YA_FIRMADO);
 
     for (const campo of ["titulo", "tipoEstudio", "tecnica", "hallazgos", "conclusion", "recomendaciones"]) {
       if (req.body?.[campo] !== undefined) informe[campo] = String(req.body[campo]).slice(0, 20000);
@@ -257,7 +256,20 @@ module.exports = function (app) {
       informe.estudiosIncluidos = validos.map(e => e._id);
     }
 
-    await informe.save();
+    // Tiene que seguir siendo borrador al guardar, no solo al leerlo. Si la
+    // firma entraba en el medio (una miniatura tocada mientras se firma, o
+    // dos pestañas), el save escribía la conclusión y las imágenes nuevas
+    // sobre un informe ya firmado y entregado (informe de QA del 16 de
+    // octubre de 2026, A11).
+    informe.$where = { estado: { $ne: "firmado" } };
+    try {
+      await informe.save();
+    } catch (e) {
+      if (["DocumentNotFoundError", "VersionError"].includes(e?.name) && await Informe.exists({ _id: informe._id, estado: "firmado" })) {
+        throw new ErrorHttp(409, YA_FIRMADO);
+      }
+      throw e;
+    }
     res.json({ ok: true, informe });
   }));
 
