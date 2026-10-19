@@ -217,6 +217,11 @@ const servidorIa = http.createServer((req, res) => {
     await page.click('.pv-pedido[data-texto="Hemograma"]');
     await page.waitForFunction(() => document.querySelectorAll("#pvMensajes .pv-sis").length >= 2, null, { timeout: 15000 });
     verificar("pedir un hemograma → el resultado", /Leucocitos/.test(await page.innerText("#pvMensajes")));
+    // Otro estudio enseguida: un solo toque en «Pedir» vuelve a abrir la lista
+    // (antes quedaba «abierta» sin verse, y el toque la cerraba).
+    await page.click("#pvPedir");
+    verificar("pedir otro estudio → un toque y la lista se abre de nuevo", (await page.locator("#pvPanel .pv-pedido").count()) > 0);
+    await page.click("#pvPedir");
     for (const q of ["¿Se le movió el dolor?", "¿Tuvo fiebre?"]) {
       const antes = await page.$$eval("#pvMensajes .pv-pac:not(.pv-escribiendo)", (xs) => xs.length);
       await page.fill("#pvTexto", q);
