@@ -7,7 +7,9 @@
 // deja marcado (revisión integral del 11 de octubre de 2026, S05; el
 // servidor, en probar_mapas_al_confirmar.js). Lo que se prueba:
 //   · cada hallazgo es una fila con su casilla, en palabras (no la clave);
-//   · al confirmar va el número de cada fila marcada, y las desmarcadas no.
+//   · al confirmar va el número de cada fila marcada, y las desmarcadas no;
+//   · las listas de la nota se cortan por coma, pero no por la coma decimal:
+//     «fiebre de 38,5 °C» es un síntoma, no dos.
 //
 // Con OFUSCADO=1 corre contra el JS ofuscado, que es el que se sirve en
 // producción.
@@ -48,6 +50,7 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const NOTA = {
   motivoConsulta: "Control", diagnostico: "Caries", plan: "Obturar",
+  sintomas: ["fiebre de 38,5 °C", "dolor al masticar"], diagnosticosDiferenciales: ["Pulpitis", "Absceso"],
   medicamentosRecetados: [],
   odontogramaSugerido: [
     { piezaFdi: 36, estado: "caries", hallazgo: "la 36 tiene caries" },
@@ -140,6 +143,11 @@ const NOTA = {
     verificar(`odontograma: solo la 36 (${JSON.stringify(a.odontograma)})`, JSON.stringify(a.odontograma) === "[0]");
     verificar(`mapa ocular: nada, se desmarcó (${JSON.stringify(a.examenOcular)})`, JSON.stringify(a.examenOcular) === "[]");
     verificar(`gineco: el útero (${JSON.stringify(a.gineco)})`, JSON.stringify(a.gineco) === "[0]");
+    const notaMandada = confirmado?.nota || {};
+    verificar(`la coma decimal no parte un síntoma (${JSON.stringify(notaMandada.sintomas)})`,
+      JSON.stringify(notaMandada.sintomas) === JSON.stringify(["fiebre de 38,5 °C", "dolor al masticar"]));
+    verificar(`  ...y la coma de la lista sí separa (${JSON.stringify(notaMandada.diagnosticosDiferenciales)})`,
+      JSON.stringify(notaMandada.diagnosticosDiferenciales) === JSON.stringify(["Pulpitis", "Absceso"]));
     await page.waitForLoadState("networkidle");
     verificar(`sin errores en la página${errores.length ? ": " + errores.join(" | ") : ""}`, errores.length === 0);
   } finally {

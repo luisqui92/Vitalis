@@ -1133,7 +1133,9 @@ async function renderDetalle(id, esRefrescoAutomatico, intento = 0) {
         const errBox = document.getElementById("confirmarErr");
         errBox.innerHTML = "";
         const val = (id) => (document.getElementById(id)?.value || "").trim();
-        const lista = (id) => val(id).split(",").map(x => x.trim()).filter(Boolean);
+        // Sin cortar la coma decimal: «fiebre de 38,5 °C» es un síntoma, no
+        // dos («fiebre de 38» y «5 °C»).
+        const lista = (id) => val(id).split(/(?<!\d),|,(?!\d)/).map(x => x.trim()).filter(Boolean);
         const marcado = (id) => !!document.getElementById(id)?.checked;
 
         const nota = esNotaEnfermeria(n) ? notaEnfermeriaDelFormulario() : {

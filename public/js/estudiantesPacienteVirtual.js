@@ -285,7 +285,9 @@ async function enviarPV(tipo, texto, input) {
     if (PV) PV.enviando = false;
     document.querySelectorAll("#pvChat button, #pvTexto").forEach(b => { b.disabled = false; });
     const panel = document.getElementById("pvPanel");
-    if (panel && tipo !== "pregunta") panel.innerHTML = "";
+    // Cerrado del todo: si quedara «abierto», el próximo toque en el mismo
+    // botón lo cerraría en vez de abrirlo, y parecería que no hace nada.
+    if (panel && tipo !== "pregunta") { panel.innerHTML = ""; panel.dataset.abierto = ""; }
   }
 }
 

@@ -35,6 +35,10 @@ function correr(uri, args) {
   verificar("una fila vacía se descarta", !n.medicamentosRecetados.some(x => x == null));
   verificar("un medicamento escrito como texto suelto se convierte, sin perderse",
     n.medicamentosRecetados.length === 2 && n.medicamentosRecetados[0].nombre === "Amoxicilina 500 mg cada 8 horas" && n.medicamentosRecetados[1].dosis === "500 mg");
+  const conTexto = normalizarNota({ motivoConsulta: "Fiebre", sintomas: "fiebre de 38,5 °C, tos; dolor\ncefalea", examenesSolicitados: "Hemograma,PCR" }).nota;
+  verificar(`una lista que llega como texto se corta por coma, punto y coma o renglón, pero no por la coma decimal (${JSON.stringify(conTexto.sintomas)})`,
+    JSON.stringify(conTexto.sintomas) === JSON.stringify(["fiebre de 38,5 °C", "tos", "dolor", "cefalea"])
+    && JSON.stringify(conTexto.examenesSolicitados) === JSON.stringify(["Hemograma", "PCR"]));
   verificar("lo mismo en vacunas y antecedentes familiares",
     n.vacunasMencionadas.length === 1 && n.vacunasMencionadas[0].nombre === "BCG" && n.antecedentesFamiliaresNuevos[0].condicion === "diabetes en la madre");
 
