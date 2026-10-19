@@ -36,7 +36,7 @@ const { registrar } = require("../services/auditoria");
 const { esOperador } = require("../services/operadores");
 const { hashPassword } = require("../services/auth");
 const { cuposDe } = require("../services/socios");
-const { zonaPorMoneda } = require("../services/zonaHoraria");
+const { zonaPorMoneda, zonaValida, hoyEnZona, instanteEnZona } = require("../services/zonaHoraria");
 const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
 const monedas = require("../services/monedas");
@@ -88,7 +88,7 @@ function requireOperador(req, res, next) {
     registrar({ req, medicoPhone: phone, accion: "operador_saldo_denegado", exito: false });
     return res.status(404).json({ error: "No encontrado" });
   }
-  Medico.findOne({ phone }).select("dosFA nombre").lean()
+  Medico.findOne({ phone }).select("dosFA nombre zonaHoraria").lean()
     .then((medico) => {
       if (!medico?.dosFA?.activo) {
         return res.status(403).json({
@@ -249,9 +249,14 @@ module.exports = function (app) {
   //
   // Todo sale de MovimientoSaldo, que es el libro. No hay un contador aparte
   // que se pueda desincronizar — ver el comentario del modelo en db/models.js.
-  app.get("/medico/operador/resumen", limitOperador, requireSesion, requireOperador, asyncRoute(async (_req, res) => {
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const mes = new Date(); mes.setDate(1); mes.setHours(0, 0, 0, 0);
+  app.get("/medico/operador/resumen", limitOperador, requireSesion, requireOperador, asyncRoute(async (req, res) => {
+    // «Hoy» y «este mes» son los del operador, en la zona de su cuenta, no
+    // los del servidor (UTC): de 20:00 a 24:00 en Bolivia las cargas de hoy
+    // volvían a cero y el mes cerraba cuatro horas antes.
+    const zona = zonaValida(req.operador?.zonaHoraria);
+    const h = hoyEnZona(zona);
+    const hoy = instanteEnZona(zona, h.anio, h.mesIndex, h.dia, 0, 0);
+    const mes = instanteEnZona(zona, h.anio, h.mesIndex, 1, 0, 0);
 
     // ═══ SE AGRUPA POR MONEDA, Y NO ES UN DETALLE DE PRESENTACIÓN ═════════
     //

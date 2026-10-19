@@ -23,6 +23,9 @@
 process.env.TZ = "UTC";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(64);
 process.env.OPENAI_KEY = process.env.OPENAI_KEY || "sk-de-prueba";
+// La cuenta del operador de pagos de la sección 14. Se lee una sola vez, al
+// cargar services/operadores.js: tiene que estar antes de cualquier require.
+process.env.OPERADORES_SALDO = "70088009";
 
 const path = require("path");
 const http = require("http");
@@ -276,6 +279,8 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   require(path.join(RAIZ, "routes", "consultaMedica"))(app);
   require(path.join(RAIZ, "routes", "asistenteSymphomed"))(app);
   require(path.join(RAIZ, "routes", "dashboardEscritorio"))(app);
+  require(path.join(RAIZ, "routes", "admin"))(app);
+  require(path.join(RAIZ, "routes", "operadorSaldo"))(app);
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
   await new Promise((ok) => servidor.listen(0, "127.0.0.1", ok));
@@ -509,6 +514,74 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
     pm === JSON.stringify({ "2026-05": 1, "2026-09": 1, "2026-10": 1 }));
   pm = await porMesDe(BR2);
   verificar(`São Paulo: las 00:30 del 1/10 son de octubre (${pm})`, pm === JSON.stringify({ "2026-10": 1 }));
+
+  // ═══ 14. EL PANEL DE LA CLÍNICA Y EL DE PAGOS ═══════════════════════════════
+  console.log("\n── 14. «Hoy» y «el mes» del panel de la clínica y del de pagos ──");
+  // Los dos armaban el día y el mes con setHours() del servidor (UTC). A las
+  // 21:30 del jueves en Bolivia el servidor ya está en el viernes: el panel
+  // contaba las citas de mañana como de hoy y el operador veía las cargas del
+  // día en cero. La zona es la de la cuenta que mira el panel.
+  const clinicaBO = await M.Clinica.create({ nombre: "Clínica La Paz" });
+  const clinicaBR = await M.Clinica.create({ nombre: "Clínica São Paulo" });
+  const ADM_BO = "70088005", MED_BO = "70088006", ADM_BR = "70088007", MED_BR = "70088008", OPER = "70088009";
+  // La administración de La Paz, sin zona guardada: la de siempre.
+  await M.Medico.create({ phone: ADM_BO, nombre: "Administración La Paz", passwordHash: "x", activo: true, rol: "admin", clinicaId: clinicaBO._id });
+  await M.Medico.create({ phone: MED_BO, nombre: "Dra. Clínica La Paz", passwordHash: "x", activo: true, clinicaId: clinicaBO._id, vinculo: "empleado" });
+  await M.Medico.create({ phone: ADM_BR, nombre: "Administração São Paulo", passwordHash: "x", activo: true, rol: "admin", clinicaId: clinicaBR._id, zonaHoraria: "America/Sao_Paulo" });
+  await M.Medico.create({ phone: MED_BR, nombre: "Dra. Clínica São Paulo", passwordHash: "x", activo: true, clinicaId: clinicaBR._id, vinculo: "empleado", zonaHoraria: "America/Sao_Paulo" });
+  tk.admBO = generarToken(ADM_BO, "admin", UN_ANIO, { admin: true, clinicaId: String(clinicaBO._id) });
+  tk.admBR = generarToken(ADM_BR, "admin", UN_ANIO, { admin: true, clinicaId: String(clinicaBR._id) });
+  await cita(MED_BO, "2026-10-16T01:00:00Z"); // jueves 15, 21:00 en La Paz
+  await cita(MED_BO, "2026-10-16T14:00:00Z"); // viernes 16, 10:00
+  await consultaCreada(MED_BO, "2026-10-01T01:00:00Z"); // 30/9, 21:00: es de septiembre
+  await consultaCreada(MED_BO, "2026-10-15T15:00:00Z"); // 15/10, 11:00
+  await cita(MED_BR, "2026-10-16T02:45:00Z"); // jueves 15, 23:45 en São Paulo
+  await cita(MED_BR, "2026-10-16T03:30:00Z"); // viernes 16, 00:30
+  const panel = async (token, ruta, ahora) => {
+    relojEn(ahora);
+    try { return await pedir(puerto, "GET", ruta, token); } finally { relojReal(); }
+  };
+  const JUEVES_2130_BO = "2026-10-16T01:30:00Z";
+  r = await panel(tk.admBO, "/admin/resumen", JUEVES_2130_BO);
+  verificar(`resumen a las 21:30 del jueves en La Paz: 1 cita hoy, no la del viernes (${r.estado}, ${r.cuerpo?.totales?.citasHoy})`,
+    r.estado === 200 && r.cuerpo.totales.citasHoy === 1);
+  verificar(`  ...1 consulta en octubre: la del 30/9 a las 21:00 es de septiembre (${r.cuerpo?.totales?.consultasMes}, ${JSON.stringify(r.cuerpo?.consultasPorMes)})`,
+    r.cuerpo?.totales?.consultasMes === 1 && JSON.stringify(Object.fromEntries(Object.entries(r.cuerpo.consultasPorMes).sort())) === JSON.stringify({ "2026-09": 1, "2026-10": 1 }));
+  r = await panel(tk.admBO, "/admin/ocupacion?dias=7", JUEVES_2130_BO);
+  const porDia = Object.fromEntries(Object.entries(r.cuerpo?.salas?.find(x => x.phone === MED_BO)?.porDia || {}).sort());
+  verificar(`ocupación: la de las 21:00 es del jueves 15 y la de las 10:00, del viernes 16 (${JSON.stringify(porDia)})`,
+    r.estado === 200 && JSON.stringify(porDia) === JSON.stringify({ "2026-10-15": 1, "2026-10-16": 1 }));
+  r = await panel(tk.admBO, "/admin/agenda", JUEVES_2130_BO);
+  verificar(`agenda sin fecha: la de hoy jueves 15, con 1 cita (${r.cuerpo?.fecha}, ${r.cuerpo?.total})`,
+    r.estado === 200 && r.cuerpo.fecha === "2026-10-15" && r.cuerpo.total === 1);
+  r = await panel(tk.admBO, "/admin/agenda?fecha=2026-10-16", JUEVES_2130_BO);
+  verificar(`agenda del viernes 16: de 00:00 a 00:00 de La Paz, 1 cita (${r.cuerpo?.fecha}, ${r.cuerpo?.total})`,
+    r.estado === 200 && r.cuerpo.fecha === "2026-10-16" && r.cuerpo.total === 1);
+  r = await panel(tk.admBO, "/admin/agenda?fecha=2026-02-31", JUEVES_2130_BO);
+  verificar(`un día que no existe (31/2) → 400, no la agenda de otro día (${r.estado})`, r.estado === 400);
+  const JUEVES_2330_BR = "2026-10-16T02:30:00Z"; // 22:30 en La Paz
+  r = await panel(tk.admBR, "/admin/resumen", JUEVES_2330_BR);
+  verificar(`São Paulo a las 23:30: la de las 00:30 ya es de mañana, 1 cita hoy (${r.cuerpo?.totales?.citasHoy})`,
+    r.estado === 200 && r.cuerpo.totales.citasHoy === 1);
+  r = await panel(tk.admBR, "/admin/agenda", JUEVES_2330_BR);
+  verificar(`  ...y su agenda de hoy es la del jueves 15, con 1 (${r.cuerpo?.fecha}, ${r.cuerpo?.total})`,
+    r.estado === 200 && r.cuerpo.fecha === "2026-10-15" && r.cuerpo.total === 1);
+
+  // El operador de pagos, en La Paz (sin zona guardada).
+  await M.Medico.create({ phone: OPER, nombre: "Pagos", passwordHash: "x", activo: true, rol: "admin", dosFA: { activo: true } });
+  tk.oper = generarToken(OPER, "admin", UN_ANIO);
+  const carga = async (iso, referencia) => {
+    const mov = await M.MovimientoSaldo.create({ medicoPhone: MED_BO, tipo: "carga", montoCentavos: 10000, moneda: "BOB", referencia, acreditadoPor: OPER });
+    await M.MovimientoSaldo.collection.updateOne({ _id: mov._id }, { $set: { createdAt: new DateReal(iso) } });
+  };
+  await carga("2026-10-01T01:00:00Z", "QR 1"); // 30/9, 21:00 en La Paz
+  await carga("2026-10-15T15:00:00Z", "QR 2"); // jueves 15, 11:00
+  await carga("2026-10-16T01:00:00Z", "QR 3"); // jueves 15, 21:00
+  r = await panel(tk.oper, "/medico/operador/resumen", JUEVES_2130_BO);
+  verificar(`pagos a las 21:30 del jueves: las 2 cargas de hoy (${r.estado}, ${r.cuerpo?.cargasHoy?.[0]?.n})`,
+    r.estado === 200 && r.cuerpo.cargasHoy?.[0]?.n === 2);
+  verificar(`  ...y 2 en octubre: la del 30/9 a las 21:00 es de septiembre (${r.cuerpo?.cargasMes?.[0]?.n})`,
+    r.cuerpo?.cargasMes?.[0]?.n === 2);
 
   servidor.close();
   await mongoose.disconnect();
