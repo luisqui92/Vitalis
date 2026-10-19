@@ -42,3 +42,59 @@ assert.throws(
 );
 
 console.log("✓ backup seguro: configuración, cifrado autenticado y rechazo fail-closed");
+
+// El tar de los estudios se cifra de archivo a archivo, sin cargarlo en
+// memoria (readFile no pasa de 2 GiB). Tiene que salir con el MISMO formato
+// que cifrar(): los respaldos ya guardados y los nuevos se abren igual.
+(async () => {
+  const fs = require("fs");
+  const os = require("os");
+  const path = require("path");
+  const crypto = require("crypto");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "backup-seguro-"));
+  try {
+    const claro = path.join(dir, "estudios.tar.gz");
+    const datos = crypto.randomBytes(3 * 1024 * 1024 + 7); // varios pedazos de lectura
+    fs.writeFileSync(claro, datos);
+
+    const cifradoNuevo = path.join(dir, "nuevo.bin");
+    await backup.cifrarArchivo(claro, cifradoNuevo);
+    const bytesNuevo = fs.readFileSync(cifradoNuevo);
+    assert.equal(bytesNuevo.subarray(0, 10).toString(), "VITALISBK1", "el archivo cifrado lleva la misma cabecera");
+    assert.equal(bytesNuevo.length, datos.length + 10 + 16 + 12 + 16, "cabecera + cuerpo, sin nada de más");
+    assert.equal((fs.statSync(cifradoNuevo).mode & 0o777).toString(8), "600", "el cifrado solo lo lee el dueño");
+    assert.deepEqual(backup.descifrar(bytesNuevo), datos, "lo cifrado por pedazos se abre con descifrar() de siempre");
+
+    const restaurado = path.join(dir, "vuelta.tar.gz");
+    assert.deepEqual(await backup.descifrarArchivo(cifradoNuevo, restaurado), { cifrado: true });
+    assert.deepEqual(fs.readFileSync(restaurado), datos, "y con descifrarArchivo(), por pedazos");
+
+    // Un tar cifrado antes de este cambio, con cifrar() en memoria.
+    const viejo = path.join(dir, "viejo.bin");
+    fs.writeFileSync(viejo, backup.cifrar(datos).buffer);
+    const restauradoViejo = path.join(dir, "vuelta-viejo.tar.gz");
+    await backup.descifrarArchivo(viejo, restauradoViejo);
+    assert.deepEqual(fs.readFileSync(restauradoViejo), datos, "descifrarArchivo() abre los respaldos hechos con cifrar()");
+
+    // Uno tocado: GCM lo detecta al final, cuando ya se escribió casi todo.
+    // No puede quedar ni el destino ni el temporal con cara de bueno.
+    const tocado = Buffer.from(bytesNuevo);
+    tocado[tocado.length - 100] ^= 1;
+    fs.writeFileSync(path.join(dir, "tocado.bin"), tocado);
+    const destinoTocado = path.join(dir, "tocado.tar.gz");
+    await assert.rejects(
+      backup.descifrarArchivo(path.join(dir, "tocado.bin"), destinoTocado),
+      /clave no es la correcta|archivo está dañado/,
+      "un tar cifrado y modificado no se abre"
+    );
+    assert.equal(fs.existsSync(destinoTocado) || fs.existsSync(destinoTocado + ".tmp"), false, "y no deja nada a medio descifrar");
+
+    // Sin cifrar (un respaldo hecho sin BACKUP_CLAVE): se copia tal cual.
+    const copia = path.join(dir, "copia.tar.gz");
+    assert.deepEqual(await backup.descifrarArchivo(claro, copia), { cifrado: false });
+    assert.deepEqual(fs.readFileSync(copia), datos);
+    console.log("✓ backup seguro: el tar se cifra y descifra por pedazos, con el mismo formato");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+})().catch((e) => { console.error("✗", e.message); process.exit(1); });

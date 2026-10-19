@@ -81,7 +81,7 @@ let SERIE_PANTALLA = 0;
 function nuevaSeriePantalla() { return ++SERIE_PANTALLA; }
 function seriePantallaVigente(n) { return n === SERIE_PANTALLA; }
 
-function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function edadDesde(fechaNacimiento) {
   if (!fechaNacimiento) return null;

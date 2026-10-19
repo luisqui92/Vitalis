@@ -14,10 +14,12 @@
 // tipos (ObjectId, fechas, binarios) sin pérdida.
 const fs = require("fs");
 const fsp = require("fs/promises");
+const os = require("os");
 const path = require("path");
 const zlib = require("zlib");
 const crypto = require("crypto");
 const { promisify } = require("util");
+const { pipeline } = require("stream/promises");
 const { execFile } = require("child_process");
 const mongoose = require("mongoose");
 const { EJSON } = require("bson");
@@ -64,6 +66,8 @@ const CLAVE = process.env.BACKUP_CLAVE || "";
 // esos archivos en el disco del servidor. Cambiarlos no rompe nada hoy y deja
 // ilegibles todos los respaldos viejos — que es justo cuando uno se entera.
 const MAGIA = Buffer.from("VITALISBK1");
+// MAGIA + sal + iv + etiqueta de GCM: lo que va antes del cuerpo cifrado.
+const CABECERA = MAGIA.length + 16 + 12 + 16;
 
 // En producción se activa BACKUP_EXIGIR_SEGURO=1. Desde ese momento la app
 // se niega a arrancar si falta cifrado, subida o verificación externa. La
@@ -131,15 +135,91 @@ function descifrar(buffer) {
   try {
     return Buffer.concat([decipher.update(buffer.subarray(o)), decipher.final()]);
   } catch {
-    // El error que tira OpenSSL acá es "Unsupported state or unable to
-    // authenticate data", que no le dice nada a nadie — y menos a quien
-    // esté leyéndolo a las dos de la mañana con el servidor caído.
-    throw new Error(
-      "No se pudo abrir el respaldo: la BACKUP_CLAVE no es la correcta, o el archivo está dañado.\n" +
-      "  Tiene que ser exactamente la misma clave con la que se hizo el respaldo.\n" +
-      "  Si la perdiste, ese respaldo no se puede recuperar — no hay forma de saltear esto."
-    );
+    throw errorDeClave();
   }
+}
+
+// El error que tira OpenSSL cuando la etiqueta no da es "Unsupported state or
+// unable to authenticate data", que no le dice nada a nadie — y menos a quien
+// esté leyéndolo a las dos de la mañana con el servidor caído.
+function errorDeClave() {
+  return new Error(
+    "No se pudo abrir el respaldo: la BACKUP_CLAVE no es la correcta, o el archivo está dañado.\n" +
+    "  Tiene que ser exactamente la misma clave con la que se hizo el respaldo.\n" +
+    "  Si la perdiste, ese respaldo no se puede recuperar — no hay forma de saltear esto."
+  );
+}
+
+// Lo mismo que cifrar(), pero de archivo a archivo y por pedazos. Es para el
+// tar de los estudios: puede pasar los 2 GiB, que es lo más que readFile
+// puede leer, y aunque no los pase, tenerlo entero en memoria dentro del
+// proceso del servidor tampoco es gratis. Sale con el MISMO formato que
+// cifrar(), así que se abre con descifrar() igual que los de antes.
+//
+// La etiqueta de GCM recién se sabe al final y en el archivo va antes del
+// cuerpo: se deja su lugar en cero y se escribe cuando termina.
+async function cifrarArchivo(origen, destino) {
+  if (!CLAVE) {
+    await fsp.copyFile(origen, destino);
+    await fsp.chmod(destino, 0o600);
+    return { cifrado: false };
+  }
+  const sal = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", derivarClave(sal), iv);
+  await fsp.writeFile(destino, Buffer.concat([MAGIA, sal, iv, Buffer.alloc(16)]), { mode: 0o600 });
+  await fsp.chmod(destino, 0o600);
+  await pipeline(fs.createReadStream(origen), cipher, fs.createWriteStream(destino, { flags: "r+", start: CABECERA }));
+  const fh = await fsp.open(destino, "r+");
+  try {
+    await fh.write(cipher.getAuthTag(), 0, 16, MAGIA.length + 16 + 12);
+  } finally {
+    await fh.close();
+  }
+  return { cifrado: true };
+}
+
+// La vuelta, también por pedazos (scripts/restaurar.js --extraer-archivos).
+// Abre lo cifrado con cifrar() y con cifrarArchivo(); uno sin cifrar lo copia
+// tal cual. GCM recién avisa que el archivo está tocado al final, cuando ya
+// se escribió casi todo: por eso va a un temporal, que se renombra solo si
+// la etiqueta da bien.
+async function descifrarArchivo(origen, destino) {
+  const temporal = destino + ".tmp";
+  const fh = await fsp.open(origen, "r");
+  const cabecera = Buffer.alloc(CABECERA);
+  let leidos;
+  try {
+    ({ bytesRead: leidos } = await fh.read(cabecera, 0, CABECERA, 0));
+  } finally {
+    await fh.close();
+  }
+
+  if (!cabecera.subarray(0, Math.min(leidos, MAGIA.length)).equals(MAGIA)) {
+    await fsp.copyFile(origen, temporal);
+    await fsp.rename(temporal, destino);
+    return { cifrado: false };
+  }
+  if (!CLAVE) throw new Error("El respaldo está cifrado y no hay BACKUP_CLAVE configurada");
+  if (leidos < CABECERA) throw errorDeClave(); // cortado antes de terminar la cabecera
+
+  let o = MAGIA.length;
+  const sal = cabecera.subarray(o, o += 16);
+  const iv = cabecera.subarray(o, o += 12);
+  const tag = cabecera.subarray(o, o += 16);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", derivarClave(sal), iv);
+  decipher.setAuthTag(tag);
+  let errorDelDescifrado = null;
+  decipher.once("error", (e) => { errorDelDescifrado = e; });
+  try {
+    await pipeline(fs.createReadStream(origen, { start: CABECERA }), decipher, fs.createWriteStream(temporal, { mode: 0o600 }));
+  } catch (e) {
+    await fsp.unlink(temporal).catch(() => {});
+    // Un disco lleno no es una clave equivocada: ese error se deja como viene.
+    throw e === errorDelDescifrado ? errorDeClave() : e;
+  }
+  await fsp.rename(temporal, destino);
+  return { cifrado: true };
 }
 
 // ─── VOLCADO DE LA BASE ───────────────────────────────────────────────────
@@ -208,6 +288,114 @@ async function escribirJsonAtomico(ruta, valor) {
   await fsp.rename(temporal, ruta);
 }
 
+// ─── UN RESPALDO POR VEZ, AUNQUE SEAN DOS PROCESOS ───────────────────────
+// respaldoEnCurso cuida al proceso del servidor, pero scripts/respaldar_ahora.js
+// corre en OTRO proceso, con el servidor vivo, justo antes de desplegar. Si
+// el automático arrancaba en ese momento, los dos usaban la misma base de
+// verificación, uno se la borraba al otro y los dos respaldos quedaban como
+// fallidos. El candado es un archivo en la carpeta de respaldos, que solo uno
+// puede crear (wx).
+//
+// Si el proceso que lo tenía murió (un pm2 restart a la mitad), el candado
+// queda ahí. Vence cuando ese proceso ya no existe, o a las 12 horas: después
+// de reiniciar la máquina ese número puede ser de cualquier otro programa. Y
+// lo que dejó ese respaldo a medias se borra.
+const RUTA_CANDADO = path.join(DIR_BACKUPS, ".respaldo.lock");
+const HORAS_CANDADO = 12;
+
+async function leerCandado() {
+  try {
+    const [texto, info] = await Promise.all([fsp.readFile(RUTA_CANDADO, "utf8"), fsp.stat(RUTA_CANDADO)]);
+    let datos = null;
+    try { datos = JSON.parse(texto); } catch { /* vacío o roto */ }
+    return { texto, datos, modificado: info.mtimeMs };
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+}
+
+function procesoVivo(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM"; // existe, pero es de otro usuario
+  }
+}
+
+function candadoVencido({ datos, modificado }) {
+  // Vacío o roto: el proceso murió entre crearlo y escribirlo, que es un
+  // instante. Uno así de hace más de un minuto ya no es de nadie.
+  if (!datos) return Date.now() - modificado > 60 * 1000;
+  if (!(Date.now() - new Date(datos.desde).getTime() < HORAS_CANDADO * 3600000)) return true;
+  // El número de proceso solo dice algo en esta máquina. Si es el de este
+  // mismo proceso, es de otra vida suya (reinició y le tocó el mismo número):
+  // acá adentro respaldoEnCurso ya no deja que haya dos.
+  if (datos.host !== os.hostname() || !Number.isInteger(datos.pid)) return false;
+  return datos.pid === process.pid || !procesoVivo(datos.pid);
+}
+
+// Lo saca de en medio con rename, que es atómico: si dos procesos ven el
+// mismo candado vencido, se lo lleva uno solo. Si lo que se llevó no es el
+// que había leído (otro lo cambió en ese instante), lo devuelve.
+async function sacarCandadoVencido(visto) {
+  const aparte = `${RUTA_CANDADO}.${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  try {
+    await fsp.rename(RUTA_CANDADO, aparte);
+  } catch (e) {
+    if (e.code === "ENOENT") return false;
+    throw e;
+  }
+  const llevado = await fsp.readFile(aparte, "utf8").catch(() => null);
+  if (llevado !== visto.texto) await fsp.link(aparte, RUTA_CANDADO).catch(() => {});
+  await fsp.unlink(aparte).catch(() => {});
+  return llevado === visto.texto;
+}
+
+// { mio } si lo tomó; { otro } con el pid y la hora de quien lo tiene, si no.
+async function tomarCandado(marca) {
+  const mio = { pid: process.pid, host: os.hostname(), desde: new Date().toISOString(), marca, id: crypto.randomBytes(8).toString("hex") };
+  for (let intento = 0; intento < 5; intento++) {
+    try {
+      await fsp.writeFile(RUTA_CANDADO, JSON.stringify(mio), { flag: "wx", mode: 0o600 });
+      return { mio };
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
+    const visto = await leerCandado();
+    if (!visto) continue; // se soltó mientras tanto
+    if (!candadoVencido(visto)) return { otro: visto.datos || { desde: new Date(visto.modificado).toISOString() } };
+    if (await sacarCandadoVencido(visto)) {
+      log.warn(`[BACKUP] el respaldo anterior no terminó (proceso ${visto.datos?.pid ?? "?"}): se suelta su candado y se borra lo que dejó`);
+      if (visto.datos?.marca) await borrarRestos(visto.datos.marca);
+    }
+  }
+  throw new Error("No se pudo tomar el candado de los respaldos");
+}
+
+async function soltarCandado({ mio }) {
+  const actual = await leerCandado().catch(() => null);
+  if (actual?.datos?.id === mio.id) await fsp.unlink(RUTA_CANDADO).catch(() => {});
+}
+
+// Lo que deja un respaldo que no terminó: sus archivos sin manifiesto (el tar
+// de los estudios, a lo mejor todavía en claro) y los temporales. Antes nadie
+// los borraba nunca: la retención solo mira los manifiestos. Se borra SOLO lo
+// de esa marca —un respaldo sin manifiesto que alguien trajo a mano para
+// restaurarlo no es un resto—, y si el manifiesto llegó a escribirse, el
+// respaldo está entero y sus datos se quedan.
+async function borrarRestos(marca) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$/.test(String(marca))) return;
+  const base = path.join(DIR_BACKUPS, `vitalis-${marca}`);
+  const datos = [base + ".vitalisbk", base + "-archivos.tar.gz"];
+  const temporales = [...datos, base + ".json"].map(r => r + ".tmp");
+  const entero = fs.existsSync(base + ".json");
+  for (const ruta of entero ? temporales : [...datos, ...temporales]) {
+    await fsp.unlink(ruta).catch(() => {});
+  }
+}
+
 // Todas las entradas —automática y manual— comparten esta promesa. Dos clics,
 // dos timers o un reinicio del frontend no pueden hacer dos volcados enormes
 // al mismo tiempo ni subir dos juegos con la misma marca.
@@ -221,16 +409,35 @@ async function hacerBackup(opciones = {}) {
   }
 }
 
-async function hacerBackupInterno({ verificar = true } = {}) {
+async function hacerBackupInterno(opciones = {}) {
   if (mongoose.connection.readyState !== 1) {
     log.warn("[BACKUP] se saltea este respaldo: MongoDB no está conectado ahora mismo");
     return { salteado: true, motivo: "sin_conexion" };
   }
 
-  const arrancó = Date.now();
   await fsp.mkdir(DIR_BACKUPS, { recursive: true, mode: 0o700 });
   await fsp.chmod(DIR_BACKUPS, 0o700).catch(() => {});
   const marca = nombreDeAhora();
+
+  const candado = await tomarCandado(marca);
+  if (candado.otro) {
+    log.warn(`[BACKUP] se saltea este respaldo: ya hay uno en curso en el proceso ${candado.otro.pid ?? "?"} desde ${candado.otro.desde}`);
+    return { salteado: true, motivo: "en_curso_otro_proceso", otro: candado.otro };
+  }
+  try {
+    return await armarRespaldo(marca, opciones);
+  } catch (e) {
+    // Que un respaldo fallido no deje sus archivos sin manifiesto para
+    // siempre (y el tar de los estudios, a lo mejor, en claro).
+    await borrarRestos(marca);
+    throw e;
+  } finally {
+    await soltarCandado(candado);
+  }
+}
+
+async function armarRespaldo(marca, { verificar = true } = {}) {
+  const arrancó = Date.now();
   const base = path.join(DIR_BACKUPS, `vitalis-${marca}`);
 
   log.info("[BACKUP] arrancando respaldo", marca);
@@ -253,8 +460,10 @@ async function hacerBackupInterno({ verificar = true } = {}) {
   let rutaArchivos = null;
   if (uploads.archivos > 0) {
     if (cifrado) {
-      const crudo = await fsp.readFile(rutaTar);
-      await fsp.writeFile(rutaTar, cifrar(crudo).buffer, { mode: 0o600 });
+      // De archivo a archivo: con uploads/ de más de 2 GiB, leerlo entero
+      // no se puede y el respaldo fallaba siempre.
+      await cifrarArchivo(rutaTar, rutaTar + ".tmp");
+      await fsp.rename(rutaTar + ".tmp", rutaTar);
     }
     await fsp.chmod(rutaTar, 0o600);
     rutaArchivos = rutaTar;
@@ -615,5 +824,5 @@ function programar() {
 module.exports = {
   hacerBackup, verificarBackup, listarBackups, estado, programar,
   validarConfiguracionBackup, erroresConfiguracionBackup,
-  cifrar, descifrar, DIR_BACKUPS,
+  cifrar, descifrar, cifrarArchivo, descifrarArchivo, DIR_BACKUPS,
 };
