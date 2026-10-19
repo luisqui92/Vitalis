@@ -1209,7 +1209,18 @@ async function intentarVerificar(consultaId) {
     set = { "verificacion.estado": "error" };
   }
   const verificacionMs = Date.now() - inicio;
-  await ConsultaMedica.updateOne({ _id: c._id }, { $set: { ...set, "tiempos.verificacionMs": verificacionMs } });
+  try {
+    await ConsultaMedica.updateOne({ _id: c._id }, { $set: { ...set, "tiempos.verificacionMs": verificacionMs } });
+  } catch (e) {
+    // Que no quede «verificando»: confirmar espera a que termine, y nada más
+    // lo vuelve a mover hasta el próximo arranque. Con error, el médico
+    // confirma igual, con el aviso de que no se comparó con el audio.
+    log.error(`[NOTA_EN_VIVO] no se pudo guardar la verificación de ${c._id}:`, e.message);
+    set = { "verificacion.estado": "error" };
+    await conReintentos(() => ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": "verificando" }, { $set: set }),
+      AJUSTES_AUDIO.GUARDAR_ESPERAS_MS)
+      .catch(e2 => log.error(`[NOTA_EN_VIVO] tampoco se pudo dejar en error la verificación de ${c._id}:`, e2.message));
+  }
   log.info(`[TIEMPOS] consulta ${c._id}: verificación ${Math.round(verificacionMs / 1000)} s → ${set["verificacion.estado"]}${set["verificacion.diferencias"]?.length ? ` (${set["verificacion.diferencias"].length} diferencia(s))` : ""}`);
   avisarCambio(c.medicoPhone);
   if (set["verificacion.estado"] === "diferencias") {
@@ -1424,6 +1435,11 @@ async function marcarTranscripcionFallida(consultaId, medicoPhone, motivo, { avi
 //     de «procesando» para siempre.
 //   · Una nota que se estaba escribiendo: se escribe de nuevo, de la
 //     transcripción o del texto en vivo, que sí están guardados.
+//   · Una nota en vivo que se estaba verificando con la transcripción
+//     completa, o que se cortó justo antes: se verifica de nuevo. Confirmar
+//     espera a que termine y nada más la movía: quedaba sin poder
+//     confirmarse nunca (A6). La de hace días queda con la verificación en
+//     error, y se confirma con ese aviso.
 //   · Un audio en disco sin consulta en curso: sobró. Se borra. Salvo el de
 //     una consulta que falló varias veces por algo pasajero: ese se guarda
 //     a propósito hasta «audioRetenidoHasta», para reintentar a mano.
@@ -1436,15 +1452,22 @@ const NOTA_INTERRUMPIDA = "Se interrumpió mientras se escribía (el servidor se
 
 async function retomarConsultas(arranque = ARRANQUE) {
   const reciente = (c) => arranque - new Date(c.createdAt) < RETOMAR_HASTA_MS;
-  const resumen = { transcripciones: 0, sinAudio: 0, notas: 0, sobras: 0 };
+  const resumen = { transcripciones: 0, sinAudio: 0, notas: 0, verificaciones: 0, sobras: 0 };
   const enDisco = new Set(await audioPendiente.guardados(arranque));
-  // Las dos listas antes de tocar nada: marcar una consulta le cambia la
-  // fecha de modificación, y la sacaría de la segunda.
+  // Las listas antes de tocar nada: marcar una consulta le cambia la fecha
+  // de modificación, y la sacaría de las que siguen.
   const enCurso = await ConsultaMedica.find({ estado: "procesando", createdAt: { $lt: arranque } }).select("_id medicoPhone pacienteId createdAt").lean();
   const notas = await ConsultaMedica.find({
     notaClinicaEstado: "pendiente", confirmadaEn: null, updatedAt: { $lt: arranque },
     $or: [{ estado: "completado", notaFuente: { $in: ["", null, "audio"] } }, { notaFuente: "vivo" }],
   });
+  // Las que están «procesando» o con la nota a medio escribir se verifican
+  // solas al terminar eso (arriba): estas son las que ya no tienen quién.
+  const verificaciones = await ConsultaMedica.find({
+    notaFuente: "vivo", confirmadaEn: null, updatedAt: { $lt: arranque },
+    estado: { $ne: "procesando" }, notaClinicaEstado: { $in: ["completado", "error"] },
+    "verificacion.estado": { $in: ["pendiente", "verificando"] },
+  }).select("_id createdAt").lean();
 
   const aTranscribir = [];
   for (const c of enCurso) {
@@ -1492,6 +1515,16 @@ async function retomarConsultas(arranque = ARRANQUE) {
     aEscribir.push({ consulta: c, paciente, vivo, texto });
   }
 
+  const aVerificar = [];
+  for (const c of verificaciones) {
+    if (!reciente(c)) {
+      await ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": { $in: ["pendiente", "verificando"] } },
+        { $set: { "verificacion.estado": "error" } });
+      continue;
+    }
+    aVerificar.push(c);
+  }
+
   // De a una por vez, en dos filas: un audio de una hora pesa en memoria, y
   // las notas no tienen por qué esperar a las transcripciones.
   await Promise.all([
@@ -1522,6 +1555,18 @@ async function retomarConsultas(arranque = ARRANQUE) {
           if (vivo) await intentarVerificar(consulta._id);
         } catch (e) {
           log.error(`[CONSULTA_MEDICA] no se pudo retomar la nota de ${consulta._id}:`, e.message);
+        }
+      }
+      for (const c of aVerificar) {
+        resumen.verificaciones++;
+        log.info(`[CONSULTA_MEDICA] retomando la verificación de ${c._id} (se cortó al reiniciar)`);
+        try {
+          // «verificando» era del proceso de antes: se suelta para que
+          // intentarVerificar la pueda reclamar.
+          await ConsultaMedica.updateOne({ _id: c._id, "verificacion.estado": "verificando" }, { $set: { "verificacion.estado": "pendiente" } });
+          await intentarVerificar(c._id);
+        } catch (e) {
+          log.error(`[CONSULTA_MEDICA] no se pudo retomar la verificación de ${c._id}:`, e.message);
         }
       }
     })(),
