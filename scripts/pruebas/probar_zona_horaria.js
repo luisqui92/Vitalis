@@ -597,6 +597,12 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   // zona, que cae a la de La Paz: a un paciente de São Paulo le decían una
   // hora menos que la de su turno.
   const confirmadaPara = (t) => t?.match(/confirmada para el ([^.]+)\./)?.[1];
+  // El lunes 19 de octubre de 2026, con las citas del sábado 24 todavía por
+  // venir; y el sábado en el horario de la cuenta: la reserva por link, la
+  // voz y WhatsApp solo aceptan un horario de los que se ofrecen
+  // (services/crearCita.js), no cualquier instante libre.
+  relojEn("2026-10-19T12:00:00Z");
+  await M.Medico.updateOne({ phone: BR }, { horarioAtencion: [{ diaSemana: 6, horaInicio: "08:00", horaFin: "18:00" }] });
   enviados.length = 0;
   r = await pedir(puerto, "POST", "/medico/citas", tk[BR], { fecha: "2026-10-24T10:00", pacienteNombre: "Maria Souza", pacienteTelefono: "5511970088012" });
   verificar(`cita a mano a las 10:00 de São Paulo → el WhatsApp dice las 10:00 (${r.estado}, ${confirmadaPara(enviados[0]?.texto)})`,
@@ -615,14 +621,10 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   // La voz: agendar, «mis citas» y cancelar, el lunes 19 (la cita es futura).
   const vapi = require(path.join(RAIZ, "services", "vapiHerramientas"));
   const telVoz = "5511970088098";
-  let agendada, misCitas, cancelada;
-  relojEn("2026-10-19T12:00:00Z");
-  try {
-    agendada = await vapi.agendarCita(BR, { fechaHora: "2026-10-24T15:00:00.000Z", pacienteNombre: "João Lima", pacienteTelefono: telVoz });
-    misCitas = await vapi.consultarMisCitas(BR, { pacienteTelefono: telVoz });
-    const citaId = misCitas.match(/citaId: ([a-f0-9]{24})/)?.[1];
-    cancelada = await vapi.cancelarCita(BR, { citaId, pacienteTelefono: telVoz });
-  } finally { relojReal(); }
+  const agendada = await vapi.agendarCita(BR, { fechaHora: "2026-10-24T15:00:00.000Z", pacienteNombre: "João Lima", pacienteTelefono: telVoz });
+  const misCitas = await vapi.consultarMisCitas(BR, { pacienteTelefono: telVoz });
+  const citaId = misCitas.match(/citaId: ([a-f0-9]{24})/)?.[1];
+  const cancelada = await vapi.cancelarCita(BR, { citaId, pacienteTelefono: telVoz });
   verificar(`voz, al agendar a las 12:00 de São Paulo: «${agendada}»`, /para sábado, 24\/10, 12:00 /.test(agendada));
   verificar(`voz, «mis citas»: «${misCitas}»`, /^Cita el sábado, 24\/10, 12:00 /.test(misCitas));
   verificar(`voz, al cancelar: «${cancelada}»`, cancelada === "Listo, cancelé la cita del sábado, 24/10, 12:00.");
@@ -640,6 +642,11 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
     });
     return avisosPush[0]?.cuerpo;
   };
+  // La Paz: el sábado hasta las 23:59 y el domingo a la mañana, de a 15
+  // minutos, para que las 23:30 sean un horario que se ofrece.
+  await M.Medico.updateOne({ phone: BO }, { duracionConsultaMinutos: 15, horarioAtencion: [
+    { diaSemana: 6, horaInicio: "23:00", horaFin: "23:59" }, { diaSemana: 0, horaInicio: "09:00", horaFin: "12:00" },
+  ] });
   const cuentaBR = await M.Medico.findOne({ phone: BR }).lean();
   const cuentaBO = await M.Medico.findOne({ phone: BO }).lean();
   let aviso = await avisoDe(cuentaBR, "2026-10-24T17:00:00Z"); // 14:00 en São Paulo
@@ -648,6 +655,7 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   verificar(`La Paz, como siempre: «${aviso}»`, aviso === "Paciente Push — sábado 24 de octubre, 23:30");
   aviso = await avisoDe({ ...cuentaBO, zonaHoraria: undefined }, "2026-10-25T14:00:00Z");
   verificar(`una cuenta sin zona, la de siempre: «${aviso}»`, aviso === "Paciente Push — domingo 25 de octubre, 10:00");
+  relojReal();
 
   servidor.close();
   await mongoose.disconnect();
