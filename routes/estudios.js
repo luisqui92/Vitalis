@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
-const { Paciente, Estudio } = require("../db/models");
+const { Paciente, Estudio, Informe } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
@@ -167,6 +167,11 @@ module.exports = function (app) {
   // ─── ELIMINAR ────────────────────────────────────────────────────────────
   app.delete("/medico/estudios/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
+    // Una imagen que va en un informe firmado no se borra: el paciente ya
+    // tiene ese informe, y sin el archivo le quedan imágenes que no cargan
+    // (informe de QA del 16 de octubre de 2026, A11). La de un borrador sí.
+    const firmado = await Informe.findOne({ medicoPhone, estado: "firmado", estudiosIncluidos: req.params.id }).select("codigo").lean();
+    if (firmado) throw new ErrorHttp(409, `Esta imagen va en el informe firmado ${firmado.codigo} y no se puede borrar: el paciente ya lo tiene.`);
     const estudio = await Estudio.findOneAndDelete({ _id: req.params.id, medicoPhone });
     if (!estudio) throw new ErrorHttp(404, "Estudio no encontrado");
     fs.unlink(path.join(DIR_ESTUDIOS, estudio.archivoNombre), () => {});

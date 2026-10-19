@@ -393,7 +393,9 @@ function wireTabEstudios(p, estudios) {
     btn.onclick = async (ev) => {
       ev.stopPropagation();
       if (!confirm(t("est.confirmarBorrar"))) return;
-      await api("/medico/estudios/" + btn.dataset.borrarEstudio, { method: "DELETE" });
+      // Una imagen de un informe firmado no se borra (409): que se vea por qué.
+      try { await api("/medico/estudios/" + btn.dataset.borrarEstudio, { method: "DELETE" }); }
+      catch (e) { alert(e.error || t("inf.errBorrar")); return; }
       renderPacienteDetalle(p._id, "estudios");
     };
   });

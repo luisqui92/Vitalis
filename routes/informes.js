@@ -128,16 +128,41 @@ async function impresoDe(informe) {
   return { membrete, paciente };
 }
 
+// Las imágenes también se congelan al firmar: cómo las dejó el médico en el
+// visor y lo que midió encima. Antes el enlace del paciente y la impresión
+// leían los ajustes de hoy, y subir el contraste de una placa cambiaba un
+// informe ya entregado (informe de QA del 16 de octubre de 2026, A11).
+async function estudiosAlFirmar(informe) {
+  const estudios = await Estudio.find({ _id: { $in: informe.estudiosIncluidos }, medicoPhone: informe.medicoPhone }).lean();
+  return estudios.map(e => ({ estudioId: e._id, nombre: e.nombre, tipo: e.tipo, fecha: e.fecha,
+    ajustesVisor: e.ajustesVisor, mediciones: e.mediciones, calibracion: e.calibracion }));
+}
+
+// Las imágenes de un informe: las congeladas si está firmado, las de hoy si
+// es un borrador. Con el _id del estudio, que es con lo que se pide el archivo.
+async function estudiosDe(informe) {
+  const congeladas = informe.estado === "firmado" && Array.isArray(informe.estudiosEmitidos) ? informe.estudiosEmitidos : null;
+  return (congeladas || await estudiosAlFirmar(informe)).map(e => ({ ...(e.toObject?.() || e), _id: e.estudioId }));
+}
+
 // Los firmados antes de que lo impreso se congelara: se congelan con lo que
 // mostraban hasta ahora, la primera vez que arranca el servidor con esto (lo
-// llama index.js). Después ya no hay ninguno: no hace nada.
+// llama index.js). Después ya no hay ninguno: no hace nada. Las imágenes se
+// congelan desde después que el membrete, así que un firmado puede tener el
+// membrete y no las imágenes.
 async function congelarInformesFirmados() {
-  const viejos = await Informe.find({ estado: "firmado", membreteEmitido: null }).select("_id medicoPhone pacienteId firmadoEn").lean();
+  const viejos = await Informe.find({ estado: "firmado", $or: [{ membreteEmitido: null }, { estudiosEmitidos: { $exists: false } }] })
+    .select("_id medicoPhone pacienteId firmadoEn membreteEmitido estudiosIncluidos estudiosEmitidos").lean();
   const versiones = new Map();
   for (const inf of viejos) {
-    if (!versiones.has(inf.medicoPhone)) versiones.set(inf.medicoPhone, await versionDelMembrete(inf.medicoPhone));
-    await Informe.updateOne({ _id: inf._id, membreteEmitido: null },
-      { $set: { membreteEmitido: versiones.get(inf.medicoPhone)._id, pacienteEmitido: await pacienteAlFirmar(inf, inf.firmadoEn) } });
+    if (!inf.membreteEmitido) {
+      if (!versiones.has(inf.medicoPhone)) versiones.set(inf.medicoPhone, await versionDelMembrete(inf.medicoPhone));
+      await Informe.updateOne({ _id: inf._id, membreteEmitido: null },
+        { $set: { membreteEmitido: versiones.get(inf.medicoPhone)._id, pacienteEmitido: await pacienteAlFirmar(inf, inf.firmadoEn) } });
+    }
+    if (!Array.isArray(inf.estudiosEmitidos)) {
+      await Informe.updateOne({ _id: inf._id, estudiosEmitidos: { $exists: false } }, { $set: { estudiosEmitidos: await estudiosAlFirmar(inf) } });
+    }
   }
   return viejos.length;
 }
@@ -247,13 +272,17 @@ module.exports = function (app) {
     if (!informe.conclusion.trim()) throw new ErrorHttp(400, "Un informe sin conclusión no se puede firmar");
 
     const firmadoEn = new Date();
-    const [version, pacienteEmitido] = await Promise.all([versionDelMembrete(medicoPhone), pacienteAlFirmar(informe, firmadoEn)]);
+    const [version, pacienteEmitido, estudiosEmitidos] = await Promise.all([
+      versionDelMembrete(medicoPhone), pacienteAlFirmar(informe, firmadoEn), estudiosAlFirmar(informe)]);
     const firmado = await Informe.findOneAndUpdate({ _id: informe._id, medicoPhone, estado: { $ne: "firmado" } }, { $set: {
       estado: "firmado", firmadoEn,
       // El enlace se crea al firmar y no antes: un borrador no se comparte.
       tokenPublico: crypto.randomBytes(24).toString("base64url"),
       tokenExpira: new Date(Date.now() + DIAS_VALIDEZ_ENLACE * 86400000),
       membreteEmitido: version._id, pacienteEmitido,
+      // La lista va con sus imágenes congeladas: si un cambio de la lista
+      // entró recién, se firma la que se congeló.
+      estudiosIncluidos: informe.estudiosIncluidos, estudiosEmitidos,
     } }, { new: true });
     if (!firmado) throw new ErrorHttp(409, "Ya está firmado");
 
@@ -277,7 +306,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const informe = await obtenerOFallar(Informe, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
     const paciente = await Paciente.findOne({ _id: informe.pacienteId, medicoPhone }).lean();
-    const estudios = await Estudio.find({ _id: { $in: informe.estudiosIncluidos }, medicoPhone }).lean();
+    const estudios = await estudiosDe(informe);
     const impreso = await impresoDe(informe);
     res.json({
       informe,
@@ -376,7 +405,7 @@ module.exports = function (app) {
     if (r.vencido) throw new ErrorHttp(410, "Este enlace venció. Pedile uno nuevo a tu médico.");
 
     const informe = r.informe;
-    const estudios = await Estudio.find({ _id: { $in: informe.estudiosIncluidos } }).lean();
+    const estudios = await estudiosDe(informe);
     const { membrete, paciente } = await impresoDe(informe);
 
     // Que el médico sepa si el paciente lo abrió, que es la pregunta que
