@@ -2,9 +2,10 @@
 // entre pacientes (recetas, estudios) que la app móvil nunca necesitó
 // (ahí todo se navega paciente por paciente), más los resúmenes de
 // Finanzas y Reportes.
-const { Receta, Estudio, TratamientoPlan, Cita, Paciente, ConsultaMedica } = require("../db/models");
+const { Receta, Estudio, TratamientoPlan, Cita, Paciente, ConsultaMedica, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { asyncRoute } = require("../services/httpHelpers");
+const { hoyEnZona, instanteEnZona, fechaStrEnZona, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 
 const requireMedico = requireAuth(["medico"]);
 
@@ -68,10 +69,13 @@ module.exports = function (app) {
   // ─── REPORTES (resumen simple, últimos 6 meses) ──────────────────────────
   app.get("/medico/reportes/resumen", requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
-    const desde = new Date();
-    desde.setMonth(desde.getMonth() - 5);
-    desde.setDate(1);
-    desde.setHours(0, 0, 0, 0);
+    // Los meses son los de la cuenta, no los del servidor (UTC): lo que pasaba
+    // entre las 20:00 y las 24:00 del último día de un mes en Bolivia caía en
+    // el mes siguiente (M10). Desde el día 1, 5 meses atrás, a las 00:00 de
+    // su zona.
+    const zona = (await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean())?.zonaHoraria || ZONA_POR_DEFECTO;
+    const h = hoyEnZona(zona);
+    const desde = instanteEnZona(zona, h.anio, h.mesIndex - 5, 1, 0, 0);
 
     const [consultas, pacientesNuevos, citas] = await Promise.all([
       ConsultaMedica.find({ medicoPhone, createdAt: { $gte: desde } }).select("estado createdAt").lean(),
@@ -82,8 +86,7 @@ module.exports = function (app) {
     function porMes(docs) {
       const porMesMap = {};
       for (const d of docs) {
-        const f = new Date(d.createdAt);
-        const clave = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}`;
+        const clave = fechaStrEnZona(zona, new Date(d.createdAt)).slice(0, 7);
         porMesMap[clave] = (porMesMap[clave] || 0) + 1;
       }
       return porMesMap;

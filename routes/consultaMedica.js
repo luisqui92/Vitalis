@@ -14,6 +14,7 @@ const { regenerarBriefClinico } = require("../services/briefClinico");
 const { generarHilo } = require("../services/hiloClinico");
 const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp");
 const { formatearFechaCompleta } = require("../services/reservaCitas");
+const { localAInstante, fechaStrEnZona, ZONA_POR_DEFECTO } = require("../services/zonaHoraria");
 const { registrar } = require("../services/auditoria");
 const { notificarMedico } = require("../services/push");
 const { avisarCambio } = require("../services/realtime");
@@ -37,6 +38,22 @@ const MAX_TEXTO_EN_VIVO = 150000;
 const PALABRAS_MINIMAS_BORRADOR = 15;
 
 const requireMedico = requireAuth(["medico"]);
+
+// La zona en la que trabaja esta cuenta (services/zonaHoraria.js).
+async function zonaDe(medicoPhone) {
+  const m = await Medico.findOne({ phone: medicoPhone }).select("zonaHoraria").lean();
+  return m?.zonaHoraria || ZONA_POR_DEFECTO;
+}
+
+// La fecha de la reconsulta que confirma el médico. El <input
+// type="datetime-local"> manda "YYYY-MM-DDTHH:mm" sin zona: es hora de pared
+// de quien la tipeó, y la zona la pone la cuenta. new Date() la tomaba como
+// hora del servidor (UTC) y el paciente recibía otra hora (A2). Si llega con
+// zona explícita (ISO con Z u offset), se respeta.
+function fechaReconsulta(valor, zona) {
+  const s = String(valor || "");
+  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? new Date(s) : localAInstante(zona, s);
+}
 
 // Acepta el audio como body crudo (no JSON): el cliente manda
 // Content-Type: audio/ogg (o wav/mp3/m4a/webm) y el archivo tal cual.
@@ -540,6 +557,9 @@ module.exports = function (app) {
     const aplicar = { ...(req.body?.aplicar || {}), ...extensiones.sumar("consulta.alConfirmar", req) };
     const aplicado = [];
     const fallado = [];
+    // La hora de la reconsulta y el día de las vacunas son los de la cuenta,
+    // no los del servidor (que corre en UTC).
+    const zona = await zonaDe(medicoPhone);
 
     // ── 1. Guardar la nota con las correcciones del médico ──
     const notaEditada = req.body?.nota;
@@ -636,7 +656,7 @@ module.exports = function (app) {
       if (pedidoReconsulta?.activo) {
         try {
           if (pedidoReconsulta.fechaHora) {
-            const f = new Date(pedidoReconsulta.fechaHora);
+            const f = fechaReconsulta(pedidoReconsulta.fechaHora, zona);
             if (isNaN(f.getTime())) throw new Error("La fecha de la reconsulta no es válida");
             registrarCorreccion({
               medicoPhone, tipo: "reconsulta", consultaId: consulta._id, campo: "fechaHora",
@@ -652,7 +672,7 @@ module.exports = function (app) {
           const primerNombre = String(paciente.nombre || "").split(" ")[0];
           // Pasan días entre que se cierra la consulta y el paciente escribió
           // por última vez, así que esto cae fuera de la ventana casi siempre.
-          const cuando = formatearFechaCompleta(sugerida.fechaHora);
+          const cuando = formatearFechaCompleta(sugerida.fechaHora, zona);
           const quien = medico?.nombre || "Su médico";
           const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
           await enviarTextoOPlantilla(paciente.telefono, texto,
@@ -743,11 +763,11 @@ module.exports = function (app) {
       const v = (nota.vacunasMencionadas || [])[Number(i)];
       if (!v?.nombre) continue;
       try {
-        // La fecha se guarda como YYYY-MM-DD en hora local: usar toISOString()
-        // directo adelantaría un día las consultas cargadas de noche en
-        // Bolivia (UTC-4).
-        const base = new Date(consulta.createdAt);
-        const fecha = v.fecha || new Date(base.getTime() - base.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        // La fecha se guarda como YYYY-MM-DD, el día de la consulta en la
+        // zona de la cuenta. getTimezoneOffset() es la zona del servidor (UTC
+        // en producción): una consulta de las 21:00 en Bolivia cargaba la
+        // vacuna con fecha del día siguiente (M6).
+        const fecha = v.fecha || fechaStrEnZona(zona, new Date(consulta.createdAt));
         await crearUnaVez(Vacuna, {
           pacienteId: consulta.pacienteId, medicoPhone,
           nombre: v.nombre, dosis: v.dosis || "", fecha,
@@ -824,8 +844,9 @@ module.exports = function (app) {
     // El médico pudo haber ajustado la fecha/hora antes de confirmar —
     // guardamos la que propuso la IA para poder comparar después.
     const fechaOriginal = sugerida.fechaHora;
+    const zona = await zonaDe(medicoPhone);
     if (req.body?.fechaHora) {
-      const f = new Date(req.body.fechaHora);
+      const f = fechaReconsulta(req.body.fechaHora, zona);
       if (isNaN(f.getTime())) throw new ErrorHttp(400, "Fecha inválida");
       sugerida.fechaHora = f;
     }
@@ -842,7 +863,7 @@ module.exports = function (app) {
     const link = `${CONFIG.APP_URL}/reservar.html?token=${token}`;
     const primerNombre = String(paciente.nombre || "").split(" ")[0];
 
-    const cuando = formatearFechaCompleta(sugerida.fechaHora);
+    const cuando = formatearFechaCompleta(sugerida.fechaHora, zona);
     const quien = medico?.nombre || "Su médico";
     const texto = `Hola ${primerNombre} 👋 ${quien} le sugiere su próxima consulta para el ${cuando}.\n\nElija el horario que le quede mejor acá (va a ver la disponibilidad real):\n${link}\n\n(el enlace es válido por 45 minutos)`;
     await enviarTextoOPlantilla(paciente.telefono, texto,
@@ -929,7 +950,7 @@ async function contextoDeNota(paciente, medicoPhone) {
   // catálogo de precios del consultorio para que la IA pueda
   // emparejar tratamientos mencionados ("hay que sellar esto",
   // "hay que hacer un relleno acá") con el ítem correcto.
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("tipoEspecialidad zonaHoraria").lean();
   // Lo que este médico receta y lo que ya corrigió: la IA reconoce sus
   // marcas como medicamentos y no repite un error que él ya arregló. Y lo que
   // aprendió de él: sus palabras y cómo escribe (services/adaptacion.js).
@@ -955,6 +976,9 @@ async function contextoDeNota(paciente, medicoPhone) {
     contexto: {
       // La nota de enfermería en vez de la médica (services/notaClinica.js).
       enfermeria: medico?.tipoEspecialidad === "enfermeria",
+      // El "hoy" que se le da a la IA y la hora de la reconsulta que
+      // devuelve son de la zona de la cuenta, no del servidor.
+      zona: medico?.zonaHoraria || ZONA_POR_DEFECTO,
       antecedentesPersonales: paciente.antecedentesPersonales || [],
       antecedentesFamiliares: paciente.antecedentesFamiliares || [],
       medicamentosActivos: medicamentosActivos.map(m => m.nombre),
@@ -980,6 +1004,9 @@ async function contextoDeNota(paciente, medicoPhone) {
 async function producirNota(consulta, paciente, medicoPhone, idioma, { texto, notaHecha } = {}) {
   try {
     const { contexto } = await contextoDeNota(paciente, medicoPhone);
+    // "El sábado" es el que sigue a la consulta, aunque la nota se escriba
+    // días después (volver a generarla, retomarla al arrancar).
+    contexto.fechaReferencia = consulta.createdAt;
     // El mismo idioma con el que se transcribió: una nota en español
     // sobre una consulta en portugués obliga al médico a traducir de
     // vuelta lo que él mismo dijo.

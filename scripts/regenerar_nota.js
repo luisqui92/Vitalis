@@ -91,7 +91,7 @@ async function regenerar(id) {
 
   const [paciente, medico] = await Promise.all([
     Paciente.findOne({ _id: consulta.pacienteId, medicoPhone: consulta.medicoPhone }).lean(),
-    Medico.findOne({ phone: consulta.medicoPhone }).select("idioma tipoEspecialidad").lean(),
+    Medico.findOne({ phone: consulta.medicoPhone }).select("idioma tipoEspecialidad zonaHoraria").lean(),
   ]);
   if (!paciente) throw new Error("No se encontró el paciente de esa consulta");
   const palabras = String(consulta.transcripcionCompleta).split(/\s+/).filter(Boolean).length;
@@ -116,6 +116,10 @@ async function regenerar(id) {
     veterinaria: esp === "veterinaria",
     especie: esp === "veterinaria" ? paciente.especie : "",
     raza: esp === "veterinaria" ? paciente.raza : "",
+    // Como el botón: el "hoy" de la IA y la hora de la reconsulta, en la zona
+    // de la cuenta y desde el día de la consulta (si falta, la de La Paz).
+    zona: medico?.zonaHoraria,
+    fechaReferencia: consulta.createdAt,
   }, medico?.idioma);
 
   if (vacia(nota)) throw new Error("La IA devolvió la nota vacía otra vez. No se guardó nada; probá de nuevo en un rato.");

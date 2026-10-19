@@ -35,6 +35,7 @@ const { requireAdmin } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { hoyEnZona, instanteEnZona, fechaStrEnZona, zonaValida } = require("../services/zonaHoraria");
 
 // Los teléfonos de los médicos de ESTA clínica. Todo lo demás se filtra por
 // esta lista: el clinicaId sale del token (ver requireAdmin), nunca del
@@ -70,12 +71,29 @@ function citaParaElPanel(cita, vinculo) {
   };
 }
 
-function inicioDeMes(mesesAtras = 0) {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  d.setMonth(d.getMonth() - mesesAtras);
-  return d;
+// ═══ EL «HOY» Y EL «MES» DEL PANEL ═════════════════════════════════════════
+//
+// Son los de la clínica, no los del servidor, que corre en UTC: de 20:00 a
+// 24:00 en Bolivia el servidor ya está en el día siguiente, y el panel
+// contaba las citas de mañana como de hoy, partía los días de la ocupación a
+// las 20:00 y cerraba el mes cuatro horas antes. Una clínica es un solo
+// lugar: alcanza con la zona de la cuenta que mira el panel (la de siempre,
+// si no tiene otra). Ver services/zonaHoraria.js.
+async function zonaDelPanel(req) {
+  const m = await Medico.findOne({ phone: req.adminUser.usuario }).select("zonaHoraria").lean();
+  return zonaValida(m?.zonaHoraria);
+}
+
+// Las 00:00 del día 1 del mes, mesesAtras meses atrás, en la zona del panel.
+function inicioDeMes(zona, mesesAtras = 0) {
+  const h = hoyEnZona(zona);
+  return instanteEnZona(zona, h.anio, h.mesIndex - mesesAtras, 1, 0, 0);
+}
+
+// Las 00:00 de hoy (más dias días) en la zona del panel.
+function inicioDeDia(zona, dias = 0) {
+  const h = hoyEnZona(zona);
+  return instanteEnZona(zona, h.anio, h.mesIndex, h.dia + dias, 0, 0);
 }
 
 module.exports = function (app) {
@@ -95,10 +113,11 @@ module.exports = function (app) {
     const telefonos = medicos.map(m => m.phone);
     if (telefonos.length === 0) return res.json({ medicos: [], totales: { consultasMes: 0, pacientes: 0, citasHoy: 0 } });
 
-    const desdeMes = inicioDeMes();
-    const desde6 = inicioDeMes(5);
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const manana = new Date(hoy); manana.setDate(manana.getDate() + 1);
+    const zona = await zonaDelPanel(req);
+    const desdeMes = inicioDeMes(zona);
+    const desde6 = inicioDeMes(zona, 5);
+    const hoy = inicioDeDia(zona);
+    const manana = inicioDeDia(zona, 1);
 
     const [porMedicoConsultas, porMedicoPacientes, porMedicoCitasHoy, porMes] = await Promise.all([
       ConsultaMedica.aggregate([
@@ -116,7 +135,7 @@ module.exports = function (app) {
       ConsultaMedica.aggregate([
         { $match: { medicoPhone: { $in: telefonos }, createdAt: { $gte: desde6 } } },
         { $group: {
-            _id: { mes: { $dateToString: { format: "%Y-%m", date: "$createdAt" } } },
+            _id: { mes: { $dateToString: { format: "%Y-%m", date: "$createdAt", timezone: zona } } },
             n: { $sum: 1 },
         } },
       ]),
@@ -155,13 +174,14 @@ module.exports = function (app) {
     const dias = Math.min(30, Math.max(1, Number(req.query.dias) || 7));
     const medicos = await medicosDeLaClinica(req.clinicaId);
     const telefonos = medicos.map(m => m.phone);
-    const desde = new Date(); desde.setHours(0, 0, 0, 0);
-    const hasta = new Date(desde); hasta.setDate(hasta.getDate() + dias);
+    const zona = await zonaDelPanel(req);
+    const desde = inicioDeDia(zona);
+    const hasta = inicioDeDia(zona, dias);
 
     const filas = telefonos.length ? await Cita.aggregate([
       { $match: { medicoPhone: { $in: telefonos }, estado: "confirmada", fecha: { $gte: desde, $lt: hasta } } },
       { $group: {
-          _id: { medico: "$medicoPhone", dia: { $dateToString: { format: "%Y-%m-%d", date: "$fecha" } } },
+          _id: { medico: "$medicoPhone", dia: { $dateToString: { format: "%Y-%m-%d", date: "$fecha", timezone: zona } } },
           n: { $sum: 1 },
       } },
     ]) : [];
@@ -208,17 +228,18 @@ module.exports = function (app) {
     const medicos = await medicosDeLaClinica(req.clinicaId);
     const telefonos = medicos.map(m => m.phone);
 
-    // La fecha llega como YYYY-MM-DD y se interpreta en la zona del servidor,
-    // igual que el resto de la agenda. Cualquier cosa que no tenga esa forma
-    // exacta es hoy: un query manoseado no puede hacer que la consulta
-    // devuelva un rango raro.
+    // La fecha llega como YYYY-MM-DD y es un día de la clínica: de 00:00 a
+    // 00:00 en la zona del panel, no en la del servidor. Cualquier cosa que
+    // no tenga esa forma exacta es hoy: un query manoseado no puede hacer que
+    // la consulta devuelva un rango raro. Una que tiene la forma y no existe
+    // (un mes 13, un 31 de febrero) es un 400.
+    const zona = await zonaDelPanel(req);
     const pedida = String(req.query.fecha || "");
-    const desde = /^\d{4}-\d{2}-\d{2}$/.test(pedida)
-      ? new Date(`${pedida}T00:00:00`)
-      : new Date();
-    if (Number.isNaN(desde.getTime())) throw new ErrorHttp(400, "Fecha inválida");
-    desde.setHours(0, 0, 0, 0);
-    const hasta = new Date(desde); hasta.setDate(hasta.getDate() + 1);
+    const m = pedida.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const desde = m ? instanteEnZona(zona, Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0) : inicioDeDia(zona);
+    if (Number.isNaN(desde.getTime()) || (m && fechaStrEnZona(zona, desde) !== pedida)) throw new ErrorHttp(400, "Fecha inválida");
+    const h = hoyEnZona(zona, desde);
+    const hasta = instanteEnZona(zona, h.anio, h.mesIndex, h.dia + 1, 0, 0);
 
     // Este .find() es sobre Cita, que es una reserva —quién viene y cuándo—,
     // no una consulta. La regla de "acá no se lee contenido clínico" sigue en
@@ -246,7 +267,7 @@ module.exports = function (app) {
     registrar({ req, medicoPhone: req.adminUser.usuario, accion: "admin_agenda_clinica", recurso: `Clinica:${req.clinicaId}` });
 
     res.json({
-      fecha: `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-${String(desde.getDate()).padStart(2, "0")}`,
+      fecha: fechaStrEnZona(zona, desde),
       salas,
       total: citas.length,
       // Para poder decirlo en pantalla en vez de que el administrador crea
