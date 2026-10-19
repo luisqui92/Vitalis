@@ -26,6 +26,28 @@ const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
 // "activá el 2FA" sin ninguna pantalla que se lo permitiera.
 const requireMedico = requireAuth(["medico", "admin"]);
 
+// ═══ EL NOMBRE SALE EN LOS WHATSAPP ════════════════════════════════════════
+//
+// El nombre de la cuenta va en los mensajes que los pacientes reciben desde
+// el número oficial (el pie del informe, la cita, la reserva) y en el aviso
+// que les llega a quienes aprueban. Sin tope ni filtro, quien se registraba
+// podía poner un enlace —«Dr. Pérez: pagá tu turno en pagos-clinica.com»— o
+// seis megas de texto, que además viajaban enteros en el aviso y en el log
+// (auditoría de QA, B2).
+//
+// Un nombre de persona son letras de cualquier idioma, espacios, puntos,
+// comas, apóstrofos, guiones y paréntesis («Dra. Fulana Pérez (veterinaria)»,
+// el ejemplo de la pantalla). Lista de lo que se acepta y no de lo que se
+// prohíbe: «bit.ly/3xYz» o «wa.me/591…» pasaban un filtro de «https» y
+// «www». La especialidad admite más cosas («Ginecología/Obstetricia»), así
+// que a ella se le mira solo que no parezca un enlace.
+//
+// «.algo» pegado, con dos letras o más después del punto, es como WhatsApp
+// reconoce un dominio sin «https»: «clinica.com», «bit.ly», «wa.me». «Dra.
+// Ana» o «J.C. Pérez» no lo son.
+const NOMBRE_DE_PERSONA = /^[\p{L}\p{M} .,'’´()-]{2,80}$/u;
+const PARECE_ENLACE = /https?:|www\.|:\/\/|\.\p{L}{2,}/iu;
+
 // Le avisa a quien aprueba que hay alguien esperando. Sin esto la fila
 // existe pero nadie la mira, y el médico que pidió cuenta se queda sin
 // respuesta pensando que Symphomed no anda.
@@ -52,8 +74,10 @@ module.exports = function (app) {
     // Se guarda solo con dígitos (services/telefono.js): «++55 11…» queda
     // «5511…», que es como lo escribe todo el sistema y lo que acepta WhatsApp.
     const phone = soloDigitos(req.body?.phone);
-    const nombre = String(req.body?.nombre || "").trim();
-    const especialidad = String(req.body?.especialidad || "").trim();
+    // Los saltos de línea y tabulados, como un espacio: el nombre va adentro
+    // de mensajes, y un renglón de más es un mensaje falso abajo del de verdad.
+    const nombre = String(req.body?.nombre || "").replace(/\s+/g, " ").trim();
+    const especialidad = String(req.body?.especialidad || "").replace(/\s+/g, " ").trim().slice(0, 80);
     const tipoEspecialidad = ["odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
     const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
     const password = String(req.body?.password || "");
@@ -61,6 +85,11 @@ module.exports = function (app) {
     const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
+    if (nombre.length > 80) throw new ErrorHttp(400, "El nombre no puede pasar de 80 caracteres");
+    if (!NOMBRE_DE_PERSONA.test(nombre) || PARECE_ENLACE.test(nombre)) {
+      throw new ErrorHttp(400, "Escribí tu nombre con letras, espacios y puntos, como «Dra. Fulana Pérez» (con un espacio después del punto): sin números ni enlaces.");
+    }
+    if (PARECE_ENLACE.test(especialidad)) throw new ErrorHttp(400, "La especialidad no puede tener enlaces");
     if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
     // No se verifica contra ningún registro —no hay una API del colegio
     // médico— así que exigirla no prueba nada por sí sola. Pero obliga a
