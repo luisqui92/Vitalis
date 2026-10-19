@@ -1,4 +1,5 @@
-// Symphomed — Que la puerta no delate quién tiene cuenta.
+// Symphomed — Que la puerta no delate quién tiene cuenta, y que un código de
+// 2FA sirva una sola vez.
 //
 // Lo que se prueba:
 //   1. El login corre bcrypt aunque el teléfono no exista, y aunque la cuenta
@@ -7,7 +8,10 @@
 //      de médicos (auditoría de QA, B-L2). Lo mismo en el login de socios.
 //      Se cuenta cuántas veces se llama a bcrypt, que no depende de lo rápida
 //      que sea la máquina.
-//   2. /medico/registro-estudiante no dice si un teléfono tiene cuenta a quien
+//   2. Un código de 2FA sirve UNA vez: ni con el mismo pase, ni con otro, ni
+//      dos a la vez. El código con que se activó el 2FA tampoco sirve para
+//      entrar (B-L3).
+//   3. /medico/registro-estudiante no dice si un teléfono tiene cuenta a quien
 //      no tiene un código válido. Antes, con un código inventado, contestaba
 //      409 «ya tiene una cuenta» a un teléfono registrado y 400 a uno libre.
 const path = require("path");
@@ -58,7 +62,8 @@ bcrypt.compare = (...a) => { compares++; return compareOriginal(...a); };
   await mongoose.connect(process.env.MONGODB_URI);
   const M = require(path.join(RAIZ, "db", "models"));
   const { CodigoEstudiante } = require(path.join(RAIZ, "modulos", "estudiantes", "modelos"));
-  const { hashPassword } = require(path.join(RAIZ, "services", "auth"));
+  const { hashPassword, generarToken } = require(path.join(RAIZ, "services", "auth"));
+  const { totp, generarSecreto } = require(path.join(RAIZ, "services", "totp"));
   await mongoose.connection.dropDatabase();
 
   const express = require("express");
@@ -100,7 +105,46 @@ bcrypt.compare = (...a) => { compares++; return compareOriginal(...a); };
   r = await P("POST", "/socio/login", null, { phone: "72094001", password: "Prueba123." });
   verificar("  ...y el socio de verdad entra", r.estado === 200 && !!r.cuerpo?.token);
 
-  console.log("\n── 2. El registro de estudiantes no delata teléfonos ──");
+  console.log("\n── 2. Un código de 2FA sirve una sola vez ──");
+  const secreto = generarSecreto();
+  await M.Medico.create({ phone: "70094010", nombre: "Dr. Con 2FA", passwordHash: clave, activo: true, dosFA: { activo: true, secreto } });
+  const pase = async () => (await P("POST", "/medico/login", null, { phone: "70094010", password: "Prueba123." })).cuerpo?.tempToken;
+  // El código se calcula UNA vez y se reusa tal cual: es lo que haría quien
+  // lo vio por encima del hombro.
+  const codigo = totp(secreto);
+  const pase1 = await pase();
+  r = await P("POST", "/medico/login/2fa", null, { tempToken: pase1, codigo });
+  verificar("la primera vez → entra", r.estado === 200 && !!r.cuerpo?.token);
+  r = await P("POST", "/medico/login/2fa", null, { tempToken: pase1, codigo });
+  verificar("el mismo código otra vez, con el mismo pase → 401", r.estado === 401 && /ya se usó/.test(r.cuerpo?.error || ""));
+  r = await P("POST", "/medico/login/2fa", null, { tempToken: await pase(), codigo });
+  verificar("  ...ni con un pase nuevo (otra contraseña bien escrita)", r.estado === 401);
+  // La auditoría se escribe sin esperarla (services/auditoria.js).
+  let intentos = 0;
+  for (let i = 0; i < 50 && !intentos; i++) {
+    intentos = await M.AuditLog.countDocuments({ medicoPhone: "70094010", accion: "login_2fa_repetido" });
+    if (!intentos) await new Promise((ok) => setTimeout(ok, 20));
+  }
+  verificar("  ...y queda en la actividad de la cuenta como código repetido", intentos >= 1);
+
+  const secreto2 = generarSecreto();
+  await M.Medico.create({ phone: "70094011", nombre: "Dra. Dos Pestañas", passwordHash: clave, activo: true, dosFA: { activo: true, secreto: secreto2 } });
+  const [pA, pB] = await Promise.all([1, 2].map(async () => (await P("POST", "/medico/login", null, { phone: "70094011", password: "Prueba123." })).cuerpo?.tempToken));
+  const codigo2 = totp(secreto2);
+  const aLaVez = await Promise.all([pA, pB].map(t => P("POST", "/medico/login/2fa", null, { tempToken: t, codigo: codigo2 })));
+  verificar(`el mismo código, dos a la vez → entra UNO (${aLaVez.map(x => x.estado).sort().join(", ")})`, aLaVez.map(x => x.estado).sort().join() === "200,401");
+
+  await M.Medico.create({ phone: "70094012", nombre: "Dr. Recién Activa", passwordHash: clave, activo: true });
+  const tkActiva = generarToken("70094012", "medico", 36e5);
+  r = await P("POST", "/medico/2fa/iniciar", tkActiva, {});
+  const codigoActivacion = totp(r.cuerpo.secreto);
+  r = await P("POST", "/medico/2fa/confirmar", tkActiva, { codigo: codigoActivacion });
+  verificar("activar el 2FA con un código → 200", r.estado === 200);
+  r = await P("POST", "/medico/login/2fa", null, {
+    tempToken: (await P("POST", "/medico/login", null, { phone: "70094012", password: "Prueba123." })).cuerpo?.tempToken, codigo: codigoActivacion });
+  verificar("  ...y ese mismo código ya no sirve para entrar", r.estado === 401);
+
+  console.log("\n── 3. El registro de estudiantes no delata teléfonos ──");
   const vence = new Date(Date.now() + 30 * 86400000);
   await CodigoEstudiante.create({ codigo: "EST-AAAA11", nivel: "interno", meses: 6, horasMes: 6, vence });
   const REG = (codigo, phone) => ({ codigo, phone, nombre: "Ana Interna", password: "Prueba123.", universidad: "Univalle" });

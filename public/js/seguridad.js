@@ -6,6 +6,7 @@ const ACCION_LABEL = {
   login: "🔓 Inicio de sesión",
   login_fallido: "⛔ Intento de inicio de sesión fallido",
   login_2fa_fallido: "⛔ Código 2FA incorrecto",
+  login_2fa_repetido: "⛔ Código 2FA ya usado",
   registro: "🆕 Cuenta creada",
   ver_paciente: "👤 Vio la ficha de un paciente",
   ver_consulta: "🎙️ Vio la transcripción de una consulta",

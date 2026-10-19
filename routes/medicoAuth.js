@@ -175,9 +175,23 @@ module.exports = function (app) {
       throw new ErrorHttp(401, "Sesión de login expirada, iniciá sesión de nuevo");
     }
     const medico = await Medico.findOne({ phone: payload.usuario, activo: true });
-    if (!medico?.dosFA?.activo || !verificarCodigo(medico.dosFA.secreto, codigo)) {
+    const paso = medico?.dosFA?.activo ? verificarCodigo(medico.dosFA.secreto, codigo, 1, { devolverPaso: true }) : null;
+    if (paso === null) {
       registrar({ req, medicoPhone: payload.usuario, accion: "login_2fa_fallido", exito: false });
       throw new ErrorHttp(401, "Código incorrecto");
+    }
+    // Un código sirve UNA vez. Sin esto, dentro de su ventana de un minuto
+    // el mismo código —visto por encima del hombro, o leído de una pantalla—
+    // entraba de nuevo, con este pase o con otro (auditoría de QA, B-L3).
+    // Atómico: de dos pedidos con el mismo código a la vez, entra uno. Y un
+    // paso anterior al último usado tampoco sirve. «$not $gte» y no «$lt»:
+    // las cuentas de antes no tienen el campo, y $lt no las encontraría.
+    const tomado = await Medico.updateOne(
+      { _id: medico._id, "dosFA.ultimoPaso": { $not: { $gte: paso } } },
+      { $set: { "dosFA.ultimoPaso": paso } });
+    if (tomado.modifiedCount === 0) {
+      registrar({ req, medicoPhone: medico.phone, accion: "login_2fa_repetido", exito: false });
+      throw new ErrorHttp(401, "Ese código ya se usó. Esperá a que la app muestre el siguiente.");
     }
     registrar({ req, medicoPhone: medico.phone, accion: "login" });
     const token = tokenDeMedico(medico);
@@ -225,10 +239,13 @@ module.exports = function (app) {
     const codigo = String(req.body?.codigo || "").trim();
     const medico = await Medico.findOne({ phone: req.adminUser.usuario });
     if (!medico.dosFA?.secretoPendiente) throw new ErrorHttp(400, "No hay una activación de 2FA en curso");
-    if (!verificarCodigo(medico.dosFA.secretoPendiente, codigo)) throw new ErrorHttp(401, "Código incorrecto");
+    const paso = verificarCodigo(medico.dosFA.secretoPendiente, codigo, 1, { devolverPaso: true });
+    if (paso === null) throw new ErrorHttp(401, "Código incorrecto");
     medico.dosFA.secreto = medico.dosFA.secretoPendiente;
     medico.dosFA.secretoPendiente = "";
     medico.dosFA.activo = true;
+    // El código con que se activó queda usado: no sirve además para entrar.
+    medico.dosFA.ultimoPaso = paso;
     // Quien activa el segundo factor casi siempre lo hace porque alguien pudo
     // haber visto su contraseña: las sesiones que se abrieron sin él dejan
     // de valer (services/auth.js, sesionVigente). La de quien lo activa

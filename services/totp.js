@@ -58,14 +58,23 @@ function totp(secretoBase32, tiempoMs = Date.now()) {
 // Acepta el código del paso actual y un paso antes/después (±30s) para
 // tolerar el reloj del celular ligeramente desincronizado — sin esto,
 // cualquier pequeño desfasaje deja al médico bloqueado afuera.
-function verificarCodigo(secretoBase32, codigo, ventana = 1) {
+//
+// Con { devolverPaso: true } devuelve el número del paso de 30 s que
+// coincidió (o null), para que el login rechace un código ya usado: dentro
+// de su ventana, el mismo código visto por encima del hombro servía otra vez
+// (routes/medicoAuth.js, auditoría de QA B-L3).
+function verificarCodigo(secretoBase32, codigo, ventana = 1, { devolverPaso = false } = {}) {
+  const no = devolverPaso ? null : false;
   const limpio = String(codigo || "").trim();
-  if (!/^\d{6}$/.test(limpio)) return false;
+  if (!/^\d{6}$/.test(limpio)) return no;
   const ahora = Date.now();
   for (let paso = -ventana; paso <= ventana; paso++) {
-    if (totp(secretoBase32, ahora + paso * PERIODO_SEG * 1000) === limpio) return true;
+    const instante = ahora + paso * PERIODO_SEG * 1000;
+    if (totp(secretoBase32, instante) === limpio) {
+      return devolverPaso ? Math.floor(instante / 1000 / PERIODO_SEG) : true;
+    }
   }
-  return false;
+  return no;
 }
 
 function generarUriOtpAuth(secretoBase32, cuenta, emisor = "Symphomed") {
