@@ -129,10 +129,20 @@ function fechaStrEnZona(tz, fecha = new Date()) {
 // El string crudo de un <input type="datetime-local"> —"YYYY-MM-DDTHH:mm",
 // sin zona— es hora de pared de quien lo tipeó. El navegador no manda
 // ninguna zona en ese valor, así que la pone la cuenta.
+//
+// El formato solo no alcanza: Date.UTC acomoda sin avisar un 31 de febrero o
+// unas 25:99 en otro día y otra hora, y la cita quedaba guardada ahí, como si
+// el médico la hubiera pedido. Una hora que no existe es una fecha inválida.
+// (instanteEnZona sí se deja desbordar: services/agenda.js le pasa "hoy + 14
+// días" a propósito.)
 function localAInstante(tz, str) {
   const m = String(str || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!m) return new Date(NaN);
-  return instanteEnZona(tz, Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
+  const [anio, mes, dia, hora, minuto] = m.slice(1).map(Number);
+  const dDia = new Date(Date.UTC(anio, mes - 1, dia));
+  if (dDia.getUTCFullYear() !== anio || dDia.getUTCMonth() !== mes - 1 || dDia.getUTCDate() !== dia) return new Date(NaN);
+  if (hora > 23 || minuto > 59) return new Date(NaN);
+  return instanteEnZona(tz, anio, mes - 1, dia, hora, minuto);
 }
 
 // ─── PARA ESCRIBIRLE AL PACIENTE ──────────────────────────────────────────

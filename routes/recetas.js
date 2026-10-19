@@ -5,7 +5,7 @@
 const { Paciente, Medico, Receta, RecetaOptica } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar, fechaCivilValida } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
@@ -17,15 +17,8 @@ function interpretarFechaCivil(valor) {
   if (valor === undefined || valor === null || valor === "") {
     return { fechaCivil: "", fecha: new Date() };
   }
-  const fechaCivil = String(valor).trim();
-  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaCivil);
-  if (!partes) throw new ErrorHttp(400, "fecha debe tener formato AAAA-MM-DD");
-  const [anio, mes, dia] = partes.slice(1).map(Number);
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia, 12));
-  if (fecha.getUTCFullYear() !== anio || fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) {
-    throw new ErrorHttp(400, "fecha no es válida");
-  }
-  return { fechaCivil, fecha };
+  const fecha = fechaCivilValida(valor);
+  return { fechaCivil: String(valor).trim(), fecha };
 }
 
 module.exports = function (app) {

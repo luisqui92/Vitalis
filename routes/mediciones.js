@@ -3,7 +3,7 @@
 const { Paciente, Medicion } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar, fechaCivilValida } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
@@ -16,8 +16,10 @@ module.exports = function (app) {
 
     const tipo = String(req.body?.tipo || "").trim();
     const valor = Number(req.body?.valor);
-    const fecha = req.body?.fecha ? new Date(req.body.fecha) : null;
-    if (!tipo || Number.isNaN(valor) || !fecha) throw new ErrorHttp(400, "tipo, valor y fecha son requeridos");
+    if (!tipo || Number.isNaN(valor) || !req.body?.fecha) throw new ErrorHttp(400, "tipo, valor y fecha son requeridos");
+    // El día del <input type="date">, que exista ("no-es-fecha" daba 500, y
+    // el 30 de febrero se guardaba como 2 de marzo).
+    const fecha = fechaCivilValida(req.body.fecha);
 
     const valorSecundario = req.body?.valorSecundario !== undefined && req.body?.valorSecundario !== null
       ? Number(req.body.valorSecundario) : null;

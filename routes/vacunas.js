@@ -2,7 +2,7 @@
 const { Paciente, Vacuna } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico } = require("../services/ratelimit");
-const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
+const { asyncRoute, ErrorHttp, obtenerOFallar, fechaCivilValida } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
 
 const requireMedico = requireAuth(["medico"]);
@@ -14,8 +14,10 @@ module.exports = function (app) {
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
 
     const nombre = String(req.body?.nombre || "").trim();
-    const fecha = req.body?.fecha ? new Date(req.body.fecha) : null;
-    if (!nombre || !fecha) throw new ErrorHttp(400, "nombre y fecha son requeridos");
+    if (!nombre || !req.body?.fecha) throw new ErrorHttp(400, "nombre y fecha son requeridos");
+    // El día del <input type="date">, que exista: el 31 de febrero no se
+    // guarda como 3 de marzo.
+    const fecha = fechaCivilValida(req.body.fecha);
 
     const vacuna = await Vacuna.create({
       pacienteId: paciente._id,
