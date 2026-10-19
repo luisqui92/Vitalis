@@ -156,7 +156,17 @@ module.exports = function (app) {
       const dejar = new Set(b.avances.map(a => String(a?.titulo ?? a)));
       informe.avances = informe.avances.filter(a => dejar.has(a.titulo));
     }
-    await informe.save();
+    // Tiene que seguir siendo borrador al guardar, no solo al leerlo: un
+    // envío que entra en el medio ya mandó lo que había.
+    informe.$where = { estado: { $ne: "enviado" } };
+    try {
+      await informe.save();
+    } catch (e) {
+      if (["DocumentNotFoundError", "VersionError"].includes(e?.name) && await InformeFamilia.exists({ _id: informe._id, estado: "enviado" })) {
+        throw new ErrorHttp(409, "Este informe ya lo recibió la familia y no se puede cambiar. Si hay un error, armá uno nuevo.");
+      }
+      throw e;
+    }
     res.json({ ok: true, informe });
   }));
 
@@ -175,17 +185,25 @@ module.exports = function (app) {
     if (!destino) throw new ErrorHttp(400, "No hay un teléfono al que mandarlo. Cargalo en la ficha o escribilo acá.");
 
     // El enlace se crea al enviar y no antes: un borrador no se comparte.
-    informe.tokenPublico = crypto.randomBytes(24).toString("base64url");
-    informe.tokenExpira = new Date(Date.now() + DIAS_VALIDEZ_ENLACE * 86400000);
-    const enlace = enlaceDe(informe, req);
+    // Y el envío se reserva antes de mandar nada, de una sola vez: con dos
+    // «enviar» juntos (dos pestañas, dos del equipo) salían dos WhatsApp,
+    // cada uno con su enlace, y el primero no abría (verificación del informe
+    // de QA del 16 de octubre de 2026, M13). El segundo lo encuentra enviado.
+    const tokenPublico = crypto.randomBytes(24).toString("base64url");
+    const enviado = await InformeFamilia.findOneAndUpdate({ _id: informe._id, estado: { $ne: "enviado" } }, { $set: {
+      estado: "enviado", enviadoEn: new Date(), enviadoA: destino,
+      tokenPublico, tokenExpira: new Date(Date.now() + DIAS_VALIDEZ_ENLACE * 86400000),
+    } }, { new: true });
+    if (!enviado) throw new ErrorHttp(409, "Este informe ya se envió.");
+    const enlace = enlaceDe(enviado, req);
 
     // El mensaje no dice nada del chico. La vista previa de WhatsApp aparece
     // en la pantalla bloqueada de un teléfono que en muchas casas es
     // compartido, y acá el dato es más sensible que en cualquier otro aviso
     // de Symphomed: una condición del neurodesarrollo no se anuncia en una
     // notificación. El contenido vive detrás del enlace.
-    const primerNombre = String(informe.nombre || "").split(" ")[0];
-    const deQuien = informe.centro || informe.profesional || "el equipo";
+    const primerNombre = String(enviado.nombre || "").split(" ")[0];
+    const deQuien = enviado.centro || enviado.profesional || "el equipo";
     const texto =
       `Hola. Le compartimos el informe de avance de ${primerNombre}.\n\n` +
       `Es un resumen de cómo le fue en estas semanas, escrito para leer en el celular. ` +
@@ -196,6 +214,9 @@ module.exports = function (app) {
       await enviarTextoOPlantilla(destino, texto,
         { plantilla: PLANTILLAS.avanceFamilia, parametros: [primerNombre, deQuien, enlace] });
     } catch (e) {
+      // No salió: vuelve a ser borrador, sin enlace, y se puede mandar de nuevo.
+      await InformeFamilia.updateOne({ _id: enviado._id, tokenPublico },
+        { $set: { estado: "borrador", enviadoEn: null, enviadoA: "", tokenPublico: null, tokenExpira: null } });
       const codigo = e.response?.data?.error?.code;
       log.error("[AVANCE] falló el envío por WhatsApp:", e.response?.data?.error?.message || e.message);
       throw new ErrorHttp(502,
@@ -206,13 +227,8 @@ module.exports = function (app) {
             "Mientras tanto podés copiar el enlace y mandárselo vos.");
     }
 
-    informe.estado = "enviado";
-    informe.enviadoEn = new Date();
-    informe.enviadoA = destino;
-    await informe.save();
-
-    registrar({ req, medicoPhone, accion: "enviar_informe_familia", recurso: `InformeFamilia:${informe._id}` });
-    res.json({ ok: true, informe, enlace, enviadoA: destino });
+    registrar({ req, medicoPhone, accion: "enviar_informe_familia", recurso: `InformeFamilia:${enviado._id}` });
+    res.json({ ok: true, informe: enviado, enlace, enviadoA: destino });
   }));
 
   app.delete("/medico/informes-familia/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
