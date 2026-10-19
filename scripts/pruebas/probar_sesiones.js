@@ -85,9 +85,10 @@ axios.post = async () => {
   app.get("/admin/prueba-sesion", requireAdmin, (req, res) => res.json({ ok: true }));
   app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   const servidor = http.createServer(app);
-  // El tiempo real, con un latido corto para no esperar 30 segundos.
+  // El tiempo real, con un latido corto para no esperar 30 segundos. Con
+  // «if»: sin latido (antes del arreglo) la prueba tiene que fallar, no romperse.
   const tiempoReal = require(path.join(RAIZ, "services", "realtime"));
-  tiempoReal.AJUSTES.LATIDO_MS = 150;
+  if (tiempoReal.AJUSTES) tiempoReal.AJUSTES.LATIDO_MS = 150;
   tiempoReal.iniciarServidorTiempoReal(servidor);
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
   const P = (m, ruta, t, cuerpo) => pedir(servidor.address().port, m, ruta, t, cuerpo);
