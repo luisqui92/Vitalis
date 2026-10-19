@@ -18,6 +18,7 @@
 //      borra (informe de QA del 16 de octubre de 2026, A11). Los firmados
 //      con el membrete ya congelado reciben sus imágenes al arrancar.
 //   6. Un cambio del borrador que se cruza con la firma no cambia lo firmado.
+//   7. Un informe que corrige a otro apunta a uno de ese mismo paciente.
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
@@ -258,6 +259,21 @@ const FIRMA = "data:image/png;base64," + Buffer.from("firma").toString("base64")
   verificar("un borrador, sin nadie firmando, se sigue editando", r.estado === 200 && r.cuerpo.informe.conclusion === "Un borrador se sigue editando.");
 
   for (const e of [placa, otraPlaca]) fs.rmSync(path.join(DIR_ESTUDIOS, e.archivoNombre), { force: true });
+
+  console.log("\n── 7. Una corrección apunta a un informe del mismo paciente ──");
+  // Un firmado no se edita: se hace otro que lo corrige. Ese «corrige a»
+  // se guardaba sin mirar (informe de QA del 16 de octubre de 2026, M13).
+  r = await P("POST", `/medico/pacientes/${pac._id}/informes`, tk, { titulo: "Corrección", corrigeA: id1 });
+  verificar("corregir un informe de este paciente → 201, apuntando a él", r.estado === 201 && r.cuerpo.informe.corrigeA === id1);
+  const otroPac = await M.Paciente.create({ medicoPhone: MED, nombre: "Otro paciente" });
+  const deOtro = (await P("POST", `/medico/pacientes/${otroPac._id}/informes`, tk, {})).cuerpo.informe._id;
+  const cuantos = await M.Informe.countDocuments({ medicoPhone: MED });
+  for (const [que, valor] of [["un id mal formado", "no-es-un-id"], ["uno que no existe", "6500000000000000000000aa"],
+    ["uno de otro paciente", deOtro], ["algo que no es un id", { $ne: null }]]) {
+    r = await P("POST", `/medico/pacientes/${pac._id}/informes`, tk, { titulo: "Corrección", corrigeA: valor });
+    verificar(`  ${que} → 404 (${r.estado})`, r.estado === 404);
+  }
+  verificar("  ...y ninguno de esos creó un informe", (await M.Informe.countDocuments({ medicoPhone: MED })) === cuantos);
 
   servidor.close();
   await mongoose.disconnect();

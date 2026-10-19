@@ -23,6 +23,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const mongoose = require("mongoose");
 const { Paciente, Estudio, Informe, Membrete, MembreteEmitido, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico, rateLimit } = require("../services/ratelimit");
@@ -213,6 +214,16 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
 
+    // El informe que este corrige tiene que ser de este paciente. Antes se
+    // guardaba lo que viniera: un id mal formado daba 500, y uno de otro
+    // paciente quedaba como corregido por este.
+    let corrigeA = null;
+    if (req.body?.corrigeA) {
+      if (!mongoose.isValidObjectId(req.body.corrigeA)) throw new ErrorHttp(404, "El informe que se corrige no existe");
+      corrigeA = (await obtenerOFallar(Informe, { _id: req.body.corrigeA, medicoPhone, pacienteId: paciente._id },
+        "El informe que se corrige no existe"))._id;
+    }
+
     // El paciente recibe su código la primera vez que se le hace un informe,
     // no al registrarlo: así los pacientes viejos también lo consiguen sin
     // tener que migrar nada.
@@ -227,7 +238,7 @@ module.exports = function (app) {
       titulo: String(req.body?.titulo || "").trim(),
       tipoEstudio: String(req.body?.tipoEstudio || "").trim(),
       fechaEstudio: req.body?.fechaEstudio ? new Date(req.body.fechaEstudio) : new Date(),
-      corrigeA: req.body?.corrigeA || null,
+      corrigeA,
     });
     registrar({ req, medicoPhone, accion: "crear_informe", recurso: `Informe:${informe._id}` });
     res.status(201).json({ ok: true, informe });
