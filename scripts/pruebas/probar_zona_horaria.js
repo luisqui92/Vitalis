@@ -372,6 +372,63 @@ const hoyQueRecibe = () => (pedidosIA.at(-1)?.messages?.[1]?.content.match(/Hoy 
   r = await pedir(puerto, "POST", `/medico/consultas/${c._id}/reconsulta/confirmar`, tk[BR], { fechaHora: "cualquier cosa" });
   verificar(`una fecha que no es fecha → 400 (${r.estado})`, r.estado === 400);
 
+  // ═══ 11. LAS RECONSULTAS QUE YA ESTABAN GUARDADAS ══════════════════════════
+  console.log("\n── 11. Las pendientes de antes del arreglo (scripts/migrar_reconsultas_zona.js) ──");
+  // El código viejo guardaba las 10:00 que dijo la IA como 10:00 UTC. Se
+  // arreglan las pendientes; lo confirmado, lo descartado y lo que se escribió
+  // después del despliegue no se toca. Fechas de 2020 y 2021 a propósito: el
+  // script no acepta un --hasta en el futuro, y así no depende de qué día se
+  // corra la prueba.
+  const HASTA = "2021-01-01T00:00:00Z";
+  const vieja = async (med, reconsulta, { modificada = "2020-12-31T12:00:00Z", confirmada = null } = {}) => {
+    const c = await M.ConsultaMedica.create({
+      medicoPhone: med, pacienteId: pacientes[med]._id, estado: "completado", notaClinicaEstado: "completado",
+      notaClinica: { motivoConsulta: "Control" },
+    });
+    await M.ConsultaMedica.collection.updateOne({ _id: c._id }, { $set: {
+      "notaClinica.reconsultaSugerida": reconsulta, confirmadaEn: confirmada ? new DateReal(confirmada) : null, updatedAt: new DateReal(modificada),
+    } });
+    return c._id;
+  };
+  const las10UTC = new DateReal("2026-10-24T10:00:00Z");
+  const ids = {
+    bo: await vieja(BO, { fechaHora: las10UTC, textoOriginal: "el sábado a las diez", estado: "pendiente" }),
+    br: await vieja(BR, { fechaHora: las10UTC, textoOriginal: "sábado às dez" }), // sin estado: es pendiente
+    confirmada: await vieja(BO, { fechaHora: las10UTC, estado: "confirmada" }, { confirmada: "2020-12-31T13:00:00Z" }),
+    descartada: await vieja(BO, { fechaHora: las10UTC, estado: "descartada" }),
+    nueva: await vieja(BO, { fechaHora: new DateReal("2026-10-24T14:00:00Z"), estado: "pendiente" }, { modificada: "2021-01-02T00:00:00Z" }),
+  };
+  // En otro proceso y sin bloquear este: la base de prueba corre colgada de
+  // este proceso, y un spawnSync la deja sin contestar.
+  const { spawn } = require("child_process");
+  const migrar = (...args) => new Promise((resolve) => {
+    const hijo = spawn(process.execPath, [path.join(RAIZ, "scripts", "migrar_reconsultas_zona.js"), ...args],
+      { cwd: RAIZ, env: { ...process.env, MONGODB_URI: process.env.MONGODB_URI } });
+    let stdout = "", stderr = "";
+    hijo.stdout.on("data", (d) => { stdout += d; });
+    hijo.stderr.on("data", (d) => { stderr += d; });
+    const corte = setTimeout(() => hijo.kill(), 60000);
+    hijo.on("exit", (status) => { clearTimeout(corte); resolve({ status, stdout, stderr }); });
+  });
+  const horas = async () => Object.fromEntries(await Promise.all(Object.entries(ids).map(async ([k, id]) =>
+    [k, (await M.ConsultaMedica.findById(id).lean()).notaClinica.reconsultaSugerida.fechaHora.toISOString().slice(11, 16)])));
+
+  let corrida = await migrar(`--hasta=${HASTA}`);
+  verificar(`sin --zona-servidor no hace nada y lo dice (${corrida.status})`, corrida.status === 1 && /zona-servidor/.test(corrida.stderr));
+  corrida = await migrar(`--hasta=${HASTA}`, "--zona-servidor=UTC");
+  let h = await horas();
+  verificar(`el plan muestra las dos que hay que corregir, y no toca nada (${JSON.stringify(h)})`,
+    corrida.status === 0 && /: 2\b/.test(corrida.stdout) && Object.values(h).filter(x => x === "10:00").length === 4 && h.nueva === "14:00");
+  corrida = await migrar(`--hasta=${HASTA}`, "--zona-servidor=UTC", "--hacelo");
+  h = await horas();
+  verificar(`con --hacelo: La Paz queda a las 14:00 UTC y São Paulo a las 13:00 UTC (${JSON.stringify(h)})`,
+    corrida.status === 0 && h.bo === "14:00" && h.br === "13:00");
+  verificar("  ...y la confirmada, la descartada y la escrita después del despliegue, como estaban",
+    h.confirmada === "10:00" && h.descartada === "10:00" && h.nueva === "14:00");
+  corrida = await migrar(`--hasta=${HASTA}`, "--zona-servidor=UTC", "--hacelo");
+  verificar(`correrlo de nuevo no las corre otra vez (${JSON.stringify(await horas())})`,
+    corrida.status === 0 && /Ninguna/.test(corrida.stdout) && JSON.stringify(await horas()) === JSON.stringify(h));
+
   servidor.close();
   await mongoose.disconnect();
   await mongod.stop();
