@@ -19,6 +19,7 @@ const { enviarTextoOPlantilla, PLANTILLAS } = require("../services/metaWhatsapp"
 const { formatearFechaCompleta } = require("../services/reservaCitas");
 const { asyncRoute, ErrorHttp, obtenerOFallar } = require("../services/httpHelpers");
 const { registrar } = require("../services/auditoria");
+const { siguienteCodigo } = require("../services/codigos");
 const { log } = require("../config");
 
 const requireMedico = requireAuth(["medico"]);
@@ -220,8 +221,15 @@ module.exports = function (app) {
 
     let paciente = telefono ? await Paciente.findOne({ medicoPhone, telefono }) : null;
     let yaExistia = !!paciente;
+    // Con código desde el alta, como en /medico/pacientes: es lo que el
+    // técnico tipea en el equipo de imagen, y sin él la Caja DICOM no le
+    // puede archivar los estudios solos (M11). Una ficha vieja sin código lo
+    // recibe acá, igual que con su primer informe (routes/informes.js).
     if (!paciente) {
-      paciente = await Paciente.create({ medicoPhone, nombre, telefono });
+      paciente = await Paciente.create({ medicoPhone, nombre, telefono, codigo: await siguienteCodigo(Paciente, medicoPhone, "P") });
+    } else if (!paciente.codigo) {
+      await Paciente.updateOne({ _id: paciente._id, codigo: { $in: [null, ""] } }, { codigo: await siguienteCodigo(Paciente, medicoPhone, "P") });
+      paciente = await Paciente.findById(paciente._id);
     }
 
     cita.pacienteId = paciente._id;

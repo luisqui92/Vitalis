@@ -1,11 +1,13 @@
 // Symphomed — Las citas que carga el médico a mano (routes/citas.js).
 //
-// La auditoría del comité de QA (octubre de 2026, M4) encontró que
-// POST /medico/citas no miraba si el horario estaba libre. Dos citas a la
-// misma hora exacta daban un 500, y dos solapadas (10:00 y 10:15) se
-// guardaban las dos. Moverla o volver a confirmarla tampoco miraba nada, una
-// fecha que no es fecha daba 500, un estado inventado se ignoraba en
-// silencio, y el paciente no se enteraba si se la movían o cancelaban.
+// La auditoría del comité de QA (octubre de 2026) encontró:
+//   · M4: POST /medico/citas no miraba si el horario estaba libre. Dos citas a
+//     la misma hora exacta daban un 500, y dos solapadas (10:00 y 10:15) se
+//     guardaban las dos. Moverla o volver a confirmarla tampoco miraba nada,
+//     una fecha que no es fecha daba 500, un estado inventado se ignoraba en
+//     silencio, y el paciente no se enteraba si se la movían o cancelaban.
+//   · M11: el paciente que se crea desde una cita quedaba sin código, y sin
+//     código la Caja DICOM no le puede archivar los estudios solos.
 //
 // Lo que se prueba, contra la ruta de verdad y una base de verdad (Google
 // Calendar y WhatsApp, de mentira, para ver qué se les pide):
@@ -14,6 +16,7 @@
 //      propio evento de Google, que hasta guardarse sigue en la hora vieja.
 //   3. Fechas y estados que no existen → 400.
 //   4. Los avisos al paciente, en la hora del consultorio.
+//   5. El código del paciente creado desde una cita.
 const path = require("path");
 const http = require("http");
 const RAIZ = path.join(__dirname, "..", "..");
@@ -180,6 +183,17 @@ function pedir(puerto, metodo, ruta, token, cuerpo) {
     fecha: localAInstante(ZONA, "2030-05-01T10:00"), estado: "confirmada" });
   r = await P("PATCH", `/medico/citas/${pasada._id}`, { estado: "cancelada" });
   verificar("cancelar una que ya pasó (ordenar la agenda) → no le avisa", r.estado === 200 && enviados.length === 0);
+
+  console.log("\n── 5. El paciente que se crea desde una cita ──");
+  r = await crear("17:00", { pacienteNombre: "Nuevo Desde Cita", pacienteTelefono: "59170003999" });
+  r = await P("POST", `/medico/citas/${r.cuerpo?.cita?._id}/crear-paciente`, {});
+  verificar(`sale con su código, como un alta normal (${r.cuerpo?.paciente?.codigo})`, r.estado === 201 && /^P-\d{4}$/.test(r.cuerpo?.paciente?.codigo || ""));
+  const vieja = await M.Paciente.create({ medicoPhone: MED, nombre: "Ficha Vieja", telefono: "59170003888" });
+  r = await crear("17:30", { pacienteNombre: "Ficha Vieja", pacienteTelefono: "59170003888" });
+  r = await P("POST", `/medico/citas/${r.cuerpo?.cita?._id}/crear-paciente`, {});
+  const codigoVieja = (await M.Paciente.findById(vieja._id).lean()).codigo;
+  verificar(`si se vincula a una ficha vieja sin código, la ficha lo recibe (${codigoVieja})`, r.estado === 201 && r.cuerpo?.yaExistia === true
+    && /^P-\d{4}$/.test(codigoVieja || "") && r.cuerpo?.paciente?.codigo === codigoVieja);
 
   servidor.close();
   await mongoose.disconnect();
