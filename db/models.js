@@ -2444,6 +2444,20 @@ const informeSchema = new mongoose.Schema({
     type: new mongoose.Schema({ nombre: String, codigo: String, sexo: String, edad: Number }, { _id: false }),
     default: null,
   },
+  // Las imágenes como estaban al firmar: cómo se veían en el visor y lo que
+  // se midió encima. El contraste de una placa se vuelve a tocar para otra
+  // consulta, y el informe que ya tiene el paciente no puede cambiar por eso.
+  // El archivo no se copia: es el mismo, y no se puede borrar mientras esté
+  // en un informe firmado (routes/estudios.js). Sin copia es undefined y no
+  // una lista vacía: así se distingue un firmado de antes de esto, que hay
+  // que congelar, de uno firmado sin imágenes.
+  estudiosEmitidos: {
+    type: [new mongoose.Schema({
+      estudioId: mongoose.Schema.Types.ObjectId, nombre: String, tipo: String, fecha: Date,
+      ajustesVisor: mongoose.Schema.Types.Mixed, mediciones: mongoose.Schema.Types.Mixed, calibracion: mongoose.Schema.Types.Mixed,
+    }, { _id: false })],
+    default: undefined,
+  },
 }, { timestamps: true });
 informeSchema.index({ medicoPhone: 1, codigo: 1 }, { unique: true });
 const Informe = mongoose.model("Informe", informeSchema);

@@ -23,6 +23,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const mongoose = require("mongoose");
 const { Paciente, Estudio, Informe, Membrete, MembreteEmitido, Medico } = require("../db/models");
 const { requireAuth } = require("../services/auth");
 const { limitMedico, rateLimit } = require("../services/ratelimit");
@@ -61,6 +62,17 @@ async function membreteDe(medicoPhone) {
   }
   return m;
 }
+
+// El nombre del centro va al pie del WhatsApp del informe, que sale del
+// número oficial, y el del profesional a la verificación pública: ninguno de
+// los dos puede llevar un enlace (informe de QA del 16 de octubre de 2026,
+// B2). Enlace es lo que WhatsApp vuelve tocable: «https://», «www.», una IP o
+// un punto pegado entre letras, como «bit.ly», «wa.me» o «pagos-clinica.com».
+// Por eso «Dra.Ana» tampoco pasa, y «Dra. Ana» sí. Un salto de línea tampoco:
+// con uno, el nombre agrega un párrafo propio al final del mensaje.
+const PARECE_ENLACE = /:\/\/|www\.|[\p{L}\p{N}]\.\p{L}{2,}|\d{1,3}(\.\d{1,3}){3}|[\u0000-\u001f\u007f]/iu;
+const nombreConEnlace = (texto) => PARECE_ENLACE.test(String(texto || ""));
+const NOMBRES_SIN_ENLACE = { nombreCentro: "El nombre del centro", profesionalNombre: "El nombre del profesional" };
 
 // La edad que tenía el paciente en una fecha (la de la firma, en un informe
 // firmado).
@@ -117,16 +129,41 @@ async function impresoDe(informe) {
   return { membrete, paciente };
 }
 
+// Las imágenes también se congelan al firmar: cómo las dejó el médico en el
+// visor y lo que midió encima. Antes el enlace del paciente y la impresión
+// leían los ajustes de hoy, y subir el contraste de una placa cambiaba un
+// informe ya entregado (informe de QA del 16 de octubre de 2026, A11).
+async function estudiosAlFirmar(informe) {
+  const estudios = await Estudio.find({ _id: { $in: informe.estudiosIncluidos }, medicoPhone: informe.medicoPhone }).lean();
+  return estudios.map(e => ({ estudioId: e._id, nombre: e.nombre, tipo: e.tipo, fecha: e.fecha,
+    ajustesVisor: e.ajustesVisor, mediciones: e.mediciones, calibracion: e.calibracion }));
+}
+
+// Las imágenes de un informe: las congeladas si está firmado, las de hoy si
+// es un borrador. Con el _id del estudio, que es con lo que se pide el archivo.
+async function estudiosDe(informe) {
+  const congeladas = informe.estado === "firmado" && Array.isArray(informe.estudiosEmitidos) ? informe.estudiosEmitidos : null;
+  return (congeladas || await estudiosAlFirmar(informe)).map(e => ({ ...(e.toObject?.() || e), _id: e.estudioId }));
+}
+
 // Los firmados antes de que lo impreso se congelara: se congelan con lo que
 // mostraban hasta ahora, la primera vez que arranca el servidor con esto (lo
-// llama index.js). Después ya no hay ninguno: no hace nada.
+// llama index.js). Después ya no hay ninguno: no hace nada. Las imágenes se
+// congelan desde después que el membrete, así que un firmado puede tener el
+// membrete y no las imágenes.
 async function congelarInformesFirmados() {
-  const viejos = await Informe.find({ estado: "firmado", membreteEmitido: null }).select("_id medicoPhone pacienteId firmadoEn").lean();
+  const viejos = await Informe.find({ estado: "firmado", $or: [{ membreteEmitido: null }, { estudiosEmitidos: { $exists: false } }] })
+    .select("_id medicoPhone pacienteId firmadoEn membreteEmitido estudiosIncluidos estudiosEmitidos").lean();
   const versiones = new Map();
   for (const inf of viejos) {
-    if (!versiones.has(inf.medicoPhone)) versiones.set(inf.medicoPhone, await versionDelMembrete(inf.medicoPhone));
-    await Informe.updateOne({ _id: inf._id, membreteEmitido: null },
-      { $set: { membreteEmitido: versiones.get(inf.medicoPhone)._id, pacienteEmitido: await pacienteAlFirmar(inf, inf.firmadoEn) } });
+    if (!inf.membreteEmitido) {
+      if (!versiones.has(inf.medicoPhone)) versiones.set(inf.medicoPhone, await versionDelMembrete(inf.medicoPhone));
+      await Informe.updateOne({ _id: inf._id, membreteEmitido: null },
+        { $set: { membreteEmitido: versiones.get(inf.medicoPhone)._id, pacienteEmitido: await pacienteAlFirmar(inf, inf.firmadoEn) } });
+    }
+    if (!Array.isArray(inf.estudiosEmitidos)) {
+      await Informe.updateOne({ _id: inf._id, estudiosEmitidos: { $exists: false } }, { $set: { estudiosEmitidos: await estudiosAlFirmar(inf) } });
+    }
   }
   return viejos.length;
 }
@@ -142,6 +179,12 @@ module.exports = function (app) {
     const m = await membreteDe(medicoPhone);
     for (const campo of ["nombreCentro", "direccion", "telefono", "ciudad", "profesionalNombre", "profesionalTitulo", "profesionalRegistro", "piePagina"]) {
       if (req.body?.[campo] !== undefined) m[campo] = String(req.body[campo]).trim().slice(0, 200);
+    }
+    for (const [campo, quien] of Object.entries(NOMBRES_SIN_ENLACE)) {
+      if (req.body?.[campo] !== undefined && nombreConEnlace(m[campo])) {
+        throw new ErrorHttp(400, `${quien} no puede llevar un enlace ni una dirección web: sale en los mensajes de WhatsApp. ` +
+          "Si es el punto de una abreviatura, dejá un espacio después («Dra. Ana»).");
+      }
     }
     // Logo y firma llegan como data URI. Se acepta solo imagen y con tope de
     // tamaño: un logo de 5 MB haría lenta cada impresión y engordaría el
@@ -171,6 +214,16 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const paciente = await obtenerOFallar(Paciente, { _id: req.params.pacienteId, medicoPhone }, "Paciente no encontrado");
 
+    // El informe que este corrige tiene que ser de este paciente. Antes se
+    // guardaba lo que viniera: un id mal formado daba 500, y uno de otro
+    // paciente quedaba como corregido por este.
+    let corrigeA = null;
+    if (req.body?.corrigeA) {
+      if (!mongoose.isValidObjectId(req.body.corrigeA)) throw new ErrorHttp(404, "El informe que se corrige no existe");
+      corrigeA = (await obtenerOFallar(Informe, { _id: req.body.corrigeA, medicoPhone, pacienteId: paciente._id },
+        "El informe que se corrige no existe"))._id;
+    }
+
     // El paciente recibe su código la primera vez que se le hace un informe,
     // no al registrarlo: así los pacientes viejos también lo consiguen sin
     // tener que migrar nada.
@@ -185,7 +238,7 @@ module.exports = function (app) {
       titulo: String(req.body?.titulo || "").trim(),
       tipoEstudio: String(req.body?.tipoEstudio || "").trim(),
       fechaEstudio: req.body?.fechaEstudio ? new Date(req.body.fechaEstudio) : new Date(),
-      corrigeA: req.body?.corrigeA || null,
+      corrigeA,
     });
     registrar({ req, medicoPhone, accion: "crear_informe", recurso: `Informe:${informe._id}` });
     res.status(201).json({ ok: true, informe });
@@ -194,9 +247,8 @@ module.exports = function (app) {
   app.patch("/medico/informes/:id", limitMedico, requireMedico, asyncRoute(async (req, res) => {
     const medicoPhone = req.adminUser.usuario;
     const informe = await obtenerOFallar(Informe, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
-    if (informe.estado === "firmado") {
-      throw new ErrorHttp(409, "Este informe ya está firmado y no se puede editar. Creá uno nuevo que lo corrija.");
-    }
+    const YA_FIRMADO = "Este informe ya está firmado y no se puede editar. Creá uno nuevo que lo corrija.";
+    if (informe.estado === "firmado") throw new ErrorHttp(409, YA_FIRMADO);
 
     for (const campo of ["titulo", "tipoEstudio", "tecnica", "hallazgos", "conclusion", "recomendaciones"]) {
       if (req.body?.[campo] !== undefined) informe[campo] = String(req.body[campo]).slice(0, 20000);
@@ -215,7 +267,20 @@ module.exports = function (app) {
       informe.estudiosIncluidos = validos.map(e => e._id);
     }
 
-    await informe.save();
+    // Tiene que seguir siendo borrador al guardar, no solo al leerlo. Si la
+    // firma entraba en el medio (una miniatura tocada mientras se firma, o
+    // dos pestañas), el save escribía la conclusión y las imágenes nuevas
+    // sobre un informe ya firmado y entregado (informe de QA del 16 de
+    // octubre de 2026, A11).
+    informe.$where = { estado: { $ne: "firmado" } };
+    try {
+      await informe.save();
+    } catch (e) {
+      if (["DocumentNotFoundError", "VersionError"].includes(e?.name) && await Informe.exists({ _id: informe._id, estado: "firmado" })) {
+        throw new ErrorHttp(409, YA_FIRMADO);
+      }
+      throw e;
+    }
     res.json({ ok: true, informe });
   }));
 
@@ -230,13 +295,17 @@ module.exports = function (app) {
     if (!informe.conclusion.trim()) throw new ErrorHttp(400, "Un informe sin conclusión no se puede firmar");
 
     const firmadoEn = new Date();
-    const [version, pacienteEmitido] = await Promise.all([versionDelMembrete(medicoPhone), pacienteAlFirmar(informe, firmadoEn)]);
+    const [version, pacienteEmitido, estudiosEmitidos] = await Promise.all([
+      versionDelMembrete(medicoPhone), pacienteAlFirmar(informe, firmadoEn), estudiosAlFirmar(informe)]);
     const firmado = await Informe.findOneAndUpdate({ _id: informe._id, medicoPhone, estado: { $ne: "firmado" } }, { $set: {
       estado: "firmado", firmadoEn,
       // El enlace se crea al firmar y no antes: un borrador no se comparte.
       tokenPublico: crypto.randomBytes(24).toString("base64url"),
       tokenExpira: new Date(Date.now() + DIAS_VALIDEZ_ENLACE * 86400000),
       membreteEmitido: version._id, pacienteEmitido,
+      // La lista va con sus imágenes congeladas: si un cambio de la lista
+      // entró recién, se firma la que se congeló.
+      estudiosIncluidos: informe.estudiosIncluidos, estudiosEmitidos,
     } }, { new: true });
     if (!firmado) throw new ErrorHttp(409, "Ya está firmado");
 
@@ -260,7 +329,7 @@ module.exports = function (app) {
     const medicoPhone = req.adminUser.usuario;
     const informe = await obtenerOFallar(Informe, { _id: req.params.id, medicoPhone }, "Informe no encontrado");
     const paciente = await Paciente.findOne({ _id: informe.pacienteId, medicoPhone }).lean();
-    const estudios = await Estudio.find({ _id: { $in: informe.estudiosIncluidos }, medicoPhone }).lean();
+    const estudios = await estudiosDe(informe);
     const impreso = await impresoDe(informe);
     res.json({
       informe,
@@ -280,8 +349,13 @@ module.exports = function (app) {
     if (informe.estado !== "firmado") throw new ErrorHttp(400, "Firmá el informe antes de enviarlo");
 
     const paciente = await Paciente.findOne({ _id: informe.pacienteId, medicoPhone }).lean();
-    const destino = String(req.body?.telefono || paciente?.telefono || "").replace(/\D/g, "");
-    if (!destino) throw new ErrorHttp(400, "El paciente no tiene teléfono cargado");
+    // Solo al teléfono de la ficha. Antes valía uno que viniera en el pedido,
+    // y con eso el número oficial le mandaba un enlace con el nombre del
+    // centro a cualquier número (informe de QA del 16 de octubre de 2026,
+    // B2). La pantalla nunca lo mandó: si el número está mal, se corrige la
+    // ficha.
+    const destino = String(paciente?.telefono || "").replace(/\D/g, "");
+    if (!destino) throw new ErrorHttp(400, "El paciente no tiene teléfono cargado. Cargalo en la ficha y volvé a enviarlo.");
 
     const { membrete } = await impresoDe(informe);
     // Cero contenido clínico en el mensaje: la vista previa de WhatsApp
@@ -290,10 +364,13 @@ module.exports = function (app) {
     const primerNombre = String(paciente?.nombre || "").split(" ")[0];
     const queEstudio = `${informe.titulo || informe.tipoEstudio || "Estudio"} — ${new Date(informe.fechaEstudio).toLocaleDateString("es-BO")}`;
     const enlace = enlaceDe(informe, req);
+    // Un nombre con enlace de antes de que se revisara (o el de la cuenta,
+    // que es el que trae el membrete hasta que alguien lo edita) no sale.
+    const centro = nombreConEnlace(membrete.nombreCentro) ? "" : membrete.nombreCentro || "";
     const texto = `Hola ${primerNombre}. Su informe ya está disponible.\n\n` +
       `${queEstudio}\n\n` +
       `Puede verlo acá:\n${enlace}\n\n` +
-      `El enlace vence en ${DIAS_VALIDEZ_ENLACE} días.\n${membrete.nombreCentro || ""}`;
+      `El enlace vence en ${DIAS_VALIDEZ_ENLACE} días.\n${centro}`;
 
     try {
       // Ni el título del estudio ni nada clínico viajan en la plantilla más
@@ -351,7 +428,7 @@ module.exports = function (app) {
     if (r.vencido) throw new ErrorHttp(410, "Este enlace venció. Pedile uno nuevo a tu médico.");
 
     const informe = r.informe;
-    const estudios = await Estudio.find({ _id: { $in: informe.estudiosIncluidos } }).lean();
+    const estudios = await estudiosDe(informe);
     const { membrete, paciente } = await impresoDe(informe);
 
     // Que el médico sepa si el paciente lo abrió, que es la pregunta que

@@ -9,7 +9,9 @@
 //   2. El contador arranca donde terminan los códigos que ya hay.
 //   3. El índice único por consultorio.
 //   4. Informes a la vez: códigos distintos.
-//   5. La caja DICOM no archiva sola con un código que es de dos pacientes.
+//   5. La caja DICOM no archiva sola con un código que es de dos pacientes,
+//      ni lo manda a la ventana de captura abierta: con un código que no es
+//      de un solo paciente, va a la bandeja.
 //   6. El script de los repetidos de antes: mira sin tocar, y arregla.
 const path = require("path");
 const fs = require("fs");
@@ -136,6 +138,26 @@ const distintos = (lista) => new Set(lista).size === lista.length;
   verificar(`un código que es de dos pacientes → a la bandeja, no a uno cualquiera (${rc.estado}, ${rc.cuerpo?.destino})`, rc.estado === 201 && rc.cuerpo?.destino === "bandeja");
   rc = await subir("p-0600");
   verificar(`un código de un solo paciente → se archiva solo (${rc.cuerpo?.destino}, por ${rc.cuerpo?.via})`, rc.estado === 201 && rc.cuerpo?.destino === "paciente" && rc.cuerpo?.via === "codigo");
+
+  // Con la ventana de captura abierta. Antes, un código que no era de uno
+  // solo seguía de largo y la placa caía en el paciente de la ventana
+  // (informe de QA del 16 de octubre de 2026, A10).
+  const enVentana = await M.Paciente.create({ medicoPhone: MED, nombre: "El de la ventana" });
+  await M.CapturaPendiente.create({ medicoPhone: MED, pacienteId: enVentana._id, pacienteNombre: enVentana.nombre, expiraEn: new Date(Date.now() + 10 * 60000) });
+  const enLaVentana = async () => M.Estudio.countDocuments({ medicoPhone: MED, pacienteId: enVentana._id });
+  rc = await subir("P-0500");
+  verificar(`con la ventana abierta, el código de dos pacientes → igual a la bandeja (${rc.cuerpo?.destino})`, rc.estado === 201 && rc.cuerpo?.destino === "bandeja");
+  rc = await subir("P-0999");
+  verificar(`  ...y un código que no es de nadie (el técnico se equivocó) → a la bandeja (${rc.cuerpo?.destino})`, rc.estado === 201 && rc.cuerpo?.destino === "bandeja");
+  rc = await subir("p0600");
+  verificar(`  ...y uno mal escrito, sin el guion → a la bandeja (${rc.cuerpo?.destino})`, rc.estado === 201 && rc.cuerpo?.destino === "bandeja");
+  verificar("  ...ninguna de las tres cayó en el paciente de la ventana", (await enLaVentana()) === 0);
+  rc = await subir("P-0600");
+  verificar(`un código de un solo paciente, con la ventana abierta → a ese paciente (${rc.cuerpo?.via})`, rc.estado === 201 && rc.cuerpo?.via === "codigo" && (await enLaVentana()) === 0);
+  rc = await subir("ECO-4471");
+  verificar(`lo que el equipo pone solo en el Patient ID no apaga la ventana → al de la ventana (${rc.cuerpo?.via})`, rc.estado === 201 && rc.cuerpo?.via === "ventana" && (await enLaVentana()) === 1);
+  rc = await subir("");
+  verificar(`  ...y sin nada en el Patient ID, también (${rc.cuerpo?.via})`, rc.estado === 201 && rc.cuerpo?.via === "ventana" && (await enLaVentana()) === 2);
 
   console.log("\n── 6. El script de los repetidos de antes ──");
   let s = await correrScript(uri, []);
