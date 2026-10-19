@@ -87,7 +87,21 @@ module.exports = function (app) {
       medico.duracionConsultaMinutos = duracionValida(duracion);
     }
     if (req.body?.googleCalendarId !== undefined) {
-      medico.googleCalendarId = String(req.body.googleCalendarId).trim();
+      // La cuenta de servicio de Google es una sola para todos los
+      // consultorios (services/googleCalendar.js): aceptar un calendario que
+      // ya usa otra cuenta le dejaba a esta escribir citas con nombres de
+      // pacientes en el ajeno y leer su ocupación (M7). Se compara sin
+      // distinguir mayúsculas, como Google trata los correos, y solo cuando
+      // cambia: la pantalla lo manda siempre, y un duplicado que ya estuviera
+      // en la base no puede impedirle al médico guardar su horario.
+      const calendarId = String(req.body.googleCalendarId).trim();
+      if (calendarId && calendarId.toLowerCase() !== String(medico.googleCalendarId || "").trim().toLowerCase()) {
+        const otro = await Medico.exists({ googleCalendarId: calendarId, _id: { $ne: medico._id } })
+          .collation({ locale: "en", strength: 2 });
+        if (otro) throw new ErrorHttp(409, "Ese calendario ya está conectado a otra cuenta de Symphomed.");
+        registrar({ req, medicoPhone: medico.phone, accion: "conectar_google_calendar", detalle: calendarId });
+      }
+      medico.googleCalendarId = calendarId;
     }
     if (req.body?.infoConsultorio !== undefined) {
       medico.infoConsultorio = String(req.body.infoConsultorio).trim();

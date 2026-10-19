@@ -12,7 +12,8 @@
 //   1. El cálculo, con lo que ya pudiera estar guardado mal, termina y usa
 //      valores sanos. Corre en otro proceso con un tiempo máximo: si se
 //      colgara, la prueba lo dice en vez de colgarse ella también.
-//   2. Al guardar el horario: una duración o un horario imposibles → 400.
+//   2. Al guardar el horario: una duración o un horario imposibles → 400. Y
+//      un Google Calendar que ya usa otra cuenta → 409 (M7).
 //   3. Al crear una cita a mano: una duración imposible → 400.
 //   4. Pedir la disponibilidad tiene el mismo límite por minuto que el resto.
 const path = require("path");
@@ -181,6 +182,31 @@ verificar("una cita de 45 minutos a las 10:00 → se ofrecen las 9:30 y las 11:0
   }
   r = await conHorario(Array.from({ length: 51 }, () => ({ diaSemana: 1, horaInicio: "08:00", horaFin: "09:00" })));
   verificar("51 franjas → 400", r.estado === 400);
+
+  // M7: la cuenta de servicio de Google es una sola para todos. Si otra
+  // cuenta ya usa ese calendario, esta escribiría citas en el ajeno.
+  await M.Medico.create({ phone: "70099002", nombre: "Dra. Otra", passwordHash: "x", activo: true, googleCalendarId: "dra.otra@gmail.com" });
+  const calendarioGuardado = async () => (await M.Medico.findOne({ phone: "70099001" }).lean()).googleCalendarId;
+  const conCalendario = (googleCalendarId) => P("PATCH", "/medico/horario", { googleCalendarId });
+  r = await conCalendario("dra.otra@gmail.com");
+  verificar("el Google Calendar de otra cuenta → 409, y no se guarda", r.estado === 409 && /otra cuenta/.test(r.cuerpo?.error || "") && await calendarioGuardado() === "");
+  r = await conCalendario("  Dra.Otra@Gmail.com ");
+  verificar("  ...tampoco escrito con mayúsculas y espacios", r.estado === 409 && await calendarioGuardado() === "");
+  r = await conCalendario(" propio@gmail.com ");
+  verificar("uno que no usa nadie → se guarda", r.estado === 200 && await calendarioGuardado() === "propio@gmail.com");
+  let registro = null;
+  for (let i = 0; i < 20 && !registro; i++) {
+    registro = await M.AuditLog.findOne({ medicoPhone: "70099001", accion: "conectar_google_calendar" }).lean();
+    if (!registro) await new Promise(ok => setTimeout(ok, 50));
+  }
+  verificar("  ...y queda anotado en la auditoría", registro?.detalle === "propio@gmail.com");
+  // Un duplicado de antes del arreglo no puede impedirle guardar su horario:
+  // la pantalla manda el calendario siempre, aunque no lo haya tocado.
+  await M.Medico.updateOne({ phone: "70099002" }, { googleCalendarId: "propio@gmail.com" });
+  r = await P("PATCH", "/medico/horario", { googleCalendarId: "propio@gmail.com", duracionConsultaMinutos: "45" });
+  verificar("con un duplicado viejo en la base, guardar sin cambiar el calendario → 200", r.estado === 200);
+  r = await conCalendario("");
+  verificar("sacar el calendario → se guarda vacío", r.estado === 200 && await calendarioGuardado() === "");
 
   console.log("\n── 3. Al crear una cita a mano ──");
   const cita = (extra) => P("POST", "/medico/citas", { fecha: "2030-05-06T10:00", pacienteNombre: "Paciente de prueba", ...extra });
