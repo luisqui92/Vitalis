@@ -23,6 +23,7 @@ async function renderSeguridad() {
     ]);
     pintarSeguridad(estado2fa.activo, dataAuditoria.eventos || [], estado2fa.soloGoogle);
     if (typeof pintarGoogleSeguridad === "function") pintarGoogleSeguridad();
+    if (typeof pintarPerfilAcceso === "function") pintarPerfilAcceso();
     // Aparte y sin await: si los respaldos tardan o fallan, la pantalla de
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
@@ -54,6 +55,7 @@ function pintarSeguridad(dosFAActivo, eventos, soloGoogle = false) {
 
     <div id="fotoPerfilBox"></div>
     <div id="googleSeguridad"></div>
+    <div id="perfilAcceso"></div>
 
     <div id="saldoBox"></div>
     <div id="memedConsejoBox"></div>

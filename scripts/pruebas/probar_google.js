@@ -128,7 +128,16 @@ async function pedir(ruta, req) {
   });
   for (const estado of ['pendiente', 'rechazada', 'inactiva']) await prueba('Google respeta cuenta ' + estado, async () => {
     cuenta = { phone: '123', activo: estado !== 'inactiva', estadoCuenta: estado }; const r = await pedir('entrar', await nuevo());
-    assert.equal(r.codigo, 403); assert.equal(r.datos.token, undefined);
+    assert.equal(r.codigo, estado === 'inactiva' ? 403 : 200); assert.equal(r.datos.token, undefined);
+    if (estado !== 'inactiva') { assert.equal(r.datos.solicitud, true); assert.equal(auth.verificarToken(r.datos.solicitudTicket).rol, 'google_solicitud'); }
+  });
+  await prueba('ticket de solicitud solo consulta su cuenta y exige el mismo navegador', async () => {
+    cuenta = { phone: '123', estadoCuenta: 'pendiente', activo: false };
+    const req = await nuevo(); const r = await pedir('entrar', req);
+    req.body = { solicitudTicket: r.datos.solicitudTicket };
+    assert.equal((await google.cuentaDeSolicitud(req)).phone, '123');
+    req.headers.cookie = (await nuevo()).headers.cookie;
+    await assert.rejects(() => google.cuentaDeSolicitud(req));
   });
   await prueba('Google mantiene el segundo factor de Symphomed', async () => {
     cuenta = { phone: '123', activo: true, estadoCuenta: 'aprobada', dosFA: { activo: true } };
@@ -166,6 +175,7 @@ async function pedir(ruta, req) {
     '../services/operadores': { todosLosOperadores: () => [] }, '../services/push': {}, '../config': { log: { info() {}, warn() {} } },
     '../services/ratelimit': {}, '../services/httpHelpers': { ErrorHttp, asyncRoute: wrap }, '../services/telefono': telefonos,
     '../services/sesionMedico': sesion, '../services/googleAcceso': google,
+    '../services/perfilesCuenta': cargar('services/perfilesCuenta.js', { './httpHelpers': { ErrorHttp } }),
   })(appAltas);
   cargar('modulos/estudiantes/rutas/cuenta.js', {
     '../../../db/models': { Medico }, '../modelos': { CodigoEstudiante: {
@@ -181,7 +191,7 @@ async function pedir(ruta, req) {
   }).registro(appAltas);
   async function alta(ruta, body = {}) {
     const req = await nuevo(); req.body.googleTicket = google.ticketRegistro(await google.comprobar(req));
-    Object.assign(req.body, { nombre: 'Prueba', phone: '+59171111111', matricula: '123', rol: 'admin', carrera: 'medicina', nivel: 'residente' }, body);
+    Object.assign(req.body, { perfilSolicitado: ruta.endsWith('estudiante') ? 'estudiante' : 'profesional', pais: 'BO', profesion: 'Odontología', tipoEspecialidad: 'odontologia', universidad: 'Universidad de prueba', periodo: '4º año', nombre: 'Prueba', phone: '+59171111111', matricula: '123', rol: 'admin', carrera: 'odontologia', nivel: 'estudiante' }, body);
     const res = { codigo: 200, status(c) { this.codigo = c; return this; }, json(d) { this.datos = d; } };
     await altas[ruta](req, res); return res;
   }
@@ -200,11 +210,19 @@ async function pedir(ruta, req) {
   await prueba('Google no permite alta de estudiante sin código válido', async () => {
     assert.equal((await alta('/medico/registro-estudiante', { codigo: 'INVALIDO' })).codigo, 400);
   });
-  await prueba('el código determina carrera, nivel y acceso, ignorando los valores enviados', async () => {
+  await prueba('el código determina carrera, nivel y acceso; la selección debe coincidir', async () => {
     const r = await alta('/medico/registro-estudiante', { codigo: 'EST-PRUEBA' }); assert.equal(r.codigo, 200);
     assert.equal(creado.estudiante.carrera, 'odontologia'); assert.equal(creado.estudiante.nivel, 'estudiante');
     assert.equal(creado.googleSolo, true); assert.equal(creado.rol, undefined); assert.equal(creado.activo, true);
     assert.equal((await alta('/medico/registro-estudiante', { codigo: 'EST-PRUEBA' })).codigo, 400);
+  });
+  await prueba('no se puede enviar perfil vacío ni cambiar la carrera o nivel del código', async () => {
+    assert.equal((await alta('/medico/registro', { perfilSolicitado: '' })).codigo, 400);
+    codigoUsado = false;
+    assert.equal((await alta('/medico/registro-estudiante', { codigo: 'EST-PRUEBA', carrera: 'medicina' })).codigo, 400);
+    assert.equal(codigoUsado, false);
+    assert.equal((await alta('/medico/registro-estudiante', { codigo: 'EST-PRUEBA', nivel: 'residente' })).codigo, 400);
+    assert.equal(codigoUsado, false);
   });
   await prueba('si falla la creación, el código de estudiante vuelve a estar disponible', async () => {
     codigoUsado = false; fallaCrear = true;
@@ -212,7 +230,7 @@ async function pedir(ruta, req) {
     assert.equal(codigoUsado, false); fallaCrear = false;
   });
   await prueba('cuenta antigua sigue registrándose con contraseña, sin identidad Google', async () => {
-    const req = { body: { nombre: 'Antigua', phone: '59172222222', password: 'clave-segura', matricula: '123' } };
+    const req = { body: { pais: 'BO', profesion: 'Medicina', tipoEspecialidad: 'medicina_general', nombre: 'Antigua', phone: '59172222222', password: 'clave-segura', matricula: '123' } };
     const res = { codigo: 200, status(c) { this.codigo = c; return this; }, json(d) { this.datos = d; } };
     await altas['/medico/registro'](req, res); assert.equal(res.codigo, 200); assert.equal(creado.googleSub, undefined);
     assert.equal(creado.passwordHash, 'HASH:clave-segura');

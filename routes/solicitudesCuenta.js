@@ -31,6 +31,7 @@ const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("../services/metaWhatsapp");
 const { CONFIG, log } = require("../config");
+const { pendiente, filtroRevision, revisionProfesional } = require("../services/perfilesCuenta");
 const { esCuentaBrasil } = require("../services/idiomas");
 
 // Igual que el panel de pagos: acá entra también una cuenta administrativa,
@@ -102,8 +103,8 @@ module.exports = function (app) {
 
   // ─── LA FILA ───────────────────────────────────────────────────────────
   app.get("/medico/solicitudes-cuenta", limitMedico, requireSesion, requireAprobador, asyncRoute(async (req, res) => {
-    const pendientes = await Medico.find({ estadoCuenta: "pendiente" })
-      .select("phone nombre especialidad tipoEspecialidad matricula idioma solicitud createdAt")
+    const pendientes = await Medico.find({ $or: [{ estadoCuenta: "pendiente" }, { "solicitud.tipo": "conversion", "solicitud.estado": "pendiente" }] })
+      .select("phone nombre especialidad tipoEspecialidad matricula idioma solicitud createdAt telefonoVerificado googleEmail formacion")
       .sort({ "solicitud.pedidaEn": 1 })   // la más vieja primero: nadie espera de más
       .limit(200)
       .lean();
@@ -111,7 +112,7 @@ module.exports = function (app) {
     // Las últimas resueltas, para poder revisar una decisión reciente sin
     // tener que buscar en el log de auditoría.
     const recientes = await Medico.find({ estadoCuenta: { $in: ["aprobada", "rechazada"] }, "solicitud.resueltaEn": { $ne: null } })
-      .select("phone nombre estadoCuenta matricula solicitud")
+      .select("phone nombre estadoCuenta matricula solicitud verificacionProfesional")
       .sort({ "solicitud.resueltaEn": -1 })
       .limit(15)
       .lean();
@@ -124,22 +125,29 @@ module.exports = function (app) {
     const quien = req.adminUser.usuario;
     const medico = await traerSolicitud(req.params.phone);
 
-    // Aprobar dos veces no es un error del que haya que quejarse —dos
-    // pestañas abiertas, un doble toque— pero tampoco puede reescribir quién
-    // aprobó y cuándo. Se contesta que ya estaba y no se toca nada.
-    if (medico.estadoCuenta === "aprobada") {
-      return res.json({ ok: true, yaEstaba: true, phone: medico.phone });
+    if (!pendiente(medico)) throw new ErrorHttp(409, "Esta solicitud ya fue resuelta. Actualizá el panel.");
+    const verificacion = revisionProfesional(medico, req.body, quien);
+    const ahora = new Date();
+    const conversion = medico.solicitud?.tipo === "conversion";
+    const set = {
+      estadoCuenta: "aprobada", activo: true, perfilAcceso: "profesional", verificacionProfesional: verificacion,
+      matricula: verificacion.matricula, tipoEspecialidad: verificacion.tipoEspecialidad,
+      sesionesDesde: ahora, "solicitud.estado": "aprobada", "solicitud.resueltaEn": ahora,
+      "solicitud.resueltaPor": quien, "solicitud.motivo": "",
+    };
+    if (conversion) {
+      // Conserva formación e historial, pero no convierte un plan de estudio en un plan clínico gratuito.
+      set.formacion = { carrera: medico.estudiante.carrera || "medicina", nivel: verificacion.etapa, nivelEducativoAnterior: medico.estudiante.nivel,
+        universidad: medico.estudiante.universidad || "", periodo: medico.formacion?.periodo || "", acreditacion: "invitacion" };
+      set.especialidad = verificacion.profesion;
+      set["suscripcion.ambito"] = "educativo";
     }
-
-    medico.estadoCuenta = "aprobada";
-    medico.activo = true;
-    medico.solicitud.resueltaEn = new Date();
-    medico.solicitud.resueltaPor = quien;
-    medico.solicitud.motivo = "";
-    await medico.save();
+    const r = await Medico.updateOne(filtroRevision(medico), { $set: set,
+      ...(conversion ? { $unset: { estudiante: 1 } } : {}) });
+    if (!r.modifiedCount) throw new ErrorHttp(409, "La solicitud cambió mientras la revisabas. Actualizá el panel.");
 
     registrar({ req, medicoPhone: quien, accion: "cuenta_aprobada", recurso: `Medico:${medico.phone}`,
-      detalle: `${medico.nombre} — matrícula ${medico.matricula || "no declarada"}` });
+      detalle: `${medico.nombre} — matrícula ${verificacion.matricula} — ${verificacion.metodo}: ${verificacion.referencia}` });
     log.info(`[CUENTAS] ${quien} aprobó a ${medico.nombre} (${medico.phone})`);
 
     res.json({ ok: true, phone: medico.phone, nombre: medico.nombre });
@@ -166,16 +174,13 @@ module.exports = function (app) {
     if (!motivo) throw new ErrorHttp(400, "Poné el motivo del rechazo: es lo que va a leer quien lo pidió");
 
     const medico = await traerSolicitud(req.params.phone);
-    if (medico.estadoCuenta === "aprobada") {
-      throw new ErrorHttp(409, "Esa cuenta ya está aprobada y en uso. Para darla de baja usá la desactivación, no el rechazo.");
-    }
-
-    medico.estadoCuenta = "rechazada";
-    medico.activo = false;
-    medico.solicitud.resueltaEn = new Date();
-    medico.solicitud.resueltaPor = quien;
-    medico.solicitud.motivo = motivo;
-    await medico.save();
+    if (!pendiente(medico)) throw new ErrorHttp(409, "Esta solicitud ya fue resuelta. Actualizá el panel.");
+    if (String(req.body?.revision ?? "") !== (medico.solicitud?.revision || "")) throw new ErrorHttp(409, "La solicitud cambió. Actualizá el panel.");
+    const conversion = medico.solicitud?.tipo === "conversion";
+    const set = { "solicitud.estado": "rechazada", "solicitud.resueltaEn": new Date(), "solicitud.resueltaPor": quien, "solicitud.motivo": motivo };
+    if (!conversion) Object.assign(set, { estadoCuenta: "rechazada", activo: false, sesionesDesde: new Date() });
+    const r = await Medico.updateOne(filtroRevision(medico), { $set: set });
+    if (!r.modifiedCount) throw new ErrorHttp(409, "La solicitud cambió mientras la revisabas. Actualizá el panel.");
 
     registrar({ req, medicoPhone: quien, accion: "cuenta_rechazada", recurso: `Medico:${medico.phone}`, detalle: motivo });
     log.info(`[CUENTAS] ${quien} rechazó a ${medico.nombre} (${medico.phone}): ${motivo}`);

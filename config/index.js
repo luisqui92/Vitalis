@@ -60,6 +60,9 @@ const CONFIG = {
   // del webhook la está pidiendo realmente Meta.
   WHATSAPP_TOKEN: process.env.WHATSAPP_TOKEN || "",
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+  // Plantilla de categoría AUTHENTICATION, aprobada en Meta, con botón COPY_CODE.
+  WHATSAPP_AUTH_TEMPLATE: process.env.WHATSAPP_AUTH_TEMPLATE || "",
+  WHATSAPP_AUTH_LANGUAGE: process.env.WHATSAPP_AUTH_LANGUAGE || "es",
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN || "",
   // WHATSAPP_APP_SECRET: el "App Secret" de la app de Meta (Configuración →
   // Básica → Mostrar). NO es el token de acceso ni el verify token.

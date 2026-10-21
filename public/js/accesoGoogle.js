@@ -44,6 +44,7 @@ async function pintarBotonGoogle(id = "googleEntrada", accion) {
           if (!vigente()) return;
           if (data.requiere2fa) return renderLogin2FA(data.tempToken);
           if (data.registro) return renderPerfilGoogle(data);
+          if (data.solicitud) return renderSolicitudGoogle(data);
           completarLogin(data);
         } catch (e) { error(e); }
       },
@@ -57,11 +58,8 @@ function renderPerfilGoogle(perfil) {
   ++GOOGLE_VISTA;
   const perfiles = Extensiones.filtrar("registro.google", [{
     id: "profesional", titulo: t("google.profesional"), ruta: "/medico/registro",
-    html: `<label for="gArea">${t("auth.reg.area")}</label>
-      <select id="gArea">${AREAS.map(a => `<option value="${a}">${t("area." + a)}</option>`).join("")}</select>
-      <label for="gMatricula">${t("auth.reg.matricula")}</label><input id="gMatricula" maxlength="60">
-      <div class="hint">${t("google.aprobacion")}</div>`,
-    datos: () => ({ tipoEspecialidad: document.getElementById("gArea").value, matricula: document.getElementById("gMatricula").value.trim() }),
+    html: camposProfesionalesHtml("g"),
+    datos: () => leerCamposProfesionales("g"),
   }]);
   app.innerHTML = `<div class="card reg-card">
     <div class="reg-titulo">${t("google.completar")}</div>
@@ -71,15 +69,20 @@ function renderPerfilGoogle(perfil) {
     <label for="gPhone">${t("google.telefono")}</label>
     <input id="gPhone" type="tel" autocomplete="tel" placeholder="+59170000000">
     <div class="hint">${t("google.telefonoAyuda")}</div>
-    <label for="gTipo">${t("google.perfil")}</label>
-    <select id="gTipo">${perfiles.map(p => `<option value="${esc(p.id)}">${esc(p.titulo)}</option>`).join("")}</select>
-    ${perfiles.map((p, i) => `<div data-google-perfil="${esc(p.id)}" ${i ? "hidden" : ""}>${p.html}</div>`).join("")}
+    <fieldset class="perfil-opciones"><legend>${t("google.perfil")}</legend>
+      ${perfiles.map(p => `<label class="perfil-opcion"><input type="radio" name="gTipo" value="${esc(p.id)}"><span><strong>${esc(p.titulo)}</strong><small>${t("perfil." + p.id + "Ayuda")}</small></span></label>`).join("")}
+    </fieldset>
+    <input type="hidden" id="gTipo" value="">
+    ${perfiles.map(p => `<div data-google-perfil="${esc(p.id)}" hidden>${p.html}</div>`).join("")}
     <div id="gError"></div>
     <button class="primary" id="gCrear">${t("google.crear")}</button>
     <button class="link" id="gExistente">${t("google.existente")}</button>
     <div class="hint">${t("google.existenteAyuda")}</div>
   </div>`;
   const tipo = document.getElementById("gTipo");
+  document.querySelectorAll('input[name="gTipo"]').forEach(radio => {
+    radio.onchange = () => { tipo.value = radio.value; tipo.onchange(); };
+  });
   tipo.onchange = () => {
     document.querySelectorAll("[data-google-perfil]").forEach(n => { n.hidden = n.dataset.googlePerfil !== tipo.value; });
   };
@@ -92,6 +95,8 @@ function renderPerfilGoogle(perfil) {
     const datos = { nombre: val("gNombre"), phone: val("gPhone"), idioma: MEDICO_IDIOMA, googleTicket: perfil.googleTicket };
     if (!datos.nombre || !datos.phone) { err.textContent = t("google.faltan"); return; }
     const elegido = perfiles.find(p => p.id === tipo.value);
+    if (!elegido) { err.textContent = t("perfil.elegir"); return; }
+    datos.perfilSolicitado = elegido.id;
     Object.assign(datos, elegido.datos());
     btn.disabled = true;
     try {
@@ -99,7 +104,7 @@ function renderPerfilGoogle(perfil) {
       if (!btn.isConnected) return;
       if (data.token) completarLogin(data);
       else {
-        app.innerHTML = `<div class="card"><h2>${t("google.pendiente")}</h2><p>${t("google.pendienteAyuda")}</p><button class="primary" id="gVolver">${t("auth.ingresar")}</button></div>`;
+        app.innerHTML = `<div class="card"><h2>${t("google.pendiente")}</h2><p>${t("perfil.pendienteIngreso")}</p><button class="primary" id="gVolver">${t("auth.ingresar")}</button></div>`;
         document.getElementById("gVolver").onclick = renderLogin;
       }
     } catch (e) { if (btn.isConnected) { btn.disabled = false; err.innerHTML = `<div class="error">${esc(e.error || t("google.error"))}</div>`; } }
@@ -114,7 +119,7 @@ async function pintarGoogleSeguridad() {
     if (!caja.isConnected || !e.disponible) return;
     if (e.vinculado) {
       caja.innerHTML = `<div class="card"><div class="seccion-titulo">Google</div><p>${esc(e.email)}</p><div class="hint">${t("google.vinculado")}</div>
-        ${e.soloGoogle ? `<p>${t("google.recuperacion")}</p><a href="https://accounts.google.com/signin/recovery" target="_blank" rel="noopener noreferrer">${t("google.recuperar")}</a>` : ""}</div>`;
+        ${e.soloGoogle ? `<p>${t(e.telefonoVerificado ? "perfil.recuperacionVerificada" : "google.recuperacion")}</p><a href="https://accounts.google.com/signin/recovery" target="_blank" rel="noopener noreferrer">${t("google.recuperar")}</a>` : ""}</div>`;
       return;
     }
     caja.innerHTML = `<div class="card"><div class="seccion-titulo">${t("google.vincular")}</div>

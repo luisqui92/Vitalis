@@ -13,6 +13,7 @@
 const { generarToken } = require("./auth");
 const { esOperador } = require("./operadores");
 const extensiones = require("./extensiones");
+const { ErrorHttp } = require("./httpHelpers");
 
 // El rol del TOKEN no es el mismo campo que el rol de la cuenta, y la
 // diferencia es la que sostiene el permiso: un director es médico para todo
@@ -21,6 +22,10 @@ const extensiones = require("./extensiones");
 // rutas clínicas lo rechazan solas, por el requireAuth(["medico"]) que ya
 // tenían — sin agregar un chequeo nuevo en cada una de las 30 rutas.
 function tokenDeMedico(medico) {
+  if ((medico.perfilAcceso === "profesional" && medico.verificacionProfesional?.estado !== "verificada") ||
+      (medico.perfilAcceso === "educativo" && !medico.estudiante?.nivel)) {
+    throw new ErrorHttp(403, "Tu perfil todavía no tiene habilitado este acceso.");
+  }
   const esAdmin = medico.rol === "admin" || medico.rol === "director";
   const rolToken = medico.rol === "admin" ? "admin" : "medico";
   return generarToken(medico.phone, rolToken, 8 * 60 * 60 * 1000, {

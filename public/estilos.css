@@ -1259,3 +1259,12 @@ button.adapt-quitar:hover,button.adapt-quitar:focus-visible{background:var(--dan
 .adapt-corr-texto{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
 .adapt-corr-veces{flex:0 0 auto;margin:0;white-space:nowrap;}
 button.adapt-reiniciar{color:var(--danger);margin-top:16px;}
+/* Selección explícita del perfil, también en móvil. */
+.perfil-opciones { border: 0; padding: 0; margin: 20px 0; display: grid; gap: 10px; }
+.perfil-opciones legend { margin-bottom: 10px; font-weight: 600; }
+.perfil-opcion { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border: 2px solid var(--border, #cad5d9); border-radius: 14px; cursor: pointer; }
+.perfil-opcion input[type=radio] { width: 20px; height: 20px; flex-shrink: 0; margin: 2px 0; }
+.perfil-opcion:has(input:checked) { border-color: var(--accent, #138677); background: rgba(19,134,119,.07); }
+.perfil-opcion small { display: block; margin-top: 5px; font-weight: 400; line-height: 1.45; }
+.perfil-opcion:focus-within { outline: 2px solid var(--accent, #138677); outline-offset: 2px; }
+[data-google-perfil][hidden] { display: none !important; }

@@ -163,22 +163,8 @@ async function renovar(argv) {
   console.log(VERDE(`\n  ✅ ${m.nombre}: acceso hasta el ${dia(base)}${set["estudiante.horasMes"] ? `, ${set["estudiante.horasMes"]} h por mes` : ""}.\n`));
 }
 
-async function convertir(argv) {
-  if (!argv[1]) return fallar("Uso: convertir <telefono>");
-  await conectar();
-  const m = await cuentaDeEstudiante(argv[1]);
-  if (!m) return;
-  // Pasar a médico es para quien se recibió de médico. Una cuenta de
-  // enfermería no se convierte en una que receta.
-  if (carreraDe(m) !== "medicina") return fallar(`${m.nombre} es de ${carreraDe(m)}: convertir pasa una cuenta de medicina a cuenta de médico, y no hay otra conversión por ahora.`);
-  console.log(`\n  ${m.nombre} (${m.phone}) pasa a ser una cuenta de MÉDICO: va a poder recetar, escribirle a pacientes y cobrar.`);
-  console.log("  Sus pacientes y consultas siguen. Las notas que grabó como estudiante conservan la marca.");
-  if (await preguntar("  Escribí SI para confirmar: ") !== "SI") return console.log("  Cancelado. No se tocó nada.\n");
-  // La marca de estudiante viaja en el token: la sesión abierta se corta y
-  // vuelve a entrar como médico (services/auth.js, sesionVigente).
-  await Medico.updateOne({ _id: m._id }, { $unset: { estudiante: 1 }, $set: { especialidad: "Medicina general", sesionesDesde: new Date() } });
-  await AuditLog.create({ medicoPhone: "script", accion: "convertir_estudiante_a_medico", recurso: `Medico:${m.phone}` }).catch(() => {});
-  console.log(VERDE("\n  ✅ Listo. Que cierre sesión y vuelva a entrar para ver el Symphomed completo.\n"));
+async function convertir() {
+  return fallar("La conversión requiere revisión documentada. La persona debe solicitar acceso profesional desde Configuración; un operador debe revisar la matrícula y aprobarla en Solicitudes de cuenta.");
 }
 
 async function main() {

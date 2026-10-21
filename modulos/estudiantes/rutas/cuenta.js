@@ -42,6 +42,9 @@ function registro(app) {
     const universidad = String(req.body?.universidad || "").trim().slice(0, 120);
     const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
     const google = await identidadParaRegistro(req);
+    if (google && req.body?.perfilSolicitado !== "estudiante") throw new ErrorHttp(400, "Seleccioná explícitamente tu perfil educativo.");
+    const periodo = String(req.body?.periodo || "").trim().slice(0, 40);
+    if (google && (!universidad || !periodo)) throw new ErrorHttp(400, "Completá universidad y año o semestre.");
     if (!codigo || !nombre) throw new ErrorHttp(400, "Faltan el código y tu nombre");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
     if (!google && password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
@@ -69,6 +72,7 @@ function registro(app) {
     let medico;
     try {
       if (!nivelValido(carrera, cod.nivel)) throw new ErrorHttp(400, "Ese código no es válido. Pedí uno nuevo a Symphomed.");
+      if (google && (req.body?.carrera !== carrera || req.body?.nivel !== cod.nivel)) throw new ErrorHttp(400, "La carrera o el nivel no coinciden con tu invitación. Revisá los datos o solicitá el código correcto.");
       medico = await Medico.create({
         phone, nombre, idioma,
         especialidad: tituloDe(carrera, cod.nivel, idioma),
@@ -79,11 +83,13 @@ function registro(app) {
         zonaHoraria: zonaPorMoneda(moneda),
         ...(google || { passwordHash: await hashPassword(password) }),
         activo: true,
+        perfilAcceso: "educativo",
+        formacion: { carrera, nivel: cod.nivel, universidad, periodo, acreditacion: "invitacion" },
         estadoCuenta: "aprobada",
         estudiante: { nivel: cod.nivel, carrera, hasta, horasMes: cod.horasMes, codigo: cod.codigo, universidad },
         // El plan que ya existe hace que sus consultas no descuenten saldo:
         // lo que pagó por el código cubre el período.
-        suscripcion: { plan: "mensual", desde: ahora, hasta, precioCentavos: cod.precioCentavos, moneda: cod.moneda, activadaPor: "codigo:" + cod.codigo },
+        suscripcion: { ambito: "educativo", plan: "mensual", desde: ahora, hasta, precioCentavos: cod.precioCentavos, moneda: cod.moneda, activadaPor: "codigo:" + cod.codigo },
       });
     } catch (e) {
       // El código vuelve a quedar libre: la cuenta no se creó.

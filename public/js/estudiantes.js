@@ -220,6 +220,11 @@ Extensiones.agregar("registro.google", perfiles => ESTUDIANTES_PRENDIDO ? [...pe
   id: "estudiante", titulo: t("google.estudiante"), ruta: "/medico/registro-estudiante",
   html: `<label for="gCodigo">${t("google.codigo")}</label>
     <input id="gCodigo" autocomplete="off" placeholder="EST-AB12CD" maxlength="30">
-    <div class="hint">${t("google.codigoAyuda")}</div>`,
-  datos: () => ({ codigo: document.getElementById("gCodigo").value.trim() }),
+    <div class="hint">${t("google.codigoAyuda")}</div>
+    <label for="gCarrera">${t("perfil.carrera")}</label><select id="gCarrera"><option value="">${t("perfil.seleccionar")}</option>${["medicina", "enfermeria", "odontologia"].map(c => `<option value="${c}">${t("est.carrera." + c)}</option>`).join("")}</select>
+    <label for="gNivel">${t("perfil.nivel")}</label><select id="gNivel"><option value="">${t("perfil.seleccionar")}</option>${["estudiante", "interno", "residente"].map(n => `<option value="${n}">${t("est.nivel." + n)}</option>`).join("")}</select>
+    <label for="gUniversidad">${t("perfil.universidad")}</label><input id="gUniversidad" maxlength="120">
+    <label for="gPeriodo">${t("perfil.periodo")}</label><input id="gPeriodo" maxlength="40">`,
+  datos: () => ({ codigo: document.getElementById("gCodigo").value.trim(), carrera: document.getElementById("gCarrera").value,
+    nivel: document.getElementById("gNivel").value, universidad: document.getElementById("gUniversidad").value.trim(), periodo: document.getElementById("gPeriodo").value.trim() }),
 }] : perfiles);

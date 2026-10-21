@@ -101,6 +101,20 @@ async function identidadParaRegistro(req) {
 function comprobarEstado(medico) {
   if (medico.estadoCuenta === "pendiente") throw new ErrorHttp(403, "Tu solicitud todavía está en revisión.");
   if (medico.estadoCuenta === "rechazada" || !medico.activo) throw new ErrorHttp(403, "Tu cuenta no está habilitada. Contactá con Symphomed.");
+  if (medico.perfilAcceso === "profesional" && medico.verificacionProfesional?.estado !== "verificada") throw new ErrorHttp(403, "La habilitación profesional todavía no está verificada.");
 }
 
-module.exports = { configuracion, mismoOrigen, iniciar, comprobar, ticketRegistro, identidadParaRegistro, comprobarEstado };
+function ticketSolicitud(perfil) {
+  return generarToken(perfil.sub, "google_solicitud", 600000, { nonce: perfil.nonce });
+}
+
+async function cuentaDeSolicitud(req) {
+  mismoOrigen(req);
+  const p = verificarToken(req.body?.solicitudTicket);
+  if (!p || p.rol !== "google_solicitud" || p.nonce !== nonceDelNavegador(req)) throw new ErrorHttp(401, "Volvé a entrar con Google para consultar tu solicitud.");
+  const m = await Medico.findOne({ googleSub: p.usuario });
+  if (!m || !["pendiente", "rechazada"].includes(m.estadoCuenta)) throw new ErrorHttp(409, "Tu cuenta cambió. Volvé a entrar con Google.");
+  return m;
+}
+
+module.exports = { configuracion, mismoOrigen, iniciar, comprobar, ticketRegistro, identidadParaRegistro, comprobarEstado, ticketSolicitud, cuentaDeSolicitud };

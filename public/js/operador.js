@@ -740,19 +740,14 @@ async function pintarSolicitudesDeCuenta() {
   if (!caja.isConnected) return;
 
   const pendientes = datos.pendientes || [];
-  if (!pendientes.length) {
-    // Cero solicitudes es el estado normal. Se dice en una línea, sin tarjeta:
-    // una caja vacía y grande todos los días entrena a no mirar esta zona.
-    caja.innerHTML = `<div class="hint" style="margin:0 0 14px">${t("cuentas.ninguna")}</div>`;
-    return;
-  }
-
-  caja.innerHTML = `
-    <div class="card" style="border-color:var(--primary)">
-      <div class="seccion-titulo" style="margin-top:0">${t("cuentas.titulo", { n: pendientes.length })}</div>
-      <div class="hint" style="margin:0 0 12px">${t("cuentas.ayuda")}</div>
-      ${pendientes.map(s => solicitudCuentaHtml(s)).join("")}
-    </div>`;
+  const recientes = (datos.recientes || []).map(r => `<div class="sol-item"><strong>${esc(r.nombre)}</strong> · ${t("perfil.solicitud." + (r.solicitud?.estado || r.estadoCuenta))}<br>
+    ${t("perfil.revisor")}: ${esc(r.solicitud?.resueltaPor || "")} · ${esc(r.solicitud?.resueltaEn ? new Date(r.solicitud.resueltaEn).toLocaleString() : "")}
+    ${r.verificacionProfesional?.referencia ? `<p>${esc(r.verificacionProfesional.metodo)} · ${esc(r.verificacionProfesional.referencia)}</p>` : ""}
+    ${r.solicitud?.motivo ? `<p>${esc(r.solicitud.motivo)}</p>` : ""}</div>`).join("");
+  caja.innerHTML = `<div class="card" style="border-color:var(--primary)">
+    <div class="seccion-titulo">${t("cuentas.titulo", { n: pendientes.length })}</div>
+    ${pendientes.length ? pendientes.map(s => solicitudCuentaHtml(s)).join("") : `<p>${t("cuentas.ninguna")}</p>`}
+    ${recientes ? `<details><summary>${t("perfil.recientes")}</summary>${recientes}</details>` : ""}</div>`;
 
   pendientes.forEach(s => engancharSolicitudCuenta(s));
 }
@@ -765,11 +760,20 @@ function solicitudCuentaHtml(s) {
     <div class="sol-item" id="sol-${esc(s.phone)}">
       <div class="sol-nombre">${esc(s.nombre)}</div>
       <div class="sol-datos">
-        ${t("cuentas.matricula")}: <span class="sol-matricula">${esc(s.matricula || t("cuentas.sinMatricula"))}</span><br>
-        ${t("area." + (s.tipoEspecialidad || "medicina_general"))}${s.especialidad ? ` · ${esc(s.especialidad)}` : ""}<br>
+        ${t("cuentas.matricula")}: <span class="sol-matricula">${esc(s.solicitud?.matricula || s.matricula || t("cuentas.sinMatricula"))}</span><br>
+        ${t("area." + (s.solicitud?.tipoEspecialidad || s.tipoEspecialidad || "medicina_general"))}${s.especialidad ? ` · ${esc(s.especialidad)}` : ""}<br>
         ${esc(s.phone)} · ${dias === 0 ? t("cuentas.hoy") : t("cuentas.hace", { dias })}
       </div>
       ${s.solicitud?.mensaje ? `<div class="sol-mensaje">${esc(s.solicitud.mensaje)}</div>` : ""}
+      <p>${esc(s.googleEmail || "")} · ${t(s.telefonoVerificado ? "perfil.telefonoVerificado" : "perfil.sinTelefonoVerificado")}</p>
+      ${s.solicitud?.tipo === "conversion" ? `<p><strong>${t("perfil.conversion")}</strong></p>` : ""}
+      <p>${esc(s.solicitud?.profesion || "")} · ${esc(s.solicitud?.pais || "")} · ${esc(s.solicitud?.etapa || "")}</p>
+      ${!s.solicitud?.pais ? `<label>${t("perfil.pais")}<input data-pais maxlength="2"></label>` : ""}
+      ${!s.solicitud?.profesion ? `<label>${t("perfil.profesion")}<input data-profesion maxlength="100"></label>` : ""}
+      <label>${t("perfil.metodo")}<select data-metodo><option value="">${t("perfil.seleccionar")}</option><option value="registro_oficial">${t("perfil.registroOficial")}</option><option value="revision_documental">${t("perfil.documental")}</option></select></label>
+      <label>${t("perfil.referencia")}<textarea data-referencia maxlength="500" rows="3"></textarea></label>
+      <label><input type="checkbox" data-identidad style="width:auto"> ${t("perfil.identidadComprobada")}</label>
+      <label><input type="checkbox" data-matricula style="width:auto"> ${t("perfil.matriculaComprobada")}</label>
       <div class="sol-acciones">
         <button class="primary" data-aprobar="${esc(s.phone)}">${t("cuentas.aprobar")}</button>
         <button class="secondary" data-rechazar="${esc(s.phone)}">${t("cuentas.rechazar")}</button>
@@ -792,7 +796,9 @@ function engancharSolicitudCuenta(s) {
     errBox.innerHTML = "";
     try {
       await api(`/medico/solicitudes-cuenta/${encodeURIComponent(s.phone)}/aprobar`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: s.solicitud?.revision || "", metodo: fila.querySelector("[data-metodo]").value,
+          referencia: fila.querySelector("[data-referencia]").value.trim(), identidadComprobada: fila.querySelector("[data-identidad]").checked,
+          matriculaComprobada: fila.querySelector("[data-matricula]").checked, pais: fila.querySelector("[data-pais]")?.value.trim(), profesion: fila.querySelector("[data-profesion]")?.value.trim() }),
       });
       pintarSolicitudesDeCuenta();
     } catch (e) {
@@ -812,7 +818,7 @@ function engancharSolicitudCuenta(s) {
     try {
       await api(`/medico/solicitudes-cuenta/${encodeURIComponent(s.phone)}/rechazar`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ motivo: motivo.trim() }),
+        body: JSON.stringify({ motivo: motivo.trim(), revision: s.solicitud?.revision || "" }),
       });
       pintarSolicitudesDeCuenta();
     } catch (e) {

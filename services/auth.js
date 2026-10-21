@@ -107,8 +107,13 @@ const SESION_CORTADA = "Tu sesión ya no es válida. Volvé a iniciar sesión.";
 async function sesionVigente(payload) {
   if (!ROLES_DE_CUENTA.includes(payload.rol)) return true;
   const { Medico } = require("../db/models");
-  const cuenta = await Medico.findOne({ phone: payload.usuario }).select("activo sesionesDesde").lean();
+  const cuenta = await Medico.findOne({ phone: payload.usuario }).select("activo sesionesDesde estadoCuenta estudiante perfilAcceso verificacionProfesional").lean();
   if (!cuenta || cuenta.activo === false) return false;
+  if (["pendiente", "rechazada"].includes(cuenta.estadoCuenta)) return false;
+  if (cuenta.perfilAcceso === "profesional" && cuenta.verificacionProfesional?.estado !== "verificada") return false;
+  // No alcanza con una marca vieja del token: la cuenta decide en cada pedido.
+  if (Boolean(cuenta.estudiante?.nivel) !== Boolean(payload.estudiante)) return false;
+  if (cuenta.perfilAcceso === "educativo" && !cuenta.estudiante?.nivel) return false;
   return !(cuenta.sesionesDesde && Number(payload.iat) < new Date(cuenta.sesionesDesde).getTime());
 }
 

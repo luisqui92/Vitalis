@@ -231,6 +231,19 @@ async function enviarPlantilla(destino, nombre, parametros = [], idioma = "es") 
   });
 }
 
+// Los códigos siempre usan una plantilla de autenticación; no dependen de la ventana de 24 h.
+async function enviarCodigoAcceso(destino, codigo) {
+  if (!CONFIG.WHATSAPP_AUTH_TEMPLATE) throw new Error("Falta plantilla de autenticación");
+  return mandar({ to: destino, type: "template", template: {
+    name: CONFIG.WHATSAPP_AUTH_TEMPLATE,
+    language: { code: CONFIG.WHATSAPP_AUTH_LANGUAGE || "es" },
+    components: [
+      { type: "body", parameters: [{ type: "text", text: codigo }] },
+      { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: codigo }] },
+    ],
+  } });
+}
+
 // Texto libre, y si Meta lo rechaza por la ventana, la plantilla.
 //
 // OJO CON EL ORDEN: `parametros` tiene que coincidir EXACTO con los {{1}},
@@ -298,7 +311,7 @@ async function obtenerEstado() {
 
 module.exports = {
   enviarTexto, enviarBotones, enviarLista, marcarLeido, obtenerEstado,
-  enviarPlantilla, enviarTextoOPlantilla, normalizarDestino, PLANTILLAS, bajarMedia,
+  enviarPlantilla, enviarCodigoAcceso, enviarTextoOPlantilla, normalizarDestino, PLANTILLAS, bajarMedia,
   codigoDeIdioma, componentesDelCuerpo,
 };
 

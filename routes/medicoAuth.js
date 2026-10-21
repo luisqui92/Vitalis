@@ -5,6 +5,7 @@ const { Medico, AuditLog } = require("../db/models");
 const { generarToken, verificarToken, hashPassword, verificarPassword, requireAuth } = require("../services/auth");
 const { generarSecreto, generarUriOtpAuth, verificarCodigo } = require("../services/totp");
 const { registrar } = require("../services/auditoria");
+const { datosProfesionales, nuevaSolicitud } = require("../services/perfilesCuenta");
 const { todosLosOperadores } = require("../services/operadores");
 const { notificarMedico } = require("../services/push");
 const { log } = require("../config");
@@ -59,6 +60,8 @@ module.exports = function (app) {
     const matricula = String(req.body?.matricula || "").trim().slice(0, 60);
     const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
     const google = await googleAcceso.identidadParaRegistro(req);
+    if (google && req.body?.perfilSolicitado !== "profesional") throw new ErrorHttp(400, "Seleccioná explícitamente tu perfil profesional.");
+    const datosPerfil = datosProfesionales(req.body);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
     if (!google && password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
@@ -87,9 +90,12 @@ module.exports = function (app) {
       phone, nombre, especialidad, tipoEspecialidad, idioma,
       ...(google || { passwordHash: await hashPassword(password) }),
       matricula,
+      perfilAcceso: "profesional",
+      formacion: { nivel: datosPerfil.etapa, acreditacion: "declarada" },
+      verificacionProfesional: { estado: "pendiente" },
       activo: false,
       estadoCuenta: "pendiente",
-      solicitud: { pedidaEn: new Date(), mensaje },
+      solicitud: nuevaSolicitud({ ...datosPerfil, mensaje }),
     });
     registrar({ req, medicoPhone: phone, accion: "solicitud_cuenta", detalle: `matrícula: ${matricula || "(sin matrícula)"}` });
     log.info(`[CUENTAS] nueva solicitud de ${nombre} (${phone}) — matrícula ${matricula || "no declarada"}`);

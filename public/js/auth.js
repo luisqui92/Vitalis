@@ -353,6 +353,10 @@ function renderRegistroPaso2() {
       ${regEncabezadoHtml(2, t("auth.reg.paso2Titulo"), t("auth.reg.paso2Bajada"))}
 
       ${selectorArea}
+      <label for="rPais">${t("perfil.pais")}</label><input id="rPais" maxlength="2" placeholder="BO / BR" value="${esc(REG_DATOS.pais || "")}">
+      <label for="rProfesion">${t("perfil.profesion")}</label><input id="rProfesion" maxlength="100" value="${esc(REG_DATOS.profesion || "")}">
+      <label for="rEtapa">${t("perfil.etapa")}</label><select id="rEtapa"><option value="profesional">${t("google.profesional")}</option><option value="residente" ${REG_DATOS.etapa === "residente" ? "selected" : ""}>${t("est.nivel.residente")}</option></select>
+      <div class="hint">${t("perfil.residenteAyuda")}</div>
 
       <label>${t("auth.reg.especialidad")}</label>
       <input id="rEsp" type="text" placeholder="${ES_LANDING_VETERINARIA ? t("auth.reg.especialidadPlaceholderVet") : t("auth.reg.especialidadPlaceholder")}" value="${esc(REG_DATOS.especialidad || "")}">
@@ -372,6 +376,9 @@ function renderRegistroPaso2() {
   document.getElementById("rVolver").onclick = () => {
     // Se guarda lo escrito antes de volver: perder lo tipeado por tocar
     // "atrás" es de las cosas que hacen abandonar un formulario.
+    REG_DATOS.pais = document.getElementById("rPais").value.trim();
+    REG_DATOS.profesion = document.getElementById("rProfesion").value.trim();
+    REG_DATOS.etapa = document.getElementById("rEtapa").value;
     REG_DATOS.tipoEspecialidad = document.getElementById("rTipoEsp").value;
     REG_DATOS.especialidad = document.getElementById("rEsp").value.trim();
     REG_DATOS.matricula = document.getElementById("rMatricula").value.trim();
@@ -388,6 +395,7 @@ function renderRegistroPaso2() {
 
     const cuerpo = {
       ...REG_DATOS,
+      pais: document.getElementById("rPais").value.trim(), profesion: document.getElementById("rProfesion").value.trim(), etapa: document.getElementById("rEtapa").value,
       tipoEspecialidad: document.getElementById("rTipoEsp").value,
       especialidad: document.getElementById("rEsp").value.trim(),
       matricula,

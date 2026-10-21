@@ -168,6 +168,18 @@ const medicoSchema = new mongoose.Schema({
   googleSolo: { type: Boolean, default: false },
   // Un teléfono escrito en un formulario NO acredita su titularidad.
   telefonoVerificado: { type: Boolean, default: false },
+  telefonoVerificadoEn: { type: Date },
+  // Ausente en cuentas históricas: no equivalen a una verificación documental nueva.
+  perfilAcceso: { type: String, enum: ["educativo", "profesional"] },
+  formacion: {
+    carrera: String, nivel: String, universidad: String, periodo: String, nivelEducativoAnterior: String,
+    acreditacion: { type: String, enum: ["invitacion", "declarada"] },
+  },
+  verificacionProfesional: {
+    estado: { type: String, enum: ["pendiente", "verificada", "suspendida"] },
+    pais: String, profesion: String, matricula: String, tipoEspecialidad: String, etapa: String,
+    metodo: String, referencia: String, verificadoPor: String, verificadoEn: Date,
+  },
   activo: { type: Boolean, default: true },
   // Las sesiones abiertas antes de esta fecha ya no valen (services/auth.js,
   // sesionVigente). Se pone al cambiar la contraseña, dar de baja la cuenta o
@@ -248,6 +260,10 @@ const medicoSchema = new mongoose.Schema({
   cpf: { type: String, default: "" },
   email: { type: String, default: "" },
   solicitud: {
+    tipo: { type: String, enum: ["alta", "conversion"] },
+    estado: { type: String, enum: ["pendiente", "aprobada", "rechazada"] },
+    revision: { type: String, default: "" },
+    pais: String, profesion: String, matricula: String, tipoEspecialidad: String, etapa: String,
     pedidaEn: { type: Date, default: null },
     // Lo que la persona escribe sobre sí misma. Es lo único que quien
     // aprueba tiene para decidir, así que se guarda entero.
@@ -327,6 +343,7 @@ const medicoSchema = new mongoose.Schema({
   // sistema evita en todos lados (por eso el prepago tampoco corta en cero,
   // sino cinco consultas más abajo).
   suscripcion: {
+    ambito: { type: String, enum: ["educativo", "profesional"] },
     plan: { type: String, enum: ["mensual", "anual", ""], default: "" },
     desde: { type: Date, default: null },
     // Hasta cuándo vale. La comparación es contra esta fecha y nada más: sin

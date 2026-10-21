@@ -21,6 +21,11 @@ module.exports = function (app) {
     const medico = await Medico.findOne({ googleSub: perfil.sub });
     res.set("Cache-Control", "no-store");
     if (!medico) return res.json({ registro: true, nombre: perfil.nombre, email: perfil.email, googleTicket: google.ticketRegistro(perfil) });
+    if (["pendiente", "rechazada"].includes(medico.estadoCuenta)) return res.json({
+      solicitud: true, solicitudTicket: google.ticketSolicitud(perfil), nombre: medico.nombre,
+      estado: medico.estadoCuenta, motivo: medico.solicitud?.motivo || "", datos: medico.solicitud,
+      telefonoVerificado: Boolean(medico.telefonoVerificado), phone: medico.phone,
+    });
     google.comprobarEstado(medico);
     if (medico.dosFA?.activo) return res.json({
       requiere2fa: true, tempToken: generarToken(medico.phone, "medico_2fa_pendiente", 300000),

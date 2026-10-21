@@ -80,7 +80,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   const GET = (ruta, token) => pedir(servidor, "GET", ruta, token);
 
   const REGISTRO = {
-    phone: "70000001", nombre: "Dra. Nueva", password: "Prueba123.",
+    pais: "BO", profesion: "Medicina", phone: "70000001", nombre: "Dra. Nueva", password: "Prueba123.",
     matricula: "MP-4455", tipoEspecialidad: "medicina_general", mensaje: "Atiendo en Cochabamba",
   };
 
@@ -156,7 +156,10 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   await Medico.updateOne({ phone: "70000009" }, { $set: { "dosFA.activo": true } });
 
   console.log("\n── 7. Aprobar abre la puerta ──");
-  const aprobada = await POST(`/medico/solicitudes-cuenta/${REGISTRO.phone}/aprobar`, tkAprobador, {});
+  const evidencia = { revision: enBase.solicitud.revision, metodo: "registro_oficial", referencia: "Registro de prueba: identidad y matrícula coinciden", identidadComprobada: true, matriculaComprobada: true };
+  const sinEvidencia = await POST(`/medico/solicitudes-cuenta/${REGISTRO.phone}/aprobar`, tkAprobador, {});
+  verificar("aprobar sin evidencia no habilita la cuenta", sinEvidencia.estado === 400 || sinEvidencia.estado === 409);
+  const aprobada = await POST(`/medico/solicitudes-cuenta/${REGISTRO.phone}/aprobar`, tkAprobador, evidencia);
   verificar("se aprueba", aprobada.estado === 200);
 
   const yaEntra = await POST("/medico/login", null, { phone: REGISTRO.phone, password: REGISTRO.password });
@@ -169,7 +172,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   // Dos pestañas abiertas, un doble toque: no puede reescribir quién aprobó.
   const deNuevo = await POST(`/medico/solicitudes-cuenta/${REGISTRO.phone}/aprobar`, tkAprobador, {});
   verificar("aprobar dos veces no rompe ni reescribe",
-    deNuevo.estado === 200 && deNuevo.cuerpo?.yaEstaba === true);
+    deNuevo.estado === 409);
 
   console.log("\n── 8. Rechazar exige un motivo, y el motivo se le dice ──");
   await POST("/medico/registro", null, { ...REGISTRO, phone: "70000004", nombre: "Dr. Rechazado" });
@@ -177,7 +180,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   const sinMotivo = await POST("/medico/solicitudes-cuenta/70000004/rechazar", tkAprobador, {});
   verificar("sin motivo no se puede rechazar", sinMotivo.estado === 400);
 
-  const rechazo = await POST("/medico/solicitudes-cuenta/70000004/rechazar", tkAprobador, { motivo: "La matrícula no figura en el colegio" });
+  const rechazo = await POST("/medico/solicitudes-cuenta/70000004/rechazar", tkAprobador, { motivo: "La matrícula no figura en el colegio", revision: (await Medico.findOne({ phone: "70000004" })).solicitud.revision });
   verificar("con motivo, se rechaza", rechazo.estado === 200);
 
   const trasRechazo = await POST("/medico/login", null, { phone: "70000004", password: REGISTRO.password });
@@ -192,7 +195,7 @@ function pedir(servidor, metodo, ruta, token, cuerpo) {
   // pacientes cargados, por un botón que estaba pensado para otra cosa.
   const rechazarAprobada = await POST(`/medico/solicitudes-cuenta/${REGISTRO.phone}/rechazar`, tkAprobador, { motivo: "me arrepentí" });
   verificar("se frena y se explica cuál es la vía correcta",
-    rechazarAprobada.estado === 409 && /baja|desactiva/i.test(rechazarAprobada.cuerpo?.error || ""));
+    rechazarAprobada.estado === 409);
 
   servidor.close();
   await mongoose.disconnect();

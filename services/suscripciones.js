@@ -90,6 +90,7 @@ function precioDelPlan(plan, moneda) {
 // siempre, que es lo que hace que este cambio no pueda romper nada de lo que
 // ya funcionaba.
 function vigenteEn(titular, ahora) {
+  if (titular?.suscripcion?.ambito === "educativo" && !titular?.estudiante?.nivel) return false;
   const hasta = titular?.suscripcion?.hasta;
   return Boolean(hasta && new Date(hasta) > ahora);
 }

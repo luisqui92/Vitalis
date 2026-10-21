@@ -34,9 +34,9 @@ function pantalla({ habilitado = true, respuesta = {}, idioma = 'es', perfilExtr
     console, setTimeout, clearTimeout,
   };
   vm.createContext(s);
-  for (const i of ['es', 'pt']) vm.runInContext(fs.readFileSync(path.join(raiz, `public/i18n/${i}/accesoGoogle.js`), 'utf8'), s);
+  for (const i of ['es', 'pt']) for (const archivo of ['accesoGoogle', 'perfilAcceso']) vm.runInContext(fs.readFileSync(path.join(raiz, `public/i18n/${i}/${archivo}.js`), 'utf8'), s);
   s.t = k => s.I18N[idioma][k] || k;
-  vm.runInContext(fs.readFileSync(path.join(raiz, 'public/js/accesoGoogle.js'), 'utf8'), s);
+  for (const archivo of ['accesoGoogle', 'perfilAcceso']) vm.runInContext(fs.readFileSync(path.join(raiz, `public/js/${archivo}.js`), 'utf8'), s);
   return { s, nodo, llamadas, caja, sdk: () => sdk, login: () => login, dosfa: () => dosfa, scripts: () => scripts };
 }
 (async () => {
@@ -67,7 +67,7 @@ function pantalla({ habilitado = true, respuesta = {}, idioma = 'es', perfilExtr
   });
   await prueba('formulario profesional envía ticket y matrícula a su ruta, sin asignar permisos', async () => {
     const p = pantalla({ respuesta: { pendiente: true } }); p.s.renderPerfilGoogle({ nombre: 'Nombre', email: 'a@example.com', googleTicket: 'ticket' });
-    for (const [id, v] of Object.entries({ gNombre: 'Nombre', gPhone: '+59171111111', gTipo: 'profesional', gArea: 'odontologia', gMatricula: '123' })) p.nodo(id).value = v;
+    for (const [id, v] of Object.entries({ gNombre: 'Nombre', gPhone: '+59171111111', gTipo: 'profesional', gArea: 'odontologia', gMatricula: '123', gPais: 'BO', gProfesion: 'Odontología', gEtapa: 'profesional' })) p.nodo(id).value = v;
     await p.nodo('gCrear').onclick(); const req = p.llamadas.at(-1); const b = JSON.parse(req.opciones.body);
     assert.equal(req.url, '/medico/registro'); assert.equal(b.googleTicket, 'ticket'); assert.equal(b.matricula, '123');
     assert.equal(b.password, undefined); assert.equal(b.rol, undefined); assert.equal(p.login(), undefined);
@@ -81,6 +81,21 @@ function pantalla({ habilitado = true, respuesta = {}, idioma = 'es', perfilExtr
   await prueba('el formulario requiere nombre y teléfono antes de enviarse', async () => {
     const p = pantalla(); p.s.renderPerfilGoogle({ email: 'a@example.com', googleTicket: 'ticket' }); await p.nodo('gCrear').onclick();
     assert.equal(p.llamadas.length, 0); assert.ok(p.nodo('gError').textContent);
+  });
+  await prueba('pendiente muestra estado y motivo escapado sin abrir sesión clínica', async () => {
+    const p = pantalla({ respuesta: { solicitud: true, estado: 'rechazada', solicitudTicket: 'limitado', telefonoVerificado: true, motivo: '<img src=x>', datos: {} } });
+    await p.s.pintarBotonGoogle(); await p.sdk().callback({ credential: 'id-token' });
+    assert.equal(p.login(), undefined); assert.ok(p.caja.innerHTML.includes('Solicitud no aprobada')); assert.ok(!p.caja.innerHTML.includes('<img'));
+    assert.ok(p.caja.innerHTML.includes('solActualizar'));
+  });
+  await prueba('no preselecciona el perfil ni envía una solicitud sin elegirlo', async () => {
+    const p = pantalla({ perfilExtra: true }); p.s.renderPerfilGoogle({ email: 'a@example.com', googleTicket: 'ticket' });
+    p.nodo('gNombre').value = 'Nombre'; p.nodo('gPhone').value = '59171111111';
+    assert.ok(p.caja.innerHTML.includes('type="radio"'));
+    assert.ok(!p.caja.innerHTML.includes(' checked'));
+    assert.ok(p.caja.innerHTML.includes('data-google-perfil="profesional" hidden'));
+    await p.nodo('gCrear').onclick(); assert.equal(p.llamadas.length, 0);
+    assert.ok(p.nodo('gError').textContent.includes('Elegí'));
   });
   await prueba('pantalla de Google disponible en portugués', () => {
     const p = pantalla({ idioma: 'pt' }); p.s.renderPerfilGoogle({ email: 'a@example.com', googleTicket: 'ticket' });
