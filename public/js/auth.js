@@ -40,6 +40,7 @@ function renderLogin() {
   const extra = Extensiones.lugar("login");
   app.innerHTML = `
     <div class="card">
+      <div id="googleEntrada" style="margin-bottom:16px"></div>
       <label>${t("auth.telefono")}</label>
       <input id="lPhone" type="tel" placeholder="${t("auth.telefonoPlaceholder")}">
       <label>${t("auth.password")}</label>
@@ -51,6 +52,7 @@ function renderLogin() {
       ${selectorIdiomaHtml()}
     </div>`;
   cablearSelectorIdioma(renderLogin);
+  if (typeof pintarBotonGoogle === "function") pintarBotonGoogle();
   document.getElementById("lGoReg").onclick = renderRegistro;
   extra.alPintar();
   document.getElementById("lGoOlvide").onclick = () => renderOlvideClave(document.getElementById("lPhone").value.trim());
@@ -283,6 +285,7 @@ function renderRegistroPaso1() {
   app.innerHTML = `
     <div class="card reg-card">
       ${regEncabezadoHtml(1, t("auth.reg.paso1Titulo"), t("auth.reg.paso1Bajada"))}
+      <div id="googleEntrada" style="margin-bottom:16px"></div>
 
       <label>${t("auth.reg.nombre")}</label>
       <input id="rNombre" type="text" autocomplete="name" placeholder="${ES_LANDING_VETERINARIA ? t("auth.reg.nombrePlaceholderVet") : t("auth.reg.nombrePlaceholder")}" value="${esc(REG_DATOS.nombre || "")}">
@@ -302,6 +305,7 @@ function renderRegistroPaso1() {
       ${selectorIdiomaHtml()}
     </div>`;
   cablearSelectorIdioma(renderRegistroPaso1);
+  if (typeof pintarBotonGoogle === "function") pintarBotonGoogle();
   document.getElementById("rGoLogin").onclick = renderLogin;
 
   // Una barra que se llena mientras escribe dice más que un texto que avisa

@@ -161,6 +161,13 @@ const medicoSchema = new mongoose.Schema({
   consultorio: { type: String, default: "" },
 
   passwordHash: { type: String, required: true },
+  // Identidad estable de Google. Sin default: el índice sparse admite cuentas antiguas.
+  googleSub: { type: String, unique: true, sparse: true },
+  googleEmail: { type: String },
+  googleVinculadoEn: { type: Date },
+  googleSolo: { type: Boolean, default: false },
+  // Un teléfono escrito en un formulario NO acredita su titularidad.
+  telefonoVerificado: { type: Boolean, default: false },
   activo: { type: Boolean, default: true },
   // Las sesiones abiertas antes de esta fecha ya no valen (services/auth.js,
   // sesionVigente). Se pone al cambiar la contraseña, dar de baja la cuenta o

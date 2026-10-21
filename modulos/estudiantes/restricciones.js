@@ -73,6 +73,7 @@ const IA = "ia";
 const ESCRITURA_PERMITIDA = [
   // Entrar (no usan el token, pero puede viajar uno viejo).
   ["POST", ruta("login")], ["POST", ruta("login/2fa")], ["POST", ruta("registro-estudiante")],
+  ["POST", ruta("google/(iniciar|entrar|vincular)")],
   // Su cuenta.
   ["PATCH", ruta("idioma")],
   ["POST", ruta("2fa/(iniciar|confirmar|desactivar)")],

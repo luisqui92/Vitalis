@@ -21,7 +21,8 @@ async function renderSeguridad() {
       api("/medico/2fa/estado"),
       api("/medico/auditoria"),
     ]);
-    pintarSeguridad(estado2fa.activo, dataAuditoria.eventos || []);
+    pintarSeguridad(estado2fa.activo, dataAuditoria.eventos || [], estado2fa.soloGoogle);
+    if (typeof pintarGoogleSeguridad === "function") pintarGoogleSeguridad();
     // Aparte y sin await: si los respaldos tardan o fallan, la pantalla de
     // seguridad tiene que aparecer igual.
     pintarEstadoBackups();
@@ -47,11 +48,12 @@ async function renderSeguridad() {
   }
 }
 
-function pintarSeguridad(dosFAActivo, eventos) {
+function pintarSeguridad(dosFAActivo, eventos, soloGoogle = false) {
   app.innerHTML = `
     <button class="back" id="btnBack">← Panel</button>
 
     <div id="fotoPerfilBox"></div>
+    <div id="googleSeguridad"></div>
 
     <div id="saldoBox"></div>
     <div id="memedConsejoBox"></div>
@@ -77,8 +79,8 @@ function pintarSeguridad(dosFAActivo, eventos) {
       <div class="seccion-titulo" style="margin-top:0">🔐 Verificación en dos pasos (2FA)</div>
       ${dosFAActivo ? `
         <div class="hint" style="color:var(--success);margin-bottom:10px">✅ Activada — además de tu contraseña, se pide un código de tu app autenticadora al ingresar.</div>
-        <label>Confirmá tu contraseña para desactivarla</label>
-        <input id="segPassDesactivar" type="password" placeholder="••••••••">
+        <label>${soloGoogle ? t("google.desactivar2fa") : "Confirmá tu contraseña para desactivarla"}</label>
+        <input id="segPassDesactivar" type="${soloGoogle ? "text" : "password"}" placeholder="••••••••">
         <div id="segErrDesactivar"></div>
         <button class="secondary" id="btnDesactivar2FA" style="color:var(--danger)">Desactivar 2FA</button>
       ` : `
@@ -135,7 +137,7 @@ function pintarSeguridad(dosFAActivo, eventos) {
     errBox.innerHTML = "";
     const password = document.getElementById("segPassDesactivar").value;
     try {
-      await api("/medico/2fa/desactivar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ password }) });
+      await api("/medico/2fa/desactivar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(soloGoogle ? { codigo: password.trim() } : { password }) });
       renderSeguridad();
     } catch (e) {
       errBox.innerHTML = `<div class="error">${esc(e.error || "No se pudo desactivar")}</div>`;

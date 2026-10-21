@@ -36,6 +36,7 @@ const Extensiones = (() => {
   const PUNTOS = {
     // Debajo del formulario de entrar (auth.js).
     "login": "lugar",
+    "registro.google": "filtro", // perfiles que pueden completar un alta con Google
     // Arriba del panel del celular y en el inicio de la compu (pacientes.js,
     // escritorio.js).
     "panel.aviso": "lugar",

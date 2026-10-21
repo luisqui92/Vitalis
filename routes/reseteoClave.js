@@ -202,7 +202,12 @@ module.exports = function (app) {
     const cuenta = await Modelo.findOne({ phone: s.telefono });
     if (!cuenta) throw new ErrorHttp(404, "Esta cuenta ya no existe.");
 
+    if (cuenta.googleSolo && !cuenta.telefonoVerificado) {
+      throw new ErrorHttp(409, "Esta cuenta debe recuperar su acceso con Google. El teléfono de contacto todavía no está verificado.");
+    }
+
     cuenta.passwordHash = await hashPassword(password);
+    if (cuenta.googleSolo) cuenta.googleSolo = false;
     // Las sesiones que estaban abiertas se cortan: si alguien entró con la
     // contraseña vieja, esto es justamente lo que lo saca (services/auth.js).
     if (s.tipo === "medico") cuenta.sesionesDesde = new Date();
@@ -241,6 +246,12 @@ module.exports = function (app) {
     const Modelo = s.tipo === "medico" ? Medico : Socio;
     const cuenta = await Modelo.findOne({ phone: s.telefono });
     if (!cuenta) throw new ErrorHttp(404, "Esa cuenta ya no existe.");
+
+    // Google no prueba el teléfono del formulario. No emitir un enlace que
+    // permita cambiar la identidad basándose solo en ese número declarado.
+    if (cuenta.googleSolo && !cuenta.telefonoVerificado) {
+      throw new ErrorHttp(409, "Esta cuenta entra con Google y su teléfono no está verificado. Debe recuperar su cuenta en accounts.google.com/signin/recovery; no envíes un restablecimiento al teléfono sin comprobar su identidad.");
+    }
 
     s.token = nuevoToken();
     s.tokenExpira = new Date(Date.now() + HORAS_VALIDEZ * 3600000);

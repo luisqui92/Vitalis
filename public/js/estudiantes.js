@@ -50,6 +50,7 @@ function renderRegistroEstudiante() {
     <div class="card reg-card">
       <div class="nota-titulo" style="margin-top:0">${t("est.reg.titulo")}</div>
       <div class="hint" style="margin-bottom:12px">${t("est.reg.bajada")}</div>
+      <div id="googleEntrada" style="margin-bottom:16px"></div>
       <label for="eCodigo">${t("est.reg.codigo")}</label>
       <input id="eCodigo" type="text" autocapitalize="characters" autocomplete="off" placeholder="EST-AB12CD">
       <label for="eNombre">${t("auth.reg.nombre")}</label>
@@ -66,6 +67,7 @@ function renderRegistroEstudiante() {
       <button class="link" id="eGoLogin">${t("auth.reg.irLogin")}</button>
     </div>`;
   document.getElementById("eGoLogin").onclick = renderLogin;
+  if (typeof pintarBotonGoogle === "function") pintarBotonGoogle();
   document.getElementById("eBtn").onclick = async () => {
     const val = (id) => document.getElementById(id).value.trim();
     const errBox = document.getElementById("eErr");
@@ -212,3 +214,12 @@ if (ESTUDIANTES_PRENDIDO) {
   Extensiones.pantalla({ fn: "renderSimulacros", tipo: "simulacros", ruta: "simulacros", menu: marcaEstudiar });
   Extensiones.pantalla({ fn: "renderCalculadora", tipo: "calculadora", ruta: "calculadora", menu: marcaEstudiar });
 }
+
+// El núcleo ofrece el formulario; el módulo conserva sus campos y su ruta.
+Extensiones.agregar("registro.google", perfiles => ESTUDIANTES_PRENDIDO ? [...perfiles, {
+  id: "estudiante", titulo: t("google.estudiante"), ruta: "/medico/registro-estudiante",
+  html: `<label for="gCodigo">${t("google.codigo")}</label>
+    <input id="gCodigo" autocomplete="off" placeholder="EST-AB12CD" maxlength="30">
+    <div class="hint">${t("google.codigoAyuda")}</div>`,
+  datos: () => ({ codigo: document.getElementById("gCodigo").value.trim() }),
+}] : perfiles);

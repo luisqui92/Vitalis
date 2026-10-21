@@ -22,6 +22,7 @@ const CONFIG = {
   ASSEMBLYAI_STREAMING_URL: process.env.ASSEMBLYAI_STREAMING_URL || "wss://streaming.assemblyai.com/v3/ws",
   MONGODB_URI: process.env.MONGODB_URI,
   APP_URL: process.env.APP_URL || "",
+  GOOGLE_LOGIN_CLIENT_ID: process.env.GOOGLE_LOGIN_CLIENT_ID || "",
 
   // Los módulos (modulos/*) se apagan sin tocar código: MODULO_ESTUDIANTES=
   // apagado en el .env y reiniciar. Apagado, el de estudiantes deja de

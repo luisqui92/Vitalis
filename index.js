@@ -53,8 +53,8 @@ app.use(helmet({
       // como script de ellos y se dibuja adentro de Symphomed. Sin esto la
       // pantalla de recetar queda en blanco SIN NINGÚN ERROR VISIBLE, que es
       // la peor forma de fallar — ver services/memed.js.
-      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='", ...DOMINIOS_MEMED],
-      styleSrc: ["'self'", "'unsafe-inline'"], // la UI usa mucho style="" inline
+      scriptSrc: ["'self'", "https://accounts.google.com/gsi/client", "'wasm-unsafe-eval'", "blob:", "'sha256-8sMMHwouVxJ/QLFj2bu21VB6DWxnVGvSofgMpKoFF6A='", ...DOMINIOS_MEMED],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/style"], // Google y estilos de la UI
       // 'blob:' es para las fotos clínicas que se traen con Authorization
       // por header (no por URL) y se abren como blob local — el comparador
       // antes/después y el mapa anatómico de Symphomed Face las muestran
@@ -68,7 +68,7 @@ app.use(helmet({
       // guía de CSP de Daily).
       // AssemblyAI no está: la vista previa en vivo pasa por el servidor
       // (services/vistaPrevia.js) y el navegador ya no se conecta con ellos.
-      connectSrc: ["'self'", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:", ...DOMINIOS_MEMED],
+      connectSrc: ["'self'", "https://accounts.google.com/gsi/", "https://api.vapi.ai", "https://*.daily.co", "https://*.pluot.blue", "wss:", ...DOMINIOS_MEMED],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       // El decoder Draco (vista 3D del odontograma) corre en un Web Worker
@@ -91,7 +91,7 @@ app.use(helmet({
       // que Brasil deje de recetarse por Memed, esta línea se va con él —
       // una excepción de CSP que ya no se usa es de las que se quedan para
       // siempre y nadie recuerda por qué.
-      frameSrc: ["'self'", ...DOMINIOS_MEMED],
+      frameSrc: ["'self'", "https://accounts.google.com/gsi/", ...DOMINIOS_MEMED],
     },
   },
   // ═══ LA RECETA DE MEMED SE QUEDABA "CARGANDO" ═══════════════════════════
@@ -158,6 +158,7 @@ app.get("/modulos.js", (_req, res) => {
 
 // ─── RUTAS ────────────────────────────────────────────────────────────────
 require("./routes/medicoAuth")(app);
+require("./routes/googleAuth")(app);
 // Los errores de la pantalla llegan acá (public/js/errores.js).
 require("./routes/erroresCliente")(app);
 // La fila de entrada: quién pidió cuenta y quién la aprueba. Registrarse en

@@ -70,6 +70,7 @@ const sinSelector = (html) => html.replace(/\n\s*<div style="text-align:center;m
 // por el lugar «login» de public/js/extensiones.js): otro enlace agregado a
 // propósito, que no cambia nada del resto.
 const sinOlvide = (html) => html
+  .replace(/\n\s*<div id="googleEntrada"[^>]*><\/div>/g, "")
   .replace(/\n\s*<button class="link" id="lGoOlvide"[^>]*>[\s\S]*?<\/button>/g, "")
   .replace(/\n\s*<button class="link" id="lGoEstudiante"[^>]*>[\s\S]*?<\/button>/g, "");
 

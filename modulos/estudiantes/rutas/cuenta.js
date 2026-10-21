@@ -12,6 +12,7 @@ const { tokenDeMedico, datosDeSesion } = require("../../../services/sesionMedico
 const { log } = require("../../../config");
 const { normalizarCodigo, estadoDe } = require("../cuenta");
 const { carreraValida, configDe, nivelValido, tituloDe } = require("../carreras");
+const { identidadParaRegistro } = require("../../../services/googleAcceso");
 
 // Como el resto de las rutas de la propia cuenta (routes/medicoAuth.js).
 const requireMedico = requireAuth(["medico", "admin"]);
@@ -40,9 +41,10 @@ function registro(app) {
     const password = String(req.body?.password || "");
     const universidad = String(req.body?.universidad || "").trim().slice(0, 120);
     const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
+    const google = await identidadParaRegistro(req);
     if (!codigo || !nombre) throw new ErrorHttp(400, "Faltan el código y tu nombre");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
-    if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
+    if (!google && password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
     if (await buscarPorTelefono(Medico, phone, { select: "_id", lean: true })) {
       throw new ErrorHttp(409, "Ese teléfono ya tiene una cuenta. Entrá con tu contraseña.");
     }
@@ -75,7 +77,7 @@ function registro(app) {
         // Su «hoy»: el de la racha de estudio (../estudio.js). Sin esto un
         // estudiante de Brasil quedaba con la hora de Bolivia.
         zonaHoraria: zonaPorMoneda(moneda),
-        passwordHash: await hashPassword(password),
+        ...(google || { passwordHash: await hashPassword(password) }),
         activo: true,
         estadoCuenta: "aprobada",
         estudiante: { nivel: cod.nivel, carrera, hasta, horasMes: cod.horasMes, codigo: cod.codigo, universidad },
