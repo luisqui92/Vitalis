@@ -14,6 +14,7 @@ const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
 // El token y los datos de sesión son los mismos entren por donde entren
 // (services/sesionMedico.js).
 const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
+const googleAcceso = require("../services/googleAcceso");
 
 // Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
 // propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
@@ -52,14 +53,15 @@ module.exports = function (app) {
     const phone = soloDigitos(req.body?.phone);
     const nombre = String(req.body?.nombre || "").trim();
     const especialidad = String(req.body?.especialidad || "").trim();
-    const tipoEspecialidad = ["odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
+    const tipoEspecialidad = ["odontologia", "estetica", "oftalmologia", "veterinaria", "ginecologia", "pediatria", "neurodesarrollo", "fisioterapia"].includes(req.body?.tipoEspecialidad) ? req.body.tipoEspecialidad : "medicina_general";
     const idioma = ["es", "pt"].includes(req.body?.idioma) ? req.body.idioma : "es";
     const password = String(req.body?.password || "");
     const matricula = String(req.body?.matricula || "").trim().slice(0, 60);
     const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
+    const google = await googleAcceso.identidadParaRegistro(req);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
-    if (password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
+    if (!google && password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
     // No se verifica contra ningún registro —no hay una API del colegio
     // médico— así que exigirla no prueba nada por sí sola. Pero obliga a
     // que mentir sea una decisión consciente, y le da a quien aprueba algo
@@ -83,7 +85,7 @@ module.exports = function (app) {
     // y no se les puede decir cosas distintas.
     const medico = await Medico.create({
       phone, nombre, especialidad, tipoEspecialidad, idioma,
-      passwordHash: await hashPassword(password),
+      ...(google || { passwordHash: await hashPassword(password) }),
       matricula,
       activo: false,
       estadoCuenta: "pendiente",
@@ -205,8 +207,8 @@ module.exports = function (app) {
 
   // ─── 2FA: estado, activar, confirmar, desactivar ────────────────────────
   app.get("/medico/2fa/estado", requireMedico, asyncRoute(async (req, res) => {
-    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("dosFA.activo").lean();
-    res.json({ activo: Boolean(medico?.dosFA?.activo) });
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("dosFA.activo googleSolo").lean();
+    res.json({ activo: Boolean(medico?.dosFA?.activo), soloGoogle: Boolean(medico?.googleSolo) });
   }));
 
   app.post("/medico/2fa/iniciar", limitMedico, requireMedico, asyncRoute(async (req, res) => {
@@ -235,8 +237,11 @@ module.exports = function (app) {
   app.post("/medico/2fa/desactivar", limitAuth, requireMedico, asyncRoute(async (req, res) => {
     const password = String(req.body?.password || "");
     const medico = await Medico.findOne({ phone: req.adminUser.usuario });
-    const { ok } = await verificarPassword(password, medico.passwordHash);
-    if (!ok) throw new ErrorHttp(401, "Contraseña incorrecta");
+    // Las cuentas sin contraseña confirman su factor actual además de la sesión Google.
+    const { ok } = medico.googleSolo
+      ? { ok: medico.dosFA?.activo && verificarCodigo(medico.dosFA.secreto, String(req.body?.codigo || "")) }
+      : await verificarPassword(password, medico.passwordHash);
+    if (!ok) throw new ErrorHttp(401, medico.googleSolo ? "Código de autenticación incorrecto" : "Contraseña incorrecta");
     medico.dosFA = { activo: false, secreto: "", secretoPendiente: "" };
     await medico.save();
     registrar({ req, medicoPhone: medico.phone, accion: "2fa_desactivado" });
