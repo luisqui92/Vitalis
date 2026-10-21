@@ -280,6 +280,8 @@ function casoEstudioHtml(tj) {
 }
 
 function preguntaEstudio(tj) {
+  if (tj.tipo === "odontograma") return t("odoEst.pregRegistro");
+  if (tj.tipo === "planDental") return t("odoEst.pregPlan");
   const dx = esc(tj.sobre || "");
   // Las de un razonamiento de enfermería: el diagnóstico de enfermería
   // prioritario, la intervención clave, los signos de alarma y lo que faltó
@@ -347,13 +349,14 @@ function opcionesEstudioHtml(tj) {
 
 // De dónde salió: su consulta (se puede abrir) o un simulacro.
 function fuenteEstudioHtml(tj) {
+  if (tj.simulacionId) return `<button type="button" class="link est-fuente" id="estFuente">${t("odoEst.fuente")}</button>`;
   if (tj.tipo === "pregunta") return `<span class="hint" style="margin:0">${t("estudio.deSimulacroFecha", { area: esc(nombreArea(tj.area)), fecha: esc(fechaEstudio(tj.fecha)) })}</span>`;
   return `<button type="button" class="link est-fuente" id="estFuente">${t("estudio.fuente", { fecha: esc(fechaEstudio(tj.caso?.fecha)) })}</button>`;
 }
 
 function engancharFuente(tj) {
   const b = document.getElementById("estFuente");
-  if (b) b.onclick = () => renderDetalle(String(tj.consultaId));
+  if (b) b.onclick = () => tj.simulacionId ? abrirPracticaPV(String(tj.simulacionId)) : renderDetalle(String(tj.consultaId));
 }
 
 function cuandoVuelve(proxima) {
@@ -423,7 +426,7 @@ function mostrarRespuesta(tj) {
   zona.innerHTML = `
     <div class="est-respuesta">
       <div class="est-respuesta-rotulo">${t("estudio.respuesta")}</div>
-      <ul class="tutor-lista">${(tj.respuesta || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      ${tj.tipo === "odontograma" ? registroDentalHtml(tj.registroEsperado) : `<ul class="tutor-lista">${(tj.respuesta || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>`}
       ${tj.perla ? `<div class="tutor-perla">💡 ${esc(tj.perla)}</div>` : ""}
       <div class="est-sigue"><span class="hint">${t("estudio.honesto")}</span>${fuenteEstudioHtml(tj)}</div>
     </div>

@@ -104,7 +104,7 @@ async function preguntasFaltantes(transcripcion, idioma, paciente = null, carrer
   if (palabras(transcripcion) < PALABRAS_MINIMAS) return vacio;
   try {
     const ficha = datosDeFicha(paciente);
-    const r = await pedirJson(`${carrera === "enfermeria" ? PROMPT_FALTA_ENF : PROMPT_FALTA}\n\n${reglaDeIdioma(idioma)}`,
+    const r = await pedirJson(`${carrera === "enfermeria" ? PROMPT_FALTA_ENF : carrera === "odontologia" ? "Sos un tutor de odontología. Priorizá antecedentes médicos y dentales, dolor, hábitos, expectativas y exploración oral.\n" + PROMPT_FALTA : PROMPT_FALTA}\n\n${reglaDeIdioma(idioma)}`,
       `${ficha ? `DATOS DE LA FICHA:\n${ficha}\n\n` : ""}LO QUE SE HABLÓ HASTA AHORA:\n${String(transcripcion).slice(-MAX_TEXTO)}`, 700);
     return {
       preguntas: (Array.isArray(r?.preguntas) ? r.preguntas : [])
@@ -200,7 +200,7 @@ async function razonamientoDiagnostico(transcripcion, respuesta, idioma, pacient
   const delEstudiante = enfermeria
     ? `Diagnóstico de enfermería prioritario: ${respuesta.principal}\nOtros diagnósticos: ${respuesta.diferenciales.length ? respuesta.diferenciales.join("; ") : "(no propuso)"}`
     : `Diagnóstico principal: ${respuesta.principal}\nDiferenciales: ${respuesta.diferenciales.length ? respuesta.diferenciales.join("; ") : "(no propuso)"}`;
-  const r = await pedirJson(`${enfermeria ? PROMPT_RAZONAMIENTO_ENF : PROMPT_RAZONAMIENTO}\n\n${reglaDeIdioma(idioma)}`,
+  const r = await pedirJson(`${enfermeria ? PROMPT_RAZONAMIENTO_ENF : carrera === "odontologia" ? "Sos un tutor de odontología. Razoná con la historia y exploración oral documentada; no inventes hallazgos radiográficos ni odontogramas.\n" + PROMPT_RAZONAMIENTO : PROMPT_RAZONAMIENTO}\n\n${reglaDeIdioma(idioma)}`,
     `${enfermeria ? "TRANSCRIPCIÓN DE LA ATENCIÓN" : "TRANSCRIPCIÓN DE LA CONSULTA"}:\n${String(transcripcion).slice(0, MAX_TEXTO)}\n\n${ficha ? `DATOS DE LA FICHA:\n${ficha}\n\n` : ""}LO QUE PROPUSO EL ESTUDIANTE:\n${delEstudiante}`, 2200);
   const saneado = sanearRazonamiento(r);
   if (!saneado.diferenciales.length) throw new Error("La IA no devolvió diferenciales");

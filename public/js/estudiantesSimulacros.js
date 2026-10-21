@@ -43,7 +43,7 @@ function pintarInicioSim(d) {
     ${pestanasEstudioHtml("simulacros")}
     <div class="card sim-portada">
       <div class="nota-titulo" style="margin-top:0">${t("sim.titulo")}</div>
-      <div class="hint" style="margin:0 0 12px">${t((d.areas || []).some(a => /^enf_/.test(a)) ? "sim.enf.bajada" : "sim.bajada")}</div>
+      <div class="hint" style="margin:0 0 12px">${t((d.areas || []).some(a => /^enf_/.test(a)) ? "sim.enf.bajada" : (d.areas || []).some(a => /^odo_/.test(a)) ? "odoEst.simBajada" : "sim.bajada")}</div>
       ${abierto ? `<button class="secondary" id="simSeguir" style="margin:0 0 12px">${t("sim.seguir", { area: esc(nombreArea(abierto.area)), n: abierto.respondidas, total: abierto.cantidad })}</button>` : ""}
       <div class="est-rotulo">${t("sim.area")}</div>
       ${chipsHtml("simAreas", ["mixto", ...(d.areas || SIM_AREAS.slice(1))], SIM_ELECCION.area, a => "estudio.area." + a)}

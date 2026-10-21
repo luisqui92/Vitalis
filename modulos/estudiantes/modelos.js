@@ -56,12 +56,14 @@ const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSche
 const tarjetaEstudioSchema = new mongoose.Schema({
   medicoPhone: { type: String, required: true },
   consultaId: { type: mongoose.Schema.Types.ObjectId, ref: "ConsultaMedica", default: null,
-    required() { return this.tipo !== "pregunta"; } },
-  tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar", "pregunta"], required: true },
+    required() { return this.tipo !== "pregunta" && !this.simulacionId; } },
+  tipo: { type: String, enum: ["dx", "estudio", "banderas", "faltoPreguntar", "pregunta", "planDental", "odontograma"], required: true },
   // Las de un razonamiento de enfermería: los mismos tipos, otras preguntas
   // («¿cuál es el diagnóstico de enfermería prioritario?», «¿qué
   // intervención corresponde?»). Sin carrera, de medicina.
   carrera: { type: String, default: undefined },
+  simulacionId: { type: mongoose.Schema.Types.ObjectId, ref: "SimulacionPaciente", default: null },
+  registroEsperado: { type: [{ diente: Number, superficie: String, estado: String, nota: String, _id: false }], default: undefined },
   preguntaId: { type: mongoose.Schema.Types.ObjectId, ref: "PreguntaSimulacro", default: null },
   area: { type: String, default: "" },        // la del simulacro
   enunciado: { type: String, default: "" },   // la viñeta y la pregunta del simulacro
@@ -103,6 +105,7 @@ const tarjetaEstudioSchema = new mongoose.Schema({
 }, { timestamps: true });
 tarjetaEstudioSchema.index({ consultaId: 1, tipo: 1 }, { unique: true, partialFilterExpression: { consultaId: { $type: "objectId" } } });
 tarjetaEstudioSchema.index({ medicoPhone: 1, preguntaId: 1 }, { unique: true, partialFilterExpression: { preguntaId: { $type: "objectId" } } });
+tarjetaEstudioSchema.index({ medicoPhone: 1, simulacionId: 1, tipo: 1 }, { unique: true, partialFilterExpression: { simulacionId: { $type: "objectId" } } });
 tarjetaEstudioSchema.index({ medicoPhone: 1, proxima: 1 });
 const TarjetaEstudio = mongoose.model("TarjetaEstudio", tarjetaEstudioSchema);
 
@@ -159,6 +162,7 @@ const simulacionPacienteSchema = new mongoose.Schema({
   },
   // Lo que ya se contestó de examen y de estudios: pedir dos veces lo mismo
   // da lo mismo, aunque no estuviera en el guion.
+  odontograma: { type: mongoose.Schema.Types.Mixed, default: undefined },
   hallazgos: { type: [{ tipo: String, clave: String, texto: String, _id: false }], default: [] },
   respuesta: {
     principal: { type: String, default: "" },

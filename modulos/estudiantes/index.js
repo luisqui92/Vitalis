@@ -69,6 +69,7 @@ function montar(app) {
   require("./rutas/estudio")(app);
   require("./rutas/pacienteVirtual")(app);
   require("./rutas/simulacros")(app);
+  require("./rutas/odontologia")(app);
 }
 
 module.exports = { nombre, activo, montar };

@@ -13,6 +13,7 @@ const { estadoDe: estadoDeEstudiante } = require("../cuenta");
 const { marcarDiaDeEstudio, zonaDe, reportarEnBanco } = require("../estudio");
 const { conCandado, claveDelPedido } = require("../candado");
 const pv = require("../pacienteVirtual");
+const { esDental: carreraDeAreaDental } = require("../odontologia");
 const { carreraDe } = require("../carreras");
 const { log } = require("../../../config");
 
@@ -153,6 +154,7 @@ module.exports = function (app) {
     if (principal.length < 3) throw new ErrorHttp(400, "Escribí tu diagnóstico principal.");
     const sim = await pv.obtener(medicoPhone, req.params.id);
     if (sim.estado !== "en_curso") throw new ErrorHttp(409, "Esta práctica ya terminó.");
+    if (carreraDeAreaDental(sim.area) && plan.length < 20) throw new ErrorHttp(400, "Explicá tu plan: prioridades, alternativas, prevención y seguimiento (al menos 20 caracteres).");
     const preguntas = (sim.mensajes || []).filter(m => m.rol === "estudiante" && m.tipo === "pregunta").length;
     if (preguntas < pv.MIN_PREGUNTAS) throw new ErrorHttp(400, `Hacele al menos ${pv.MIN_PREGUNTAS} preguntas al paciente antes de terminar.`);
     const respuesta = { principal, diferenciales, plan, en: new Date() };
@@ -174,6 +176,10 @@ module.exports = function (app) {
       throw new ErrorHttp(502, "No se pudo armar la evaluación. Probá de nuevo en un rato.");
     }
     await SimulacionPaciente.updateOne({ _id: sim._id, estado: "evaluando" }, { $set: { estado: "terminada", evaluacion, terminadaEn: new Date() } });
+    if (carreraDeAreaDental(cerrada.area)) {
+      await require("./odontologia").crearRepasoDental({ ...cerrada, estado: "terminada", evaluacion, terminadaEn: new Date() })
+        .catch(e => log.warn("[ODONTOLOGIA] repaso pendiente:", e.message));
+    }
     // Terminar una práctica cuenta como día de estudio; se anota antes de
     // contestar, para que el inicio ya la muestre.
     await marcarDiaDeEstudio(medicoPhone, await zonaDe(medicoPhone)).catch(e => log.warn("[ESTUDIO] racha:", e.message));
