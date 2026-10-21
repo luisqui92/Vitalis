@@ -66,12 +66,14 @@ function pintarInicioPV(d) {
   const cupo = d.cupo || { quedan: 0, limite: 0 };
   const abierta = d.enCurso;
   const enf = (d.areas || []).some(pvEsEnfermeria);
+  const dental = (d.areas || []).some(pvEsOdontologia);
+  if (PV_ELECCION.area !== "cualquiera" && !(d.areas || PV_AREAS).includes(PV_ELECCION.area)) PV_ELECCION.area = "cualquiera";
   app.innerHTML = `
     ${volverEstudioHtml()}
     ${pestanasEstudioHtml("paciente")}
     <div class="card pv-portada">
       <div class="nota-titulo" style="margin-top:0">${t("pv.titulo")}</div>
-      <div class="hint" style="margin:0 0 12px">${pvT(enf, "pv.bajada")}</div>
+      <div class="hint" style="margin:0 0 12px">${dental ? t("odoEst.bajada") : pvT(enf, "pv.bajada")}</div>
       ${abierta ? `<button class="secondary" id="pvSeguir" style="margin:0 0 12px">${abierta.paciente?.nombre
         ? t("pv.seguirCon", { nombre: esc(abierta.paciente.nombre) }) : t("pv.seguir")}</button>` : ""}
       <div class="est-rotulo">${t("pv.area")}</div>
@@ -213,10 +215,12 @@ function pintarChatPV(sim) {
       </form>
       <div id="pvErr"></div>
       <div class="hint">${t("pv.consejo")} <span id="pvCuenta">${t("pv.cuenta", { n: sim.preguntasHechas || 0, max: sim.maxMensajes || 80 })}</span></div>
-    </div>`;
+    </div>
+    ${pvEsOdontologia(sim.area) ? odontogramaEstudianteHtml() : ""}`;
+  if (pvEsOdontologia(sim.area)) montarOdontogramaEstudiante(sim);
   irArribaEstudio();
   pvAlFinal();
-  document.getElementById("pvSalir").onclick = renderPacienteVirtual;
+  document.getElementById("pvSalir").onclick = () => { if (!odontogramaPendientePV()) renderPacienteVirtual(); };
   document.getElementById("pvVoz").onclick = () => {
     pvFijarVoz(!pvVozActiva());
     pvCallar();
@@ -297,14 +301,15 @@ function panelPedidoPV(tipo) {
   if (panel.dataset.abierto === tipo) { panel.innerHTML = ""; panel.dataset.abierto = ""; return; }
   panel.dataset.abierto = tipo;
   const enf = pvEsEnfermeria(PV.sim.area);
-  const lista = enf ? (tipo === "examen" ? PV_VALORACIONES : PV_ESCALAS) : tipo === "examen"
+  const dental = pvEsOdontologia(PV.sim.area);
+  const lista = dental ? (PV.sim.exploracionesDentales?.[tipo] || []) : enf ? (tipo === "examen" ? PV_VALORACIONES : PV_ESCALAS) : tipo === "examen"
     ? PV_EXAMENES.filter(x => x !== "gineco" || PV.sim.area === "gineco")
     : PV_ESTUDIOS;
   const prefijo = enf ? (tipo === "examen" ? "pv.enf.va." : "pv.enf.es.") : tipo === "examen" ? "pv.ex." : "pv.es.";
   panel.innerHTML = `
     <div class="pv-panel">
       <div class="est-rotulo" style="margin-top:0">${pvT(enf, tipo === "examen" ? "pv.queExaminas" : "pv.quePedis")}</div>
-      <div class="est-chips">${lista.map(x => `<button type="button" class="est-chip pv-pedido" data-texto="${esc(t(prefijo + x))}">${t(prefijo + x)}</button>`).join("")}</div>
+      <div class="est-chips">${lista.map(x => `<button type="button" class="est-chip pv-pedido" data-texto="${esc(dental ? x : t(prefijo + x))}">${esc(dental ? x : t(prefijo + x))}</button>`).join("")}</div>
       <div class="pv-otro">
         <input id="pvOtro" type="text" maxlength="200" placeholder="${pvT(enf, tipo === "examen" ? "pv.otroExamen" : "pv.otroEstudio")}">
         <button type="button" class="pv-enviar" id="pvOtroBtn">${t("pv.pedir")}</button>
@@ -318,6 +323,7 @@ function panelPedidoPV(tipo) {
 }
 
 function panelTerminarPV() {
+  if (odontogramaPendientePV()) return;
   const panel = document.getElementById("pvPanel");
   if (panel.dataset.abierto === "terminar") { panel.innerHTML = ""; panel.dataset.abierto = ""; return; }
   panel.dataset.abierto = "terminar";
@@ -330,7 +336,7 @@ function panelTerminarPV() {
       <input id="pvPrincipal" type="text" maxlength="160">
       <label for="pvDiferenciales">${t(enf ? "tutor.enf.diferenciales" : "tutor.diferenciales")} <span class="hint">${t("nota.separadosComa")}</span></label>
       <input id="pvDiferenciales" type="text" maxlength="400">
-      <label for="pvPlan">${pvT(enf, "pv.conducta")} <span class="hint">${t("pv.opcional")}</span></label>
+      <label for="pvPlan">${pvEsOdontologia(PV.sim.area) ? t("odoEst.plan") : pvT(enf, "pv.conducta")} <span class="hint">${pvEsOdontologia(PV.sim.area) ? t("odoEst.planAyuda") : t("pv.opcional")}</span></label>
       <textarea id="pvPlan" rows="${enf ? 3 : 2}" maxlength="600"></textarea>
       <div id="pvTermErr"></div>
       <button class="primary" id="pvVerEval">${t("pv.verEvaluacion")}</button>
@@ -338,6 +344,7 @@ function panelTerminarPV() {
     </div>`;
   document.getElementById("pvPrincipal").focus();
   document.getElementById("pvVerEval").onclick = async () => {
+    if (odontogramaPendientePV()) return;
     const principal = document.getElementById("pvPrincipal").value.trim();
     const errBox = document.getElementById("pvTermErr");
     errBox.innerHTML = "";
@@ -471,6 +478,7 @@ function pintarEvaluacionPV(sim) {
       ${ev.intervenciones ? `<div class="nota-titulo">${t("pv.enf.intervenciones")}</div>
         ${listaPV(ev.intervenciones.adecuadas, "si", "✓")}${listaPV(ev.intervenciones.faltaron, "no", "✗")}${listaPV(ev.intervenciones.inadecuadas, "ojo", "⚠")}
         ${![...(ev.intervenciones.adecuadas || []), ...(ev.intervenciones.faltaron || []), ...(ev.intervenciones.inadecuadas || [])].length ? `<div class="hint">${t("pv.enf.sinIntervenciones")}</div>` : ""}` : ""}
+      ${pvEsOdontologia(sim.area) ? evaluacionDentalHtml(sim) : ""}
       <div class="nota-titulo">${t("pv.comunicacion")}</div>
       ${listaPV(ev.comunicacion?.bien, "si", "✓")}${listaPV(ev.comunicacion?.mejorar, "ojo", "→")}
       ${g.perla ? `<div class="tutor-perla">💡 ${esc(g.perla)}</div>` : ""}
@@ -486,6 +494,14 @@ function pintarEvaluacionPV(sim) {
   irArribaEstudio();
   document.getElementById("pvVolver").onclick = renderPacienteVirtual;
   document.getElementById("pvOtro").onclick = renderPacienteVirtual;
+  const repasarDental = document.getElementById("odoEstRepasar");
+  if (repasarDental) repasarDental.onclick = async () => {
+    repasarDental.disabled = true;
+    try {
+      await api(`/medico/pacientes-virtuales/${sim._id}/repaso`, { method: "POST" });
+      renderEstudiar();
+    } catch (e) { repasarDental.textContent = e.error || t("pv.error"); repasarDental.disabled = false; }
+  };
   document.getElementById("pvReportar").onclick = () => {
     const caja = document.getElementById("pvReporte");
     caja.innerHTML = `<div class="est-reporte">

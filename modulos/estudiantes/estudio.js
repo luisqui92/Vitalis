@@ -64,7 +64,7 @@ const POR_REPASO = 10;
 // confirma una apendicitis?» le soplaría la respuesta a «¿cuál es el
 // diagnóstico más probable?» del mismo caso.
 // Las "pregunta" son las que erró en un simulacro (simulacros.js).
-const ORDEN_TIPO = { dx: 0, estudio: 1, banderas: 2, faltoPreguntar: 3, pregunta: 4 };
+const ORDEN_TIPO = { dx: 0, estudio: 1, banderas: 2, faltoPreguntar: 3, pregunta: 4, planDental: 5, odontograma: 6 };
 // Las que se contestan eligiendo una opción; las otras, «me acordaba o no».
 const DE_OPCIONES = new Set(["dx", "pregunta"]);
 const MOTIVOS_REPORTE = ["respuesta", "pregunta", "datos"];
@@ -246,6 +246,8 @@ async function tarjetasDeRepaso(medicoPhone, ahora = new Date()) {
 // muestra recién cuando él la pide.
 function paraMostrar(t, azar = mezclar) {
   const base = { _id: t._id, tipo: t.tipo, consultaId: t.consultaId, caso: t.caso, sobre: t.sobre || "", caja: t.caja, carrera: t.carrera || "medicina" };
+  if (t.simulacionId) base.simulacionId = t.simulacionId;
+  if (t.tipo === "odontograma") base.registroEsperado = t.registroEsperado || [];
   if (t.tipo === "pregunta") Object.assign(base, { enunciado: t.enunciado || "", area: t.area || "", fecha: t.createdAt });
   if (DE_OPCIONES.has(t.tipo)) return { ...base, opciones: azar((t.opciones || []).map((texto, i) => ({ i, texto }))) };
   return { ...base, respuesta: t.respuesta || [], perla: t.perla || "" };

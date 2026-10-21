@@ -32,6 +32,7 @@
 // Con el banco armado, nada: armar un simulacro es elegir preguntas. Cuando
 // faltan se generan en lotes, en segundo plano, con un tope por día para que
 // un error no gaste sin límite. scripts/banco_estudio.js precarga el banco.
+const dental = require("./odontologia");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { PreguntaSimulacro, Simulacro, TarjetaEstudio } = require("./modelos");
@@ -48,6 +49,7 @@ const { calcular, numerosDe, coincide } = require("./calculos");
 const areasDe = (carrera) => configDe(carrera).areasSimulacro;
 const AREAS = areasDe("medicina");
 const NOMBRE_AREA = {
+  ...dental.AREAS,
   clinica: "medicina interna", pediatria: "pediatría", gineco: "ginecología y obstetricia",
   cirugia: "cirugía general", salud_publica: "salud pública y medicina preventiva",
   enf_fundamentos: "fundamentos de enfermería", enf_adulto: "enfermería del adulto (médico-quirúrgica)",
@@ -57,6 +59,7 @@ const NOMBRE_AREA = {
 };
 // Para que un lote no salga con cinco preguntas del mismo tema.
 const TEMAS = {
+  ...dental.TEMAS,
   clinica: ["cardiología", "neumología", "endocrinología y diabetes", "nefrología", "gastroenterología e hígado", "infectología",
     "hematología", "reumatología", "neurología", "agua, electrolitos y ácido-base", "geriatría"],
   pediatria: ["neonatología", "crecimiento y desarrollo", "infecciones respiratorias", "diarrea y deshidratación", "inmunizaciones",
@@ -123,7 +126,8 @@ const paisDe = (idioma) => PAIS[perfil(idioma).pais] || "Bolivia";
 function promptPreguntas(idioma, area, temas) {
   if (carreraDeArea(area) === "enfermeria") return promptPreguntasEnfermeria(idioma, area, temas);
   const pais = paisDe(idioma);
-  return `Sos un docente que escribe preguntas para el examen de ingreso a la residencia médica en ${pais}. Escribí ${temas.length} preguntas de opción múltiple de ${NOMBRE_AREA[area]}, una de cada uno de estos temas: ${temas.join("; ")}.
+  const contexto = dental.esDental(area) ? "docente de odontología que escribe preguntas para el examen de grado de odontología" : "docente que escribe preguntas para el examen de ingreso a la residencia médica";
+  return `Sos un ${contexto} en ${pais}. Escribí ${temas.length} preguntas de opción múltiple de ${NOMBRE_AREA[area]}, una de cada uno de estos temas: ${temas.join("; ")}.
 
 Cada pregunta:
 - "tema": el tema, corto.
@@ -238,7 +242,7 @@ Respondé SOLO JSON, una respuesta por pregunta y en el mismo orden: {"respuesta
 // Se quedan las que otra IA, sin ver la respuesta, contesta igual y sin dudar.
 async function verificarLote(preguntas, carrera = "medicina") {
   if (!preguntas.length) return [];
-  const r = await ia.pedirJson(carrera === "enfermeria" ? PROMPT_VERIFICAR_ENFERMERIA : PROMPT_VERIFICAR,
+  const r = await ia.pedirJson(carrera === "enfermeria" ? PROMPT_VERIFICAR_ENFERMERIA : carrera === "odontologia" ? PROMPT_VERIFICAR.replace("un médico que rinde el examen de residencia", "un odontólogo que verifica un examen de odontología") : PROMPT_VERIFICAR,
     preguntas.map((p, i) => `PREGUNTA ${i + 1}: ${p.enunciado}\n${p.opciones.map((o, k) => `${k}. ${o}`).join("\n")}`).join("\n\n"),
     { maxTokens: 400, temperatura: 0 });
   const respuestas = Array.isArray(r?.respuestas) ? r.respuestas : [];

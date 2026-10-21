@@ -124,7 +124,8 @@ const ESCRITURA_PERMITIDA = [
   ["POST", ruta(`estudio/tarjetas/${ID}/responder`)],
   ["POST", ruta("(pacientes-virtuales|simulacros)"), IA],
   ["POST", ruta(`pacientes-virtuales/${ID}/(mensajes|terminar)`), IA],
-  ["POST", ruta(`pacientes-virtuales/${ID}/reportar`)],
+  ["POST", ruta(`pacientes-virtuales/${ID}/(reportar|repaso)`)],
+  ["PUT", ruta(`pacientes-virtuales/${ID}/odontograma`)],
   // Contestar un simulacro no le pide nada a la IA: las preguntas ya están.
   ["POST", ruta(`simulacros/${ID}/(responder|terminar|reportar)`)],
   ["POST", ruta(`simulacros/preguntas/${ID}/reportar`)],

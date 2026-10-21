@@ -35,6 +35,15 @@ const CARRERAS = {
     areasSimulacro: ["enf_fundamentos", "enf_adulto", "enf_materno", "enf_pediatria", "enf_comunitaria", "enf_urgencias", "enf_salud_mental"],
     areasPaciente: ["enf_hospitalizacion", "enf_materno", "enf_pediatria", "enf_urgencias", "enf_comunitaria", "enf_geriatria"],
   },
+  odontologia: {
+    niveles: ["estudiante", "interno"], tipoEspecialidad: "odontologia",
+    titulo: {
+      es: { estudiante: "Estudiante de odontología", interno: "Interno de odontología" },
+      pt: { estudiante: "Estudante de odontologia", interno: "Interno de odontologia" },
+    },
+    areasSimulacro: ["odo_anatomia", "odo_cariologia", "odo_endodoncia", "odo_periodoncia", "odo_cirugia", "odo_pediatria", "odo_prevencion"],
+    areasPaciente: ["odo_cariologia", "odo_endodoncia", "odo_periodoncia", "odo_cirugia", "odo_pediatria", "odo_prevencion"],
+  },
 };
 
 const CARRERA_POR_DEFECTO = "medicina";

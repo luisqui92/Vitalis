@@ -36,6 +36,7 @@
 //   arma una vez, coherente con el caso, y queda guardado: pedir lo mismo dos
 //   veces da lo mismo.
 // · Es práctica: la evaluación la hace una IA, y la pantalla lo dice.
+const dental = require("./odontologia");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { CasoVirtual, SimulacionPaciente } = require("./modelos");
@@ -51,6 +52,7 @@ const areasDe = (carrera) => configDe(carrera).areasPaciente;
 const AREAS = areasDe("medicina");
 const DIFICULTADES = ["basico", "intermedio", "avanzado"];
 const NOMBRE_AREA = {
+  ...dental.AREAS,
   clinica: "medicina interna", pediatria: "pediatría", gineco: "ginecología y obstetricia",
   cirugia: "cirugía general", emergencias: "emergencias",
   enf_hospitalizacion: "hospitalización (enfermería médico-quirúrgica)", enf_materno: "enfermería materno-perinatal",
@@ -109,7 +111,9 @@ const paisDe = (idioma) => PAIS[perfil(idioma).pais] || "Bolivia";
 function promptCaso(idioma, area, dificultad, evitar) {
   if (esEnfermeria(area)) return promptCasoEnfermeria(idioma, area, dificultad, evitar);
   const pais = paisDe(idioma);
-  return `Sos un docente de medicina que arma casos para que estudiantes practiquen la entrevista clínica con un paciente simulado, como en un examen práctico (ECOE). Armá UN caso nuevo.
+  const especialidad = dental.esDental(area) ? "odontología" : "medicina";
+  return `${dental.esDental(area) ? dental.instruccionesCaso() : ""}
+Sos un docente de ${especialidad} que arma casos para que estudiantes practiquen la entrevista clínica con un paciente simulado, como en un examen práctico (ECOE). Armá UN caso nuevo.
 
 Área: ${NOMBRE_AREA[area]}. Dificultad ${NOMBRE_DIFICULTAD[dificultad]}. País: ${pais}.
 ${evitar.length ? `Que el diagnóstico NO sea ninguno de estos (ya están en el banco): ${evitar.join("; ")}.` : ""}
@@ -163,7 +167,7 @@ Respondé SOLO JSON:
 
 const SIGNOS = ["PA", "FC", "FR", "T", "SatO2", "Peso", "Talla"];
 
-function sanearGuion(r) {
+function sanearGuion(r, area = "clinica") {
   const p = r?.paciente || {};
   const edad = Number(p.edad), meses = Number(p.edadMeses);
   const diagnostico = texto(r?.diagnostico, 160);
@@ -208,6 +212,10 @@ function sanearGuion(r) {
   if (diagnosticoMedico) guion.diagnosticoMedico = diagnosticoMedico;
   const intervenciones = lista(r?.intervencionesClave, 6);
   if (intervenciones.length) guion.intervencionesClave = intervenciones;
+  if (dental.esDental(area)) {
+    guion.odontologia = dental.sanearCaso(r?.odontologia);
+    if (!guion.odontologia) return null;
+  }
   // Sin lo esencial no hay práctica posible.
   const sirve = guion.paciente.nombre && guion.motivo && guion.historia.length >= 3 && guion.diagnostico
     && guion.diferenciales.length >= 2 && guion.preguntasClave.length >= 4 && guion.examenFisico.length >= 1;
@@ -249,11 +257,15 @@ const PROMPT_RESOLVER_ENFERMERIA = `Sos un licenciado en enfermería. Te paso un
 Respondé SOLO JSON: {"opcion": número de la opción, empezando en 0}`;
 
 // ¿El caso cierra? Otra IA, sin ver la respuesta, tiene que llegar a ella.
-async function resolverAciegas(guion, enfermeria = false) {
+async function resolverAciegas(guion, enfermeria = false, odontologia = false) {
   const opciones = mezclar([guion.diagnostico, ...guion.diferenciales.map(d => d.diagnostico)]);
-  const r = await ia.pedirJson(enfermeria ? PROMPT_RESOLVER_ENFERMERIA : PROMPT_RESOLVER,
-    `CASO:\n${casoSinRespuesta(guion)}\n\nOPCIONES:\n${opciones.map((o, i) => `${i}. ${o}`).join("\n")}`,
-    { maxTokens: 60, temperatura: 0 });
+  const prompt = enfermeria ? PROMPT_RESOLVER_ENFERMERIA : odontologia
+    ? PROMPT_RESOLVER.replace("un médico", "un odontólogo") + '\nAdemás, verificá que cada registro del odontograma esté respaldado por un hallazgo explícito del examen y sea coherente con la pieza y superficie. Añadí "odontogramaCoherente": true|false al JSON.'
+    : PROMPT_RESOLVER;
+  const r = await ia.pedirJson(prompt,
+    `CASO:\n${casoSinRespuesta(guion)}${odontologia ? "\nODONTOGRAMA A COMPROBAR:\n" + JSON.stringify(guion.odontologia?.odontograma) : ""}\n\nOPCIONES:\n${opciones.map((o, i) => `${i}. ${o}`).join("\n")}`,
+    { maxTokens: odontologia ? 120 : 60, temperatura: 0 });
+  if (odontologia && (!Number.isInteger(r?.opcion) || r.odontogramaCoherente !== true)) return false;
   return opciones[Number(r?.opcion)] === guion.diagnostico;
 }
 
@@ -263,10 +275,10 @@ async function generarCaso(idioma, area, dificultad) {
   const evitar = (await CasoVirtual.find({ idioma, area, dificultad }).sort({ createdAt: -1 }).limit(30).select("guion.diagnostico").lean())
     .map(c => c.guion?.diagnostico).filter(Boolean);
   for (let intento = 1; intento <= 3; intento++) {
-    const r = await ia.pedirJson(promptCaso(idioma, area, dificultad, evitar), "Armá el caso.", { maxTokens: 2500, temperatura: 0.8, timeout: 120000 });
-    const guion = sanearGuion(r);
+    const r = await ia.pedirJson(promptCaso(idioma, area, dificultad, evitar), "Armá el caso.", { maxTokens: dental.esDental(area) ? 4000 : 2500, temperatura: 0.8, timeout: 120000 });
+    const guion = sanearGuion(r, area);
     if (!guion) { log.warn(`[PACIENTE_VIRTUAL] guion incompleto (intento ${intento})`); continue; }
-    if (!(await resolverAciegas(guion, esEnfermeria(area)))) { log.warn(`[PACIENTE_VIRTUAL] el caso no cierra (intento ${intento})`); continue; }
+    if (!(await resolverAciegas(guion, esEnfermeria(area), dental.esDental(area)))) { log.warn(`[PACIENTE_VIRTUAL] el caso no cierra (intento ${intento})`); continue; }
     return CasoVirtual.create({ idioma, area, dificultad, guion, usos: 1 });
   }
   throw new Error("no salió un caso que cierre");
@@ -300,12 +312,12 @@ async function prepararSimulacion(simId) {
 
 // ─── LA ENTREVISTA ─────────────────────────────────────────────────────────
 
-function promptPaciente(g, idioma, enfermeria = false) {
+function promptPaciente(g, idioma, enfermeria = false, odontologia = false) {
   const quien = /madre|padre|m[aã]e|pai/i.test(g.quienHabla || "")
     ? `Sos ${g.quienHabla} de ${g.paciente?.nombre}, y respondés por tu hijo o hija`
     : `Sos ${g.paciente?.nombre}`;
   if (enfermeria) return promptPacienteEnfermeria(g, idioma, quien);
-  return `Esto es una práctica de entrevista clínica para estudiantes de medicina. ${quien}: un paciente simulado.
+  return `Esto es una práctica de entrevista clínica para estudiantes de ${odontologia ? "odontología" : "medicina"}. ${quien}: un paciente simulado.
 
 Respondé lo que te pregunta el estudiante como lo haría esta persona: en primera persona, con palabras comunes (no técnicas), corto (1 a 3 frases), con esta forma de ser: ${g.personalidad || "colaborador"}. Hablá en ${perfil(idioma).nota.nombre}.
 
@@ -341,7 +353,7 @@ ${JSON.stringify(guionDelPaciente(g))}`;
 async function responderComoPaciente(sim, pregunta) {
   const historial = (sim.mensajes || []).filter(m => m.rol !== "sistema").slice(-30)
     .map(m => ({ role: m.rol === "estudiante" ? "user" : "assistant", content: m.texto }));
-  const r = await ia.pedirTexto(promptPaciente(sim.guion, sim.idioma, esEnfermeria(sim.area)), [...historial, { role: "user", content: pregunta }],
+  const r = await ia.pedirTexto(promptPaciente(sim.guion, sim.idioma, esEnfermeria(sim.area), dental.esDental(sim.area)), [...historial, { role: "user", content: pregunta }],
     { maxTokens: 220, temperatura: 0.5 });
   const limpio = r.replace(/^["«“]+|["»”]+$/g, "").trim().slice(0, 600);
   if (!limpio) throw new Error("el paciente no contestó");
@@ -393,6 +405,14 @@ async function pedirHallazgo(sim, tipo, pedido) {
   const ya = (sim.hallazgos || []).find(h => h.tipo === tipo && h.clave === clave);
   if (ya) return { texto: ya.texto, clave, nuevo: false };
   const g = sim.guion;
+  if (dental.esDental(sim.area)) {
+    const datos = tipo === "examen" ? g.examenFisico : g.estudios;
+    const encontrado = (datos || []).find(x => normalizar(tipo === "examen" ? x.region : x.nombre) === clave);
+    const resultado = encontrado ? (tipo === "examen" ? encontrado.hallazgo : encontrado.resultado)
+      : sim.idioma === "pt" ? "Este resultado não está disponível neste caso. Escolha uma das explorações preparadas."
+      : "Este resultado no está disponible en este caso. Elegí una de las exploraciones preparadas.";
+    return { texto: resultado, clave, nuevo: true };
+  }
   const contexto = {
     paciente: g.paciente, motivo: g.motivo, historia: g.historia, antecedentes: g.antecedentes, negativos: g.negativos,
     signosVitales: g.signosVitales, examenFisico: g.examenFisico, estudios: g.estudios,
@@ -478,10 +498,20 @@ async function evaluar(sim) {
       { maxTokens: 1800, temperatura: 0.2, timeout: 90000 });
     return sanearEvaluacion(r, g);
   }
-  const r = await ia.pedirJson(`${PROMPT_EVALUAR}\n\n${reglaDeIdioma(sim.idioma)}`,
+  const esDental = dental.esDental(sim.area);
+  const prompt = esDental ? PROMPT_EVALUAR.replace("estudiante de medicina", "estudiante de odontología") + dental.instruccionesEvaluacion() : PROMPT_EVALUAR;
+  const r = await ia.pedirJson(`${prompt}\n\n${reglaDeIdioma(sim.idioma)}`,
     `GUION DEL CASO:\n${JSON.stringify(g)}\n\nCONVERSACIÓN:\n${transcripcion(sim)}\n\nSU DIAGNÓSTICO: ${sim.respuesta.principal}\nSUS DIFERENCIALES: ${sim.respuesta.diferenciales.join("; ") || "(no propuso)"}\nSU CONDUCTA: ${sim.respuesta.plan || "(no escribió)"}`,
-    { maxTokens: 1500, temperatura: 0.2, timeout: 90000 });
-  return sanearEvaluacion(r, g);
+    { maxTokens: esDental ? 2300 : 1500, temperatura: 0.2, timeout: 90000 });
+  const evaluacion = sanearEvaluacion(r, g);
+  if (esDental) {
+    if (!r?.planTratamiento || !["adecuadas", "faltaron", "inadecuadas"].every(k => Array.isArray(r.planTratamiento[k]))) {
+      throw new Error("La evaluación odontológica no incluyó el plan de tratamiento.");
+    }
+    evaluacion.planTratamiento = dental.sanearPlan(r?.planTratamiento);
+    evaluacion.odontograma = dental.compararRegistro(g.odontologia.odontograma, sim.odontograma?.registro || []);
+  }
+  return evaluacion;
 }
 
 // ─── LO DE CADA ESTUDIANTE ─────────────────────────────────────────────────
@@ -533,6 +563,15 @@ function vista(sim) {
     preguntasHechas: preguntasDe(sim),
     maxMensajes: MAX_MENSAJES, minPreguntas: MIN_PREGUNTAS,
   };
+  if (dental.esDental(sim.area) && g.odontologia) {
+    base.denticionDental = g.odontologia.denticion;
+    base.odontograma = sim.odontograma || { registro: [], revision: 0 };
+    // Se muestran los nombres de exploraciones, nunca sus resultados.
+    base.exploracionesDentales = {
+      examen: (g.examenFisico || []).map(x => x.region),
+      estudio: (g.estudios || []).map(x => x.nombre),
+    };
+  }
   if (sim.estado !== "terminada") return base;
   return { ...base, respuesta: sim.respuesta, guion: g, evaluacion: sim.evaluacion };
 }

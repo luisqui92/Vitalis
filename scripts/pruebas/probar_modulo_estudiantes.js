@@ -141,7 +141,7 @@ console.log("\n── 2. La pantalla: las del núcleo no conocen al módulo ─�
 {
   const delModulo = archivosJs(path.join("public", "js"), n => n.startsWith("estudiantes"));
   const nucleo = archivosJs(path.join("public", "js"), n => !n.startsWith("estudiantes"));
-  verificar(`el módulo son ${delModulo.length} archivos (public/js/estudiantes*.js)`, delModulo.length === 6);
+  verificar(`el módulo son ${delModulo.length} archivos (public/js/estudiantes*.js)`, delModulo.length === 7);
   const nombran = [];
   for (const f of nucleo) {
     sinComentarios(leer(f)).split("\n").forEach((linea, i) => {

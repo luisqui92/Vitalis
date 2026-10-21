@@ -160,6 +160,14 @@ async function muestra(argv) {
       console.log(`  «${g.motivo}»`);
       console.log(`  ${VERDE("→")} ${g.diagnostico}`);
       for (const d of g.diferenciales || []) console.log(GRIS(`    no es ${d.diagnostico}: ${d.porQueNo}`));
+      if (g.odontologia) {
+        console.log(GRIS(`    historia: ${(g.historia || []).join("; ")}`));
+        for (const x of g.examenFisico || []) console.log(GRIS(`    examen · ${x.region}: ${x.hallazgo}`));
+        for (const x of g.estudios || []) console.log(GRIS(`    estudio · ${x.nombre}: ${x.resultado}`));
+        console.log(GRIS(`    dentición: ${g.odontologia.denticion}`));
+        for (const x of g.odontologia.odontograma || []) console.log(GRIS(`    FDI ${x.diente} · ${x.superficie}: ${x.estado} · ${x.nota || ""}`));
+        console.log(GRIS(`    plan esperado: ${(g.odontologia.planClave || []).join("; ")}`));
+      }
       if ((g.intervencionesClave || []).length) console.log(GRIS(`    intervenciones: ${g.intervencionesClave.join("; ")}`));
     }
   } else {

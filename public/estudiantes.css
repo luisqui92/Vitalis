@@ -191,3 +191,24 @@
 .calc-equivalencias div{padding:8px;border-radius:var(--radius-sm);background:var(--card);font-size:13px;overflow-wrap:anywhere;}
 .calc-equivalencias b{display:block;font-family:var(--font-marca);font-size:17px;color:var(--text);}
 .calc-equivalencias .calc-de{outline:1px solid rgba(var(--primary-rgb),.35);}
+
+/* Odontograma del estudiante: controles táctiles y etiquetas independientes del color. */
+.odo-est { padding:16px; margin:16px 0; border:1px solid var(--border, #53616d); border-radius:12px; }
+.odo-est summary { cursor:pointer; font-weight:700; }
+.odo-est fieldset { border:0; padding:0; margin:0; min-width:0; }
+.odo-est-dientes { display:grid; grid-template-columns:repeat(16,minmax(44px,1fr)); gap:4px; margin:8px 0 16px; overflow-x:auto; padding:3px; }
+.odo-est-temporal .odo-est-dientes { grid-template-columns:repeat(10,minmax(44px,1fr)); }
+.odo-est-diente { min-height:44px; padding:5px 1px; font-size:14px; border:1px solid var(--border,#53616d); border-radius:7px; background:var(--card, #122431); color:var(--text,#fff); }
+.odo-est-diente span { display:block; font-size:12px; }
+.odo-est-diente svg { display:block; width:36px; height:36px; margin:4px auto; }
+.odo-est-leyenda { display:flex; flex-wrap:wrap; gap:8px 12px; margin:8px 0 16px; font-size:12px; }
+.odo-est-leyenda span { display:flex; align-items:center; gap:4px; }
+.odo-est-leyenda i { width:12px; height:12px; border:1px solid #9cb6c2; border-radius:3px; }
+.odo-est-diente.activo { outline:2px solid var(--primary,#2cc3df); outline-offset:1px; }
+.odo-est button:focus-visible,.odo-est select:focus-visible { outline:3px solid var(--primary,#2cc3df); outline-offset:2px; }
+.odo-est-superficies { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.odo-est-superficies label { margin:0; font-size:14px; }
+.odo-est-superficies select { width:100%; min-height:44px; }
+.odo-est-registro input { width:100%; }
+.odo-est-evaluacion details { margin:10px 0; padding:10px; border:1px solid var(--border,#53616d); border-radius:8px; }
+@media(max-width:380px) { .odo-est { padding:10px; } .odo-est-diente { font-size:12px; } }
