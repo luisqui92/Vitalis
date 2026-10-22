@@ -76,7 +76,7 @@ module.exports = function (app) {
       const estado = await estadoDeEstudiante(medico);
       if (estado?.vencido) throw new ErrorHttp(402, estado.motivo);
       const cupo = await pv.cupoDe(medico);
-      if (!cupo.quedan) throw new ErrorHttp(402, `Ya hiciste los ${cupo.limite} pacientes virtuales de este mes. El mes que viene se renuevan.`);
+      if (!cupo.quedan) throw new ErrorHttp(402, medico.estudiante?.prueba?.activa ? `Ya usaste los ${cupo.limite} pacientes virtuales de la prueba. Activá un plan para continuar.` : `Ya hiciste los ${cupo.limite} pacientes virtuales de este mes. El mes que viene se renuevan.`);
       await SimulacionPaciente.updateMany({ medicoPhone, estado: { $in: ["preparando", "en_curso"] } }, { $set: { estado: "abandonada" } });
       const nueva = await SimulacionPaciente.create({ medicoPhone, idioma: medico.idioma || "es", area, dificultad, ...(clave ? { clave } : {}) });
       // En segundo plano: la pantalla pregunta hasta que esté listo.

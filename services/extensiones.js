@@ -33,6 +33,12 @@
 const { log } = require("../config");
 
 const PUNTOS = {
+  "audio.reservar": { forma: "revisar", que: "reserva cupo y escribe limitesAudio en el contexto; falla cerrado" },
+  "audio.descartar": { forma: "revisar", que: "libera una reserva que no llegó a guardarse" },
+  "audio.completar": { forma: "revisar", que: "concilia el cupo después de guardar la transcripción" },
+  "vistaPrevia.configurar": { forma: "revisar", que: "puede desactivar vista previa para un tipo de acceso" },
+  "suscripcion.estado": { forma: "sumar", que: "oferta y vigencia de planes propios de módulos" },
+  "suscripcion.activar": { forma: "revisar", que: "puede resolver una activación de plan con reglas propias" },
   // La sesión del médico (services/sesionMedico.js).
   "sesion.token": { forma: "sumar", que: "marcas que se suman al token de sesión" },
   "sesion.datos": { forma: "sumar", que: "datos que se suman a la sesión que recibe la pantalla" },

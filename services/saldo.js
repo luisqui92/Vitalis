@@ -77,7 +77,7 @@ async function monedaDe(medicoPhone) {
 }
 
 async function estadoDe(medicoPhone) {
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion consultasGratisUsadas clinicaId").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("saldoCentavos moneda suscripcion consultasGratisUsadas clinicaId estudiante").lean();
   // El plan puede venir del centro donde trabaja. Se busca SOLO si pertenece
   // a uno: la enorme mayoría de los médicos no, y una consulta de más por
   // cada pintado de pantalla se paga en todas.
@@ -92,6 +92,7 @@ async function estadoDe(medicoPhone) {
   const consultasRestantes = Math.max(0, Math.floor(saldoCentavos / cfg.precioConsulta));
   const limiteNegativo = -5 * cfg.precioConsulta;
   const plan = suscripciones.estado(medico, clinica);
+  const cubierto = suscripciones.vigente(medico, clinica);
   const gratisUsadas = Math.min(medico?.consultasGratisUsadas || 0, CONSULTAS_GRATIS);
   const gratisRestantes = CONSULTAS_GRATIS - gratisUsadas;
   return {
@@ -110,9 +111,9 @@ async function estadoDe(medicoPhone) {
     // Tampoco se avisa mientras le queden de cortesía: una cuenta nueva
     // arranca en cero y vería "te queda poco saldo" antes de haber usado
     // Symphomed una sola vez.
-    bajo: !plan.activa && gratisRestantes === 0 && consultasRestantes <= AVISAR_DESDE,
+    bajo: !cubierto && gratisRestantes === 0 && consultasRestantes <= AVISAR_DESDE,
     // Si ya no puede ni empezar otra consulta.
-    bloqueado: !plan.activa && gratisRestantes === 0 && saldoCentavos <= limiteNegativo,
+    bloqueado: !cubierto && gratisRestantes === 0 && saldoCentavos <= limiteNegativo,
     limiteNegativoCentavos: limiteNegativo,
     recargaMinimaCentavos: cfg.recargaMinima,
     suscripcion: plan,
@@ -289,7 +290,7 @@ async function cobrarConsulta({ medicoPhone, consultaId, concepto }) {
   // El precio es el de SU moneda. Cobrarle 1200 centavos a un médico
   // brasileño porque ese es el precio boliviano sería cobrarle un número, no
   // un precio.
-  const medico = await Medico.findOne({ phone: medicoPhone }).select("moneda suscripcion clinicaId").lean();
+  const medico = await Medico.findOne({ phone: medicoPhone }).select("moneda suscripcion clinicaId estudiante").lean();
   const clinica = medico?.clinicaId
     ? await Clinica.findById(medico.clinicaId).select("suscripcion").lean()
     : null;

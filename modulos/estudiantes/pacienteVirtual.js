@@ -517,9 +517,10 @@ async function evaluar(sim) {
 // ─── LO DE CADA ESTUDIANTE ─────────────────────────────────────────────────
 
 async function cupoDe(medico, ahora = new Date()) {
-  const limite = NIVELES[medico?.estudiante?.nivel]?.pacientesMes || 0;
+  const prueba = medico?.estudiante?.prueba;
+  const limite = prueba?.activa ? 3 : NIVELES[medico?.estudiante?.nivel]?.pacientesMes || 0;
   const usados = await SimulacionPaciente.countDocuments({
-    medicoPhone: medico.phone, createdAt: { $gte: inicioDelMes(ahora) }, estado: { $ne: "error" },
+    medicoPhone: medico.phone, createdAt: { $gte: prueba?.activa ? prueba.desde : inicioDelMes(ahora) }, estado: { $ne: "error" },
   });
   return { usados, limite, quedan: Math.max(0, limite - usados) };
 }

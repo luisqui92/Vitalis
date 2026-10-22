@@ -6,7 +6,7 @@ Esta entrega parte de `codex/acceso-google`. No despliega ni cambia credenciales
 
 - Google confirma el control de una identidad Google. No acredita universidad, matrícula ni profesión.
 - La primera alta exige elegir una tarjeta de perfil; ninguna aparece seleccionada. El servidor exige la selección para registros Google. Los ingresos posteriores recuperan el perfil guardado.
-- Educativo: código de invitación, carrera, nivel, universidad y año/semestre. Carrera y nivel deben coincidir con el código; el código sigue fijando duración y cuotas. Se conserva el modelo comercial de invitaciones; no se crea una prueba gratuita sin código.
+- Educativo: alta directa con Google, carrera, nivel, universidad y año/semestre. Sin invitación: prueba de 3 días y 15 minutos totales de audio. Las invitaciones existentes se mantienen como alternativa opcional. Ver [REGISTRO_ESTUDIANTES_ABIERTO.md](REGISTRO_ESTUDIANTES_ABIERTO.md).
 - Profesional: país de la matrícula (código ISO de dos letras), profesión, área, matrícula y etapa profesional/residente. También se piden estos datos en el registro con contraseña. La cuenta queda inactiva y pendiente.
 - El residente conserva una etapa de formación independiente de la habilitación. Elegir residente no acredita ni habilita funciones clínicas.
 - Una cuenta Google pendiente o rechazada puede consultar/corregir su solicitud sin un segundo código. Recibe un ticket de diez minutos ligado al navegador, nunca un token clínico. El rechazo muestra el motivo. Para volver a entrar después de vencer el ticket se usa Google de nuevo.

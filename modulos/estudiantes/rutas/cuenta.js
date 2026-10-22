@@ -12,6 +12,7 @@ const { tokenDeMedico, datosDeSesion } = require("../../../services/sesionMedico
 const { log } = require("../../../config");
 const { normalizarCodigo, estadoDe } = require("../cuenta");
 const { carreraValida, configDe, nivelValido, tituloDe } = require("../carreras");
+const prueba = require("../prueba");
 const { identidadParaRegistro } = require("../../../services/googleAcceso");
 
 // Como el resto de las rutas de la propia cuenta (routes/medicoAuth.js).
@@ -21,6 +22,12 @@ const requireMedico = requireAuth(["medico", "admin"]);
 // pantalla lo pide para avisar ANTES de grabar. Es parte de las reglas de la
 // cuenta: se monta aunque el módulo esté apagado.
 function estado(app) {
+  app.get("/medico/estudiante/plan", requireMedico, asyncRoute(async (req, res) => {
+    const medico = await Medico.findOne({ phone: req.adminUser.usuario }).lean();
+    if (!medico?.estudiante?.nivel) throw new ErrorHttp(403, "Esta oferta corresponde a cuentas educativas.");
+    const { datosDePago, paisDelMedico } = require("../../../services/datosPago");
+    res.json({ ...require("../planes").estado({ medico }), pago: await datosDePago(paisDelMedico(medico)), moneda: medico.moneda });
+  }));
   app.get("/medico/estudiante/estado", requireMedico, asyncRoute(async (req, res) => {
     const medico = await Medico.findOne({ phone: req.adminUser.usuario }).select("phone estudiante").lean();
     res.json({ estudiante: await estadoDe(medico) });
@@ -34,6 +41,7 @@ function estado(app) {
 // Un código sirve una sola vez: se reclama con un update atómico, así dos
 // personas con el mismo código no pueden quedarse las dos con él.
 function registro(app) {
+  app.get("/medico/estudiante/registro-config", (_req, res) => res.set("Cache-Control", "no-store").json(prueba.configuracion()));
   app.post("/medico/registro-estudiante", limitAuth, asyncRoute(async (req, res) => {
     const codigo = normalizarCodigo(req.body?.codigo);
     const phone = soloDigitos(req.body?.phone);
@@ -45,13 +53,20 @@ function registro(app) {
     if (google && req.body?.perfilSolicitado !== "estudiante") throw new ErrorHttp(400, "Seleccioná explícitamente tu perfil educativo.");
     const periodo = String(req.body?.periodo || "").trim().slice(0, 40);
     if (google && (!universidad || !periodo)) throw new ErrorHttp(400, "Completá universidad y año o semestre.");
-    if (!codigo || !nombre) throw new ErrorHttp(400, "Faltan el código y tu nombre");
+    if (!nombre) throw new ErrorHttp(400, "Falta tu nombre");
+    if (!codigo && !google) throw new ErrorHttp(400, "Para iniciar la prueba gratuita, entrá con Google.");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");
     if (!google && password.length < 8) throw new ErrorHttp(400, "La contraseña debe tener al menos 8 caracteres");
     if (await buscarPorTelefono(Medico, phone, { select: "_id", lean: true })) {
       throw new ErrorHttp(409, "Ese teléfono ya tiene una cuenta. Entrá con tu contraseña.");
     }
 
+    if (!codigo) {
+      const medico = await prueba.registrar({ google, phone, nombre, universidad, periodo, idioma,
+        carrera: req.body?.carrera, nivel: req.body?.nivel });
+      registrar({ req, medicoPhone: phone, accion: "registro_estudiante_prueba" });
+      return res.json({ token: tokenDeMedico(medico), ...datosDeSesion(medico) });
+    }
     const ahora = new Date();
     const cod = await CodigoEstudiante.findOneAndUpdate(
       { codigo, usadoPor: null, anulado: false, vence: { $gt: ahora } },

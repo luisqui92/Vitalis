@@ -1,6 +1,6 @@
 // Symphomed — Português · contas de estudante (public/js/estudiantes.js).
 Object.assign(I18N.pt, {
-  "est.irRegistro": "🎓 Tenho um código de estudante",
+  "est.irRegistro": "Sou estudante · Testar grátis",
   "est.reg.titulo": "🎓 Entrar como estudante",
   "est.reg.bajada": "Com o código que a Symphomed te deu. Vale uma única vez: fica no seu nome.",
   "est.reg.codigo": "Código de convite",
@@ -57,4 +57,26 @@ Object.assign(I18N.pt, {
   "tutor.enf.estudio": "Intervenção-chave:",
   "tutor.enf.faltoPreguntar": "Faltou avaliar",
   "tutor.enf.errPrincipal": "Escreva seu diagnóstico de enfermagem prioritário antes de comparar.",
+});
+
+Object.assign(I18N.pt, {
+  "est.abierto.navegador": "Se o Google não abrir dentro do TikTok ou Instagram, abra este link no Chrome ou Safari pelo menu do aplicativo.",
+  "est.abierto.titulo": "Estude com a Symphomed",
+  "est.abierto.oferta": "Entre com Google e teste grátis por 3 dias, com 15 minutos de áudio no total. Sem convite e sem cartão.",
+  "est.abierto.audio": "No teste, o áudio é transcrito ao finalizar. Se exceder o saldo restante, somente esse trecho será processado. Use casos de prática sem dados identificáveis.",
+  "est.abierto.tengoCodigo": "Já tenho um código de convite",
+  "est.abierto.elegir": "Depois de entrar com Google, escolha Estudante e complete seu perfil.",
+  "est.abierto.noDisponible": "O cadastro com Google não está disponível agora. Tente mais tarde.",
+  "est.abierto.verPlan": "Ver planos e continuar",
+  "est.abierto.prueba": "Seu teste gratuito",
+  "est.abierto.restante": "Restam {minutos} minutos de áudio e {dias} dias de teste.",
+  "est.abierto.plan": "Continuar com um plano educativo",
+  "est.abierto.pago": "Pague usando os dados da Symphomed e envie o comprovante. O plano será ativado após confirmar o pagamento; não há cobrança automática.",
+  "est.abierto.sinPago": "Os dados de pagamento ainda não estão configurados. Sua conta e seus casos serão mantidos.",
+  "est.abierto.comprobante": "Enviar comprovante pelo WhatsApp",
+  "est.abierto.volver": "Voltar",
+  "est.abierto.precio": "{precio} por mês · {horas} horas de áudio por mês",
+  "est.abierto.practicas": "O teste também inclui até 3 pacientes virtuais e 3 simulados.",
+  "est.abierto.cuenta": "Conta",
+  "est.abierto.titular": "Titular"
 });

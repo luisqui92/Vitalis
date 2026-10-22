@@ -556,7 +556,8 @@ function crearTranscriptorEnVivo(onTexto) {
     let avisoDelServidor = "";
     try {
       // El pase vale para una sola conexión y por unos segundos: se usa ya.
-      const { pase, ruta } = await api("/medico/transcripcion-token");
+      const { pase, ruta, sinVistaPrevia } = await api("/medico/transcripcion-token");
+      if (sinVistaPrevia) { huboCorte = true; return; }
       const protocolo = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${protocolo}//${location.host}${ruta || "/ws-vista-previa"}?pase=${encodeURIComponent(pase)}`);
 

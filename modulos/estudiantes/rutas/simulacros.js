@@ -74,7 +74,7 @@ module.exports = function (app) {
       const estado = await estadoDeEstudiante(medico);
       if (estado?.vencido) throw new ErrorHttp(402, estado.motivo);
       const cupo = await sim.cupoDe(medico);
-      if (!cupo.quedan) throw new ErrorHttp(402, `Ya hiciste los ${cupo.limite} simulacros de este mes. El mes que viene se renuevan.`);
+      if (!cupo.quedan) throw new ErrorHttp(402, medico.estudiante?.prueba?.activa ? `Ya usaste los ${cupo.limite} simulacros de la prueba. Activá un plan para continuar.` : `Ya hiciste los ${cupo.limite} simulacros de este mes. El mes que viene se renuevan.`);
       // Uno abierto a la vez: el que estaba a medias se da por terminado.
       const viejos = await Simulacro.find({ medicoPhone, estado: "listo" }).select("_id").lean();
       const zona = await zonaDe(medicoPhone);

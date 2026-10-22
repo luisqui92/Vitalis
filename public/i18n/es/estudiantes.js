@@ -1,6 +1,6 @@
 // Symphomed — Español · cuentas de estudiante (public/js/estudiantes.js).
 Object.assign(I18N.es, {
-  "est.irRegistro": "🎓 Tengo un código de estudiante",
+  "est.irRegistro": "Soy estudiante · Probar gratis",
   "est.reg.titulo": "🎓 Entrar como estudiante",
   "est.reg.bajada": "Con el código que te dio Symphomed. Sirve una sola vez: queda a tu nombre.",
   "est.reg.codigo": "Código de invitación",
@@ -57,4 +57,26 @@ Object.assign(I18N.es, {
   "tutor.enf.estudio": "Intervención clave:",
   "tutor.enf.faltoPreguntar": "Faltó valorar",
   "tutor.enf.errPrincipal": "Escribí tu diagnóstico de enfermería prioritario antes de comparar.",
+});
+
+Object.assign(I18N.es, {
+  "est.abierto.navegador": "Si Google no abre dentro de TikTok o Instagram, abrí este enlace en Chrome o Safari desde el menú de la aplicación.",
+  "est.abierto.titulo": "Estudiá con Symphomed",
+  "est.abierto.oferta": "Entrá con Google y probá gratis durante 3 días, con 15 minutos de audio en total. Sin invitación y sin tarjeta.",
+  "est.abierto.audio": "Durante la prueba, el audio se transcribe al finalizar. Si supera el cupo restante, solo se procesa ese tramo. Usá casos de práctica sin datos identificables.",
+  "est.abierto.tengoCodigo": "Ya tengo un código de invitación",
+  "est.abierto.elegir": "Después de entrar con Google, elegí Estudiante y completá tu perfil.",
+  "est.abierto.noDisponible": "El registro con Google no está disponible en este momento. Intentá más tarde.",
+  "est.abierto.verPlan": "Ver planes y continuar",
+  "est.abierto.prueba": "Tu prueba gratuita",
+  "est.abierto.restante": "Te quedan {minutos} minutos de audio y {dias} días de prueba.",
+  "est.abierto.plan": "Continuar con un plan educativo",
+  "est.abierto.pago": "Pagá con los datos de Symphomed y enviá el comprobante. El plan se activa después de confirmar el pago; no hay cobros automáticos.",
+  "est.abierto.sinPago": "Todavía no hay datos de pago configurados. Tu cuenta y tus casos se conservan.",
+  "est.abierto.comprobante": "Enviar comprobante por WhatsApp",
+  "est.abierto.volver": "Volver",
+  "est.abierto.precio": "{precio} al mes · {horas} horas de audio por mes",
+  "est.abierto.practicas": "La prueba también incluye hasta 3 pacientes virtuales y 3 simulacros.",
+  "est.abierto.cuenta": "Cuenta",
+  "est.abierto.titular": "Titular"
 });

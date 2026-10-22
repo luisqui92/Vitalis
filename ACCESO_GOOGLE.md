@@ -79,3 +79,7 @@ Antes de activar para todos, probar en un entorno de pruebas con Google configur
 Para instalar, usar el procedimiento de despliegue habitual con respaldo previo y conservación de los JavaScript ofuscados locales. Después de las comprobaciones, ofuscar con `node scripts/ofuscar.js` y reiniciar PM2. No usar `git reset --hard` sobre el servidor.
 
 Para deshabilitar solo Google, vaciar `GOOGLE_LOGIN_CLIENT_ID` y reiniciar. Las cuentas antiguas siguen entrando por contraseña, pero las nuevas creadas solo con Google necesitarán que se reactive Google. No retirar el acceso sin contemplar esas cuentas.
+
+## Registro educativo abierto
+
+La inscripción educativa ya no exige invitación: Google permite iniciar una prueba de 3 días y 15 minutos totales. Los códigos anteriores siguen siendo opcionales. Ver [REGISTRO_ESTUDIANTES_ABIERTO.md](REGISTRO_ESTUDIANTES_ABIERTO.md).

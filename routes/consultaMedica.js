@@ -163,6 +163,9 @@ module.exports = function (app) {
     if (saldo.bloqueado) {
       throw new ErrorHttp(402, `Tu saldo llegó al límite (Bs ${saldo.saldoBs}). Cargá saldo para seguir transcribiendo consultas.`);
     }
+    const opciones = { req };
+    await extensiones.revisar("vistaPrevia.configurar", opciones);
+    if (opciones.sinVistaPrevia) return res.json({ sinVistaPrevia: true });
     res.json({ pase: await vistaPrevia.emitirPase(req.adminUser), ruta: vistaPrevia.RUTA });
   }));
 
@@ -245,9 +248,12 @@ module.exports = function (app) {
     // (services/audioPendiente.js). El id se elige antes para que el audio
     // exista antes que la consulta: nunca hay una «procesando» sin su audio.
     const consultaId = new mongoose.Types.ObjectId();
+    const contextoAudio = { req, consultaId };
+    await extensiones.revisar("audio.reservar", contextoAudio);
     try {
       await audioPendiente.guardar(consultaId, audioBuffer);
     } catch (e) {
+      await extensiones.revisar("audio.descartar", contextoAudio);
       log.error("[CONSULTA_MEDICA] no se pudo guardar el audio en disco:", e.message);
       throw new ErrorHttp(503, "No se pudo guardar el audio. Probá de nuevo en un rato: la grabación sigue en el teléfono.");
     }
@@ -256,9 +262,11 @@ module.exports = function (app) {
       consulta = await ConsultaMedica.create({
         _id: consultaId, medicoPhone, pacienteId: paciente._id, pacienteNombre: paciente.nombre, estado: "procesando",
         ...extensiones.sumar("consulta.alCrear", req),
+        limitesAudio: contextoAudio.limitesAudio,
       });
     } catch (e) {
       await audioPendiente.borrar(consultaId).catch(() => {});
+      await extensiones.revisar("audio.descartar", contextoAudio);
       throw e;
     }
     await vistaPrevia.vincular(req.vistaPrevia, consulta._id)
@@ -1255,7 +1263,7 @@ async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { mult
       medicamentosDelMedico(medicoPhone), adaptacion.vocabularioParaTranscribir(medicoPhone),
     ]);
     const inicioTranscripcion = Date.now();
-    t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico, propios });
+    t = await transcribirConsultaMedica(audioBuffer, medicoParaVocabulario?.tipoEspecialidad, medicoParaVocabulario?.idioma, { multicanal, delMedico, propios, maxSegundos: consulta.limitesAudio?.segundos });
     transcripcionMs = Date.now() - inicioTranscripcion;
     duracionSegundos = t.duracionSegundos;
   } catch (e) {
@@ -1273,6 +1281,8 @@ async function transcribirEnSegundoPlano(consulta, paciente, audioBuffer, { mult
   } catch (e) {
     return fallaDeTranscripcion(consulta, { intento }, e);
   }
+  await extensiones.revisar("audio.completar", { consulta, duracionSegundos })
+    .catch(() => log.warn("[CONSULTA_MEDICA] Cupo pendiente de conciliación; la transcripción ya está guardada."));
   // La transcripción ya está guardada: el audio no hace falta más.
   await audioPendiente.borrar(consulta._id).catch(e => log.error("[CONSULTA_MEDICA] no se pudo borrar el audio:", e.message));
 

@@ -88,7 +88,7 @@ async function subirAudio(audioBuffer) {
 // multichannel y speaker_labels no van juntos, y está bien que no vayan:
 // pedir diarización sobre un audio donde ya sabés quién es quién es pedirle
 // al modelo que dude de un dato que ya tenés.
-async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false, delMedico = [], propios = [] } = {}) {
+async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal = false, delMedico = [], propios = [], maxSegundos } = {}) {
   const lang = idiomaSoportado(idioma);
   const conMedicalMode = IDIOMAS_CON_MEDICAL_MODE.includes(lang);
   if (!conMedicalMode) {
@@ -101,6 +101,7 @@ async function pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multican
     "https://api.assemblyai.com/v2/transcript",
     {
       audio_url: audioUrl,
+      ...(Number.isFinite(maxSegundos) && maxSegundos > 0 ? { audio_end_at: Math.floor(maxSegundos * 1000) } : {}),
       language_code: lang,
       ...(multicanal ? { multichannel: true } : { speaker_labels: true }),
       // Un RANGO, no un número exacto. Antes iba speakers_expected: 2, con el
@@ -171,13 +172,13 @@ function quienSegunCanal(canal) {
   return "";
 }
 
-async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false, delMedico = [], propios = [] } = {}) {
+async function transcribirConsultaMedica(audioBuffer, tipoEspecialidad, idioma, { multicanal = false, delMedico = [], propios = [], maxSegundos } = {}) {
   if (!CONFIG.ASSEMBLYAI_API_KEY) {
     throw new Error("ASSEMBLYAI_API_KEY no configurado");
   }
 
   const audioUrl = await subirAudio(audioBuffer);
-  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal, delMedico, propios });
+  const id = await pedirTranscripcion(audioUrl, tipoEspecialidad, idioma, { multicanal, delMedico, propios, maxSegundos });
   const data = await esperarTranscripcion(id);
 
   const segmentos = (data.utterances || []).map(u => ({

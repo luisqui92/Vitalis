@@ -44,6 +44,15 @@ const codigoEstudianteSchema = new mongoose.Schema({
 }, { timestamps: true });
 const CodigoEstudiante = mongoose.model("CodigoEstudiante", codigoEstudianteSchema);
 
+// Se conserva tras vencer la prueba: entrar otra vez no regala otro cupo.
+const pruebaSchema = new mongoose.Schema({
+  _id: String, // sub verificado por Google, no enviado por el formulario
+  phone: { type: String, unique: true, required: true },
+  desde: Date, hasta: Date, segundos: Number, usados: { type: Number, default: 0 },
+  reservaConsulta: { type: String, default: "" }, reservaSegundos: Number, reservaEn: Date,
+}, { timestamps: true });
+const PruebaEstudiante = mongoose.model("PruebaEstudiante", pruebaSchema);
+
 // ─── TARJETAS DE ESTUDIO (ver estudio.js) ──────────────────────────────────
 //
 // Las preguntas de repaso de un estudiante, hechas con SUS casos: salen del
@@ -291,6 +300,6 @@ candadoSchema.index({ hasta: 1 }, { expireAfterSeconds: 3600 });
 const Candado = mongoose.model("CandadoEstudiante", candadoSchema);
 
 module.exports = {
-  CodigoEstudiante, RazonamientoDiagnostico, RachaEstudio, TarjetaEstudio,
+  PruebaEstudiante, CodigoEstudiante, RazonamientoDiagnostico, RachaEstudio, TarjetaEstudio,
   CasoVirtual, SimulacionPaciente, PreguntaSimulacro, Simulacro, Candado,
 };

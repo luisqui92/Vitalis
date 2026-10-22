@@ -79,6 +79,7 @@ function renderPerfilGoogle(perfil) {
     <button class="link" id="gExistente">${t("google.existente")}</button>
     <div class="hint">${t("google.existenteAyuda")}</div>
   </div>`;
+  perfiles.forEach(p => { if (p.alPintar) p.alPintar(); });
   const tipo = document.getElementById("gTipo");
   document.querySelectorAll('input[name="gTipo"]').forEach(radio => {
     radio.onchange = () => { tipo.value = radio.value; tipo.onchange(); };

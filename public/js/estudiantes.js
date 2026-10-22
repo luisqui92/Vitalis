@@ -44,7 +44,26 @@ const ICONOS_ESTUDIANTE = {
 };
 
 // ─── ENTRAR CON UN CÓDIGO ──────────────────────────────────────────────────
-function renderRegistroEstudiante() {
+async function renderRegistroEstudiante() {
+  detenerPolling();
+  app.innerHTML = `<div class="card reg-card"><h2>${t("est.abierto.titulo")}</h2><p>${t("est.abierto.oferta")}</p><p class="hint">${t("est.abierto.audio")}</p>
+    <p class="hint">${t("est.abierto.navegador")}</p><p class="hint">${t("est.abierto.practicas")}</p>
+    <div id="estRegistroAbierto"><p>${t("google.cargando")}</p></div>
+    <button class="link" id="estTengoCodigo">${t("est.abierto.tengoCodigo")}</button>
+    <button class="link" id="estYaTengoCuenta">${t("auth.reg.irLogin")}</button>${selectorIdiomaHtml()}</div>`;
+  document.getElementById("estTengoCodigo").onclick = renderRegistroEstudianteInvitacion;
+  document.getElementById("estYaTengoCuenta").onclick = renderLogin;
+  cablearSelectorIdioma(renderRegistroEstudiante);
+  const caja = document.getElementById("estRegistroAbierto");
+  try {
+    const c = await api("/medico/estudiante/registro-config");
+    if (!caja.isConnected) return;
+    if (!c.disponible) { caja.textContent = t("est.abierto.noDisponible"); return; }
+    caja.innerHTML = `<div id="googleEntrada"></div><p class="hint">${t("est.abierto.elegir")}</p>`;
+    await pintarBotonGoogle();
+  } catch (_) { if (caja.isConnected) caja.textContent = t("est.abierto.noDisponible"); }
+}
+function renderRegistroEstudianteInvitacion() {
   detenerPolling();
   app.innerHTML = `
     <div class="card reg-card">
@@ -102,7 +121,9 @@ function avisoEstudianteHtml(e) {
   const fecha = e.hasta ? new Date(e.hasta).toLocaleDateString(localeActual()) : "";
   // Medicina, como siempre; las otras carreras dicen cuál es.
   const nivel = t("est.nivel." + e.nivel) + (e.carrera && e.carrera !== "medicina" ? " · " + t("est.carrera." + e.carrera) : "");
-  if (e.bloqueado) return `<div class="error est-aviso" style="margin-top:0">⚠️ ${esc(e.motivo)}</div>`;
+  const continuar = `<button type="button" class="primary" id="estVerPlan">${t("est.abierto.verPlan")}</button>`;
+  if (e.prueba) return `<div class="card est-aviso"><strong>${t("est.abierto.prueba")}</strong><p>${t("est.abierto.restante", { minutos: Math.floor(e.segundosRestantes / 60), dias: e.diasRestantes })}</p><p class="hint">${t("est.abierto.audio")}</p>${e.bloqueado ? `<p>${esc(e.motivo)}</p>` : ""}${continuar}</div>`;
+  if (e.bloqueado) return `<div class="error est-aviso" style="margin-top:0">⚠️ ${esc(e.motivo)}${continuar}</div>`;
   const porVencer = e.diasRestantes <= 7;
   return `<div class="card card-secundaria est-aviso"${porVencer ? ` style="border-color:var(--warning)"` : ""}>
     <div><b>🎓 ${esc(nivel)}</b> · ${t(porVencer ? "est.aviso.venceProntoEl" : "est.aviso.venceEl", { fecha: esc(fecha), dias: e.diasRestantes })}</div>
@@ -132,6 +153,8 @@ async function pintarAvisoEstudiante() {
   const hueco = document.getElementById("estAvisoInicio");
   if (!hueco) return;
   hueco.innerHTML = avisoEstudianteHtml(e) + (ESTUDIANTES_PRENDIDO ? estudioInicioHtml(estudio) : "");
+  const plan = document.getElementById("estVerPlan");
+  if (plan) plan.onclick = renderPlanEstudiante;
   const ir = document.getElementById("estIrEstudiar");
   if (ir) ir.onclick = () => renderEstudiar();
 }
@@ -218,13 +241,41 @@ if (ESTUDIANTES_PRENDIDO) {
 // El núcleo ofrece el formulario; el módulo conserva sus campos y su ruta.
 Extensiones.agregar("registro.google", perfiles => ESTUDIANTES_PRENDIDO ? [...perfiles, {
   id: "estudiante", titulo: t("google.estudiante"), ruta: "/medico/registro-estudiante",
-  html: `<label for="gCodigo">${t("google.codigo")}</label>
+  html: `<p>${t("est.abierto.oferta")}</p><p class="hint">${t("est.abierto.audio")}</p><details><summary>${t("est.abierto.tengoCodigo")}</summary><label for="gCodigo">${t("google.codigo")}</label>
     <input id="gCodigo" autocomplete="off" placeholder="EST-AB12CD" maxlength="30">
-    <div class="hint">${t("google.codigoAyuda")}</div>
+    <div class="hint">${t("google.codigoAyuda")}</div></details>
     <label for="gCarrera">${t("perfil.carrera")}</label><select id="gCarrera"><option value="">${t("perfil.seleccionar")}</option>${["medicina", "enfermeria", "odontologia"].map(c => `<option value="${c}">${t("est.carrera." + c)}</option>`).join("")}</select>
     <label for="gNivel">${t("perfil.nivel")}</label><select id="gNivel"><option value="">${t("perfil.seleccionar")}</option>${["estudiante", "interno", "residente"].map(n => `<option value="${n}">${t("est.nivel." + n)}</option>`).join("")}</select>
     <label for="gUniversidad">${t("perfil.universidad")}</label><input id="gUniversidad" maxlength="120">
     <label for="gPeriodo">${t("perfil.periodo")}</label><input id="gPeriodo" maxlength="40">`,
+  alPintar: () => {
+    const carrera = document.getElementById("gCarrera"), nivel = document.getElementById("gNivel");
+    carrera.onchange = () => {
+      const residente = nivel.querySelector('option[value="residente"]');
+      residente.disabled = carrera.value !== "medicina";
+      if (residente.disabled && nivel.value === "residente") nivel.value = "";
+    };
+    carrera.onchange();
+  },
   datos: () => ({ codigo: document.getElementById("gCodigo").value.trim(), carrera: document.getElementById("gCarrera").value,
     nivel: document.getElementById("gNivel").value, universidad: document.getElementById("gUniversidad").value.trim(), periodo: document.getElementById("gPeriodo").value.trim() }),
 }] : perfiles);
+
+async function renderPlanEstudiante() {
+  detenerPolling();
+  app.innerHTML = `<div class="card" id="estPlanCaja"><p>${t("google.cargando")}</p></div>`;
+  const caja = document.getElementById("estPlanCaja");
+  try {
+    const d = await api("/medico/estudiante/plan"); if (!caja.isConnected) return;
+    const p = d.pago, s = d.suscripcion;
+    const qr = typeof p.qr === "string" && (/^https:\/\//.test(p.qr) || /^\/(?!\/)/.test(p.qr)) ? p.qr : "";
+    const whatsapp = String(p.whatsapp || "").replace(/\D/g, "");
+    caja.innerHTML = `<h2>${t("est.abierto.plan")}</h2><p>${t("est.abierto.precio", { precio: esc(s.precios.mensualTexto), horas: s.horasMes })}</p>
+      <p>${t(p.configurado ? "est.abierto.pago" : "est.abierto.sinPago")}</p>
+      ${p.configurado ? `${qr ? `<img src="${esc(qr)}" alt="QR" style="max-width:100%;width:240px">` : ""}<p>${esc(p.banco || "")}<br>${t("est.abierto.cuenta")}: ${esc(p.cuenta || "")}<br>${t("est.abierto.titular")}: ${esc(p.titular || "")}</p>` : ""}
+      ${whatsapp ? `<a class="primary" href="https://wa.me/${whatsapp}" target="_blank" rel="noopener noreferrer">${t("est.abierto.comprobante")}</a>` : ""}
+      <button type="button" class="link" id="estPlanVolver">${t("est.abierto.volver")}</button>`;
+    document.getElementById("estPlanVolver").onclick = irAPantallaInicial;
+  } catch (e) { if (caja.isConnected) caja.innerHTML = `<p class="error">${esc(e.error || t("google.error"))}</p><button type="button" class="link" id="estPlanVolver">${t("est.abierto.volver")}</button>`;
+    const volver = document.getElementById("estPlanVolver"); if (volver) volver.onclick = irAPantallaInicial; }
+}

@@ -233,6 +233,8 @@ const medicoSchema = new mongoose.Schema({
       hasta: { type: Date, default: null },
       // Horas de audio por mes calendario: es lo que cuesta.
       horasMes: { type: Number, default: 0 },
+      prueba: { id: String, activa: Boolean, desde: Date, segundos: Number },
+      pagosReferencias: [String],
       codigo: { type: String, default: "" },
       universidad: { type: String, default: "" },
     },
@@ -578,6 +580,7 @@ const consultaMedicaSchema = new mongoose.Schema({
   pacienteNombre: { type: String, default: "" }, // copia del nombre al momento de crear, para no tener que hacer join en las listas
   estado: { type: String, enum: ["procesando", "completado", "error"], default: "procesando", index: true },
   duracionSegundos: Number,
+  limitesAudio: { id: String, segundos: Number },
   transcripcionCompleta: String,
   segmentos: [{
     hablante: String,   // "A", "B"... según lo que detecta AssemblyAI (no sabe cuál es médico/paciente)

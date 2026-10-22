@@ -491,8 +491,9 @@ async function vista(s, ahora = new Date()) {
 }
 
 async function cupoDe(medico, ahora = new Date()) {
-  const limite = NIVELES[medico?.estudiante?.nivel]?.simulacrosMes || 0;
-  const usados = await Simulacro.countDocuments({ medicoPhone: medico.phone, createdAt: { $gte: inicioDelMes(ahora) }, estado: { $ne: "error" } });
+  const prueba = medico?.estudiante?.prueba;
+  const limite = prueba?.activa ? 3 : NIVELES[medico?.estudiante?.nivel]?.simulacrosMes || 0;
+  const usados = await Simulacro.countDocuments({ medicoPhone: medico.phone, createdAt: { $gte: prueba?.activa ? prueba.desde : inicioDelMes(ahora) }, estado: { $ne: "error" } });
   return { usados, limite, quedan: Math.max(0, limite - usados) };
 }
 

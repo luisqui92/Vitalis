@@ -255,6 +255,8 @@ async function alertaDelKardex({ medicoPhone, paciente, idioma }) {
 }
 
 function montar(app) {
+  require("./prueba").montar(extensiones);
+  require("./planes").montar(extensiones);
   app.use(middlewareEstudiantes);
   extensiones.enganchar("sesion.token", marcaDelToken);
   extensiones.enganchar("sesion.datos", datosDeLaSesion);

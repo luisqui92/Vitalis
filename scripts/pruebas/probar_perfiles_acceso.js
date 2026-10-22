@@ -79,7 +79,7 @@ const aprobar="POST /medico/solicitudes-cuenta/:phone/aprobar", rechazar="POST /
     assert.equal(models.Clinica.schema.obj.suscripcion.ambito,undefined);
   });
   await test("un plan educativo conservado no financia uso clínico tras la conversión",()=>{
-    const planes=cargar("services/suscripciones.js",{"./monedas":{}});
+    const planes=cargar("services/suscripciones.js",{"./monedas":{},"./extensiones":{sumar:()=>({})}});
     const plan={ambito:"educativo",hasta:new Date(Date.now()+86400000)};
     assert.equal(planes.vigente({suscripcion:plan,estudiante:{nivel:"estudiante"}}),true);
     assert.equal(planes.vigente({suscripcion:plan,perfilAcceso:"profesional"}),false);

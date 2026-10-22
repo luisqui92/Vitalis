@@ -41,6 +41,7 @@ const { notificarMedico } = require("../services/push");
 const saldos = require("../services/saldo");
 const monedas = require("../services/monedas");
 const suscripciones = require("../services/suscripciones");
+const extensiones = require("../services/extensiones");
 const { datosDePago, guardarDatosDePago, normalizarPais } = require("../services/datosPago");
 const { log } = require("../config");
 
@@ -562,6 +563,9 @@ module.exports = function (app) {
 
     const medico = await Medico.findOne({ phone: destino });
     if (!medico) throw new ErrorHttp(404, "No encontramos ese médico");
+    const activacion = { medico, plan, referencia, quien, req };
+    await extensiones.revisar("suscripcion.activar", activacion);
+    if (activacion.respuesta) return res.json(activacion.respuesta);
 
     const moneda = monedas.normalizar(medico.moneda);
     const precio = suscripciones.precioDelPlan(plan, moneda);

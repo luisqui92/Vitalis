@@ -26,6 +26,7 @@ if (TOKEN) {
   conectarTiempoReal();
   irAPantallaInicial();
 } else {
-  renderLogin();
+  if (new URLSearchParams(location.search).get("registro") === "estudiante" && typeof renderRegistroEstudiante === "function" && ESTUDIANTES_PRENDIDO) renderRegistroEstudiante();
+  else renderLogin();
 }
 }

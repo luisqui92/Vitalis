@@ -186,6 +186,7 @@ async function pedir(ruta, req) {
     '../../../services/ratelimit': {}, '../../../services/httpHelpers': { ErrorHttp, asyncRoute: wrap },
     '../../../services/telefono': telefonos, '../../../services/zonaHoraria': { zonaPorMoneda: () => 'America/La_Paz' },
     '../../../services/sesionMedico': sesion, '../../../config': { log: { info() {} } },
+    '../prueba': { configuracion:()=>({disponible:true}), registrar: async () => { throw new ErrorHttp(503, 'Prueba cubierta en probar_registro_abierto'); } },
     '../cuenta': { normalizarCodigo: c => c || '', estadoDe: () => {} },
     '../carreras': require('../../modulos/estudiantes/carreras'), '../../../services/googleAcceso': google,
   }).registro(appAltas);
@@ -207,7 +208,7 @@ async function pedir(ruta, req) {
   await prueba('Google no permite alta profesional sin matrícula', async () => {
     assert.equal((await alta('/medico/registro', { matricula: '' })).codigo, 400);
   });
-  await prueba('Google no permite alta de estudiante sin código válido', async () => {
+  await prueba('si se proporciona una invitación, Google rechaza códigos inválidos', async () => {
     assert.equal((await alta('/medico/registro-estudiante', { codigo: 'INVALIDO' })).codigo, 400);
   });
   await prueba('el código determina carrera, nivel y acceso; la selección debe coincidir', async () => {

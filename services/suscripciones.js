@@ -34,6 +34,7 @@
 // ¿el plan está bien puesto, o hay alguien haciendo 300 consultas al mes por
 // R$ 400 mientras la transcripción y la IA se pagan por consulta?
 const monedas = require("./monedas");
+const extensiones = require("./extensiones");
 
 // Cuántos meses da cada plan. El anual son doce meses al precio de once —
 // el "mes gratis" no es un descuento suelto, es el mes trece.
@@ -122,6 +123,8 @@ function diasRestantes(medico, clinica = null, ahora = new Date()) {
 // Estado para mostrar. Devuelve siempre algo: "sin plan" es una respuesta.
 function estado(medico, clinica = null, ahora = new Date()) {
   if (clinica instanceof Date) { ahora = clinica; clinica = null; }
+  const propio = extensiones.sumar("suscripcion.estado", { medico, ahora }).suscripcion;
+  if (propio) return propio;
   const quien = titularDelPlan(medico, clinica, ahora);
   const s = quien ? quien.titular.suscripcion : {};
   const activa = Boolean(quien);

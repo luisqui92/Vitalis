@@ -112,13 +112,17 @@ async function segundosDelMes(medicoPhone, ahora, sinVistaPrevia) {
 async function estadoDe(medico, ahora = new Date(), { sinVistaPrevia = null } = {}) {
   if (!esEstudiante(medico)) return null;
   const e = medico.estudiante;
-  const segundosUsados = Math.round(await segundosDelMes(medico.phone, ahora, sinVistaPrevia));
+  const prueba = e.prueba?.activa ? await require("./prueba").estado(medico) : null;
+  const segundosUsados = prueba ? prueba.usados : Math.round(await segundosDelMes(medico.phone, ahora, sinVistaPrevia));
   const horasMes = Number(e.horasMes) || NIVELES[e.nivel]?.horasMes || 0;
   const hasta = e.hasta ? new Date(e.hasta) : null;
   const vencido = accesoVencido(medico, ahora);
   const sinHoras = horasMes > 0 && segundosUsados >= horasMes * 3600;
   const diasRestantes = hasta ? Math.max(0, Math.ceil((hasta - ahora) / 86400000)) : 0;
   return {
+    prueba: Boolean(prueba), procesando: Boolean(prueba?.procesando),
+    segundosRestantes: Math.max(0, horasMes * 3600 - segundosUsados),
+    segundosTotales: horasMes * 3600,
     nivel: e.nivel,
     carrera: carreraDe(medico),
     hasta,
@@ -128,7 +132,7 @@ async function estadoDe(medico, ahora = new Date(), { sinVistaPrevia = null } = 
     vencido,
     sinHoras,
     bloqueado: vencido || sinHoras,
-    motivo: vencido
+    motivo: prueba?.procesando ? "Tu audio se está procesando. Esperá a que termine antes de grabar otro." : prueba && (vencido || sinHoras) ? "Terminó tu tiempo o cupo de audio de prueba. Activá un plan para seguir transcribiendo; tus casos se conservan." : vencido
       ? MOTIVO_VENCIDO
       : sinHoras
         ? `Usaste las ${horasMes} horas de audio de este mes. El mes que viene se renuevan; si necesitás más, pedíselas a Symphomed.`
