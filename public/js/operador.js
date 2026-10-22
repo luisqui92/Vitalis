@@ -741,6 +741,7 @@ async function pintarSolicitudesDeCuenta() {
 
   const pendientes = datos.pendientes || [];
   const recientes = (datos.recientes || []).map(r => `<div class="sol-item"><strong>${esc(r.nombre)}</strong> · ${t("perfil.solicitud." + (r.solicitud?.estado || r.estadoCuenta))}<br>
+    <p>${avisoCuentaHtml(r)}</p>
     ${t("perfil.revisor")}: ${esc(r.solicitud?.resueltaPor || "")} · ${esc(r.solicitud?.resueltaEn ? new Date(r.solicitud.resueltaEn).toLocaleString() : "")}
     ${r.verificacionProfesional?.referencia ? `<p>${esc(r.verificacionProfesional.metodo)} · ${esc(r.verificacionProfesional.referencia)}</p>` : ""}
     ${r.solicitud?.motivo ? `<p>${esc(r.solicitud.motivo)}</p>` : ""}</div>`).join("");
@@ -750,8 +751,24 @@ async function pintarSolicitudesDeCuenta() {
     ${recientes ? `<details><summary>${t("perfil.recientes")}</summary>${recientes}</details>` : ""}</div>`;
 
   pendientes.forEach(s => engancharSolicitudCuenta(s));
+  caja.querySelectorAll("[data-reenviar-correo]").forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        await api(`/medico/solicitudes-cuenta/${encodeURIComponent(btn.dataset.reenviarCorreo)}/reenviar-correo`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avisoId: btn.dataset.aviso }),
+        });
+        await pintarSolicitudesDeCuenta();
+      } catch (e) { btn.disabled = false; alert(e.error || t("google.error")); }
+    };
+  });
 }
 
+function avisoCuentaHtml(s) {
+  const a = s.solicitud?.correo;
+  return `${t("perfil.correo")}: ${t("perfil.correo." + (a?.estado || "sin_aviso"))}${a && ["error", "expirado", "sin_correo"].includes(a.estado) ?
+    ` <button type="button" class="secondary" data-reenviar-correo="${esc(s.phone)}" data-aviso="${esc(a.id)}">${t("perfil.reenviarCorreo")}</button>` : ""}`;
+}
 function solicitudCuentaHtml(s) {
   const dias = s.solicitud?.pedidaEn
     ? Math.floor((Date.now() - new Date(s.solicitud.pedidaEn)) / 86400000)
@@ -766,6 +783,7 @@ function solicitudCuentaHtml(s) {
       </div>
       ${s.solicitud?.mensaje ? `<div class="sol-mensaje">${esc(s.solicitud.mensaje)}</div>` : ""}
       <p>${esc(s.googleEmail || "")} · ${t(s.telefonoVerificado ? "perfil.telefonoVerificado" : "perfil.sinTelefonoVerificado")}</p>
+      <p>${avisoCuentaHtml(s)}</p>
       ${s.solicitud?.tipo === "conversion" ? `<p><strong>${t("perfil.conversion")}</strong></p>` : ""}
       <p>${esc(s.solicitud?.profesion || "")} · ${esc(s.solicitud?.pais || "")} · ${esc(s.solicitud?.etapa || "")}</p>
       ${!s.solicitud?.pais ? `<label>${t("perfil.pais")}<input data-pais maxlength="2"></label>` : ""}

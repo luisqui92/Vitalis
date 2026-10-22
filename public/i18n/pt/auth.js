@@ -60,7 +60,7 @@ Object.assign(I18N.pt, {
   "auth.reg.hito2": "Estamos revisando",
   "auth.reg.hito2Detalle": "Quem olha é uma pessoa, não um sistema. Costuma levar menos de um dia útil.",
   "auth.reg.hito3": "Avisamos e você entra",
-  "auth.reg.hito3Detalle": "Escrevemos pelo WhatsApp no número que você informou. Você entra com esse mesmo telefone e sua senha.",
+  "auth.reg.hito3Detalle": "Entre novamente para consultar o estado. No acesso anterior, use telefone e senha; com Google, sua conta vinculada.",
   "auth.reg.entendido": "Entendi",
   "auth.reg.boton": "Criar conta",
   "auth.reg.irLogin": "Já tenho conta, entrar",

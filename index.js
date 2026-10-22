@@ -408,6 +408,7 @@ require("./routes/informes").congelarInformesFirmados()
 
 // Copias de seguridad automáticas. Va acá, después de levantar el servidor,
 // para que un problema con los respaldos nunca impida que Symphomed atienda.
+require("./services/correosCuenta").programar();
 require("./services/backup").programar();
 require("./services/recordatorioMedicamento").programar();
 require("./services/alertaRetiroGanado").programar();

@@ -15,7 +15,7 @@ El teléfono continúa como clave interna de los datos existentes. Google añade
 
 El teléfono del formulario queda sin verificar. No se ofrece recuperación automática por ese dato. Las cuentas creadas exclusivamente con Google usan la recuperación oficial de Google; los endpoints de aprobar y usar restablecimientos impiden emitir/usar un cambio de contraseña basado en un teléfono no verificado para esas cuentas. Una cuenta previa vinculada mantiene su recuperación habitual con revisión de operador.
 
-La verificación por WhatsApp se implementa en el flujo descrito en [PERFILES_VERIFICADOS.md](PERFILES_VERIFICADOS.md), con OTP, límites y plantilla de autenticación de Meta. Requiere configurar y probar el proveedor. No marcar `telefonoVerificado` manualmente solo porque se completó el formulario. Tampoco se incluye cambiar/desvincular la identidad Google desde la pantalla: un reemplazo de identidad necesita un flujo de reautenticación y recuperación propio.
+El acceso Google no exige otro código por correo ni WhatsApp. El teléfono se conserva como contacto sin verificar; completarlo no habilita recuperación. Los avisos de revisión llegan al correo verificado por Google cuando se configura el proveedor, según [PERFILES_VERIFICADOS.md](PERFILES_VERIFICADOS.md). Tampoco se incluye cambiar/desvincular la identidad Google desde la pantalla: un reemplazo de identidad necesita un flujo de reautenticación y recuperación propio.
 
 El 2FA de Symphomed se mantiene al entrar con Google. Las cuentas Google sin contraseña confirman el código actual del autenticador, dentro de una sesión autenticada, para desactivarlo; las cuentas antiguas mantienen la confirmación por contraseña.
 

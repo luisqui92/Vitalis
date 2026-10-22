@@ -140,7 +140,7 @@ module.exports = function (app) {
     // contraseña que ya estaba bien.
     if (medico.estadoCuenta === "pendiente") {
       registrar({ req, medicoPhone: phone, accion: "login_pendiente", exito: false });
-      throw new ErrorHttp(403, "Tu solicitud todavía está en revisión. Te avisamos por WhatsApp apenas la aprobemos.");
+      throw new ErrorHttp(403, "Tu solicitud todavía está en revisión. Consultá su estado al volver a ingresar.");
     }
     if (medico.estadoCuenta === "rechazada") {
       registrar({ req, medicoPhone: phone, accion: "login_rechazada", exito: false });

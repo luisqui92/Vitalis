@@ -74,9 +74,8 @@ const ESCRITURA_PERMITIDA = [
   // Entrar (no usan el token, pero puede viajar uno viejo).
   ["POST", ruta("login")], ["POST", ruta("login/2fa")], ["POST", ruta("registro-estudiante")],
   ["POST", ruta("google/(iniciar|entrar|vincular)")],
-  ["POST", ruta("google/solicitud/(actualizar|telefono/(enviar|confirmar))")],
+  ["POST", ruta("google/solicitud/actualizar")],
   ["POST", ruta("perfil-acceso/solicitar-profesional")],
-  ["POST", ruta("telefono/(enviar|confirmar)")],
   // Su cuenta.
   ["PATCH", ruta("idioma")],
   ["POST", ruta("2fa/(iniciar|confirmar|desactivar)")],

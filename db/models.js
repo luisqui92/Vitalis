@@ -263,6 +263,17 @@ const medicoSchema = new mongoose.Schema({
     tipo: { type: String, enum: ["alta", "conversion"] },
     estado: { type: String, enum: ["pendiente", "aprobada", "rechazada"] },
     revision: { type: String, default: "" },
+    // Último aviso: una decisión sustituye un aviso de recepción aún pendiente.
+    correo: {
+      type: {
+        id: String,
+        tipo: { type: String, enum: ["recibida", "aprobada", "corregir"] },
+        estado: { type: String, enum: ["pendiente", "enviando", "enviado", "error", "sin_correo", "expirado"] },
+        intentos: Number, proximoIntento: Date, iniciadoEn: Date, enviadoEn: Date,
+        bloqueo: String, destino: String, idioma: String, ingreso: String, remitente: String, proveedorId: String,
+      },
+      default: undefined,
+    },
     pais: String, profesion: String, matricula: String, tipoEspecialidad: String, etapa: String,
     pedidaEn: { type: Date, default: null },
     // Lo que la persona escribe sobre sí misma. Es lo único que quien
@@ -404,6 +415,7 @@ medicoSchema.set("toJSON", {
     return ret;
   },
 });
+medicoSchema.index({ "solicitud.correo.estado": 1, "solicitud.correo.proximoIntento": 1 });
 const Medico = mongoose.model("Medico", medicoSchema);
 
 // Paciente: la entidad central del Kardex. Todo lo demás (consultas,

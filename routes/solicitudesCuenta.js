@@ -29,10 +29,8 @@ const { esOperador } = require("../services/operadores");
 const { registrar } = require("../services/auditoria");
 const { limitMedico } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
-const { enviarTextoOPlantilla, normalizarDestino, PLANTILLAS } = require("../services/metaWhatsapp");
-const { CONFIG, log } = require("../config");
-const { pendiente, filtroRevision, revisionProfesional } = require("../services/perfilesCuenta");
-const { esCuentaBrasil } = require("../services/idiomas");
+const { log } = require("../config");
+const { pendiente, filtroRevision, revisionProfesional, nuevoAvisoCuenta } = require("../services/perfilesCuenta");
 
 // Igual que el panel de pagos: acá entra también una cuenta administrativa,
 // porque quien administra Symphomed no tiene por qué ser médico.
@@ -76,29 +74,6 @@ async function traerSolicitud(phone) {
   return medico;
 }
 
-async function avisarCuentaAprobada(medico) {
-  const esBrasil = esCuentaBrasil(medico);
-  const destino = normalizarDestino(medico.phone, esBrasil ? "BR" : "BO");
-  if (!destino) throw new Error("la cuenta no tiene un teléfono válido");
-
-  const nombre = medico.nombre || "Profesional";
-  const ingreso = CONFIG.APP_URL || "https://app.symphomed.com";
-  const portugues = medico.idioma === "pt";
-  const texto = portugues
-    ? `Olá ${nombre}, sua conta da Symphomed foi aprovada.\n\nVocê já pode entrar em ${ingreso} com o telefone que cadastrou.\n\nPor segurança, não compartilhe sua senha.`
-    : `Hola ${nombre}, tu cuenta de Symphomed fue aprobada.\n\nYa podés ingresar en ${ingreso} con el teléfono que registraste.\n\nPor seguridad, no compartas tu contraseña.`;
-
-  // Meta rechazó la variante pt_BR de esta plantilla en esta cuenta.
-  // Dentro de las 24 h se mantiene el texto libre en portugués; fuera de la
-  // ventana se usa la plantilla española aprobada para no perder el aviso.
-  const resultado = await enviarTextoOPlantilla(destino, texto, {
-    plantilla: PLANTILLAS.cuentaAprobada,
-    parametros: [nombre, ingreso],
-    idioma: "es",
-  });
-  if (!resultado) throw new Error("WhatsApp Meta no está configurado");
-}
-
 module.exports = function (app) {
 
   // ─── LA FILA ───────────────────────────────────────────────────────────
@@ -120,6 +95,23 @@ module.exports = function (app) {
     res.json({ pendientes, recientes });
   }));
 
+  // Reenvío explícito por el mismo operador autorizado, sin cambiar permisos.
+  app.post("/medico/solicitudes-cuenta/:phone/reenviar-correo", limitMedico, requireSesion, requireAprobador, asyncRoute(async (req, res) => {
+    const m = await traerSolicitud(req.params.phone), aviso = m.solicitud?.correo;
+    if (!aviso || !["error", "expirado", "sin_correo"].includes(aviso.estado) || req.body?.avisoId !== aviso.id) {
+      throw new ErrorHttp(409, "El aviso cambió o no necesita reenvío. Actualizá el panel.");
+    }
+    if (!m.googleSub || !m.googleEmail) throw new ErrorHttp(409, "Esta cuenta no tiene un correo Google verificado.");
+    const reciente = aviso.iniciadoEn && Date.now() - new Date(aviso.iniciadoEn).getTime() < 23 * 3600 * 1000;
+    const campos = reciente
+      ? { "solicitud.correo.estado": "pendiente", "solicitud.correo.intentos": 0, "solicitud.correo.proximoIntento": new Date() }
+      : { "solicitud.correo": nuevoAvisoCuenta(aviso.tipo) };
+    const r = await Medico.updateOne({ _id: m._id, "solicitud.correo.id": aviso.id, "solicitud.correo.estado": aviso.estado }, { $set: campos });
+    if (!r.modifiedCount) throw new ErrorHttp(409, "El aviso cambió. Actualizá el panel.");
+    registrar({ req, medicoPhone: req.adminUser.usuario, accion: "cuenta_correo_reintento", recurso: `Medico:${m.phone}` });
+    res.json({ ok: true });
+  }));
+
   // ─── APROBAR ───────────────────────────────────────────────────────────
   app.post("/medico/solicitudes-cuenta/:phone/aprobar", limitMedico, requireSesion, requireAprobador, asyncRoute(async (req, res) => {
     const quien = req.adminUser.usuario;
@@ -133,7 +125,7 @@ module.exports = function (app) {
       estadoCuenta: "aprobada", activo: true, perfilAcceso: "profesional", verificacionProfesional: verificacion,
       matricula: verificacion.matricula, tipoEspecialidad: verificacion.tipoEspecialidad,
       sesionesDesde: ahora, "solicitud.estado": "aprobada", "solicitud.resueltaEn": ahora,
-      "solicitud.resueltaPor": quien, "solicitud.motivo": "",
+      "solicitud.resueltaPor": quien, "solicitud.motivo": "", "solicitud.correo": nuevoAvisoCuenta("aprobada"),
     };
     if (conversion) {
       // Conserva formación e historial, pero no convierte un plan de estudio en un plan clínico gratuito.
@@ -152,16 +144,6 @@ module.exports = function (app) {
 
     res.json({ ok: true, phone: medico.phone, nombre: medico.nombre });
 
-    // La aprobación ya quedó guardada: el aviso es importante, pero una
-    // caída de Meta no puede revertirla ni convertir la respuesta en 500.
-    avisarCuentaAprobada(medico)
-      .then(() => registrar({ req, medicoPhone: quien, accion: "cuenta_aprobada_whatsapp",
-        recurso: `Medico:${medico.phone}` }))
-      .catch((e) => {
-        registrar({ req, medicoPhone: quien, accion: "cuenta_aprobada_whatsapp",
-          recurso: `Medico:${medico.phone}`, detalle: e.message, exito: false });
-        log.error(`[CUENTAS] cuenta aprobada, pero no se pudo avisar por WhatsApp a ${medico.phone}: ${e.message}`);
-      });
   }));
 
   // ─── RECHAZAR ──────────────────────────────────────────────────────────
@@ -177,7 +159,7 @@ module.exports = function (app) {
     if (!pendiente(medico)) throw new ErrorHttp(409, "Esta solicitud ya fue resuelta. Actualizá el panel.");
     if (String(req.body?.revision ?? "") !== (medico.solicitud?.revision || "")) throw new ErrorHttp(409, "La solicitud cambió. Actualizá el panel.");
     const conversion = medico.solicitud?.tipo === "conversion";
-    const set = { "solicitud.estado": "rechazada", "solicitud.resueltaEn": new Date(), "solicitud.resueltaPor": quien, "solicitud.motivo": motivo };
+    const set = { "solicitud.correo": nuevoAvisoCuenta("corregir"), "solicitud.estado": "rechazada", "solicitud.resueltaEn": new Date(), "solicitud.resueltaPor": quien, "solicitud.motivo": motivo };
     if (!conversion) Object.assign(set, { estadoCuenta: "rechazada", activo: false, sesionesDesde: new Date() });
     const r = await Medico.updateOne(filtroRevision(medico), { $set: set });
     if (!r.modifiedCount) throw new ErrorHttp(409, "La solicitud cambió mientras la revisabas. Actualizá el panel.");

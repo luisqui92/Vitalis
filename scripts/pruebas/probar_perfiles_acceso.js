@@ -75,7 +75,7 @@ const aprobar="POST /medico/solicitudes-cuenta/:phone/aprobar", rechazar="POST /
     const models=cargar("db/models.js",{mongoose:{Schema,connect:()=>Promise.resolve(),connection:{on(){}},model:(name,schema)=>({schema,on(){}})},"../config":{CONFIG:{},log:{info(){},error(){},warn(){}}}});
     const d=models.Medico.schema.obj;
     assert.ok(d.perfilAcceso);assert.ok(d.verificacionProfesional.verificadoPor);assert.ok(d.formacion.nivelEducativoAnterior);
-    assert.ok(d.suscripcion.ambito);assert.ok(d.solicitud.revision);
+    assert.ok(d.suscripcion.ambito);assert.ok(d.solicitud.revision);assert.ok(d.solicitud.correo.type.remitente);
     assert.equal(models.Clinica.schema.obj.suscripcion.ambito,undefined);
   });
   await test("un plan educativo conservado no financia uso clínico tras la conversión",()=>{
@@ -170,6 +170,84 @@ const aprobar="POST /medico/solicitudes-cuenta/:phone/aprobar", rechazar="POST /
     assert.equal(await auth.sesionVigente({usuario:"estudiante1",rol:"medico",estudiante:true,iat:Date.now()}),true);
     assert.equal(await auth.sesionVigente({usuario:"estudiante2",rol:"medico",estudiante:true,iat:0}),false);
   });
+  await test("ninguna ruta de este flujo envía ni confirma OTP de teléfono",()=>{
+    assert.ok(!Object.keys(rutas).some(p=>/\/telefono\/(enviar|confirmar)$/.test(p)));
+    const s=fs.readFileSync(path.join(ROOT,"public/js/perfilAcceso.js"),"utf8");
+    assert.ok(!s.includes("one-time-code"));assert.ok(!s.includes("solicitud/telefono/"));
+  });
+  await test("recepción, aprobación y corrección guardan el aviso junto a la decisión",async()=>{
+    const m=await crear("avisos");assert.equal(m.solicitud.correo.tipo,"recibida");
+    assert.equal((await pedir(aprobar,m.phone,revision(m))).code,200);
+    assert.equal(Medico.docs.get(m.phone).solicitud.correo.tipo,"aprobada");
+    const otro=await crear("avisos2");await pedir(rechazar,otro.phone,{revision:otro.solicitud.revision,motivo:"Faltan datos"});
+    assert.equal(Medico.docs.get(otro.phone).solicitud.correo.tipo,"corregir");
+    assert.equal(Medico.docs.get("estudiante1").solicitud.correo.tipo,"corregir");
+    assert.equal(Medico.docs.get("editar").solicitud.correo.tipo,"recibida");
+  });
+  const MailMedico=modelo(), mailConfig={APP_URL:"https://example.test"}, enviosCorreo=[];
+  let fallaCorreo=false, antesDeResponder=null;
+  const correoDeps={"../db/models":{Medico:MailMedico},"../config":{CONFIG:mailConfig,log:{warn(){}}},axios:{post:async(url,body,options)=>{
+    enviosCorreo.push({url,body,options});if(antesDeResponder)await antesDeResponder();
+    if(fallaCorreo)throw new Error("fallo simulado");return{data:{id:"proveedor-1"}};
+  }}};
+  const correos=cargar("services/correosCuenta.js",correoDeps);
+  function nuevaCuentaCorreo(extra={}){
+    MailMedico.docs.clear();enviosCorreo.length=0;fallaCorreo=false;antesDeResponder=null;
+    const m={_id:"mail",googleSub:"google-verificado",googleEmail:"persona@example.test",activo:false,telefonoVerificado:false,
+      solicitud:perfiles.nuevaSolicitud(profesional),...extra};MailMedico.docs.set(m._id,structuredClone(m));return MailMedico.docs.get(m._id);
+  }
+  await test("sin proveedor configurado conserva el aviso pendiente sin afirmar envío",async()=>{
+    const m=nuevaCuentaCorreo();assert.equal(await correos.procesarUno(),false);assert.equal(m.solicitud.correo.estado,"pendiente");assert.equal(enviosCorreo.length,0);
+    mailConfig.RESEND_API_KEY="clave-simulada";mailConfig.CORREO_CUENTAS_REMITENTE="Symphomed <avisos@example.test>";
+  });
+  await test("dos trabajadores compiten por un único envío; correo no activa ni verifica la cuenta",async()=>{
+    const m=nuevaCuentaCorreo();await Promise.all([correos.procesarUno(),correos.procesarUno()]);
+    assert.equal(enviosCorreo.length,1);assert.equal(m.solicitud.correo.estado,"enviado");assert.equal(m.activo,false);assert.equal(m.telefonoVerificado,false);
+    assert.deepEqual(Array.from(enviosCorreo[0].body.to),["persona@example.test"]);assert.equal(enviosCorreo[0].options.maxRedirects,0);
+  });
+  await test("correo histórico sin identidad Google nunca se usa como destino verificado",async()=>{
+    const m=nuevaCuentaCorreo({googleSub:undefined,googleEmail:undefined,email:"no-verificado@example.test"});
+    await correos.procesarUno();assert.equal(m.solicitud.correo.estado,"sin_correo");assert.equal(enviosCorreo.length,0);
+  });
+  await test("reinicio y fallo de red conservan clave idempotente y contenido del envío",async()=>{
+    const m=nuevaCuentaCorreo();fallaCorreo=true;await correos.procesarUno();assert.equal(m.solicitud.correo.estado,"pendiente");
+    const primero=JSON.stringify(enviosCorreo[0]);m.solicitud.correo.proximoIntento=new Date(0);m.idioma="pt";fallaCorreo=false;
+    const reiniciado=cargar("services/correosCuenta.js",correoDeps);await reiniciado.procesarUno();
+    assert.equal(JSON.stringify(enviosCorreo[1]),primero);assert.equal(m.solicitud.correo.estado,"enviado");
+  });
+  await test("cinco fallos detienen el reintento automático sin revertir la aprobación",async()=>{
+    const m=nuevaCuentaCorreo({activo:true,estadoCuenta:"aprobada"});fallaCorreo=true;
+    for(let i=0;i<5;i++){m.solicitud.correo.proximoIntento=new Date(0);await correos.procesarUno();}
+    assert.equal(m.solicitud.correo.estado,"error");assert.equal(await correos.procesarUno(),false);assert.equal(enviosCorreo.length,5);assert.equal(m.activo,true);
+  });
+  await test("un bloqueo vencido se recupera; un aviso fuera de la ventana idempotente no se reenvía",async()=>{
+    const m=nuevaCuentaCorreo();Object.assign(m.solicitud.correo,{estado:"enviando",bloqueo:"proceso-muerto",proximoIntento:new Date(0)});
+    await correos.procesarUno();assert.equal(enviosCorreo.length,1);
+    const viejo=nuevaCuentaCorreo();viejo.solicitud.correo.iniciadoEn=new Date(Date.now()-24*3600000);
+    await correos.procesarUno();assert.equal(viejo.solicitud.correo.estado,"expirado");assert.equal(enviosCorreo.length,0);
+  });
+  await test("una respuesta tardía del proveedor no sobrescribe una nueva decisión",async()=>{
+    const m=nuevaCuentaCorreo();antesDeResponder=async()=>{m.solicitud.correo=structuredClone(perfiles.nuevoAvisoCuenta("aprobada"));};
+    await correos.procesarUno();assert.equal(m.solicitud.correo.tipo,"aprobada");assert.equal(m.solicitud.correo.estado,"pendiente");
+  });
+  await test("avisos ES/PT no incluyen datos clínicos, matrícula ni motivo del rechazo",()=>{
+    for(const lang of ["es","pt"])for(const tipo of ["recibida","aprobada","corregir"]){
+      const c=correos.contenido(tipo,lang,"https://example.test");assert.ok(c.subject);assert.ok(c.text.includes("https://example.test"));
+      assert.ok(!c.text.includes(profesional.matricula));assert.ok(!c.text.includes("Faltan datos"));
+    }
+  });
+  await test("reenvío administrativo usa los mismos controles y no modifica permisos",async()=>{
+    const ruta="POST /medico/solicitudes-cuenta/:phone/reenviar-correo";
+    assert.equal(cadenas[ruta][2],cadenas[aprobar][2]);
+    const m=await crear("reintentar",{googleSub:"g",googleEmail:"persona@example.test"}), d=Medico.docs.get(m.phone);
+    Object.assign(d.solicitud.correo,{estado:"error",intentos:5,iniciadoEn:new Date()});const id=d.solicitud.correo.id;
+    assert.equal((await pedir(ruta,m.phone,{avisoId:"obsoleto"})).code,409);
+    assert.equal((await pedir(ruta,m.phone,{avisoId:id})).code,200);assert.equal(d.solicitud.correo.id,id);
+    assert.equal(d.solicitud.correo.estado,"pendiente");assert.equal(d.activo,false);
+    assert.equal((await pedir(ruta,m.phone,{avisoId:id})).code,409);
+  });
+
+  // Servicio OTP reservado para una futura entrega: no tiene rutas activas.
   const phone="59171111111";
   let m=await crear(phone,{activo:true,estadoCuenta:"aprobada",telefonoVerificado:false});
   await test("sin plantilla WhatsApp no envía ni verifica",async()=>{

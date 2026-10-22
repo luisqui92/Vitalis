@@ -19,7 +19,12 @@ function datosProfesionales(body) {
 
 function nuevaSolicitud(datos, tipo = "alta") {
   return { ...datos, tipo, estado: "pendiente", revision: crypto.randomUUID(), pedidaEn: new Date(),
-    resueltaEn: null, resueltaPor: "", motivo: "", mensaje: texto(datos.mensaje, 600) };
+    correo: nuevoAvisoCuenta("recibida"), resueltaEn: null, resueltaPor: "", motivo: "", mensaje: texto(datos.mensaje, 600) };
+}
+
+// Se guarda en la misma escritura que la solicitud; no depende de un envío HTTP.
+function nuevoAvisoCuenta(tipo) {
+  return { id: crypto.randomUUID(), tipo, estado: "pendiente", intentos: 0, proximoIntento: new Date() };
 }
 
 function pendiente(m) {
@@ -52,4 +57,4 @@ function accesoProfesionalValido(m) {
   return m.perfilAcceso !== "profesional" || m.verificacionProfesional?.estado === "verificada";
 }
 
-module.exports = { datosProfesionales, nuevaSolicitud, pendiente, filtroRevision, revisionProfesional, accesoProfesionalValido };
+module.exports = { nuevoAvisoCuenta, datosProfesionales, nuevaSolicitud, pendiente, filtroRevision, revisionProfesional, accesoProfesionalValido };
