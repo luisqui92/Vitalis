@@ -267,13 +267,32 @@ async function renderPlanEstudiante() {
   const caja = document.getElementById("estPlanCaja");
   try {
     const d = await api("/medico/estudiante/plan"); if (!caja.isConnected) return;
-    const p = d.pago, s = d.suscripcion;
+    const p = d.pago || {}, s = d.suscripcion;
     const qr = typeof p.qr === "string" && (/^https:\/\//.test(p.qr) || /^\/(?!\/)/.test(p.qr)) ? p.qr : "";
-    const whatsapp = String(p.whatsapp || "").replace(/\D/g, "");
+    const numero = String(p.whatsapp || "").replace(/\D/g, "");
+    const whatsapp = /^[1-9]\d{6,14}$/.test(numero) ? numero : "";
+    const banco = String(p.banco || "").trim(), cuenta = String(p.cuenta || "").trim(), titular = String(p.titular || "").trim();
+    const medioDePago = Boolean(qr || (banco && cuenta));
+    // No invitar a transferir si no hay un canal donde entregar el comprobante.
+    const disponible = medioDePago && Boolean(whatsapp);
+    const mensaje = t("est.abierto.mensajePago", { precio: s.precios.mensualTexto });
+    const enlaceWhatsApp = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(mensaje)}` : "";
     caja.innerHTML = `<h2>${t("est.abierto.plan")}</h2><p>${t("est.abierto.precio", { precio: esc(s.precios.mensualTexto), horas: s.horasMes })}</p>
-      <p>${t(p.configurado ? "est.abierto.pago" : "est.abierto.sinPago")}</p>
-      ${p.configurado ? `${qr ? `<img src="${esc(qr)}" alt="QR" style="max-width:100%;width:240px">` : ""}<p>${esc(p.banco || "")}<br>${t("est.abierto.cuenta")}: ${esc(p.cuenta || "")}<br>${t("est.abierto.titular")}: ${esc(p.titular || "")}</p>` : ""}
-      ${whatsapp ? `<a class="primary" href="https://wa.me/${whatsapp}" target="_blank" rel="noopener noreferrer">${t("est.abierto.comprobante")}</a>` : ""}
+      <p>${t(disponible ? "est.abierto.pago" : medioDePago ? "est.abierto.sinCanalPago" : "est.abierto.sinPago")}</p>
+      ${disponible ? `
+        <h3>${t("est.abierto.pasoPagar")}</h3>
+        ${qr ? `<img src="${esc(qr)}" alt="${t("est.abierto.qrAlt")}" style="display:block;max-width:100%;width:280px;height:auto;margin:16px auto">
+          <a class="secondary" style="display:block;text-align:center;margin:12px 0" href="${esc(qr)}" target="_blank" rel="noopener noreferrer">${t("est.abierto.abrirQr")}</a>
+          ${/^\/(?!\/)/.test(qr) && !qr.includes("\\") ? `<a class="secondary" style="display:block;text-align:center;margin:12px 0" href="${esc(qr)}" download>${t("est.abierto.guardarQr")}</a>` : ""}
+          <p class="hint">${t("est.abierto.qrAyuda")}</p>` : ""}
+        ${banco ? `<p>${esc(banco)}</p>` : ""}
+        ${cuenta ? `<p>${t("est.abierto.cuenta")}: ${esc(cuenta)}</p>` : ""}
+        ${titular ? `<p>${t("est.abierto.titular")}: ${esc(titular)}</p>` : ""}
+        <p class="hint">${t("est.abierto.verificarPago", { precio: esc(s.precios.mensualTexto) })}</p>
+        <h3>${t("est.abierto.pasoComprobante")}</h3>
+        <p>${t("est.abierto.adjuntarComprobante")}</p>` : ""}
+      ${whatsapp ? `<a class="primary" style="display:block;text-align:center;margin:16px 0" href="${esc(enlaceWhatsApp)}" target="_blank" rel="noopener noreferrer">${t(disponible ? "est.abierto.comprobante" : "est.abierto.consultarPago")}</a><p class="hint">WhatsApp: +${esc(whatsapp)}</p>` : ""}
+      ${disponible ? `<p class="hint">${t("est.abierto.activacionPago")}</p>` : ""}
       <button type="button" class="link" id="estPlanVolver">${t("est.abierto.volver")}</button>`;
     document.getElementById("estPlanVolver").onclick = irAPantallaInicial;
   } catch (e) { if (caja.isConnected) caja.innerHTML = `<p class="error">${esc(e.error || t("google.error"))}</p><button type="button" class="link" id="estPlanVolver">${t("est.abierto.volver")}</button>`;

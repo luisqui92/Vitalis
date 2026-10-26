@@ -78,5 +78,17 @@ Object.assign(I18N.pt, {
   "est.abierto.precio": "{precio} por mês · {horas} horas de áudio por mês",
   "est.abierto.practicas": "O teste também inclui até 3 pacientes virtuais e 3 simulados.",
   "est.abierto.cuenta": "Conta",
-  "est.abierto.titular": "Titular"
+  "est.abierto.titular": "Titular",
+  "est.abierto.sinCanalPago": "O canal para enviar comprovantes ainda não está disponível. Aguarde a habilitação antes de pagar. Sua conta e seus casos serão mantidos.",
+  "est.abierto.pasoPagar": "1. Faça o pagamento",
+  "est.abierto.qrAlt": "QR de pagamento da Symphomed",
+  "est.abierto.abrirQr": "Abrir QR em tamanho completo",
+  "est.abierto.guardarQr": "Baixar QR",
+  "est.abierto.qrAyuda": "Se pagar neste celular, salve a imagem e importe no aplicativo do banco, se ele permitir ler QR da galeria. Você também pode abrir o QR e manter a imagem pressionada para salvá-la.",
+  "est.abierto.verificarPago": "Antes de confirmar, confira o destinatário e o valor de {precio} no banco.",
+  "est.abierto.pasoComprobante": "2. Envie seu comprovante",
+  "est.abierto.adjuntarComprobante": "Abra o WhatsApp pelo botão abaixo e anexe a foto ou o PDF do comprovante. Informe o e-mail usado para entrar na Symphomed para identificar sua conta.",
+  "est.abierto.consultarPago": "Consultar como pagar pelo WhatsApp",
+  "est.abierto.activacionPago": "O botão abre o WhatsApp; não anexa nem envia arquivos automaticamente. A Symphomed verificará o pagamento antes de ativar o plano.",
+  "est.abierto.mensajePago": "Olá, quero confirmar o pagamento do plano educativo mensal da Symphomed por {precio}. Meu e-mail de acesso é: "
 });
