@@ -4,18 +4,18 @@ const { requireAuth, verificarPassword, generarToken } = require("../services/au
 const { verificarCodigo } = require("../services/totp");
 const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
 const { registrar } = require("../services/auditoria");
-const { limitAuth, limitMedico } = require("../services/ratelimit");
+const { limitAuth, limitMedico, limitGoogleConfig, limitGoogleInicio, limitGoogleEntrada } = require("../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../services/httpHelpers");
 const requireSesion = requireAuth(["medico", "admin"]);
 
 module.exports = function (app) {
-  app.get("/medico/google/config", limitAuth, (_req, res) => {
+  app.get("/medico/google/config", limitGoogleConfig, (_req, res) => {
     res.set("Cache-Control", "no-store").json({ disponible: Boolean(google.configuracion()) });
   });
-  app.post("/medico/google/iniciar", limitAuth, asyncRoute(async (req, res) => {
+  app.post("/medico/google/iniciar", limitGoogleInicio, asyncRoute(async (req, res) => {
     res.set("Cache-Control", "no-store").json(await google.iniciar(req, res));
   }));
-  app.post("/medico/google/entrar", limitAuth, asyncRoute(async (req, res) => {
+  app.post("/medico/google/entrar", limitGoogleEntrada, asyncRoute(async (req, res) => {
     const perfil = await google.comprobar(req);
     // Nunca enlazar automáticamente por email ni por teléfono declarado.
     const medico = await Medico.findOne({ googleSub: perfil.sub });

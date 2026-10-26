@@ -125,6 +125,31 @@ const limitVistaPrevia = rateLimitPorClave(
 // resuelve cayéndose a la IP.
 const limitAuth = rateLimit("auth", 8, 10 * 60 * 1000, "Demasiados intentos. Esperá unos minutos antes de volver a intentar.");
 
+// Cargar el botón de Google no es intentar una contraseña. Cada etapa tiene
+// su propia cuota: config/iniciar no consumen auth ni googleEntrada.
+const limitGoogleConfig = rateLimit("googleConfig", 120, 60 * 1000,
+  "Se consultó el acceso con Google muchas veces. Esperá un momento.");
+const limitGoogleInicio = rateLimit("googleInicio", 60, 10 * 60 * 1000,
+  "Se abrió el acceso con Google muchas veces. Esperá unos minutos.");
+const limitGoogleEntrada = rateLimit("googleEntrada", 60, 10 * 60 * 1000,
+  "Demasiados intentos de acceso con Google. Esperá unos minutos.");
+
+// Después de Google ya existe una identidad firmada: las altas de personas
+// distintas detrás del mismo router no deben compartir ocho intentos.
+// Esto solo elige la cuota. El handler sigue comprobando origen, cookie,
+// nonce, perfil, duplicados y todos los permisos antes de crear una cuenta.
+function identidadRegistroGoogle(req) {
+  const ticket = req.body?.googleTicket;
+  if (typeof ticket !== "string" || ticket.length > 12000) return null;
+  const p = verificarToken(ticket);
+  return p?.rol === "google_registro" && typeof p.usuario === "string" && p.usuario ? p.usuario : null;
+}
+const limitRegistroGoogle = rateLimitPorClave("googleRegistro", 8, 10 * 60 * 1000,
+  "Demasiados intentos de registro para esta cuenta Google. Esperá unos minutos.", identidadRegistroGoogle);
+function limitRegistro(req, res, next) {
+  return identidadRegistroGoogle(req) ? limitRegistroGoogle(req, res, next) : limitAuth(req, res, next);
+}
+
 // Página pública de reserva (sin login) — la usa cualquiera que abra el
 // link, así que necesita su propio límite en vez de compartir el de medico.
 const limitReservaPublica = rateLimit("reservaPublica", 20, 60 * 1000, "Demasiados intentos. Esperá un momento.");
@@ -189,4 +214,4 @@ const limit2faPorSesion = rateLimitPorClave(
   }
 );
 
-module.exports = { rateLimit, rateLimitPorClave, claveDeMedico, limitMedico, limitVistaPrevia, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };
+module.exports = { limitGoogleConfig, limitGoogleInicio, limitGoogleEntrada, limitRegistro, rateLimit, rateLimitPorClave, claveDeMedico, limitMedico, limitVistaPrevia, limitAuth, limitReservaPublica, limitLoginPorCuenta, limit2faPorSesion, getIP };

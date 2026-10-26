@@ -4,7 +4,7 @@ const { Medico } = require("../../../db/models");
 const { CodigoEstudiante } = require("../modelos");
 const { hashPassword, requireAuth } = require("../../../services/auth");
 const { registrar } = require("../../../services/auditoria");
-const { limitAuth } = require("../../../services/ratelimit");
+const { limitRegistro } = require("../../../services/ratelimit");
 const { asyncRoute, ErrorHttp } = require("../../../services/httpHelpers");
 const { soloDigitos, buscarPorTelefono } = require("../../../services/telefono");
 const { zonaPorMoneda } = require("../../../services/zonaHoraria");
@@ -42,7 +42,7 @@ function estado(app) {
 // personas con el mismo código no pueden quedarse las dos con él.
 function registro(app) {
   app.get("/medico/estudiante/registro-config", (_req, res) => res.set("Cache-Control", "no-store").json(prueba.configuracion()));
-  app.post("/medico/registro-estudiante", limitAuth, asyncRoute(async (req, res) => {
+  app.post("/medico/registro-estudiante", limitRegistro, asyncRoute(async (req, res) => {
     const codigo = normalizarCodigo(req.body?.codigo);
     const phone = soloDigitos(req.body?.phone);
     const nombre = String(req.body?.nombre || "").trim().slice(0, 120);
