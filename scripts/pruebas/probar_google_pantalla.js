@@ -144,5 +144,35 @@ function pantalla({ habilitado = true, respuesta = {}, idioma = 'es', perfilExtr
       if (tipo === 'profesional') assert.equal(body.pais, 'BO');
     }
   });
+  await prueba('enlace de soporte confirma Google sin contraseña ni alta de cuenta', async () => {
+    const p = pantalla({ respuesta: { ok: true } });
+    const token = 'a'.repeat(43);
+    await p.s.renderVinculacionGoogleSoporte(token);
+    assert.ok(!p.caja.innerHTML.includes('type="password"'));
+    assert.ok(!p.caja.innerHTML.includes('gPhone'));
+    p.nodo('gSoporteTotp').value = '123456';
+    await p.sdk().callback({ credential: 'credencial-google' });
+    const llamada = p.llamadas.at(-1), body = JSON.parse(llamada.opciones.body);
+    assert.equal(llamada.url, '/medico/google/vincular-soporte');
+    assert.deepEqual(body, { enlaceToken: token, credential: 'credencial-google', codigo: '123456' });
+    assert.ok(p.caja.innerHTML.includes('Google vinculado'));
+    assert.equal(p.login(), undefined); // El login posterior conserva el control 2FA normal.
+  });
+  await prueba('enlace inválido no carga Google y pantalla de soporte disponible en portugués', async () => {
+    const p = pantalla({ idioma: 'pt' });
+    await p.s.renderVinculacionGoogleSoporte('invalido');
+    assert.ok(p.nodo('googleSoporteBoton').innerHTML.includes('O link não é válido'));
+    assert.equal(p.llamadas.length, 0);
+    const main = fs.readFileSync(path.join(raiz, 'public/js/main.js'), 'utf8');
+    const llamados = [], ubicacion = { hash: '#vincular-google=' + 'a'.repeat(43), pathname: '/', search: '' };
+    const entorno = { TOKEN: 'sesion-otra-cuenta', btnLogout: {}, btnAsistente: { style: {} },
+      logout() {}, abrirAsistente() {}, aplicarTemaSegunEspecialidad() {}, aplicarLandingVeterinariaSiCorresponde() {},
+      location: ubicacion, history: { replaceState: (...args) => llamados.push(['limpiar', args[2]]) },
+      renderVinculacionGoogleSoporte: token => llamados.push(['vincular', token]),
+      conectarTiempoReal: () => { throw new Error('No debe entrar en la cuenta anterior'); },
+    };
+    vm.runInNewContext(main, entorno);
+    assert.deepEqual(llamados, [['limpiar', '/'], ['vincular', 'a'.repeat(43)]]);
+  });
   console.log(`\n${n} pruebas de pantalla aprobadas (DOM y SDK controlados).`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

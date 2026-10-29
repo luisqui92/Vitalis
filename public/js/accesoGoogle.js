@@ -440,3 +440,33 @@ async function pintarGoogleSeguridad() {
     });
   } catch (e) { if (caja.isConnected) caja.innerHTML = `<div class="error">${esc(e.error || t("google.error"))}</div>`; }
 }
+
+async function renderVinculacionGoogleSoporte(enlaceToken) {
+  detenerPolling();
+  ++GOOGLE_VISTA;
+  app.innerHTML = `<div class="card reg-card">
+    <h2>${t("google.soporteTitulo")}</h2>
+    <p>${t("google.soporteAyuda")}</p>
+    <label for="gSoporteTotp">${t("google.totp")}</label>
+    <input id="gSoporteTotp" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+    <div id="googleSoporteBoton"></div>
+    <button class="link" id="gSoporteVolver">${t("auth.ingresar")}</button>
+  </div>`;
+  document.getElementById("gSoporteVolver").onclick = renderLogin;
+  const caja = document.getElementById("googleSoporteBoton");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(enlaceToken)) {
+    caja.innerHTML = `<p class="error">${t("google.soporteInvalido")}</p>`;
+    return;
+  }
+  await pintarBotonGoogle("googleSoporteBoton", async credential => {
+    const codigo = document.getElementById("gSoporteTotp").value.trim();
+    await api("/medico/google/vincular-soporte", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enlaceToken, credential, codigo }) });
+    if (!caja.isConnected) return;
+    ++GOOGLE_VISTA;
+    enlaceToken = "";
+    app.innerHTML = `<div class="card"><h2>${t("google.soporteListo")}</h2><p>${t("google.soporteContinuar")}</p>
+      <button class="primary" id="gSoporteIngresar">${t("auth.ingresar")}</button></div>`;
+    document.getElementById("gSoporteIngresar").onclick = renderLogin;
+  });
+}

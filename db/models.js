@@ -166,6 +166,11 @@ const medicoSchema = new mongoose.Schema({
   googleEmail: { type: String },
   googleVinculadoEn: { type: Date },
   googleSolo: { type: Boolean, default: false },
+  // Autorización de soporte para vincular Google a una cuenta histórica.
+  // Solo se guarda el hash; el enlace vence y se consume al vincular.
+  googleEnlaceSoporte: {
+    hash: String, email: String, vence: Date, creadoEn: Date, creadoPor: String,
+  },
   // Un teléfono escrito en un formulario NO acredita su titularidad.
   telefonoVerificado: { type: Boolean, default: false },
   telefonoVerificadoEn: { type: Date },

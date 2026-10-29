@@ -22,7 +22,12 @@ if (typeof esPaginaInformePublico === "function" && esPaginaInformePublico()) {
 
 aplicarTemaSegunEspecialidad();
 aplicarLandingVeterinariaSiCorresponde();
-if (TOKEN) {
+if (location.hash.startsWith("#vincular-google=")) {
+  const enlace = location.hash.slice("#vincular-google=".length);
+  // El secreto viaja en el fragmento: no llega a logs HTTP ni al Referer.
+  history.replaceState(null, "", location.pathname + location.search);
+  renderVinculacionGoogleSoporte(enlace);
+} else if (TOKEN) {
   conectarTiempoReal();
   irAPantallaInicial();
 } else {

@@ -1,4 +1,9 @@
 Object.assign(I18N.es, {
+  "google.soporteTitulo": "Vincular Google a tu cuenta existente",
+  "google.soporteAyuda": "Elegí el correo de Google que confirmaste con Symphomed. Conservarás tu cuenta, tus datos y tu plan. No necesitás recordar tu contraseña ni volver a registrarte. Si usás una app autenticadora, ingresá su código antes de continuar.",
+  "google.soporteInvalido": "El enlace no es válido. Pedí uno nuevo a Symphomed.",
+  "google.soporteListo": "Google vinculado",
+  "google.soporteContinuar": "Ya podés ingresar con Continuar con Google y el mismo correo que acabás de vincular. Tu teléfono y tus datos se conservan. Si tenés verificación en dos pasos, sigue activa.",
   "google.error": "No se pudo completar el acceso con Google. Probá de nuevo; también podés usar tu acceso habitual.",
   "google.reintentar": "Volver a intentar",
   "google.cargando": "Conectando con Google…",
