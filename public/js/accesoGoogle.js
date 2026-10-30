@@ -407,6 +407,7 @@ function renderPerfilGoogle(perfil) {
     try {
       const data = await api(elegido.ruta, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
       if (!btn.isConnected) return;
+      if (data.requiere2fa) return renderLogin2FA(data.tempToken);
       if (data.token) completarLogin(data);
       else {
         app.innerHTML = `<div class="card"><h2>${t("google.pendiente")}</h2><p>${t("perfil.pendienteIngreso")}</p><button class="primary" id="gVolver">${t("auth.ingresar")}</button></div>`;

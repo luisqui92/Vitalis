@@ -16,6 +16,7 @@ const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
 // (services/sesionMedico.js).
 const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
 const googleAcceso = require("../services/googleAcceso");
+const googleAltaUnica = require("../services/googleAltaUnica");
 
 // Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
 // propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
@@ -61,6 +62,16 @@ module.exports = function (app) {
     const mensaje = String(req.body?.mensaje || "").trim().slice(0, 600);
     const google = await googleAcceso.identidadParaRegistro(req);
     if (google && req.body?.perfilSolicitado !== "profesional") throw new ErrorHttp(400, "Seleccioná explícitamente tu perfil profesional.");
+    if (google && phone) {
+      const existente = await googleAltaUnica.intentar(phone, google);
+      if (existente) {
+        registrar({ req, medicoPhone: existente.phone, accion: "vincular_google_alta_unica", recurso: `Medico:${existente._id}` });
+        res.set("Cache-Control", "no-store");
+        if (existente.dosFA?.activo) return res.json({ requiere2fa: true,
+          tempToken: generarToken(existente.phone, "medico_2fa_pendiente", 300000) });
+        return res.json({ token: tokenDeMedico(existente), ...datosDeSesion(existente) });
+      }
+    }
     const datosPerfil = datosProfesionales(req.body);
     if (!phone || !nombre) throw new ErrorHttp(400, "phone y nombre son requeridos");
     if (!/^\d{6,15}$/.test(phone)) throw new ErrorHttp(400, "Ese teléfono no parece válido: escribilo con el código de país, por ejemplo +59170000000.");

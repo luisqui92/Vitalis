@@ -174,5 +174,12 @@ function pantalla({ habilitado = true, respuesta = {}, idioma = 'es', perfilExtr
     vm.runInNewContext(main, entorno);
     assert.deepEqual(llamados, [['limpiar', '/'], ['vincular', 'a'.repeat(43)]]);
   });
+  await prueba('vinculación autorizada desde el formulario respeta la pantalla de segundo factor', async () => {
+    const p = pantalla({ respuesta: { requiere2fa: true, tempToken: 'segundo-factor' } });
+    p.s.renderPerfilGoogle({ email: 'a@example.com', googleTicket: 'ticket' });
+    for (const [id, valor] of Object.entries({ gNombre: 'Nombre', gPhone: '+5511912345678', gTipo: 'profesional' })) p.nodo(id).value = valor;
+    await p.nodo('gCrear').onclick();
+    assert.equal(p.dosfa(), 'segundo-factor'); assert.equal(p.login(), undefined);
+  });
   console.log(`\n${n} pruebas de pantalla aprobadas (DOM y SDK controlados).`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

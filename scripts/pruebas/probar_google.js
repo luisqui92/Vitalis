@@ -164,7 +164,7 @@ async function pedir(ruta, req) {
   // Las rutas reales de alta con almacenamiento simulado: campos, permisos y rollback.
   const altas = {};
   const appAltas = Object.fromEntries(['get', 'post', 'patch'].map(m => [m, (p, ...h) => { altas[p] = h.at(-1); }]));
-  let creado, telefonoExiste = false, fallaCrear = false, codigoUsado = false;
+  let creado, telefonoExiste = false, fallaCrear = false, codigoUsado = false, cuentaAutorizada = null;
   Medico.create = async d => { if (fallaCrear) throw new Error('fallo simulado'); creado = d; return d; };
   const telefonos = { soloDigitos: p => String(p || '').replace(/\D/g, ''), buscarPorTelefono: async () => telefonoExiste ? { _id: 'vieja' } : null };
   const sesion = { tokenDeMedico: () => 'sesion', datosDeSesion: m => ({ phone: m.phone }) };
@@ -175,6 +175,7 @@ async function pedir(ruta, req) {
     '../services/operadores': { todosLosOperadores: () => [] }, '../services/push': {}, '../config': { log: { info() {}, warn() {} } },
     '../services/ratelimit': {}, '../services/httpHelpers': { ErrorHttp, asyncRoute: wrap }, '../services/telefono': telefonos,
     '../services/sesionMedico': sesion, '../services/googleAcceso': google,
+    '../services/googleAltaUnica': { intentar: async () => cuentaAutorizada },
     '../services/perfilesCuenta': cargar('services/perfilesCuenta.js', { './httpHelpers': { ErrorHttp } }),
   })(appAltas);
   cargar('modulos/estudiantes/rutas/cuenta.js', {
@@ -193,7 +194,7 @@ async function pedir(ruta, req) {
   async function alta(ruta, body = {}) {
     const req = await nuevo(); req.body.googleTicket = google.ticketRegistro(await google.comprobar(req));
     Object.assign(req.body, { perfilSolicitado: ruta.endsWith('estudiante') ? 'estudiante' : 'profesional', pais: 'BO', profesion: 'Odontología', tipoEspecialidad: 'odontologia', universidad: 'Universidad de prueba', periodo: '4º año', nombre: 'Prueba', phone: '+59171111111', matricula: '123', rol: 'admin', carrera: 'odontologia', nivel: 'estudiante' }, body);
-    const res = { codigo: 200, status(c) { this.codigo = c; return this; }, json(d) { this.datos = d; } };
+    const res = { codigo: 200, set() { return this; }, status(c) { this.codigo = c; return this; }, json(d) { this.datos = d; } };
     await altas[ruta](req, res); return res;
   }
   await prueba('alta profesional con Google queda pendiente, sin contraseña elegida ni rol administrativo', async () => {
@@ -207,6 +208,21 @@ async function pedir(ruta, req) {
   });
   await prueba('Google no permite alta profesional sin matrícula', async () => {
     assert.equal((await alta('/medico/registro', { matricula: '' })).codigo, 400);
+  });
+  await prueba('excepción autorizada entra en la cuenta original sin crear otra ni cambiar sus datos', async () => {
+    const antes = creado;
+    cuentaAutorizada = { _id: 'original', phone: '++55 11 91234 5678', nombre: 'Cuenta anterior', rol: 'medico' };
+    const r = await alta('/medico/registro', { matricula: '', pais: '', nombre: 'Nombre nuevo', rol: 'admin' });
+    assert.equal(r.codigo, 200); assert.equal(r.datos.phone, cuentaAutorizada.phone); assert.equal(r.datos.token, 'sesion');
+    assert.equal(creado, antes); cuentaAutorizada = null;
+  });
+  await prueba('excepción de vinculación no saltea el segundo factor del inicio de sesión', async () => {
+    cuentaAutorizada = { phone: '++55 11 91234 5678', dosFA: { activo: true } };
+    const r = await alta('/medico/registro', { matricula: '' });
+    assert.equal(r.codigo, 200); assert.equal(r.datos.requiere2fa, true); assert.equal(r.datos.token, undefined);
+    const temporal = auth.verificarToken(r.datos.tempToken);
+    assert.equal(temporal.rol, 'medico_2fa_pendiente'); assert.equal(temporal.usuario, cuentaAutorizada.phone);
+    cuentaAutorizada = null;
   });
   await prueba('si se proporciona una invitación, Google rechaza códigos inválidos', async () => {
     assert.equal((await alta('/medico/registro-estudiante', { codigo: 'INVALIDO' })).codigo, 400);

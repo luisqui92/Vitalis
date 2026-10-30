@@ -171,6 +171,11 @@ const medicoSchema = new mongoose.Schema({
   googleEnlaceSoporte: {
     hash: String, email: String, vence: Date, creadoEn: Date, creadoPor: String,
   },
+  // Excepción autorizada por soporte: teléfono + correo previo, un solo uso.
+  googleAltaUnica: {
+    telefono: String, email: String, vence: Date, autorizadaEn: Date,
+    autorizadaPor: String, usadaEn: Date,
+  },
   // Un teléfono escrito en un formulario NO acredita su titularidad.
   telefonoVerificado: { type: Boolean, default: false },
   telefonoVerificadoEn: { type: Date },

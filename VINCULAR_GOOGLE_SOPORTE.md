@@ -1,5 +1,30 @@
 # Vincular una cuenta histórica con Google desde soporte
 
+## Excepción de un solo uso desde el registro habitual
+
+Si el administrador confirma que el correo ya guardado en la cuenta pertenece
+al cliente, puede autorizar únicamente esa cuenta sin enviar enlaces o mensajes:
+
+```sh
+node scripts/autorizar_google_existente.js TELEFONO_CON_PAIS
+```
+
+Busca una cuenta única ignorando el formato del teléfono. Toma `googleEmail`, o
+`email` si no hay `googleEmail`; si no hay correo válido o Google ya está vinculado,
+se detiene. Muestra el nombre, teléfono literal y correo autorizado. No deduce
+el correo a partir de lo que declare el siguiente visitante.
+
+Durante 48 horas, el cliente entra con Google, elige perfil profesional y envía
+el formulario con su teléfono. Un ticket de Google válido que confirme exactamente
+el correo autorizado vincula la cuenta original y consume el permiso atómicamente.
+El resto de las cuentas mantiene el comportamiento anterior. El permiso usado no
+puede reactivarse mediante este comando. El primer acceso conserva el control 2FA.
+No cambia el teléfono, contraseña, permisos, datos o plan. No hace falta WhatsApp,
+SMS ni códigos enviados por correo. La autorización es un acto de soporte; la
+mera coincidencia de teléfono nunca alcanza para apropiarse de una cuenta.
+
+## Enlace privado de soporte
+
 Para un cliente que conserva su cuenta pero no recuerda la contraseña o el
 formato del teléfono. No crea cuentas, no migra historias y no cambia el teléfono.
 
