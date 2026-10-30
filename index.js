@@ -160,6 +160,7 @@ app.get("/modulos.js", (_req, res) => {
 require("./routes/medicoAuth")(app);
 require("./routes/googleAuth")(app);
 require("./routes/googleVinculacion")(app);
+require("./routes/googleRevision")(app);
 require("./routes/perfilCuenta")(app);
 // Los errores de la pantalla llegan acá (public/js/errores.js).
 require("./routes/erroresCliente")(app);

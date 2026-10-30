@@ -51,16 +51,18 @@ async function traerEstadoOperador() {
   // por el segundo factor. Se consultan por separado para que una caída en
   // pagos no esconda que hay una cuenta esperando aprobación, ni al revés.
   if (OPERADOR_ESTADO.operador && OPERADOR_ESTADO.dosFAActivo) {
-    const [pagos, cuentas, reseteos, bajas] = await Promise.all([
+    const [pagos, cuentas, reseteos, bajas, google] = await Promise.all([
       api("/medico/operador/solicitudes").catch(() => null),
       api("/medico/solicitudes-cuenta").catch(() => null),
       api("/medico/operador/reseteos").catch(() => null),
       api("/medico/operador/bajas").catch(() => null),
+      api("/medico/operador/vinculaciones-google").catch(() => null),
     ]);
     OPERADOR_ESTADO.pendientes = pagos?.pendientes || 0;
     OPERADOR_ESTADO.cuentasPendientes = cuentas?.pendientes?.length || 0;
     OPERADOR_ESTADO.reseteosPendientes = reseteos?.pedidos?.length || 0;
     OPERADOR_ESTADO.bajasPendientes = bajas?.pedidos?.length || 0;
+    OPERADOR_ESTADO.googlePendientes = google?.solicitudes?.length || 0;
   }
   return OPERADOR_ESTADO;
 }
@@ -79,12 +81,14 @@ function avisoOperadorHtml() {
   const cuentas = e?.cuentasPendientes || 0;
   const reseteos = e?.reseteosPendientes || 0;
   const bajas = e?.bajasPendientes || 0;
-  if (!e?.operador || (!pagos && !cuentas && !reseteos && !bajas)) return "";
+  const google = e?.googlePendientes || 0;
+  if (!e?.operador || (!pagos && !cuentas && !reseteos && !bajas && !google)) return "";
   return `
     <button type="button" class="card no-imprimir saldo-aviso-panel" id="avisoOperador" style="width:100%;text-align:left;border-color:var(--primary)">
       ${cuentas ? `<span style="display:block;font-weight:600">${t("cuentas.panelPendientes", { n: cuentas })}</span>` : ""}
       ${reseteos ? `<span style="display:block;font-weight:600">${t("op.reseteosPendientes", { n: reseteos })}</span>` : ""}
       ${bajas ? `<span style="display:block;font-weight:600">${t("op.bajasPendientes", { n: bajas })}</span>` : ""}
+      ${google ? `<span style="display:block;font-weight:600">${t("op.google.pendientes", { n: google })}</span>` : ""}
       ${pagos ? `<span style="display:block;font-weight:600">${t("op.panelPendientes", { n: pagos })}</span>` : ""}
       <span class="hint" style="display:block;margin:2px 0 0">${t("op.panelAyuda")}</span>
     </button>`;
@@ -180,6 +184,7 @@ async function renderPagos() {
     <div class="hint" style="margin:0 0 12px">${t("op.ayuda", { minimo: (e.recargaMinimaCentavos / 100).toFixed(2) })}</div>
 
     <div id="opCuentas"></div>
+    <div id="opGoogle"></div>
     <div id="opReseteos"></div>
     <div id="opBajas"></div>
     <div id="opResumen"></div>
@@ -200,6 +205,7 @@ async function renderPagos() {
   // abran la cuenta es más urgente que un pago, pero si esta consulta tarda
   // no puede retrasar el resto del panel.
   pintarSolicitudesDeCuenta();
+  pintarVinculacionesGoogle();
   pintarReseteos();
   pintarBajas();
   pintarResumenPagos();
@@ -1040,4 +1046,54 @@ function engancharBaja(p) {
       salida.innerHTML = `<div class="error">${esc(e.error || t("op.bajas.errRechazar"))}</div>`;
     }
   };
+}
+
+async function pintarVinculacionesGoogle(resultado = "") {
+  const caja = document.getElementById("opGoogle");
+  if (!caja) return;
+  caja.innerHTML = `<div class="card"><h3>${t("op.google.titulo")}</h3><p>${t("google.cargando")}</p></div>`;
+  try {
+    const data = await api("/medico/operador/vinculaciones-google");
+    if (!caja.isConnected) return;
+    const solicitudes = data.solicitudes || [];
+    if (OPERADOR_ESTADO) OPERADOR_ESTADO.googlePendientes = solicitudes.length;
+    caja.innerHTML = `<div class="card"><h3>${t("op.google.titulo")}</h3>
+      ${resultado ? `<p role="status">${esc(resultado)}</p>` : ""}
+      <p>${t("op.google.ayuda")}</p>
+      ${solicitudes.length ? solicitudes.map((s, i) => `<div class="card card-secundaria" id="opGoogleFila${i}">
+        <strong>${esc(s.nombre)}</strong><p>${esc(s.phone)}</p>
+        <p>${t("op.google.correo")}: <strong>${esc(s.email)}</strong></p>
+        <button type="button" class="primary" data-google-aprobar="${i}">${t("op.google.aprobar")}</button>
+        <button type="button" class="secondary" data-google-rechazar="${i}">${t("op.google.rechazar")}</button>
+        <div id="opGoogleError${i}" role="alert"></div></div>`).join("") : `<p class="hint">${t("op.google.sinPendientes")}</p>`}
+      <button type="button" class="secondary" id="opGoogleActualizar">${t("op.google.actualizar")}</button></div>`;
+    document.getElementById("opGoogleActualizar").onclick = () => pintarVinculacionesGoogle();
+    for (const [i, s] of solicitudes.entries()) {
+      const fila = document.getElementById(`opGoogleFila${i}`);
+      const decidir = async aprobar => {
+        if (!confirm(t(aprobar ? "op.google.confirmar" : "op.google.confirmarRechazo", { nombre: s.nombre, email: s.email }))) return;
+        fila.querySelectorAll("button").forEach(b => { b.disabled = true; });
+        const error = document.getElementById(`opGoogleError${i}`); error.textContent = "";
+        try {
+          await api(`/medico/operador/vinculaciones-google/${encodeURIComponent(s.cuentaId)}/${encodeURIComponent(s.solicitudId)}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accion: aprobar ? "aprobar" : "rechazar", email: s.email, confirmoIdentidad: aprobar }),
+          });
+          if (!fila.isConnected) return;
+          await pintarVinculacionesGoogle(t(aprobar ? "op.google.aprobada" : "op.google.rechazada"));
+        } catch (e) {
+          if (!fila.isConnected) return;
+          error.textContent = e.error || t("google.error");
+          fila.querySelectorAll("button").forEach(b => { b.disabled = false; });
+        }
+      };
+      fila.querySelector(`[data-google-aprobar="${i}"]`).onclick = () => decidir(true);
+      fila.querySelector(`[data-google-rechazar="${i}"]`).onclick = () => decidir(false);
+    }
+  } catch (e) {
+    if (!caja.isConnected) return;
+    caja.innerHTML = `<div class="card"><h3>${t("op.google.titulo")}</h3><p class="error">${esc(e.error || t("google.error"))}</p>
+      <button type="button" class="secondary" id="opGoogleActualizar">${t("op.google.actualizar")}</button></div>`;
+    document.getElementById("opGoogleActualizar").onclick = () => pintarVinculacionesGoogle();
+  }
 }

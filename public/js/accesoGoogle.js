@@ -353,6 +353,8 @@ function renderPerfilGoogle(perfil) {
     <div class="hint" id="gPhoneFormato">${t("google.telefonoFormato")}</div>
     <div class="hint" id="gPhoneCompleto" aria-live="polite"></div>
     <div class="hint">${t("google.telefonoAyuda")}</div>
+    <button type="button" class="secondary" id="gPedirVinculacion">${t("google.revisionPedir")}</button>
+    <div id="gVincularError" class="error" role="alert"></div>
     <fieldset class="perfil-opciones"><legend>${t("google.perfil")}</legend>
       ${perfiles.map(p => `<label class="perfil-opcion"><input type="radio" name="gTipo" value="${esc(p.id)}"><span><strong>${esc(p.titulo)}</strong><small>${t("perfil." + p.id + "Ayuda")}</small></span></label>`).join("")}
     </fieldset>
@@ -390,6 +392,20 @@ function renderPerfilGoogle(perfil) {
   };
   document.getElementById("gExistente").onclick = renderLogin;
   const btn = document.getElementById("gCrear");
+  const pedirVinculacion = document.getElementById("gPedirVinculacion");
+  pedirVinculacion.onclick = async () => {
+    const err = document.getElementById("gVincularError");
+    const telefono = componerTelefonoGoogle(telefonoPais.value, telefonoNumero.value);
+    if (!telefono) { err.textContent = t("google.telefonoInvalido"); return; }
+    err.textContent = ""; pedirVinculacion.disabled = true; btn.disabled = true;
+    try {
+      await api("/medico/google/solicitar-vinculacion", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: telefono.phone, googleTicket: perfil.googleTicket }) });
+      if (pedirVinculacion.isConnected) renderGoogleRevisionPendiente();
+    } catch (e) {
+      if (pedirVinculacion.isConnected) { err.textContent = e.error || t("google.error"); pedirVinculacion.disabled = false; btn.disabled = false; }
+    }
+  };
   btn.onclick = async () => {
     const val = id => document.getElementById(id).value.trim();
     const err = document.getElementById("gError");
@@ -403,18 +419,26 @@ function renderPerfilGoogle(perfil) {
     if (!elegido) { err.textContent = t("perfil.elegir"); return; }
     datos.perfilSolicitado = elegido.id;
     Object.assign(datos, elegido.datos());
-    btn.disabled = true;
+    btn.disabled = true; pedirVinculacion.disabled = true;
     try {
       const data = await api(elegido.ruta, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
       if (!btn.isConnected) return;
+      if (data.vinculacionPendiente) return renderGoogleRevisionPendiente();
       if (data.requiere2fa) return renderLogin2FA(data.tempToken);
       if (data.token) completarLogin(data);
       else {
         app.innerHTML = `<div class="card"><h2>${t("google.pendiente")}</h2><p>${t("perfil.pendienteIngreso")}</p><button class="primary" id="gVolver">${t("auth.ingresar")}</button></div>`;
         document.getElementById("gVolver").onclick = renderLogin;
       }
-    } catch (e) { if (btn.isConnected) { btn.disabled = false; err.innerHTML = `<div class="error">${esc(e.error || t("google.error"))}</div>`; } }
+    } catch (e) { if (btn.isConnected) { btn.disabled = false; pedirVinculacion.disabled = false; err.innerHTML = `<div class="error">${esc(e.error || t("google.error"))}</div>`; } }
   };
+}
+
+function renderGoogleRevisionPendiente() {
+  detenerPolling(); ++GOOGLE_VISTA;
+  app.innerHTML = `<div class="card"><h2>${t("google.revisionPendiente")}</h2>
+    <p>${t("google.revisionAyuda")}</p><button class="primary" id="gRevisionVolver">${t("auth.ingresar")}</button></div>`;
+  document.getElementById("gRevisionVolver").onclick = renderLogin;
 }
 
 async function pintarGoogleSeguridad() {

@@ -1,4 +1,7 @@
 Object.assign(I18N.es, {
+  "google.revisionPedir": "Ya tengo cuenta: solicitar vinculación con Google",
+  "google.revisionPendiente": "Vinculación pendiente de aprobación",
+  "google.revisionAyuda": "Recibimos tu solicitud. Symphomed debe confirmar que este Google corresponde a tu cuenta anterior. Cuando la aprueben, volvé a entrar con el mismo Google. No se creó otra cuenta ni se modificaron tus datos.",
   "google.soporteTitulo": "Vincular Google a tu cuenta existente",
   "google.soporteAyuda": "Elegí el correo de Google que confirmaste con Symphomed. Conservarás tu cuenta, tus datos y tu plan. No necesitás recordar tu contraseña ni volver a registrarte. Si usás una app autenticadora, ingresá su código antes de continuar.",
   "google.soporteInvalido": "El enlace no es válido. Pedí uno nuevo a Symphomed.",

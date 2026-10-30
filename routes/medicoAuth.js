@@ -17,6 +17,7 @@ const { soloDigitos, buscarPorTelefono } = require("../services/telefono");
 const { tokenDeMedico, datosDeSesion } = require("../services/sesionMedico");
 const googleAcceso = require("../services/googleAcceso");
 const googleAltaUnica = require("../services/googleAltaUnica");
+const googleRevision = require("../services/googleRevision");
 
 // Las únicas rutas de este archivo que piden sesión son las de 2FA y la del
 // propio log de accesos: todas son sobre LA CUENTA QUE LLAMA, ninguna toca un
@@ -63,6 +64,7 @@ module.exports = function (app) {
     const google = await googleAcceso.identidadParaRegistro(req);
     if (google && req.body?.perfilSolicitado !== "profesional") throw new ErrorHttp(400, "Seleccioná explícitamente tu perfil profesional.");
     if (google && phone) {
+      if (await googleRevision.solicitar(phone, google)) return res.set("Cache-Control", "no-store").json({ vinculacionPendiente: true });
       const existente = await googleAltaUnica.intentar(phone, google);
       if (existente) {
         registrar({ req, medicoPhone: existente.phone, accion: "vincular_google_alta_unica", recurso: `Medico:${existente._id}` });

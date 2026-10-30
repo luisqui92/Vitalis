@@ -176,6 +176,12 @@ const medicoSchema = new mongoose.Schema({
     telefono: String, email: String, vence: Date, autorizadaEn: Date,
     autorizadaPor: String, usadaEn: Date,
   },
+  googleRevision: {
+    telefono: String, habilitada: Boolean, revision: String, vence: Date,
+    autorizadaPor: String, autorizadaEn: Date, usadaEn: Date,
+    solicitudes: [{ _id: false, id: String, googleSub: String, email: String,
+      nombre: String, creadaEn: Date, estado: String, decididaEn: Date, decididaPor: String }],
+  },
   // Un teléfono escrito en un formulario NO acredita su titularidad.
   telefonoVerificado: { type: Boolean, default: false },
   telefonoVerificadoEn: { type: Date },

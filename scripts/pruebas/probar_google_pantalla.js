@@ -181,5 +181,22 @@ function pantalla({ habilitado = true, respuesta = {}, idioma = 'es', perfilExtr
     await p.nodo('gCrear').onclick();
     assert.equal(p.dosfa(), 'segundo-factor'); assert.equal(p.login(), undefined);
   });
+  await prueba('cuenta existente puede solicitar vinculación solo con teléfono y Google, sin contraseña ni rol', async () => {
+    const p = pantalla({ respuesta: { vinculacionPendiente: true } });
+    p.s.renderPerfilGoogle({ email: 'cliente@gmail.com', googleTicket: 'ticket-real' });
+    p.nodo('gPhone').value = '+55 11 91234 5678';
+    await p.nodo('gPedirVinculacion').onclick();
+    const r = p.llamadas.at(-1);
+    assert.equal(r.url, '/medico/google/solicitar-vinculacion');
+    assert.deepEqual(JSON.parse(r.opciones.body), { phone: '+5511912345678', googleTicket: 'ticket-real' });
+    assert.equal(p.login(), undefined); assert.ok(p.caja.innerHTML.includes('pendiente de aprobación'));
+  });
+  await prueba('Crear mi cuenta muestra la solicitud pendiente sin iniciar sesión ni prometer aprobación', async () => {
+    const p = pantalla({ respuesta: { vinculacionPendiente: true } });
+    p.s.renderPerfilGoogle({ email: 'cliente@gmail.com', googleTicket: 'ticket-real' });
+    for (const [id, v] of Object.entries({ gNombre: 'Cliente', gPhone: '+5511912345678', gTipo: 'profesional' })) p.nodo(id).value = v;
+    await p.nodo('gCrear').onclick();
+    assert.equal(p.login(), undefined); assert.ok(p.caja.innerHTML.includes('pendiente de aprobación'));
+  });
   console.log(`\n${n} pruebas de pantalla aprobadas (DOM y SDK controlados).`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -1,5 +1,47 @@
 # Vincular una cuenta histórica con Google desde soporte
 
+## Solicitud con aprobación desde el panel (sin conocer previamente el correo)
+
+Para el cliente que solo conoce su teléfono y tiene un Google aún sin vincular:
+
+```sh
+node scripts/habilitar_revision_google.js TELEFONO_CON_PAIS
+```
+
+Habilita únicamente la cuenta encontrada durante 48 horas; admite formatos
+históricos del teléfono y se detiene si hay varias coincidencias. No necesita un
+correo guardado. Desactiva la excepción automática y enlaces anteriores de esa
+cuenta para que la nueva vinculación requiera decisión humana.
+
+El cliente entra con Google, escribe el teléfono en «Completá tu perfil» y toca
+«Ya tengo cuenta: solicitar vinculación con Google». No necesita elegir carrera,
+volver a declarar matrícula ni saber su contraseña. Si envía el alta profesional
+habitual, la cuenta habilitada también se dirige a esta revisión.
+
+El servidor valida el ticket de Google y su cookie/nonce antes de registrar la
+solicitud. No se obtiene el correo de un campo libre. La solicitud no crea una
+cuenta ni concede sesión. Repetir el envío con el mismo Google no crea duplicados.
+
+En **Cuentas y pagos → Vinculaciones con Google**, un operador autorizado con 2FA
+puede actualizar la lista, ver cuenta y teléfono originales y el correo que pide
+acceso, y aprobar o rechazar tras confirmar la identidad por soporte. Google prueba
+el correo, no la propiedad del teléfono: el operador debe revisar la solicitud.
+No se envía ningún mensaje por WhatsApp, SMS o correo.
+
+La decisión y la vinculación se guardan juntas en la cuenta mediante una operación
+atómica con control de revisión. Aprobar consume el permiso y cierra las sesiones
+anteriores; conserva teléfono literal, contraseña, permisos, plan y segundo factor.
+El cliente vuelve a ingresar con el Google aprobado. La API de aprobación no
+entrega al operador una sesión del cliente. Un Google ya vinculado a otra cuenta
+no se reasigna. Rechazar no cambia el acceso, y una solicitud de otro Google no
+puede sobrescribir la primera. Las solicitudes caducadas necesitan renovar la
+habilitación mediante el comando de soporte. Máximo 50 solicitudes por cuenta.
+
+Pruebas del nuevo flujo: `node scripts/pruebas/probar_google_revision.js`.
+Incluye middleware, decisiones concurrentes, permisos, segundo factor, pantalla
+de operador y datos preservados, con MongoDB y OAuth simulados. La prueba final
+con el cliente y el operador debe hacerse en la instalación real.
+
 ## Excepción de un solo uso desde el registro habitual
 
 Si el administrador confirma que el correo ya guardado en la cuenta pertenece

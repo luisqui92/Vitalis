@@ -1,5 +1,17 @@
 // Symphomed — Español · pantalla de operador (acreditar recargas).
 Object.assign(I18N.es, {
+  "op.google.titulo": "Vinculaciones con Google",
+  "op.google.pendientes": "{n} vinculaciones con Google pendientes",
+  "op.google.ayuda": "Google confirmó el correo, pero no el teléfono escrito. Aprobá únicamente después de confirmar que la solicitud pertenece al titular de la cuenta.",
+  "op.google.correo": "Google que solicita acceso",
+  "op.google.aprobar": "Aprobar y vincular",
+  "op.google.rechazar": "Rechazar",
+  "op.google.sinPendientes": "No hay vinculaciones pendientes.",
+  "op.google.actualizar": "Actualizar solicitudes",
+  "op.google.confirmar": "¿Confirmaste que {email} pertenece a {nombre}? Aprobar permitirá entrar con ese Google a su cuenta existente.",
+  "op.google.confirmarRechazo": "¿Rechazar la solicitud de {email} para {nombre}?",
+  "op.google.aprobada": "Google vinculado. El cliente ya puede ingresar con ese Google; su segundo factor, si lo tiene, sigue activo.",
+  "op.google.rechazada": "Solicitud rechazada. No se vinculó Google.",
   "op.titulo": "Cuentas y pagos",
   "op.ayuda": "Revisá primero las solicitudes de cuenta. Para acreditar saldo, verificá el pago en el banco; la recarga mínima es Bs {minimo}.",
   "op.falta2fa": "Para acreditar saldo necesitás la verificación en dos pasos activa. Activala más abajo y volvé a entrar.",

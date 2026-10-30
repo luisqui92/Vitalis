@@ -164,7 +164,7 @@ async function pedir(ruta, req) {
   // Las rutas reales de alta con almacenamiento simulado: campos, permisos y rollback.
   const altas = {};
   const appAltas = Object.fromEntries(['get', 'post', 'patch'].map(m => [m, (p, ...h) => { altas[p] = h.at(-1); }]));
-  let creado, telefonoExiste = false, fallaCrear = false, codigoUsado = false, cuentaAutorizada = null;
+  let creado, telefonoExiste = false, fallaCrear = false, codigoUsado = false, cuentaAutorizada = null, revisionPendiente = false;
   Medico.create = async d => { if (fallaCrear) throw new Error('fallo simulado'); creado = d; return d; };
   const telefonos = { soloDigitos: p => String(p || '').replace(/\D/g, ''), buscarPorTelefono: async () => telefonoExiste ? { _id: 'vieja' } : null };
   const sesion = { tokenDeMedico: () => 'sesion', datosDeSesion: m => ({ phone: m.phone }) };
@@ -176,6 +176,7 @@ async function pedir(ruta, req) {
     '../services/ratelimit': {}, '../services/httpHelpers': { ErrorHttp, asyncRoute: wrap }, '../services/telefono': telefonos,
     '../services/sesionMedico': sesion, '../services/googleAcceso': google,
     '../services/googleAltaUnica': { intentar: async () => cuentaAutorizada },
+    '../services/googleRevision': { solicitar: async () => revisionPendiente },
     '../services/perfilesCuenta': cargar('services/perfilesCuenta.js', { './httpHelpers': { ErrorHttp } }),
   })(appAltas);
   cargar('modulos/estudiantes/rutas/cuenta.js', {
@@ -208,6 +209,13 @@ async function pedir(ruta, req) {
   });
   await prueba('Google no permite alta profesional sin matrícula', async () => {
     assert.equal((await alta('/medico/registro', { matricula: '' })).codigo, 400);
+  });
+  await prueba('solicitud de vinculación desde registro queda pendiente y no concede acceso', async () => {
+    const antes = creado; revisionPendiente = true;
+    const r = await alta('/medico/registro', { matricula: '', rol: 'admin' });
+    assert.equal(r.codigo, 200); assert.equal(r.datos.vinculacionPendiente, true);
+    assert.equal(r.datos.token, undefined); assert.equal(creado, antes);
+    revisionPendiente = false;
   });
   await prueba('excepción autorizada entra en la cuenta original sin crear otra ni cambiar sus datos', async () => {
     const antes = creado;
